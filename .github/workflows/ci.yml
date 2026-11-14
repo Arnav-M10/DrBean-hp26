@@ -111,3 +111,27 @@ jobs:
           else
             echo "not delivered yet: recorded as unrun, not as passed"
           fi
+
+  browser:
+    name: browser review, approved design and native replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python3 scripts/dev/launcher.py setup
+      - name: install pinned browser test dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: tests/integration
+      - name: install Chromium and system dependencies
+        run: node tests/integration/node_modules/playwright/cli.js install --with-deps chromium
+      - name: manual editor browser check
+        run: node tests/integration/web_manual_smoke.mjs
+      - name: real browser API and science workflow
+        run: |
+          export NODE_PATH="$PWD/tests/integration/node_modules"
+          export BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python"
+          node apps/web/check-backend.mjs
