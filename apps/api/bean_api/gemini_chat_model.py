@@ -23,6 +23,7 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, Field
 
 from .canonical import parse_json_strict
+from .gemini_tool_diagnostics import ToolCallValidationFailure
 from .providers import ProviderFailure
 
 _BOUND = 128 * 1024
@@ -33,6 +34,12 @@ _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.:-]{0,127}\Z")
 
 class _CancelledModelCall(Exception):
     """Bridge a pinned LangChain gather bug, never a retryable provider error."""
+
+
+class _SchemaValidationError(ValueError):
+    def __init__(self, reason, missing_fields=()):
+        self.reason, self.missing_fields = reason, tuple(missing_fields)
+        super().__init__(reason)
 
 
 def _json(value: Any) -> str:
@@ -94,21 +101,22 @@ def _validate_schema(value: Any, schema: dict[str, Any], root: dict[str, Any] | 
              "number": lambda: type(value) in (int, float), "boolean": lambda: type(value) is bool,
              "null": lambda: value is None}
     if kind is not None and (kind not in kinds or not kinds[kind]()):
-        raise ValueError("Incorrect JSON value type")
+        raise _SchemaValidationError("wrong_argument_type")
     if "enum" in schema and _json(value) not in {_json(item) for item in schema["enum"]}:
         raise ValueError("Value outside the declared enumeration")
     if "const" in schema and _json(value) != _json(schema["const"]):
         raise ValueError("Incorrect constant")
     if type(value) is dict:
         properties = schema.get("properties", {})
-        if set(schema.get("required", ())) - value.keys():
-            raise ValueError("Required tool argument missing")
+        missing = set(schema.get("required", ())) - value.keys()
+        if missing:
+            raise _SchemaValidationError("missing_required", missing)
         if not schema.get("minProperties", 0) <= len(value) <= schema.get("maxProperties", _BOUND):
             raise ValueError("Incorrect object size")
         for key, item in value.items():
             child = properties.get(key, schema.get("additionalProperties", True))
             if child is False:
-                raise ValueError("Undeclared tool argument")
+                raise _SchemaValidationError("unknown_arguments")
             if isinstance(child, dict):
                 _validate_schema(item, child, root, depth + 1)
     if type(value) is list:
@@ -257,18 +265,29 @@ class GeminiChatModel(BaseChatModel):
 
         return model | RunnableLambda(parse)
 
+    def _tool_failure(self, reason, name=None, missing_fields=()):
+        declarations = {value["name"]: value["parameters_json_schema"] for value in map(json.loads, self.tools_json)}
+        return ToolCallValidationFailure(reason, declarations, tool_name=name, missing_fields=missing_fields)
+
     def _validate_arguments(self, name: str, arguments: Any) -> None:
         declarations = {value["name"]: value for value in map(json.loads, self.tools_json)}
-        if name not in declarations or type(arguments) is not dict:
-            raise ProviderFailure("provider_malformed_tool_call")
+        if name not in declarations:
+            raise self._tool_failure("unknown_tool")
+        if type(arguments) is not dict:
+            raise self._tool_failure("wrong_argument_type", name)
         try:
             _json(arguments)
             _validate_schema(arguments, declarations[name]["parameters_json_schema"])
+        except _SchemaValidationError as exc:
+            raise self._tool_failure(exc.reason, name, exc.missing_fields) from None
+        except (TypeError, ValueError, KeyError):
+            raise self._tool_failure("schema_constraint", name) from None
+        try:
             validator = dict(self.tool_validators).get(name)
             if validator is not None:
                 validator.model_validate(arguments, strict=True)
         except (TypeError, ValueError, KeyError):
-            raise ProviderFailure("provider_malformed_tool_call") from None
+            raise self._tool_failure("strict_validation", name) from None
 
     def _serialize(self, messages: list[BaseMessage]) -> tuple[list[types.Content], str | None]:
         contents, system, pending, seen = [], [], {}, set()
@@ -298,7 +317,7 @@ class GeminiChatModel(BaseChatModel):
                 contents.append(types.Content(role="user", parts=[types.Part(text=_text(message))]))
             elif isinstance(message, AIMessage):
                 if message.invalid_tool_calls:
-                    raise ProviderFailure("provider_malformed_tool_call")
+                    raise self._tool_failure("invalid_tool_call")
                 text = _text(message)
                 raw = message.additional_kwargs.get(_PARTS)
                 if raw is not None:
@@ -321,7 +340,7 @@ class GeminiChatModel(BaseChatModel):
                 for call, part in zip(message.tool_calls, function_parts, strict=True):
                     call_id = call.get("id")
                     if not isinstance(call_id, str) or not call_id or len(call_id) > 256 or call_id in seen:
-                        raise ProviderFailure("provider_malformed_tool_call")
+                        raise self._tool_failure("duplicate_id" if isinstance(call_id, str) and call_id in seen else "invalid_id", call["name"])
                     seen.add(call_id)
                     pending[call_id] = (call["name"], part.function_call.id)
                 contents.append(types.Content(role="model", parts=parts))
@@ -357,11 +376,11 @@ class GeminiChatModel(BaseChatModel):
                 call = part.function_call
                 self._validate_arguments(call.name, call.args)
                 if call.partial_args is not None or call.will_continue is not None:
-                    raise ProviderFailure("provider_malformed_tool_call")
+                    raise self._tool_failure("incremental_call", call.name)
                 call_id = call.id or (local_ids[len(calls)] if local_ids and len(local_ids) > len(calls)
                                       else "gemini-local-" + uuid4().hex)
                 if not isinstance(call_id, str) or not call_id or len(call_id) > 256 or call_id in ids:
-                    raise ProviderFailure("provider_malformed_tool_call")
+                    raise self._tool_failure("duplicate_id" if call_id in ids else "invalid_id", call.name)
                 calls.append({"name": call.name, "args": call.args, "id": call_id, "type": "tool_call"})
                 ids.append(call_id)
             raw.append(data)
@@ -371,7 +390,7 @@ class GeminiChatModel(BaseChatModel):
             raise ProviderFailure("provider_empty_response")
         if self.response_schema_json is not None:
             if calls:
-                raise ProviderFailure("provider_malformed_tool_call")
+                raise self._tool_failure("invalid_tool_call")
             try:
                 value = parse_json_strict(text, max_bytes=_BOUND)
                 _validate_schema(value, json.loads(self.response_schema_json))

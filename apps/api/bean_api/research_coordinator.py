@@ -616,7 +616,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
 
     async def run_scientific_operation(proposal_id: str, proposal_digest: str,
                                        review_id: str, review_digest: str, runtime: ToolRuntime) -> dict[str, Any]:
-        """Pause for canonical approval; execute/reconcile only that child."""
+        """Copy all four prepared fields verbatim; pause for approval; execute/reconcile that child."""
         _references([proposal_id])
         review = _review(await _await(ports.read_review(proposal_id)), proposal_id)
         if (proposal_digest, review_id, review_digest) != (
@@ -705,7 +705,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     async def publish_research_report(evidence_ids: list[str], text: str,
             next_action: Literal["stop", "clarify", "review_design", "review_observation", "review_plan"],
             runtime: ToolRuntime) -> Command:
-        """Publish an evidence-bound report and proposed next action."""
+        """Publish evidence + next_action. text must be exactly 'The evidence has a conditional scope.'."""
         _references(evidence_ids)
         # Validate commentary against the complete bounded facts, not the view.
         facts = {ref: await complete_fact(ref) for ref in evidence_ids}
@@ -834,12 +834,12 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     graph = create_deep_agent(model=model, tools=typed, middleware=[NoFilesystem(), planning, Boundary()],
         state_schema=ResearchState, backend=StateBackend(), checkpointer=checkpointer,
         subagents=[], skills=None, memory=None, store=None, cache=None, debug=False,
-        system_prompt=("Use canonical IDs. Plan; prepare; human approve; run; use canonical_evidence; report/clarify. "
-            "Batch only independent todos+prepare/report. Snapshots keep prior facts. Clarify missing assumptions; invent nothing. "
+        system_prompt=("Canonical IDs. Plan; prepare; human approve; run; use canonical_evidence; report/clarify. "
+            "Batch only independent todos+prepare/report. Clarify missing assumptions; invent nothing. "
             "A counterexample is compatible and strictly outside the CLOSED claim. Bounded misses prove nothing. "
             "Design: distinct checked candidates, reviewed times/allowance, separate approval, positive checked margin. "
             "Keep history and readings' time/allowance/origin. Exclusions aren't global. Execution/binding/verification/replay differ. "
-            "Cite evidence: 'The evidence has a conditional scope.'"))
+            "Report text exactly 'The evidence has a conditional scope.'"))
     inventories = [set(n.data.tools_by_name) for n in graph.get_graph().nodes.values()
                    if hasattr(n.data, "tools_by_name")]
     if inventories != [set(TOOLS)]:
