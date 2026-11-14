@@ -267,8 +267,13 @@ try {
   assert.equal(followupRun.state, 'completed', JSON.stringify(followupRun))
   const followupEvidence = await api(`/records/${followupRun.scenarios[0].result_id}`)
   assert.equal(followupEvidence.body.result.candidate_results.length, 2)
-  assert.equal(followupEvidence.body.result.native_replay.operation, 'review')
+  assert.equal(followupEvidence.body.result.native_replay.operation, 'recheck')
   assert.equal(followupEvidence.body.result.native_replay.dataset_origin, 'hypothetical')
+  await page.fill('#run-id', followupId)
+  await page.getByRole('button', { name: 'Open or refresh run', exact: true }).click()
+  await page.getByRole('region', { name: 'Follow-up candidate checks', exact: true }).waitFor()
+  assert.match(await page.locator('#backend-investigations').textContent(), /Observation origin: hypothetical/)
+
   assert.equal((await api(`/records/${positive.suggestion.id}`)).digest, positive.suggestion.digest)
 
   // A changed observation must create new reviewed identities and actual computation.
