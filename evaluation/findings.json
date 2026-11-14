@@ -1030,6 +1030,54 @@
           }
         }
       ]
+    },
+    {
+      "id": "F-LEDGER-TOTALS",
+      "title": "Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity",
+      "minimal_input": "isolated store; reserve 100/20; reconcile usage {input 100, output 20, thought 0, total 5000} (the shape providers.sanitize_usage produces; Gemini totals include e.g. tool-use prompt tokens)",
+      "expected": "at least the reported total is charged (conservative totals)",
+      "observed": "main charges 120 tokens for a reported total of 5000",
+      "impact": "no spend today (dispatch disabled); before live activation the shared cap could be exceeded",
+      "owner": "2",
+      "severity": "P2",
+      "status": "fixed_pending_retest",
+      "command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail",
+      "evidence": {
+        "tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"
+      },
+      "retests": [
+        {
+          "at_commit": "preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in",
+          "result": "fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges.",
+          "evidence": {
+            "command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "F-LEDGER-MALFORMED",
+      "title": "Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError",
+      "minimal_input": "isolated store; reconcile usage {input_tokens: '5000'}; then reserve again",
+      "expected": "refused at reconciliation, or later reservations refused with an explicit accounting error",
+      "observed": "main stores it; the next begin_attempt raises TypeError: '>' not supported between 'str' and 'int' (still fails closed: no new spending admitted, history untouched)",
+      "impact": "fails closed but as an unhandled error; providers.sanitize_usage keeps the live path to integers, so reachable only through other callers or old rows",
+      "owner": "2",
+      "severity": "P2",
+      "status": "fixed_pending_retest",
+      "command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail",
+      "evidence": {
+        "tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"
+      },
+      "retests": [
+        {
+          "at_commit": "preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in",
+          "result": "fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges.",
+          "evidence": {
+            "command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"
+          }
+        }
+      ]
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14.",

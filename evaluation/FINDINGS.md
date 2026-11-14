@@ -40,6 +40,8 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 | F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
 | F-RESTART-EPERM | P0 | 2 | open | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
 | H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
+| F-LEDGER-TOTALS | P2 | 2 | fixed_pending_retest | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
+| F-LEDGER-MALFORMED | P2 | 2 | fixed_pending_retest | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
 
@@ -314,6 +316,24 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Expected:** baselines complete; cancellation leaves no live scientific or guard process
 - **Observed:** hero and changed-input baselines fail with worker_failed / scientific_attempt_failed; run_bounded with a trivial adapter raises PermissionError at science.py:180 (`os.killpg(process.pid, SIGKILL)` in finally, which catches only ProcessLookupError); cancellation without the barrier leaves 1 live child. Darwin returns EPERM for killpg on a group whose only member is an exited, unreaped leader (standalone repro, CPython 3.11.17 and 3.13.18); Linux returns ESRCH, so Linux validation passed. The exception also skips the rest of the cleanup, including closing the parent lifeline, which is why the guard survives a cancellation. A one-line local diagnostic patch catching PermissionError makes the same lane pass 6/7 (as on main) and cancel/restart with the barrier pass.
 - **Evidence:** {"readme": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md", "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/killpg-eperm-repro.py", "results": "evaluation/results/previews/backend-restart-recovery-c231be4"}
+
+## F-LEDGER-TOTALS (P2, owner 2, fixed_pending_retest)
+
+- **Input:** isolated store; reserve 100/20; reconcile usage {input 100, output 20, thought 0, total 5000} (the shape providers.sanitize_usage produces; Gemini totals include e.g. tool-use prompt tokens)
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail`
+- **Expected:** at least the reported total is charged (conservative totals)
+- **Observed:** main charges 120 tokens for a reported total of 5000
+- **Evidence:** {"tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"}
+- **Retest at preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in:** fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges. (evidence: {"command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"})
+
+## F-LEDGER-MALFORMED (P2, owner 2, fixed_pending_retest)
+
+- **Input:** isolated store; reconcile usage {input_tokens: '5000'}; then reserve again
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail`
+- **Expected:** refused at reconciliation, or later reservations refused with an explicit accounting error
+- **Observed:** main stores it; the next begin_attempt raises TypeError: '>' not supported between 'str' and 'int' (still fails closed: no new spending admitted, history untouched)
+- **Evidence:** {"tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"}
+- **Retest at preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in:** fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges. (evidence: {"command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"})
 
 ## Check-level finding ids (raised only when the check fails)
 
