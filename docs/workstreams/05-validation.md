@@ -6,9 +6,9 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 
 | Item | Value |
 |---|---|
-| Branch | `claude/adversarial-validation` (pushed), started from `586fb9b`, merged `origin/main` `adac945` as `1862ebf` |
+| Branch | `claude/adversarial-validation` (pushed); PR #8 merged it into `main` up to `4ea7cb3`; `main` `9cc90e0` merged back as `7be805a` |
 | Integration branch | `main` (GitHub default since the PR #3/#4 merges) |
-| Last recorded lane run | harness `d2d3c53` against application `adac945` (`evaluation/results/lane-runs.jsonl`, last line) |
+| Last recorded lane run | harness `8bb1fbe` against merged `main` `9cc90e0` (acceptance: science fails on this Mac, F-MAC-NPROC; diagnostic: `evaluation/results/previews/main-8bb1fbe/`) |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 |
 | AI mode | zero external model dispatch, verified by the egress guard in API, worker and pytest; live Gemini `NOT_RUN` |
 | Findings | `evaluation/findings.json` → `evaluation/FINDINGS.md` (open P0: F-MAC-NPROC, F-BASELINE-DISCOVERY on main, F-NATIVE-BYTES pending retest, F-FOLLOWUP-FEEDBACK) |
@@ -64,7 +64,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
-| `backend/browser-baseline` | `cc779bf` | plain: hero fails (F-MAC-NPROC). diagnostic: discovery + baseline replay pass; changed input, concurrency, design authority, zero dispatch pass; hero blocked by F-DESIGN-SOURCE-ARTIFACTS; follow-up per-candidate blocked (F-FOLLOWUP-FEEDBACK); cancel/restart unobservable (computation < 1 s). |
+| `backend/browser-baseline` (now merged as PR #6) | `cc779bf` | plain: hero fails (F-MAC-NPROC). diagnostic: discovery + baseline replay pass; changed input, concurrency, design authority, zero dispatch pass; hero blocked by F-DESIGN-SOURCE-ARTIFACTS; follow-up per-candidate blocked (F-FOLLOWUP-FEEDBACK); cancel/restart unobservable (computation < 1 s). |
 
 ## Next exact actions
 

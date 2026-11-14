@@ -582,8 +582,10 @@ def check_design(checks: Checks, design: dict, pair: list[dict], base: dict, *, 
         checks.expect(f"{prefix}_no_selection_without_separation", result.get("selected_time") is None,
                       f"selected_time {result.get('selected_time')}")
     else:
+        seam = result.get("reason_code") == "invalid_input" and bool(request.get("source_artifact_ids"))
         checks.add(f"{prefix}_checked_tier", "failed" if tier not in ("numerical_guidance", "unavailable") else
-                   "blocked", f"design tier {tier}, reason {result.get('reason_code')}", finding="F-DESIGN-TIER")
+                   "blocked", f"design tier {tier}, reason {result.get('reason_code')}",
+                   finding="F-DESIGN-SOURCE-ARTIFACTS" if seam else "F-DESIGN-TIER")
     return info
 
 

@@ -1,9 +1,9 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T04:40:00Z",
-  "application_code_commit": "adac9452 (origin/main, merged into claude/adversarial-validation as 1862ebf)",
-  "observed_at_harness_commit": "d2d3c53",
+  "updated_at": "2026-11-14T05:00:00Z",
+  "application_code_commit": "9cc90e0 (origin/main incl. PR #6 browser-baseline, #7 Owner 4, #8 this branch to 4ea7cb3)",
+  "observed_at_harness_commit": "8bb1fbe",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -71,7 +71,7 @@
       "id": "F-BASELINE-DISCOVERY",
       "severity": "P0",
       "owner": "1 (producer) and 2 (adapter wiring)",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "title": "Counterdex has no bounded baseline candidate-discovery operation (investigate)",
       "minimal_input": "evaluation/cases/science/hero-v1.json",
       "command": "PYTHONPATH=packages/groundwork_adapter python3.11 -c 'import counterdex; print(counterdex.__all__)'",
@@ -93,6 +93,13 @@
           "result": "Fixed on that branch: ordinary HTTP baseline returns certified_counterexample with two exact candidates in the admitted domain, the outside one freshly valid (ke = 101/1016, strictly below 0.10), both compatible per the independent 80-digit oracle; the counterdex.application-bundle.v1 baseline packet downloads and passes fresh replay-native with the authenticated anchor. Close after it merges to main and passes on the Mac without diagnostics.",
           "evidence": {
             "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc"
+          }
+        },
+        {
+          "at_commit": "main 9cc90e0 (merged as 7be805a, harness 8bb1fbe) with diagnostic relax_nproc",
+          "result": "Integrated on main via PR #6; the diagnostic run of main reproduces the preview: certified counterexample, exact in-domain candidates, baseline replay-native passes. Close after a non-diagnostic Mac run (blocked only by F-MAC-NPROC) or a CI Linux run of this lane.",
+          "evidence": {
+            "results": "evaluation/results/previews/main-8bb1fbe/relax_nproc"
           }
         }
       ]
@@ -124,6 +131,13 @@
           "result": "Native bytes, X-Artifact-SHA256, length, media type and the separate anchor route all verified over HTTP for baseline and design packets; altered bytes and wrong anchors rejected. Pending a non-diagnostic run on main.",
           "evidence": {
             "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc"
+          }
+        },
+        {
+          "at_commit": "main 9cc90e0 (merged as 7be805a, harness 8bb1fbe) with diagnostic relax_nproc",
+          "result": "Integrated on main; diagnostic run verifies bytes, header, length, anchors, tamper and wrong-anchor rejection for baseline and design packets.",
+          "evidence": {
+            "results": "evaluation/results/previews/main-8bb1fbe/relax_nproc"
           }
         }
       ]
@@ -376,6 +390,13 @@
           "evidence": {
             "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/plain"
           }
+        },
+        {
+          "at_commit": "main 9cc90e0 (merged as 7be805a, harness 8bb1fbe)",
+          "result": "Still present on the merged main (browser-baseline integrated): RS-HERO-FULL and RS-CHANGED-INPUT fail with scientific_runtime_unavailable on this Mac without diagnostics. Owner 1 recorded an isolated reproduction on codex/science-next (bad5e9f); Owner 4's CI adds scripts/release/user_conditions_check.py for it.",
+          "evidence": {
+            "attempts": "evaluation/results/attempts.jsonl at 8bb1fbe"
+          }
         }
       ]
     },
@@ -430,7 +451,16 @@
       "evidence": {
         "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-HERO-FULL isolation checks)",
         "suggested_seam": "do not project the baseline application packet as a pair-reuse source_artifact_digest (pass it as historical context), or teach the engine to accept baseline certificates; and return a specific reason code instead of a silent numerical fallback"
-      }
+      },
+      "retests": [
+        {
+          "at_commit": "main 9cc90e0 (merged as 7be805a, harness 8bb1fbe) with diagnostic relax_nproc",
+          "result": "Reproduced on main: documented request with source_artifact_ids -> numerical_guidance/invalid_input; without them -> checked separation at 8 h with fresh replay.",
+          "evidence": {
+            "results": "evaluation/results/previews/main-8bb1fbe/relax_nproc"
+          }
+        }
+      ]
     },
     {
       "id": "F-SIBLING-FORKS",
