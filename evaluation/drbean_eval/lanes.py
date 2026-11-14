@@ -380,9 +380,10 @@ def run_pytest_lane(lane: str, repo: str, results_dir: str, *, app_repo: str | N
         archive = os.path.join(work, "stack-guards")
         os.makedirs(archive)
         junit = os.path.join(work, "junit.xml")
+        evidence = os.path.join(work, "evidence")
         env = _strip_credentials(dict(os.environ))  # a real key can never reach a test; tests add labelled dummies
         env.update({"DRBEAN_SESSION_GUARD_LOG": session_log, "DRBEAN_STACK_GUARD_ARCHIVE": archive,
-                    "DRBEAN_BACKEND_PYTHON": backend, "PYTHONDONTWRITEBYTECODE": "1"})
+                    "DRBEAN_BACKEND_PYTHON": backend, "PYTHONDONTWRITEBYTECODE": "1", "DRBEAN_EVIDENCE_DIR": evidence})
         argv = [backend, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-o", "junit_family=xunit2",
                 f"--junitxml={junit}", "-m", spec["pytest_marker"], *extra_args, "tests/integration"]
         started, clock = _now(), time.monotonic()
@@ -406,9 +407,11 @@ def run_pytest_lane(lane: str, repo: str, results_dir: str, *, app_repo: str | N
             "preconditions": preconditions, "results": results, "requests_and_usage": accounting,
             "output_tail": tail[-12:],
             "status": "passed" if ok else "failed" if exit_code is not None else "error"})
+        emitted = {name: os.path.join(evidence, name) for name in sorted(os.listdir(evidence))} \
+            if os.path.isdir(evidence) else {}
         return _store(report, results_dir, {"junit.xml": junit,
-                                            "guard-summary.json": _write_json(work, "guard-summary.json",
-                                                                              accounting)})
+                                            "guard-summary.json": _write_json(work, "guard-summary.json", accounting),
+                                            **emitted})
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

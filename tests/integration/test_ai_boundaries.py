@@ -17,6 +17,7 @@ import asyncio
 import hashlib
 import io
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -486,6 +487,26 @@ def adaptive(observed):
                                            "next_action": "stop"}
 
 
+def _emit(name: str, value) -> None:
+    """Machine-readable evidence for the lane report, written only when a lane runner asks (DRBEAN_EVIDENCE_DIR)."""
+    directory = os.environ.get("DRBEAN_EVIDENCE_DIR")
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, name), "w", encoding="utf-8") as handle:
+            json.dump(value, handle, indent=1, sort_keys=True, default=str)
+
+
+def _versions(*names):
+    import importlib.metadata
+    out = {}
+    for name in names:
+        try:
+            out[name] = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            out[name] = None
+    return out
+
+
 def test_actual_graph_offers_only_permitted_tools_and_records_controlled_lane():
     tools = Tools("certified_counterexample")
     model = scripted_model(adaptive)
@@ -496,6 +517,12 @@ def test_actual_graph_offers_only_permitted_tools_and_records_controlled_lane():
     assert result.runtime["execution_lane"] == "controlled_model"
     assert result.runtime.get("live_qualified") is False
     assert [e["type"] for e in tools.events][0] == "runtime_inventory"
+    _emit("deepagents-inventory.json", {
+        "evidence": "actual create_deep_agent graph driven by a scripted controlled model (not Gemini, not live)",
+        "versions": _versions("deepagents", "langchain", "langchain-core", "langgraph"),
+        "offered_tools": model.offered, "status": result.status, "runtime": result.runtime,
+        "tool_event_types": [event["type"] for event in tools.events],
+        "executed": tools.executed, "skipped": tools.skipped})
 
 
 def test_same_objective_different_evidence_changes_the_permitted_disposition():
@@ -505,6 +532,14 @@ def test_same_objective_different_evidence_changes_the_permitted_disposition():
     assert first.status == second.status == "completed"
     assert (witnessed.executed, witnessed.skipped) == (["baseline"], [("optional", "sufficient_evidence")])
     assert (inconclusive.executed, inconclusive.skipped) == (["baseline", "optional"], [])
+    _emit("deepagents-adaptivity-controlled.json", {
+        "evidence": "scripted controlled model: regression evidence that the graph routes different returned evidence "
+                    "to different permitted actions; NOT live model adaptivity",
+        "objective": "Decide whether the reviewed comparison is still needed, then explain.",
+        "conditions": [{"baseline_outcome": "certified_counterexample", "executed": witnessed.executed,
+                        "skipped": witnessed.skipped},
+                       {"baseline_outcome": "no_counterexample_found", "executed": inconclusive.executed,
+                        "skipped": inconclusive.skipped}]})
 
 
 def test_forbidden_tool_request_fails_without_any_side_effect():
