@@ -6,13 +6,13 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 
 | Item | Value |
 |---|---|
-| Branch | `claude/adversarial-validation` (PR #22). `main` `2d2993d` (PRs #24-#26: browser checkpoints, follow-up browser, science review incl. Owner 2's ledger rewrite) merged in as `f29066d`; nothing reverted. Final candidate `e791e91` (application code = `main` `2d2993d`) |
+| Branch | `claude/adversarial-validation` (PR #22). `main` `22c9a24` (PR #27: controlled source review, browser source workflow, launcher) merged in as `1bc3604`, after `2d2993d` as `f29066d`; nothing reverted. Final candidate `1bc3604` (application code = `main` `22c9a24`) |
 | Integration branch | `main` (GitHub default since the PR #3/#4 merges) |
-| Last recorded lane run | Candidate `e791e91`, this Mac, no diagnostics: harness path 7/7 (new: engine runtime = repository source, oracle-confirmed positive separation, executed no-separation design, unresolved follow-up from the engine enclosure), Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 controls (qualified record), integration 72 passed + 28 xfail, backend 588, engine 292, web 30. Record: `evaluation/results/integration/qualification-e791e91.md`. Labelled preview with PRs #20/#27/#28: lane 7/7, integration 96/96, backend 688 + 1 cross-PR failure |
+| Last recorded lane run | Candidate `1bc3604`, this Mac, no diagnostics: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls, integration 73 passed + 27 xfail (source review now passes on main), backend 619, engine 292, web 31. Record: `evaluation/results/integration/qualification-1bc3604.md` (supersedes `e791e91`, which qualified `main` `2d2993d`) |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 from Owner 4's `.venv-engine` (created by `launcher.py setup`); checkout under iCloud-synced `~/Documents` (see F-LAUNCHER-HIDDEN-PTH) |
 | AI mode | zero external model dispatch, verified by the egress guard in API, worker and pytest; live Gemini `NOT_RUN` |
-| Findings | `evaluation/findings.json` -> `evaluation/FINDINGS.md`. No open P0. New: H-GATE-CONTROLS-DIRTY (P1, mine, fixed), F-EXPLANATION-CHECKED-GATES and F-NARRATION-OVERSUPPRESSION (P2, Owner 3), H-SOURCE-RETRY-KEY (P2, mine, fixed). Closed: F-LEDGER-TOTALS/MALFORMED. Open: explanation gaps (fixed in PR #28), F-NARRATION-OVERSUPPRESSION (PR #28 vs PR #20), F-REVIEW-MATERIALIZATION (P1, needs PR #20 on main), F-TEST-VAR-LEAK (reproduced), F-SIBLING-FORKS |
-| Release gate | `cli.py gate --require release` on the evidence commit after `e791e91`: `evaluation/results/gates-latest.json`. Scientific acceptance only; not Owner 4's product release, not live Gemini |
+| Findings | `evaluation/findings.json` -> `evaluation/FINDINGS.md`. No open P0. Closed this round: F-LEDGER-TOTALS/MALFORMED, F-REVIEW-MATERIALIZATION (on main), H-GATE-CONTROLS-DIRTY and H-SOURCE-RETRY-KEY (harness). Open: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES (P2, Owner 3, fixed in PR #28), F-NARRATION-OVERSUPPRESSION (P2, Owner 3, PR #28 vs PR #20), F-TEST-VAR-LEAK (P2, Owner 2, reproduced), F-SIBLING-FORKS (P2, Owner 2) |
+| Release gate | `cli.py gate --require release` on the evidence commit after `1bc3604`: `evaluation/results/gates-latest.json`. Scientific acceptance of `main` `22c9a24` only; not Owner 4's product release, not live Gemini |
 
 ## Gate evidence (current)
 
@@ -89,7 +89,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 1. Owner 3: resolve F-NARRATION-OVERSUPPRESSION before the second of PR #20 / PR #28 merges (PR #20's coordinator test narration is withheld by PR #28's language).
 2. When PR #28 merges: the 27 explanation-gap cases become ordinary assertions automatically (declared policy); confirm they pass on main and close the four F-EXPLANATION findings by retest.
-3. When PR #20 merges: `tests/integration/test_source_review_science.py` runs fully on main; close F-REVIEW-MATERIALIZATION by retest.
+3. Done: PR #27 brought controlled source review to main; the source-review test passes there and F-REVIEW-MATERIALIZATION is closed by retest.
 4. Any later relevant code change: refresh `.venv-engine` if the engine changed, then rerun both launch paths, controls, integration and the gate on a clean candidate.
 
 ## Conditional future work (not authorized now)

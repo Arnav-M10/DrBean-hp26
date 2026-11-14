@@ -2,8 +2,8 @@
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
   "updated_at": "2026-11-14",
-  "application_code_commit": "2d2993d",
-  "observed_at_harness_commit": "e791e91",
+  "application_code_commit": "22c9a24",
+  "observed_at_harness_commit": "1bc3604",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -127,6 +127,18 @@
               "att_9c18ee097daa4f73",
               "att_6ca787bfe84048e7",
               "att_690401b8bcf048c3"
+            ]
+          }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls.",
+          "evidence": {
+            "attempts": [
+              "att_b6fc5431663f4693",
+              "att_f66513d7ec274c82",
+              "att_917faf93b8a14f96",
+              "att_17ae63064bb84863"
             ]
           }
         }
@@ -562,7 +574,7 @@
       "id": "F-REVIEW-MATERIALIZATION",
       "severity": "P1",
       "owner": "2",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "An accepted intake review creates no dataset association (source values never reach execution)",
       "minimal_input": "controlled clean proposal, every field confirmed",
       "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k clean_proposal_stays_unreviewed",
@@ -586,6 +598,13 @@
           "result": "Not drivable over HTTP on main without a proposal source (controlled intake is PR #20). On the labelled combined preview (this branch + PR #20/#27/#28) review -> materialization associates the source and the corrected value reaches a separately approved real run (tests/integration/test_source_review_science.py passes there). Close when PR #20 merges and that test passes on main.",
           "evidence": {
             "preview": "evaluation/results/previews/combined-6a69a55-pr20-pr27-pr28"
+          }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Closed by retest on main: tests/integration/test_source_review_science.py passes on the candidate (controlled proposal with explicit authorship and zero provider attempts; same-key retry returns the same record; a human correction kept beside the original; materialization binds review -> dataset -> problem, keeps source linkage and the original spelling, is idempotent and grants no approval; a separately approved real run on the corrected inputs; native download, fresh replay and tamper controls; zero external attempts).",
+          "evidence": {
+            "pytest": "73 passed, 27 xfailed at 1bc3604"
           }
         }
       ]
@@ -821,6 +840,18 @@
               "att_690401b8bcf048c3"
             ]
           }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls.",
+          "evidence": {
+            "attempts": [
+              "att_b6fc5431663f4693",
+              "att_f66513d7ec274c82",
+              "att_917faf93b8a14f96",
+              "att_17ae63064bb84863"
+            ]
+          }
         }
       ]
     },
@@ -911,6 +942,11 @@
         {
           "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
           "result": "Reproduced twice at the candidate: with var/ absent, `BEAN_COUNTERDEX_PYTHON=.venv-engine/bin/python .venv/bin/python -m pytest -q tests --ignore=tests/integration` (588 passed) leaves an empty var/artifacts in the checkout.",
+          "evidence": {}
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Reproduced again at 1bc3604: the backend suite (619 passed) leaves an empty var/artifacts in the checkout.",
           "evidence": {}
         }
       ]
@@ -1147,6 +1183,18 @@
               "att_690401b8bcf048c3"
             ]
           }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls.",
+          "evidence": {
+            "attempts": [
+              "att_b6fc5431663f4693",
+              "att_f66513d7ec274c82",
+              "att_917faf93b8a14f96",
+              "att_17ae63064bb84863"
+            ]
+          }
         }
       ]
     },
@@ -1244,6 +1292,13 @@
           "evidence": {
             "pytest": "72 passed, 28 xfailed at e791e91"
           }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate.",
+          "evidence": {
+            "pytest": "73 passed, 27 xfailed"
+          }
         }
       ]
     },
@@ -1283,6 +1338,13 @@
           "evidence": {
             "pytest": "72 passed, 28 xfailed at e791e91"
           }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate.",
+          "evidence": {
+            "pytest": "73 passed, 27 xfailed"
+          }
         }
       ]
     },
@@ -1321,6 +1383,13 @@
           "result": "Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there).",
           "evidence": {
             "pytest": "72 passed, 28 xfailed at e791e91"
+          }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate.",
+          "evidence": {
+            "pytest": "73 passed, 27 xfailed"
           }
         }
       ]
@@ -1376,6 +1445,18 @@
               "att_9c18ee097daa4f73",
               "att_6ca787bfe84048e7",
               "att_690401b8bcf048c3"
+            ]
+          }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls.",
+          "evidence": {
+            "attempts": [
+              "att_b6fc5431663f4693",
+              "att_f66513d7ec274c82",
+              "att_917faf93b8a14f96",
+              "att_17ae63064bb84863"
             ]
           }
         }
@@ -1507,6 +1588,13 @@
           "evidence": {
             "pytest": "72 passed, 28 xfailed at e791e91"
           }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate.",
+          "evidence": {
+            "pytest": "73 passed, 27 xfailed"
+          }
         }
       ]
     },
@@ -1536,6 +1624,18 @@
           "evidence": {
             "controls": "evaluation/results/controls.jsonl (tested_commit e791e91)"
           }
+        },
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls.",
+          "evidence": {
+            "attempts": [
+              "att_b6fc5431663f4693",
+              "att_f66513d7ec274c82",
+              "att_917faf93b8a14f96",
+              "att_17ae63064bb84863"
+            ]
+          }
         }
       ]
     },
@@ -1555,7 +1655,13 @@
         "tests": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept (strict xfail under the declared policy; passes on main)",
         "combined_backend": "1 failed, 688 passed at local merge 6a69a55"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named)",
+          "result": "Main 22c9a24 has PR #27's source review but neither PR #20's coordinator change nor PR #28; the conflict between those two open PRs is unchanged.",
+          "evidence": {}
+        }
+      ]
     },
     {
       "id": "H-SOURCE-RETRY-KEY",
