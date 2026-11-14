@@ -20,6 +20,7 @@ def research_capabilities(settings, provider_config=None):
     factory = importlib.util.find_spec("bean_api.research_controlled") is not None
     controlled = settings.research_mode == "controlled" and factory
     live = False
+    readiness_reason = None
     if settings.research_mode == "live" and getattr(provider_config, "mode", None) == "live":
         try:
             provider_config.check_ready()
@@ -28,14 +29,20 @@ def research_capabilities(settings, provider_config=None):
             from .providers import ProviderFailure
             if not isinstance(error, ProviderFailure):
                 raise
+            readiness_reason = error.code
     reason = None if controlled or live else "research_disabled" if settings.research_mode == "disabled" else "live_coordination_not_configured" if settings.research_mode == "live" else "controlled_policy_unavailable"
     return {"implemented": True, "registered": True, "configured": controlled or live,
+        "configured_mode": settings.research_mode,
+        "readiness": {"state": "configured" if controlled or live else "disabled" if settings.research_mode == "disabled" else "unavailable",
+                      "reason": readiness_reason or reason},
         "execution_mode": "controlled" if controlled else "live" if live else "disabled", "dispatch_enabled": controlled or live,
         "contract_version": "DB-RESEARCH-1", "graph_version": "research-graph.v1",
         "checkpoint_version": "research-checkpoint.v1", "persistence": "application_sqlite",
         "review_resume": True, "unavailable_reason": reason,
         "supported_operations": ["investigation", "checked_pair_design"] if controlled or live else [],
-        "deferred_operations": ["observation", "design_amendment", "restart_continuation"],
+        "deferred_operations": ["observation", "design_amendment"],
+        "checkpoint_continuation": {"implemented": True, "scope": "reconciled_same_action_committed_tools",
+                                    "uncertain_provider_requests": "not_replayed"},
         "restart_qualification": "not_run",
         "session_allocation_required": True, "default_live_allocation": 0,
         "session_limits_policy": "research-session-limits.v2", "session_limits": {"logical_turns": 16, "tool_calls": 24, "child_count": 4},
@@ -98,12 +105,25 @@ class ResearchRunner:
                 result = await graph.start()
             else:
                 values = previous.checkpoint.get("channel_values", {})
-                if action["resume_required"]:
-                    result = await graph.resume(new_action=values.get("action_id") != context.action_id)
+                if values.get("action_id") == context.action_id:
+                    # Reconciliation preserves this action and all consumed
+                    # admission. Only committed tools/terminal results can be
+                    # continued; a pending model request is never replayed.
+                    result = await graph.continue_pending()
+                elif action["resume_required"]:
+                    try:
+                        result = await graph.resume(new_action=True)
+                    except CoordinatorFailure as error:
+                        if error.code != "research_not_awaiting_review":
+                            raise
+                        # Pending checkpoint writes can contain this action's
+                        # committed update while the raw checkpoint is older.
+                        # The facade reconstructs and validates the binding.
+                        result = await graph.continue_pending()
                 elif values.get("research_terminal") and values.get("action_id") != context.action_id:
                     result = await graph.advance()
                 else:
-                    raise DomainError("research_checkpoint_reconciliation_required", "No safe committed graph continuation is available.", 409)
+                    result = await graph.continue_pending()
             if result["awaiting_child"]:
                 pending = next(i for i in result["interrupts"] if i["kind"] == "canonical_scientific_child")
                 self.service.release(context, "waiting_child", waiting_job_id=pending["job_id"])
@@ -122,7 +142,16 @@ class ResearchRunner:
             known = isinstance(error, (DomainError, CoordinatorFailure, ProviderFailure, LedgerBudgetExceeded))
             code = getattr(error, "code", "research_runtime_failure") if known else "research_timeout" if isinstance(error, asyncio.TimeoutError) else "research_permission_failure" if isinstance(error, PermissionError) else "research_runtime_failure"
             try:
-                self.service.release(context, "needs_reconciliation" if "reconcil" in code else "failed", error_code=code)
+                # Retention is still fenced by the active lease and never
+                # starts a model/scientific operation or renews any admission.
+                await ports.publish_fallback_report(code)
+            except Exception:
+                # Preserve the original execution failure even if report
+                # retention is unavailable (for example after lease loss).
+                pass
+            try:
+                recovery = "reconcil" in code or code == "research_model_outcome_unrecoverable"
+                self.service.release(context, "needs_reconciliation" if recovery else "failed", error_code=code)
             except DomainError:
                 pass
         finally:
