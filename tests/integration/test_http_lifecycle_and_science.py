@@ -45,11 +45,10 @@ def test_cross_workspace_records_are_invisible_and_unusable(module_stack):
     dataset = mine.post(f"/workspaces/{workspace}/datasets", HERO["dataset"])
     problem = mine.post(f"/workspaces/{workspace}/problems", {**HERO["problem"], "dataset_id": dataset["id"],
                                                               "dataset_digest": dataset["digest"]})
-    plan = mine.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"], "plan": {
-        "schema_version": "DB-SC-1", "problem_id": problem["id"], "problem_digest": problem["digest"],
-        "dataset_id": dataset["id"], "scenarios": [{"id": "baseline", "problem_id": problem["id"],
-                                                     "problem_digest": problem["digest"], "kind": "baseline",
-                                                     "label": "isolation"}]}})
+    builder = sf.Flow(mine, None, str(module_stack.workdir) + "/isolation-scratch", science_python=None,
+                      package_dir=str(REPO / "packages" / "groundwork_adapter"))
+    plan = mine.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"],
+                                                        "plan": builder.plan_body(problem, dataset, "isolation")})
     approval = mine.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
                          "expected_current_revision_id": problem["id"], "accepted": True})
     for path in (f"/workspaces/{workspace}", f"/records/{dataset['id']}", f"/records/{plan['id']}",

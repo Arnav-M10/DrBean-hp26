@@ -44,7 +44,9 @@ KNOWN_OUTCOMES = {"certified_counterexample", "numerical_candidate", "no_counter
 # Reason code -> finding id, so a blocked baseline names its actual cause and owner.
 REASON_FINDINGS = {"groundwork_adapter_not_installed": "F-ADAPTER-SELECTION",
                    "baseline_producer_unavailable": "F-BASELINE-DISCOVERY",
-                   "scientific_runtime_missing": "F-RUNTIME-MISSING"}
+                   "scientific_runtime_missing": "F-RUNTIME-MISSING",
+                   # Observed cause on the team's Mac: RLIMIT_NPROC is per user, so the child cannot spawn CPython.
+                   "scientific_runtime_unavailable": "F-MAC-NPROC"}
 
 
 def F(text) -> Fraction:
@@ -138,6 +140,42 @@ class Flow:
         schema = ((self.openapi().get("components") or {}).get("schemas") or {}).get(name) or {}
         return set((schema.get("properties") or {}).keys()), set(schema.get("required") or [])
 
+    # -- request builders (one implementation for every scenario) ----------
+    def plan_body(self, problem: dict, dataset: dict, label: str) -> dict:
+        body = {"schema_version": "DB-SC-1", "problem_id": problem["id"], "problem_digest": problem["digest"],
+                "dataset_id": dataset["id"],
+                "scenarios": [{"id": "baseline", "problem_id": problem["id"], "problem_digest": problem["digest"],
+                               "kind": "baseline", "label": label[:128]}]}
+        props, _ = self.schema_properties("PlanBody")
+        if "scientific_profile" in props:  # Owner 2's strict Counterdex route needs profile + reviewed objective
+            body.update(scientific_profile=SCIENTIFIC_PROFILE, objective=OBJECTIVE)
+        return body
+
+    def design_request(self, run: dict, problem: dict, pair: list[dict], review: dict, *,
+                       feasible_times: list[str] | None = None, allowance: str | None = None) -> dict:
+        request = {"schema_version": "DB-SC-1", "historical_run_id": run["id"], "scenario_id": "baseline",
+                   "problem_id": problem["id"], "problem_digest": problem["digest"],
+                   "candidate_ids": [c["id"] for c in pair],
+                   "candidate_vectors": [c["parameter_vector"] for c in pair],
+                   "observable": "concentration",
+                   "feasible_times": feasible_times or review["feasible_times"],
+                   "future_hard_allowance": allowance or review["future_hard_allowance"],
+                   "allow_construction": bool(review.get("allow_construction")),
+                   "allow_continuation": bool(review.get("allow_continuation"))}
+        props, _ = self.schema_properties("DesignRequestBody")
+        if "scientific_profile" in props:  # every reviewed scope field is explicit; nothing is inherited
+            sources = []
+            for candidate in pair:
+                for artifact_id in candidate.get("artifact_ids") or []:
+                    if artifact_id not in sources:
+                        sources.append(artifact_id)
+            request.update(scientific_profile=SCIENTIFIC_PROFILE, requested_tier="checked_pair_separation",
+                           allowance_origin={"kind": review.get("allowance_origin", "hypothetical"),
+                                             "description": review.get("allowance_description",
+                                                                       "Reviewed future hard allowance")},
+                           maximum_horizon=review["maximum_horizon"], source_artifact_ids=sources[:2])
+        return request
+
     # -- polling -----------------------------------------------------------
     def poll(self, path: str, timeout: float | None = None) -> dict:
         deadline = time.monotonic() + (timeout or self.poll_timeout)
@@ -164,13 +202,8 @@ class Flow:
         dataset = self.client.post(f"/workspaces/{workspace_id}/datasets", dataset_body, label=f"{label}-dataset")
         problem_body = {**packet["problem"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]}
         problem = self.client.post(f"/workspaces/{workspace_id}/problems", problem_body, label=f"{label}-problem")
-        plan_body = {"schema_version": "DB-SC-1", "problem_id": problem["id"], "problem_digest": problem["digest"],
-                     "dataset_id": dataset["id"],
-                     "scenarios": [{"id": "baseline", "problem_id": problem["id"], "problem_digest": problem["digest"],
-                                    "kind": "baseline", "label": "Reviewed baseline investigation"}]}
+        plan_body = self.plan_body(problem, dataset, "Reviewed baseline investigation")
         props, required = self.schema_properties("PlanBody")
-        if "scientific_profile" in props:  # Owner 2's strict Counterdex route needs profile + reviewed objective
-            plan_body.update(scientific_profile=SCIENTIFIC_PROFILE, objective=OBJECTIVE)
         unknown_required = sorted(required - set(plan_body) - {"permitted_tools", "budget", "provider_disclosure",
                                                                "parent_plan_id"})
         if unknown_required:
@@ -210,26 +243,9 @@ class Flow:
     def design(self, base: dict, pair: list[dict], *, feasible_times: list[str], allowance: str, label: str,
                review: dict) -> dict:
         run, problem = base["run"], base["problem"]
-        request = {"schema_version": "DB-SC-1", "historical_run_id": run["id"], "scenario_id": "baseline",
-                   "problem_id": problem["id"], "problem_digest": problem["digest"],
-                   "candidate_ids": [c["id"] for c in pair],
-                   "candidate_vectors": [c["parameter_vector"] for c in pair],
-                   "observable": "concentration", "feasible_times": feasible_times,
-                   "future_hard_allowance": allowance,
-                   "allow_construction": bool(review.get("allow_construction")),
-                   "allow_continuation": bool(review.get("allow_continuation"))}
+        request = self.design_request(run, problem, pair, review, feasible_times=feasible_times,
+                                      allowance=allowance)
         props, required = self.schema_properties("DesignRequestBody")
-        if "scientific_profile" in props:  # every reviewed scope field is explicit; nothing is inherited
-            sources = []
-            for candidate in pair:
-                for artifact_id in candidate.get("artifact_ids") or []:
-                    if artifact_id not in sources:
-                        sources.append(artifact_id)
-            request.update(scientific_profile=SCIENTIFIC_PROFILE, requested_tier="checked_pair_separation",
-                           allowance_origin={"kind": review.get("allowance_origin", "hypothetical"),
-                                             "description": review.get("allowance_description",
-                                                                       "Reviewed future hard allowance")},
-                           maximum_horizon=review["maximum_horizon"], source_artifact_ids=sources[:2])
         missing = sorted(required - set(request) - {"budget", "schema_version", "observable"})
         if missing:
             return {"blocked": f"DesignRequestBody requires fields the reviewed packet does not define: {missing}",
@@ -582,10 +598,17 @@ def scenario_hero(flow: Flow, packet: dict) -> dict:
     repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     source_id = upload_source(flow, checks, workspace["id"], os.path.join(repo, "fixtures", "intake", "clean.png"),
                               "6363da39c1a7a86e45e5a9d5f17aa87006130cc75c61844f4902be0f118c0b06")
-    dataset = packet["dataset"]
     if source_id:
-        dataset = {**dataset, "rows": [{**row, "source_asset_id": source_id} for row in dataset["rows"]]}
-    base = flow.baseline(packet, label="hero", workspace_id=workspace["id"], dataset_override=dataset)
+        # Source-derived values must arrive through review -> materialization, never a direct dataset that cites
+        # the source. The science run below uses the manual-entry path (same reviewed values, no source claim).
+        linked = {**packet["dataset"], "rows": [{**row, "source_asset_id": source_id} for row in packet["dataset"]["rows"]]}
+        response = flow.client.raw("POST", f"/workspaces/{workspace['id']}/datasets", key=flow.client.new_key("linked"),
+                                   content_type="application/json", body=json.dumps(linked).encode())
+        code = response.json().get("code") if response.data else None
+        checks.expect("source_linked_values_require_review", response.status == 422 and code == "source_review_required",
+                      f"direct source-linked dataset -> {response.status} {code}",
+                      finding=None if response.status == 422 else "F-SOURCE-BYPASS")
+    base = flow.baseline(packet, label="hero", workspace_id=workspace["id"])
     flow.cache["hero"] = base
     info = check_baseline(checks, base, packet, known_positive=packet["designation"]["known_positive"])
     flow.cache["hero_info"] = info
@@ -669,11 +692,8 @@ def scenario_retry_concurrent(flow: Flow, packet: dict, *, threads: int = 8) -> 
     problem = flow.client.post(f"/workspaces/{workspace}/problems",
                                {**packet["problem"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]},
                                label="c-problem")
-    plan = flow.client.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"], "plan": {
-        "schema_version": "DB-SC-1", "problem_id": problem["id"], "problem_digest": problem["digest"],
-        "dataset_id": dataset["id"], "scenarios": [{"id": "baseline", "problem_id": problem["id"],
-                                                     "problem_digest": problem["digest"], "kind": "baseline",
-                                                     "label": "Concurrency control baseline"}]}}, label="c-plan")
+    plan = flow.client.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"],
+                            "plan": flow.plan_body(problem, dataset, "Concurrency control baseline")}, label="c-plan")
     approval = flow.client.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
                                 "expected_current_revision_id": problem["id"], "accepted": True}, label="c-approve")
     body = {"approval_id": approval["id"], "expected_plan_digest": plan["digest"]}
@@ -734,7 +754,7 @@ def scenario_design_authority(flow: Flow, packet: dict) -> dict:
         fake = [{"id": "candidate-not-in-evidence-1", "parameter_vector": {"A": "9/1", "ke": "1/8", "ka": "7/2"}},
                 {"id": "candidate-not-in-evidence-2", "parameter_vector": {"A": "8/1", "ke": "3/40", "ka": "4/1"}}]
         try:
-            flow.client.post(f"/runs/{run['id']}/design-proposals", _design_request(run, problem, fake, review),
+            flow.client.post(f"/runs/{run['id']}/design-proposals", flow.design_request(run, problem, fake, review),
                              label="authority-no-evidence")
             checks.add("design_requires_usable_evidence_and_listed_candidates", "failed",
                        "a design plan was created from candidates absent from the historical evidence",
@@ -746,7 +766,7 @@ def scenario_design_authority(flow: Flow, packet: dict) -> dict:
         checks.add("baseline_approval_cannot_start_design", "blocked",
                    "needs a completed baseline with two candidates (see hero entry)", finding="F-HERO-NO-PAIR")
         return {"checks": checks, "observation": {"pair": None}}
-    first = _design_request(run, problem, pair, review)
+    first = flow.design_request(run, problem, pair, review)
     plan = flow.client.post(f"/runs/{run['id']}/design-proposals", first, label="authority-plan-a")
     # 1. The baseline approval names the investigation plan, never this design.
     try:
@@ -802,16 +822,6 @@ def scenario_design_authority(flow: Flow, packet: dict) -> dict:
     return {"checks": checks, "observation": {"design_plan_id": plan["id"], "approval_id": approval_a["id"]}}
 
 
-def _design_request(run: dict, problem: dict, pair: list[dict], review: dict) -> dict:
-    return {"schema_version": "DB-SC-1", "historical_run_id": run["id"], "scenario_id": "baseline",
-            "problem_id": problem["id"], "problem_digest": problem["digest"],
-            "candidate_ids": [c["id"] for c in pair], "candidate_vectors": [c["parameter_vector"] for c in pair],
-            "observable": "concentration", "feasible_times": review["feasible_times"],
-            "future_hard_allowance": review["future_hard_allowance"],
-            "allow_construction": bool(review.get("allow_construction")),
-            "allow_continuation": bool(review.get("allow_continuation"))}
-
-
 def _nudge(rational: str) -> str:
     value = F(rational) * Fraction(1001, 1000)
     return f"{value.numerator}/{value.denominator}"
@@ -859,11 +869,7 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
                                    {**packet["problem"], "dataset_id": revised["id"], "dataset_digest": revised["digest"]},
                                    label=f"fu-problem-{branch['branch']}")
         plan = flow.client.post(f"/workspaces/{base['workspace_id']}/plans", {
-            "expected_current_revision_id": problem["id"], "plan": {
-                "schema_version": "DB-SC-1", "problem_id": problem["id"], "problem_digest": problem["digest"],
-                "dataset_id": revised["id"], "scenarios": [{"id": "baseline", "problem_id": problem["id"],
-                                                             "problem_digest": problem["digest"], "kind": "baseline",
-                                                             "label": "Follow-up baseline"}]}},
+            "expected_current_revision_id": problem["id"], "plan": flow.plan_body(problem, revised, "Follow-up baseline")},
             label=f"fu-plan-{branch['branch']}")
         try:
             flow.client.post(f"/plans/{plan['id']}/runs", {"approval_id": base["approval"]["id"],
@@ -1008,11 +1014,8 @@ def _approved_run(flow: Flow, packet: dict, workspace: str, label: str) -> dict:
                                 .replace("-", "_")}, label=f"{label}-dataset")
     problem = flow.client.post(f"/workspaces/{workspace}/problems", {**packet["problem"], "dataset_id": dataset["id"],
                                "dataset_digest": dataset["digest"]}, label=f"{label}-problem")
-    plan = flow.client.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"], "plan": {
-        "schema_version": "DB-SC-1", "problem_id": problem["id"], "problem_digest": problem["digest"],
-        "dataset_id": dataset["id"], "scenarios": [{"id": "baseline", "problem_id": problem["id"],
-                                                     "problem_digest": problem["digest"], "kind": "baseline",
-                                                     "label": label}]}}, label=f"{label}-plan")
+    plan = flow.client.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"],
+                            "plan": flow.plan_body(problem, dataset, label)}, label=f"{label}-plan")
     approval = flow.client.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
                                 "expected_current_revision_id": problem["id"], "accepted": True},
                                 label=f"{label}-approval")

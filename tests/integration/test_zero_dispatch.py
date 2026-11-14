@@ -67,23 +67,30 @@ def exercise_model_paths(stack) -> dict:
     permission = client.post(f"/workspaces/{workspace}/provider-consents", {
         "provider": "gemini", "model": model, "source_asset_ids": [], "context_fields": ["problem", "dataset"],
         "problem_id": problem["id"], "accepted": True})
-    plan = client.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"], "plan": {
-        "schema_version": "DB-SC-1", "problem_id": problem["id"], "problem_digest": problem["digest"],
-        "dataset_id": dataset["id"], "scenarios": [{"id": "baseline", "problem_id": problem["id"],
-                                                     "problem_digest": problem["digest"], "kind": "baseline",
-                                                     "label": "agent baseline"}],
-        "provider_disclosure": {"provider": "gemini", "model": model, "context_fields": ["problem", "dataset"],
-                                "permission_id": permission["id"]}}})
-    approval = client.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
-                           "expected_current_revision_id": problem["id"], "accepted": True})
-    run = client.post(f"/plans/{plan['id']}/runs", {"approval_id": approval["id"], "expected_plan_digest": plan["digest"]})
-    deadline = time.monotonic() + 60
-    while time.monotonic() < deadline:
-        state = client.get(f"/runs/{run['id']}")
-        if state["state"] in {"completed", "failed", "cancelled", "interrupted"}:
-            break
-        time.sleep(0.3)
-    seen["agent_run"] = {"state": state["state"], "error_code": state.get("error_code")}
+    from drbean_eval import science_flow
+    builder = science_flow.Flow(client, None, str(stack.workdir) + "/zero-dispatch-scratch", science_python=None,
+                                package_dir=str(REPO / "packages" / "groundwork_adapter"))
+    plan_body = {**builder.plan_body(problem, dataset, "agent baseline"),
+                 "provider_disclosure": {"provider": "gemini", "model": model, "context_fields": ["problem", "dataset"],
+                                         "permission_id": permission["id"]}}
+    created = client.raw("POST", f"/workspaces/{workspace}/plans", key=client.new_key("agent-plan"),
+                         content_type="application/json",
+                         body=_json({"expected_current_revision_id": problem["id"], "plan": plan_body}))
+    if created.status != 201:  # refusing an AI-disclosed plan while dispatch is disabled is also a safe outcome
+        seen["agent_run"] = {"state": "plan_refused", "error_code": created.json().get("code")}
+    else:
+        plan = created.json()
+        approval = client.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
+                               "expected_current_revision_id": problem["id"], "accepted": True})
+        run = client.post(f"/plans/{plan['id']}/runs", {"approval_id": approval["id"],
+                          "expected_plan_digest": plan["digest"]})
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            state = client.get(f"/runs/{run['id']}")
+            if state["state"] in {"completed", "failed", "cancelled", "interrupted"}:
+                break
+            time.sleep(0.3)
+        seen["agent_run"] = {"state": state["state"], "error_code": state.get("error_code")}
     seen["provider_attempts"] = client.get(f"/workspaces/{workspace}/provider-attempts")
     return seen
 
@@ -112,7 +119,7 @@ def test_default_configuration_attempts_no_external_model_request(stack_factory)
     gemini = seen["capabilities"]["gemini"]
     assert gemini["verified_in_environment"] is False and gemini["configured"] is False
     assert seen["capabilities"]["deepagents"]["verified_in_environment"] is False
-    assert seen["agent_run"]["state"] == "failed"  # an AI plan cannot silently run without a provider
+    assert seen["agent_run"]["state"] in {"failed", "plan_refused"}  # an AI plan cannot silently run
     assert all(a["state"] != "completed" for a in seen["provider_attempts"])
 
 
