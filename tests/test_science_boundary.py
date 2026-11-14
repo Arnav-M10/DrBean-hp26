@@ -5,6 +5,8 @@ import subprocess
 import sys
 import time
 
+import pytest
+
 from bean_api.science import UnavailableAdapter, run_bounded
 
 
@@ -30,7 +32,7 @@ def process_running(pid):
     try:
         if stat.read_text().split()[2] == "Z":
             return False
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         # The OS can reap the process while this observer reads its state.
         # Fall through to the portable liveness check (also used off Linux).
         pass
@@ -48,9 +50,10 @@ def assert_descendant_terminated(pid):
     assert not process_running(pid), "The owned descendant remained running after parent acknowledgement"
 
 
-def test_process_observer_handles_reaping_during_stat_read(monkeypatch):
+@pytest.mark.parametrize("failure", [FileNotFoundError, ProcessLookupError])
+def test_process_observer_handles_reaping_during_stat_read(monkeypatch, failure):
     def disappeared(*args, **kwargs):
-        raise FileNotFoundError
+        raise failure
     def reaped(*args):
         raise ProcessLookupError
     monkeypatch.setattr(Path, "read_text", disappeared)
