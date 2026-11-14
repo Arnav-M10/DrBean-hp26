@@ -10,7 +10,8 @@ Frozen predicates: [coordinator/](coordinator/README.md). Baseline on main `299a
 [results/integration/baseline-299a356.md](results/integration/baseline-299a356.md) (12 passed, 7 not_run, 35
 not_available, 0 failed; the durable coordinator and general-file producer do not exist yet). Revision 2
 ([results/coordinator/baseline-299a356-r2.json](results/coordinator/baseline-299a356-r2.json)) re-observes the same
-tree at harness `f278de6` and corrects SCI-06's missing parts. Previews of unmerged A/B branches live under
+tree at harness `f278de6` and corrects SCI-06's missing parts; revision 3 (`-r3`, harness `644ad8c`) adds
+the SCI-05/06/07 cases: 14 passed, 5 not_run, 35 not_available. Previews of unmerged A/B branches live under
 `results/previews/` (for example `pr42-051b4d6/`) and are never acceptance.
 
 ## Integrated acceptance checkpoint

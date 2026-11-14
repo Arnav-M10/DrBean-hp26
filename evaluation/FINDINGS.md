@@ -1,6 +1,6 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `299a356`, observed with harness `bb503a7` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `299a356`, observed with harness `644ad8c` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
@@ -518,6 +518,7 @@ Application code commit `299a356`, observed with harness `bb503a7` on macOS 26.7
 - **Observed:** engine_controls.replay_class returned scientific_exclusion, the class for a genuine computed exclusion, because it tested integrity, binding and verification before the recorded-result comparison. No earlier control or record produced this combination, so no past result changes. The checker itself flagged the mismatch
 - **Evidence:** {"fix": "evaluation/drbean_eval/engine_controls.py replay_class", "regression": "control defense:forged_both_compatible_rejected; evaluation/tests/test_gates_controls.py::ReplayClassification"}
 - **Retest at C working tree before the harness commit (development run into a scratch results directory, not release evidence):** 27/27 controls pass, including the five new coordinator controls; the forged packet is integrity_failure with the real anchor and mathematical_failure with the test anchor (evidence: {})
+- **Retest at 644ad8c (clean C harness commit; application = main 299a356):** 27/27 required controls pass in the release batch; defense:forged_both_compatible_rejected classifies the forged packet integrity_failure (real anchor) and mathematical_failure (test anchor, recorded_result_mismatch) (evidence: {"controls": "evaluation/results/controls.jsonl (run at 644ad8c)"})
 
 ## F-UPLOAD-LIMIT-MESSAGE (P3, owner B (upload boundary and general-file admission), open)
 

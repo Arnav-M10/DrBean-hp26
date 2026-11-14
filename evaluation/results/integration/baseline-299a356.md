@@ -130,3 +130,37 @@ contradiction flag. Revision 2 records the correction; this file keeps the origi
 - The F-NARRATION-OVERSUPPRESSION fix is reproduced there; the finding is now `fixed_pending_retest`.
 - The inventory probe passes 4/4 there.
 - New P3 finding for B: F-CI-BROWSER-CHECK-INTERMITTENT, one browser-check timeout in seven runs on this tree.
+
+## Revision 3 at 644ad8c: SCI-06 and SCI-07 passed
+
+C harness commit `644ad8c` added independent cases. The engine cases are five controls, all required by the release
+gate:
+- a both-compatible reading under a declared wider allowance;
+- the same reading at the separating allowance;
+- a forged both-compatible packet;
+- requested numerical guidance;
+- declared-unavailable grid times.
+
+Through HTTP, RS-FOLLOWUP gained:
+- a both-compatible branch with its own declared allowance (43/100 against the design's 1/5);
+- a check that no reading keeps both candidates at the checked design's separating scope;
+- SCI-07 checks on every branch: separate candidate and pair fields, and no interval-proof or whole-model wording.
+
+The clean batch at `644ad8c`:
+- acceptance 7/7, with RS-FOLLOWUP 213/213 checks;
+- controls 27/27;
+- `controlled_callbacks` `lane_6570acb4c1464fc7`: 102 passed, 5 xfail, 47 NOT_AVAILABLE;
+- `controlled_science` `lane_ec11394af1c34ce1`: 18 passed, 11 NOT_AVAILABLE, 2 not_run;
+- `historical_replay` `lane_611f1631c7314b89`: 185 replayed, 1 incompatible;
+- gate exit 0.
+
+**Predicates (revision 3, `evaluation/results/coordinator/baseline-299a356-r3.json`): 14 passed, 5 not_run,
+35 not_available, 0 failed.**
+- **SCI-06 is now passed.** The contradiction clause is exercised as a forged packet, which the checker refuses. A
+  correct computation cannot produce both-compatible at the separating scope, and the application never did.
+- **SCI-07 is now passed.**
+- **SCI-05 stays not_run.** Numerical guidance and unavailable grid times are exercised at the engine only; the
+  application's design records, reports and UI labels for them are not yet exercised.
+- **Still not_run:** SCI-02, SCI-08, AUTH-07 and METER-07.
+
+The harness finding H-REPLAY-CLASS-RECORDED-MISMATCH (P3) was fixed and retested in this batch.

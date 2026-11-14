@@ -1,9 +1,9 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T13:55:53Z",
+  "updated_at": "2026-11-14T14:15:47Z",
   "application_code_commit": "299a356",
-  "observed_at_harness_commit": "bb503a7",
+  "observed_at_harness_commit": "644ad8c",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -1930,6 +1930,13 @@
         {
           "at_commit": "C working tree before the harness commit (development run into a scratch results directory, not release evidence)",
           "result": "27/27 controls pass, including the five new coordinator controls; the forged packet is integrity_failure with the real anchor and mathematical_failure with the test anchor"
+        },
+        {
+          "at_commit": "644ad8c (clean C harness commit; application = main 299a356)",
+          "result": "27/27 required controls pass in the release batch; defense:forged_both_compatible_rejected classifies the forged packet integrity_failure (real anchor) and mathematical_failure (test anchor, recorded_result_mismatch)",
+          "evidence": {
+            "controls": "evaluation/results/controls.jsonl (run at 644ad8c)"
+          }
         }
       ]
     },
@@ -1977,7 +1984,7 @@
       "retests": []
     }
   ],
-  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed). 2026-11-14T13:30:28Z: added F-UPLOAD-LIMIT-MESSAGE (P3, B) from the PR #40 producer refusing both supplied papers with a generic boundary message. 2026-11-14T13:55:53Z: F-NARRATION-OVERSUPPRESSION fix reproduced on A's PR #42 051b4d6 (component overlay, not on main) and set to fixed_pending_retest; C's converse cases at f278de6 hold on v2 and v3. Added F-CI-BROWSER-CHECK-INTERMITTENT (P3, B). Header now names the 299a356 baseline (observed at bb503a7).",
+  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed). 2026-11-14T13:30:28Z: added F-UPLOAD-LIMIT-MESSAGE (P3, B) from the PR #40 producer refusing both supplied papers with a generic boundary message. 2026-11-14T13:55:53Z: F-NARRATION-OVERSUPPRESSION fix reproduced on A's PR #42 051b4d6 (component overlay, not on main) and set to fixed_pending_retest; C's converse cases at f278de6 hold on v2 and v3. Added F-CI-BROWSER-CHECK-INTERMITTENT (P3, B). Header now names the 299a356 baseline (observed at bb503a7). 2026-11-14T14:15:47Z: C added SCI-05/06/07 cases at 644ad8c (five required engine controls; RS-FOLLOWUP both-compatible branch, separating-scope and SCI-07 checks); fixed harness H-REPLAY-CLASS-RECORDED-MISMATCH and retested it in the clean batch.",
   "check_catalog": {
     "note": "Finding ids that a check names when it fails. They are not observed findings: an id appears in `findings` only after a check actually failed or was blocked. Every id cited by evaluation/drbean_eval or tests/integration must be a finding or listed here (enforced by evaluation/tests).",
     "ids": {
