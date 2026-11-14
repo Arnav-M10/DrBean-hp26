@@ -63,10 +63,36 @@ function setConnection(text, tone = '') {
   $('connection').className = `meta ${tone}`
 }
 
-async function connect() {
+// Same recovery as the main page: say what happened, offer a retry, and offer a new
+// private workspace only when the session layer says that is the way forward.
+function connectionFailure(error) {
+  const message = error.mayStartNew || error.code === 'session_storage_unavailable' ? error.message
+    : error.status === 429 ? 'The server cannot open another private session right now. Retry later. Earlier research is kept.'
+    : error.status === 404 ? 'Private access is not set up on this server. Ask its owner to check the setup, then retry.'
+    : error.kind === 'unreachable' || [502, 503, 504].includes(error.status) ? 'The server is unavailable or still starting. Retry when it is ready.'
+    : error.status === 401 ? 'This session is no longer available. Retry the connection to see how to continue.'
+    : error.message || 'The private workspace could not be opened. Retry the connection.'
+  setConnection('Not connected', 'bad')
+  $('connection-message').textContent = message
+  $('start-new-workspace').hidden = error.mayStartNew !== true
+  $('connection-problem').hidden = false
+}
+
+let connecting = false
+async function connect(startNew = false) {
+  if (connecting) return
+  connecting = true
+  setConnection('Connecting…')
+  $('connection-problem').hidden = true
   try {
-    const opened = await bootstrapSharedSession()
+    const opened = await bootstrapSharedSession(undefined, { startNew })
+    // A different workspace shares nothing with the old one, so its study starts empty.
+    if (workspace && workspace !== opened.session.workspace_id) {
+      draft = blankDraft(); snapshot = null; results = null; $('study-name').textContent = ''; location.hash = 'data'
+    }
     api = opened.api; workspace = opened.session.workspace_id
+    api.setConnectionFailureHandler(error => { if (api === opened.api && !connecting) connectionFailure(error) })
+    startStatus('')
     study = readStore()
     capabilities = await readConnection(api, '/capabilities')
     const research = capabilities.deepagents
@@ -75,8 +101,11 @@ async function connect() {
     else if (research.execution_mode === 'live') setConnection('This server uses a live model, which needs consent in the classic view', 'bad')
     else setConnection('Private workspace')
     await reopen()
+    route()
   } catch (error) {
-    setConnection(error.message, 'bad')
+    connectionFailure(error)
+  } finally {
+    connecting = false
   }
   route()
 }
@@ -90,8 +119,9 @@ async function reopen() {
     draftFromSnapshot(snapshot)
     if (snapshot.reports.length) await loadResults()
     if (!location.hash) location.replace('#' + (results ? (results.m.next ? 'next' : 'result') : snapshot.pending_review?.kind === 'plan' ? 'check' : 'data'))
-  } catch {
-    study = {}; writeStore()
+  } catch (error) {
+    // Forget the saved study only when the server says it does not exist.
+    if (error.status === 404) { study = {}; writeStore() }
   }
 }
 
@@ -141,7 +171,7 @@ async function useFile(file) {
     startStatus('')
     useTables(tables, { kind: 'file', name: (asset.filename || file.name).replace(/\.[^.]+$/, ''), asset })
   } catch (error) {
-    startStatus(error.message, true)
+    startStatus(readable(error), true)
   }
 }
 
@@ -223,9 +253,14 @@ function countStatus(id, count) {
   if (count) { status(id, count === 1 ? 'One thing needs fixing first.' : `${count} things need fixing first.`, 'bad'); $(id).dataset.count = '' }
   else if ($(id).dataset.count !== undefined) status(id, '')
 }
+// Server refusals arrive as "code: message Request: id." Keep the message and the request id
+// (it matches the server log); a lost session is explained once, by the notice at the top.
+function readable(error) {
+  if (error?.status === 401) return 'Your private session ended. Reconnect at the top of the page, then try again.'
+  return String(error?.message || 'Something went wrong.').replace(/^[a-z0-9_]+: /, '')
+}
 function failure(id, error) {
-  const uncertain = error?.kind === 'uncertain'
-  status(id, uncertain ? `${error.message}` : (error?.message || 'Something went wrong.'), 'bad')
+  status(id, readable(error), 'bad')
 }
 
 const slug = text => (text || 'study').normalize('NFKD').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'study'
@@ -645,6 +680,8 @@ document.addEventListener('click', event => {
   else if (action === 'close') target.closest('dialog').close()
   else if (action === 'add') { draft.rows.push({ time: '', value: '', allowance: draft.allowanceForAll || '', included: true }); renderRows(); renderData(); $('rows').lastElementChild?.querySelector('[data-key="time"]')?.focus() }
   else if (action === 'remove') { draft.rows.splice(Number(target.dataset.row), 1); renderRows(); renderData() }
+  else if (action === 'retry-connection') connect()
+  else if (action === 'start-new-workspace') connect(true)
   else if (action === 'start-over' || action === 'new-study') { draft = blankDraft(); study = {}; snapshot = null; results = null; writeStore(); $('study-name').textContent = ''; location.hash = 'data'; route() }
   else if (action === 'prepare') prepare()
   else if (action === 'approve-check') approve('check-status', 'approve-check', () => { location.hash = 'result' })
@@ -656,7 +693,8 @@ document.addEventListener('click', event => {
   else if (action === 'report') downloadReport(target)
 })
 
-$('file').addEventListener('change', event => useFile(event.target.files[0]))
+// Clearing the input lets the same file be chosen again after a failed upload.
+$('file').addEventListener('change', event => { const file = event.target.files[0]; event.target.value = ''; useFile(file) })
 const drop = $('drop')
 drop.addEventListener('dragover', event => { event.preventDefault(); drop.classList.add('over') })
 drop.addEventListener('dragleave', () => drop.classList.remove('over'))
