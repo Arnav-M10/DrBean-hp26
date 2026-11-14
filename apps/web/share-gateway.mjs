@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, open } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { createServer, request as upstreamRequest } from 'node:http'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,7 +11,18 @@ export function shareOrigin(value) {
   return new URL(value)
 }
 
-export function createShareGateway({ originFile, webPort = 4173 }) {
+async function demoToken(file) {
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const info = await handle.stat()
+    if (!info.isFile() || info.uid !== process.getuid() || (info.mode & 0o777) !== 0o600 || info.size > 1024) throw new Error('Invalid demo credential file.')
+    const token = JSON.parse(await handle.readFile('utf8')).token
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{32,128}$/.test(token)) throw new Error('Invalid demo credential.')
+    return token
+  } finally { await handle.close() }
+}
+
+export function createShareGateway({ originFile, accessFile, webPort = 4173 }) {
   if (!Number.isInteger(webPort) || webPort < 1 || webPort > 65535) throw new Error('Invalid loopback web port.')
   return createServer(async (request, response) => {
     let origin
@@ -35,9 +47,24 @@ export function createShareGateway({ originFile, webPort = 4173 }) {
       response.writeHead(405, { 'Cache-Control': 'no-store' }).end()
       return
     }
+    let token
+    if (request.url.startsWith('/api/bean/v1/')) {
+      try { token = await demoToken(accessFile) } catch {
+        response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Shared demo is not ready.')
+        return
+      }
+      if (request.url === '/api/bean/v1/shared-session' && request.method === 'GET') {
+        response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+        response.end(JSON.stringify({ mode: 'shared_demo', shared_data: true, credentials: 'server_managed' }))
+        return
+      }
+    }
     const localHost = `127.0.0.1:${webPort}`
     const headers = { host: localHost }
-    for (const name of ['authorization', 'content-type', 'idempotency-key']) {
+    // A public visitor can use only the isolated demo identity. Ignore any
+    // browser-supplied owner token; neither credential is returned to the browser.
+    if (token) headers.authorization = `Bearer ${token}`
+    for (const name of ['content-type', 'idempotency-key']) {
       if (request.headers[name]) headers[name] = request.headers[name]
     }
     if (request.headers.origin) headers.origin = `http://${localHost}`
@@ -66,6 +93,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid sharing port.')
   const originFile = process.env.BEAN_SHARE_ORIGIN_FILE
   if (!originFile) throw new Error('BEAN_SHARE_ORIGIN_FILE is required.')
-  const server = createShareGateway({ originFile })
+  const accessFile = process.env.BEAN_SHARE_ACCESS_FILE
+  if (!accessFile) throw new Error('BEAN_SHARE_ACCESS_FILE is required.')
+  const server = createShareGateway({ originFile, accessFile })
   server.listen(port, '127.0.0.1', () => console.log(`Dr. Bean sharing gateway on 127.0.0.1:${server.address().port}`))
 }
