@@ -65,7 +65,7 @@ test('local session proxy retains real module routes and injects only its own pr
   }
   state.cookie = issuedCookie
   const session = await send('/api/bean/v1/shared-session', {
-    authorization: 'Bearer DRBEAN-DUMMY-owner', cookie: `__Host-bean_session=${credential}; unrelated=private`,
+    authorization: 'Bearer ' + proof, cookie: `__Host-bean_session=${credential}; unrelated=private`,
     'x-bean-shared-gateway': 'forged', 'x-bean-shared-origin': 'https://evil.test',
     'x-bean-local-gateway': 'forged', 'x-bean-local-origin': 'http://evil.test',
     'x-forwarded-for': 'evil', 'x-forwarded-host': 'evil', 'x-forwarded-proto': 'https', forwarded: 'host=evil',
@@ -79,7 +79,7 @@ test('local session proxy retains real module routes and injects only its own pr
   for (const key of ['authorization', 'cookie', 'x-bean-shared-gateway', 'x-bean-shared-origin', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'forwarded']) assert.equal(calls[0].headers[key], undefined, key)
   state.cookie = undefined
   const result = await send('/api/bean/v1/workspaces/w/research-assets', {
-    origin, authorization: 'Bearer DRBEAN-DUMMY-owner', 'x-source-name': 'plants.csv', 'content-type': 'text/csv',
+    origin, authorization: 'Bearer ' + proof, 'x-source-name': 'plants.csv', 'content-type': 'text/csv',
     cookie: `unrelated=private; bean_local_session=${credential}; __Host-bean_session=${proof}`, 'sec-fetch-site': 'same-origin',
   }, 'POST')
   assert.equal(result.status, 200)
@@ -150,7 +150,7 @@ test('private local configuration is checked on every request and is never serve
 
 test('missing private configuration fails closed without forwarding bearer credentials', async t => {
   const { calls, send } = await fixture(t, { configured: false })
-  const result = await send('/api/bean/v1/shared-session', { authorization: 'Bearer DRBEAN-DUMMY-owner' })
+  const result = await send('/api/bean/v1/shared-session', { authorization: 'Bearer ' + proof })
   assert.equal(result.status, 503)
   assert.equal(calls.length, 0)
   assert.equal(result.headers['set-cookie'], undefined)

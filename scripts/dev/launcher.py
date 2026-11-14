@@ -681,7 +681,7 @@ def cmd_start(_args) -> int:
     provider_env = provider_child_env(env, live)
     try:
         spawn("api", [BACKEND_PY, "-m", "uvicorn", "bean_api.main:create_app", "--factory", "--host", HOST,
-                      "--port", str(API_PORT), "--no-access-log"], provider_env)
+                      "--port", str(API_PORT), "--no-access-log", "--no-proxy-headers"], provider_env)
         spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], provider_env)
         spawn("web", ["node", os.path.join("apps", "web", "serve.mjs"), str(WEB_PORT)], env)
     except (OSError, LifecycleError, KeyboardInterrupt) as error:

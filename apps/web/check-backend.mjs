@@ -16,7 +16,9 @@ import { createRequire } from 'node:module'
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const temp = await mkdtemp(join(tmpdir(), 'drbean-web-baseline-'))
-const token = randomBytes(40).toString('hex')
+const token = `DRBEAN-DUMMY-${randomBytes(20).toString('hex')}`
+const localGatewayFile = join(temp, 'local-gateway.json')
+await writeFile(localGatewayFile, JSON.stringify({ version: 1, secret: `DRBEAN-DUMMY-${randomBytes(15).toString('hex')}` }), { mode: 0o600 })
 const freePort = async () => {
   const server = createServer()
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
@@ -31,7 +33,8 @@ const env = { PATH: process.env.PATH, PYTHONPATH: join(root, 'apps/api'),
   BEAN_DATABASE_PATH: join(temp, 'test.sqlite'), BEAN_BLOB_DIR: join(temp, 'sources'),
   BEAN_ARTIFACT_DIR: join(temp, 'artifacts'), BEAN_AUTH_TOKENS_JSON: JSON.stringify({ 'web-test': token }),
   BEAN_SOURCE_INTAKE_MODE: 'controlled', BEAN_CONTROLLED_SOURCE_MANIFEST: join(root, 'scripts/ai/fixtures/source-previews.v1.json'),
-  BEAN_SCIENCE_ADAPTER: 'counterdex', BEAN_COUNTERDEX_PYTHON: enginePython, BEAN_WEB_API_PORT: String(apiPort) }
+  BEAN_SCIENCE_ADAPTER: 'counterdex', BEAN_COUNTERDEX_PYTHON: enginePython, BEAN_WEB_API_PORT: String(apiPort),
+  BEAN_LOCAL_GATEWAY_FILE: localGatewayFile, BEAN_LOCAL_BROWSER_ORIGIN: base, BEAN_AI_MODE: 'placeholder' }
 const children = []
 const start = (command, args, childEnv = env) => {
   const child = spawn(command, args, { cwd: root, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -40,9 +43,13 @@ const start = (command, args, childEnv = env) => {
   children.push(child); return child
 }
 const python = process.env.BEAN_TEST_PYTHON || resolve(root, '.venv/bin/python')
+let browserContext
 const api = async path => {
-  const response = await fetch(`${base}/api/bean/v1${path}`, { headers: { Authorization: `Bearer ${token}` } })
-  assert.ok(response.ok, `HTTP ${response.status}: ${await response.clone().text()}`)
+  assert.ok(browserContext || path === '/capabilities', 'Private API evidence requires the actual browser context')
+  const response = browserContext ? await browserContext.request.get(`${base}/api/bean/v1${path}`)
+    : await fetch(`${base}/api/bean/v1${path}`)
+  const ok = browserContext ? response.ok() : response.ok, status = browserContext ? response.status() : response.status
+  assert.ok(ok, `HTTP ${status}: ${ok ? '' : await response.text()}`)
   return response.json()
 }
 const waitForExit = child => new Promise((resolve, reject) => {
@@ -52,7 +59,7 @@ const waitForExit = child => new Promise((resolve, reject) => {
 })
 let browser, activePage, lastApiResponse
 try {
-  const server = start(python, ['-m', 'uvicorn', 'bean_api.main:create_app', '--factory', '--host', '127.0.0.1', '--port', String(apiPort)])
+  const server = start(python, ['-m', 'uvicorn', 'bean_api.main:create_app', '--factory', '--host', '127.0.0.1', '--port', String(apiPort), '--no-proxy-headers'])
   const web = start(process.execPath, ['apps/web/serve.mjs', String(webPort)])
   let capabilities
   for (let i = 0; ; i++) {
@@ -67,6 +74,7 @@ try {
   start(python, ['-m', 'bean_api.worker'])
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] })
   const context = await browser.newContext({ acceptDownloads: true })
+  browserContext = context
   const page = await context.newPage(), errors = [], external = []
   activePage = page
   page.on('response', async response => {
@@ -84,13 +92,11 @@ try {
   // Pages are hash routes; changing the hash never reloads in-memory state.
   const go = async hash => { await page.evaluate(target => { location.hash = target }, hash); await page.waitForSelector(`#${hash}:not([hidden])`) }
   const openSourcePanel = () => page.locator('#source-path').evaluate(panel => { panel.open = true })
-  await page.locator('#connection-panel summary').click()
-  await page.fill('#bearer', token)
-  await page.getByRole('button', { name: 'Connect', exact: true }).click()
-  await page.waitForFunction(() => document.querySelector('#connection-status').textContent.includes('Connected'))
-  await page.fill('#workspace-name', 'Browser baseline computation')
-  await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('#workspace-select').value !== '')
+  assert.equal(await page.locator('#bearer').isVisible(), false)
+  const connected = await api('/shared-session/current')
+  assert.equal(connected.workspace_id, await page.locator('#workspace-select').inputValue())
+  assert.equal(connected.credentials, 'server_managed')
   await page.click('#example')
   await page.getByRole('button', { name: 'Use these rows', exact: true }).click()
   await page.click('#measurements button[type=submit]')
@@ -378,13 +384,22 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   assert.deepEqual(errors, [])
   assert.deepEqual(external, [])
-  assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0)
-  assert.equal((await context.cookies()).length, 0)
-  await page.click('#disconnect')
-  assert.match(await page.locator('#backend-review').textContent(), /Connect to a Dr\. Bean server/)
+  const storage = await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage }, readableCookie: document.cookie }))
+  assert.deepEqual(storage.local, { 'dr-bean.private-workspace.v1': workspace })
+  assert.deepEqual(storage.session, {})
+  assert.equal(storage.readableCookie, '')
+  const cookies = await context.cookies()
+  assert.equal(cookies.length, 1)
+  assert.equal(cookies[0].name, 'bean_local_session')
+  assert.equal(cookies[0].httpOnly, true)
+  assert.equal(cookies[0].sameSite, 'Strict')
+  const logout = await context.request.post(`${base}/api/bean/v1/shared-session/logout`, { headers: { Origin: base } })
+  assert.equal(logout.status(), 200)
+  const revoked = await context.request.get(`${base}/api/bean/v1/workspaces`)
+  assert.equal(revoked.status(), 401)
   const denied = await fetch(`${base}/api/bean/v1/workspaces`, { headers: { Origin: 'https://external.invalid' } })
   assert.equal(denied.status, 403)
-  console.log('Passed: actual browser review/approval/dispatch, real baseline discovery on two reviewed inputs, separately approved positive and no-separation designs from the actual pair, exact native and anchor downloads with installed-engine replay, preserved earlier evidence, reopened design history, zero provider attempts, memory-only credentials, and proxy origin rejection.')
+  console.log('Passed: automatic private browser session, actual browser review/approval/dispatch, real baseline discovery on two reviewed inputs, separately approved positive and no-separation designs from the actual pair, exact native and anchor downloads with installed-engine replay, preserved earlier evidence, reopened design history, zero provider attempts, HttpOnly credentials, explicit revocation, and proxy origin rejection.')
 } catch (error) {
   if (activePage) {
     const directory = process.env.BEAN_BROWSER_DIAGNOSTICS_DIR || join(root, 'var/test-evidence/browser-failures')

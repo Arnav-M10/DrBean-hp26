@@ -45,13 +45,13 @@ export function bootstrapSharedSession(fetcher = defaultFetch, {
     const memory = () => storage ? memoryMarkers.get(storage) ?? null : unavailableStorageMarker
     const remembered = () => { try { return storage?.getItem(markerKey) ?? memory() } catch { return memory() } }
     const remember = (value, required = false) => {
-      if (storage) memoryMarkers.set(storage, value); else unavailableStorageMarker = value
       try {
         if (value === null) storage?.removeItem(markerKey); else storage?.setItem(markerKey, value)
         if (required && (!storage || storage.getItem(markerKey) !== value)) throw new Error('Storage unavailable')
       } catch {
         if (required) throw new ApiError('session_recovery', 'Allow cookies and site storage for this site, then retry connection. A private workspace has not been created.', { code: 'session_storage_unavailable' })
       }
+      if (storage) memoryMarkers.set(storage, value); else unavailableStorageMarker = value
     }
     let current
     try { current = metadata(await readConnection(api, '/shared-session/current', delay)) } catch (error) {

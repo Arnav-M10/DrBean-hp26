@@ -141,6 +141,7 @@ test('readable but unwritable storage fails before issuance, including repeat vi
     config.storage = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError') } }
     const fetcher = async url => { if (url.endsWith('/shared-session')) { issued++; return reply(metadata) } return missing() }
     await assert.rejects(bootstrapSharedSession(fetcher, config), e => e.code === 'session_storage_unavailable')
+    await assert.rejects(bootstrapSharedSession(fetcher, config), e => e.code === 'session_storage_unavailable')
   }
   assert.equal(issued, 0)
 })

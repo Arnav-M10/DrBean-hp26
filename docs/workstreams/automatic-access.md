@@ -36,3 +36,25 @@ the resulting combined candidate still need integration and browser retesting.
 
 No provider calls or new public tunnel have run. Temporary fixture stores and
 nonstandard ports are used for acceptance; no real owner credentials were read.
+
+## Browser and launcher regression checkpoint
+
+The ordinary retained manual-science and controlled Deep Agents browser runners
+now use automatic local sessions and their actual cookie transport. Both passed,
+including the separate declared-actual follow-up variant, real baseline,
+changed inputs, positive/no-separation design, native downloads and fresh replay.
+The editor smoke passed 18 checks; general UI smoke passed 23 checks. All 94 web
+unit tests passed. Proxy headers are disabled explicitly at the API process.
+The secret scan passed after replacing a literal dummy bearer string in a test
+with its already generated dummy fixture; no credential or scanner rule changed.
+
+The initially reused backend runtime lacked the locked PDF decoder dependency.
+It was left untouched; a fresh locked backend runtime was prepared separately.
+The initial full run had 1,233 passes and 23 PDF-dependent failures/errors;
+a full rerun in the matching environment is in progress. Schema export produces
+identical schema definitions but existing PDF example boxes vary by about 0.0003
+on macOS. Generator changes were not retained; frozen examples were not edited.
+
+Claude’s independent `tests/integration/langchain_demo_browser.mjs` still targets
+old bearer onboarding and is not registered in ordinary CI. It was left unchanged
+for its owner to update; the retained production-path `check-research.mjs` passes.

@@ -7,12 +7,16 @@ the three prompts in `docs/agent-prompts/`; changes require a committed handoff.
 Base: `296578a` (the handoff prototype is already in main). No provider request
 is authorized by bootstrap, upload, session creation or reconnect.
 
-## Browser adapter
+## Browser adapter (automatic-local amendment, 2026-11-14)
 
-`session.mjs` exports `bootstrapSharedSession(fetcher = fetch)`, returning
-`{api, session}` from `GET /api/bean/v1/shared-session`, or `null` only when this
-is a local server without shared access (404). Errors, invalid/expired cookies
-and unavailable services must stay visible; they are not an owner-login fallback.
+`session.mjs` exports `bootstrapSharedSession(fetcher = fetch, options = {})`,
+returning `{api, session}` for both the local loopback and shared HTTPS app.
+`GET /api/bean/v1/shared-session/current` is nonissuing: it returns current
+metadata, 401 `browser_session_missing` for an absent cookie, or 401 for a
+stale/invalid cookie. The browser issues through `GET /shared-session` only on
+an absent first-visit cookie, then confirms retention with another current read.
+404 and unavailable-service errors remain visible; no owner-login fallback exists.
+
 The response is exactly the nonsecret metadata:
 
 ```json
@@ -20,22 +24,44 @@ The response is exactly the nonsecret metadata:
 ```
 
 The returned `api` is `new BeanApi(null, fetcher, {mode:'browser_session'})`:
-requests use `credentials:'same-origin'` with no JavaScript bearer credential.
-Existing `new BeanApi(ownerToken, fetcher)` uses `credentials:'omit'` as before.
-The UI owner replaces the prototype `shared_demo` hook with this module, selects
-the returned private workspace, and shares this one API context with the general
-and scientific workflows. Keep explicit advanced local owner login available.
-Session secrets never enter local/session storage, DOM, URLs or JSON.
+requests use `credentials:'same-origin'` without a JavaScript bearer credential.
+Operator `new BeanApi(ownerToken, fetcher)` remains a direct-API maintenance
+transport; the local and public web proxies strip browser Authorization.
+The UI selects the returned workspace and shares one API context with the general
+and scientific workflows. Session secrets never enter web storage, DOM, URLs or
+JSON. A nonsecret local-storage marker records issuance/continuity; a first issue
+requires a successful marker write. Existing valid cookies can reopen even when
+storage is blocked. Web Locks serialize first visits across supporting tabs.
+
+Only the allowlisted current-session/capabilities/workspace GET reads retry,
+at most three attempts. Session issuance, rotation, science, consent and model
+requests never retry automatically. Lost issuance acknowledgements remain
+uncertain until a read confirms the cookie. Expired, revoked or cleared sessions
+require explicit `options.startNew: true` before a new workspace can be issued;
+this never recovers or transfers prior research. A previously unseen hostname or
+fully cleared site storage cannot identify the earlier browser.
 
 Additional lifecycle routes: `POST /shared-session/rotate` rotates the cookie,
-revokes the old credential and preserves the private actor/workspace;
-`POST /shared-session/logout` revokes it and clears the cookie. Both require the
-same authenticated cookie and exact same-origin mutation boundary. Expired,
-forged and revoked credentials return 401 and clear the cookie; they cannot
-recover the previous workspace. A new absent-cookie bootstrap creates a new
-private workspace. Losing a cookie is not an invitation to someone else's data.
+revokes its old credential and preserves the actor, workspace and absolute expiry;
+`POST /shared-session/logout` revokes it and clears the cookie. Both retain
+authenticated-cookie and exact-origin mutation checks. Capacity counts only
+active unexpired credentials; history is retained and provider accounting is
+unchanged.
 
 ## Private server boundary
+
+Local HTTP access is explicitly configured with `BEAN_LOCAL_GATEWAY_FILE`
+and `BEAN_LOCAL_BROWSER_ORIGIN`. The launcher provisions the separate owner-only
+`var/local-gateway.json` proof without replacing an existing file. The local
+proxy strips Authorization and arbitrary forwarded/trust headers, then sends
+`X-Bean-Local-Gateway` and the exact configured `X-Bean-Local-Origin`.
+The API also requires the real loopback peer; the launcher disables uvicorn
+forwarded-header trust. Mixed local/public boundary proofs are rejected.
+
+Local `bean_local_session` is host-only, HttpOnly, SameSite=Strict, Path=/,
+without Secure for the explicitly scoped loopback HTTP origin. It cannot select
+the HTTPS lane. Public gateway and cookie requirements below remain unchanged.
+
 
 The cookie is `__Host-bean_session`: 32 random bytes in 43 URL-safe characters,
 `Path=/; Secure; HttpOnly; SameSite=Strict`, no Domain, absolute 24-hour lifetime.
@@ -62,11 +88,11 @@ or a provider credential. Only the gateway receives its file path through
 The API reads this configuration at request time, compares digests and validates
 the shared origin again. Sharing never edits `auth.json` or creates a demo actor.
 The API's `BEAN_SHARE_GATEWAY_FILE` defaults to `share-gateway.json` beside its
-existing database. A missing file disables session bootstrap (404); provisioning
-it needs no API restart. Existing owner tokens and data remain unchanged.
+existing database. A missing shared file disables the shared lane (404); provisioning
+it needs no API restart. The independently configured local lane is unaffected. Existing owner tokens and data remain unchanged.
 
 `/capabilities` adds `shared_access:{mode:'browser_session',available:boolean,
-session_ttl_seconds:86400}`. Availability requires valid boundary configuration.
+session_ttl_seconds:86400}`. Availability requires valid local or shared boundary configuration.
 The share launcher checks it before public activation, serializes lifecycle
 changes, and never stops an unrelated process. It retains gateway configuration
 through failure/restart; gateway and tunnel environments contain no provider key.

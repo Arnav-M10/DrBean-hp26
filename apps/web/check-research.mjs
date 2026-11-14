@@ -28,9 +28,9 @@ const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', DRBEAN_VAR_DIR: scratch,
   BEAN_DEV_API_PORT: String(apiPort), BEAN_DEV_WEB_PORT: String(webPort), BEAN_RESEARCH_MODE: 'controlled',
   BEAN_AI_MODE: 'placeholder', PYTHONPATH: join(root, 'apps/api') + ':' + join(root, 'evaluation/drbean_eval/guard'),
   DRBEAN_EGRESS_GUARD_LOG: join(scratch, 'egress.jsonl'), LANGSMITH_TRACING: 'false' }
-let browser, token = '', launched = false, page
+let browser, browserContext, launched = false, page
 const checks = [], external = [], errors = []
-const redact = value => token ? String(value).split(token).join('[synthetic private credential]') : String(value)
+const redact = value => String(value)
 async function command(executable, args, timeout = 45000) {
   const child = spawn(executable, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
   let text = '', timer
@@ -43,8 +43,11 @@ async function command(executable, args, timeout = 45000) {
   return text
 }
 async function api(path) {
-  const response = await fetch(`http://127.0.0.1:${apiPort}/api/bean/v1${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) })
-  assert.equal(response.status, 200, await response.clone().text())
+  assert.ok(browserContext || path === '/capabilities', 'Private API evidence requires the actual browser context')
+  const response = browserContext ? await browserContext.request.get(`${base}/api/bean/v1${path}`)
+    : await fetch(`${base}/api/bean/v1${path}`, { signal: AbortSignal.timeout(15000) })
+  const status = browserContext ? response.status() : response.status
+  assert.equal(status, 200, status === 200 ? '' : await response.text())
   return response.json()
 }
 const check = name => checks.push(name)
@@ -53,8 +56,6 @@ try {
   await command(python, ['-m', 'bean_api.bootstrap'], 10000)
   await command(python, ['scripts/dev/launcher.py', 'start'])
   launched = true
-  const credentials = JSON.parse(await readFile(join(scratch, 'auth.json'), 'utf8'))
-  token = Object.values(credentials)[0]
   const capabilities = await api('/capabilities')
   assert.equal(capabilities.deepagents.execution_mode, 'controlled', JSON.stringify(capabilities.deepagents))
   assert.equal(capabilities.deepagents.dispatch_enabled, true, JSON.stringify(capabilities.deepagents))
@@ -62,6 +63,7 @@ try {
   check('actual-launcher-api-worker-and-controlled-policy-ready')
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] })
   const context = await browser.newContext({ acceptDownloads: true })
+  browserContext = context
   page = await context.newPage()
   page.on('pageerror', error => errors.push(error.message))
   await page.route('**/*', route => {
@@ -70,14 +72,13 @@ try {
     return route.continue()
   })
   await page.goto(base + '#inputs')
-  await page.locator('#connection-panel summary').click()
-  await page.fill('#bearer', token)
-  await page.getByRole('button', { name: 'Connect', exact: true }).click()
-  await page.waitForFunction(() => document.querySelector('#connection-status').textContent.includes('Connected'))
-  await page.fill('#workspace-name', 'Narrow agent browser: explicit synthetic readings, computed evidence')
-  await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('#workspace-select').value !== '')
   const workspace = await page.locator('#workspace-select').inputValue()
+  assert.equal(await page.locator('#bearer').isVisible(), false)
+  const connected = await api('/shared-session/current')
+  assert.equal(connected.workspace_id, workspace)
+  assert.equal(connected.credentials, 'server_managed')
+  check('automatic-private-browser-session-without-token-entry')
   // Exercise the ordinary file input, not the optional example button.
   const file = join(scratch, 'reviewed-synthetic-readings.csv')
   await writeFile(file, 'time,concentration,epsilon\n0.25,4.80,0.50\n0.5,7.20,0.50\n1,8.00,0.50\n2,6.80,0.50\n4,5.70,0.50\n')

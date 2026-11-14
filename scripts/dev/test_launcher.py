@@ -522,6 +522,8 @@ class LiveOptIn(unittest.TestCase):
             self.assertEqual(launcher.cmd_start(None), 0)
         environments = {call.args[0]: call.args[2] for call in spawn.call_args_list}
         self.assertEqual(set(environments), {"api", "worker", "web"})
+        api_command = next(call.args[1] for call in spawn.call_args_list if call.args[0] == "api")
+        self.assertIn("--no-proxy-headers", api_command)
         for name in ("api", "worker"):
             self.assertEqual(environments[name]["GEMINI_API_KEY"], self.config["GEMINI_API_KEY"])
             self.assertNotIn("GOOGLE_GEMINI_BASE_URL", environments[name])
