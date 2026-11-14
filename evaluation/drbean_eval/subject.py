@@ -121,7 +121,7 @@ class LaunchedHttpSubject:
         self.evidence_class = ("diagnostic" if self.diagnostic_overrides else
                                "preview" if self.app_repo != self.repo else "executed_acceptance")
         try:
-            self.science_python = launcher.science_python()
+            self.science_python = launcher.science_python(self.app_repo)
             self.science_error = None
         except launcher.StackError as error:
             self.science_python, self.science_error = None, str(error)

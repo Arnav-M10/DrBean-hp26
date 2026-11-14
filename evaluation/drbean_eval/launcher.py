@@ -61,9 +61,11 @@ def backend_python(repo: str) -> str:
     return candidate
 
 
-def science_python() -> str:
-    """Operator-selected CPython 3.11 for fresh native replay (DRBEAN_SCIENCE_PYTHON or python3.11)."""
-    candidate = os.environ.get("DRBEAN_SCIENCE_PYTHON") or shutil.which("python3.11")
+def science_python(repo: str | None = None) -> str:
+    """Operator-selected CPython 3.11: DRBEAN_SCIENCE_PYTHON, else Owner 4's qualified .venv-engine, else python3.11."""
+    engine = os.path.join(repo or os.path.dirname(os.path.dirname(HERE)), ".venv-engine", "bin", "python")
+    candidate = (os.environ.get("DRBEAN_SCIENCE_PYTHON") or (engine if os.path.isfile(engine) else None)
+                 or shutil.which("python3.11"))
     if not candidate or not os.path.isfile(candidate):
         raise StackError("CPython 3.11 for native replay not found; set DRBEAN_SCIENCE_PYTHON")
     out = subprocess.run([candidate, "-I", "-c", "import sys,platform;print(platform.python_implementation(),"
@@ -126,6 +128,10 @@ class LocalStack:
     def __init__(self, repo: str, *, workdir: str | None = None, worker: bool = True,
                  stack_env: dict[str, str] | None = None, allow_dummy_provider_config: bool = False,
                  startup_timeout: float = 60.0, diagnostic_overrides: tuple[str, ...] = ()):
+        unknown = set(diagnostic_overrides) - DIAGNOSTIC_OVERRIDES  # refuse before touching any interpreter
+        if unknown:
+            raise StackError(f"unknown diagnostic override(s) {sorted(unknown)}; known: {sorted(DIAGNOSTIC_OVERRIDES)}")
+        self.diagnostic_overrides = tuple(sorted(set(diagnostic_overrides)))
         self.repo = os.path.abspath(repo)
         self.python = backend_python(self.repo)
         self._own_workdir = workdir is None
@@ -140,17 +146,13 @@ class LocalStack:
         self.blob_dir = os.path.join(self.workdir, "state", "sources")
         self.artifact_dir = os.path.join(self.workdir, "state", "artifacts")
         try:  # Owner 2's declared runtime selection: an absolute, operator-chosen CPython 3.11
-            self.counterdex_python = science_python()
+            self.counterdex_python = science_python(self.repo)
         except StackError:
             self.counterdex_python = None
         self.processes: dict[str, subprocess.Popen] = {}
         self.seen_descendants: dict[int, dict] = {}
         self.events: list[dict] = []
         self.extra_env = self._checked_extra_env(stack_env or {}, allow_dummy_provider_config)
-        unknown = set(diagnostic_overrides) - DIAGNOSTIC_OVERRIDES
-        if unknown:
-            raise StackError(f"unknown diagnostic override(s) {sorted(unknown)}; known: {sorted(DIAGNOSTIC_OVERRIDES)}")
-        self.diagnostic_overrides = tuple(sorted(set(diagnostic_overrides)))
 
     # -- environment -------------------------------------------------------
     @staticmethod
