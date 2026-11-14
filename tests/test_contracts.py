@@ -12,7 +12,7 @@ from bean_api.contracts import ApprovalRequest, DatasetBody, DesignRequestBody, 
 FIXTURES = Path(__file__).resolve().parents[1] / "shared" / "contracts" / "DB-SC-1" / "fixtures"
 
 
-@pytest.mark.parametrize("value", [0, 0.5, True, "0.5", "2/4", "-0/1", "+1/1", "01/1", "1/01", "1/0", "0/2", "1/-2", "1" * 257 + "/1"])
+@pytest.mark.parametrize("value", [0, 0.5, True, "0.5", "2/4", "-0/1", "+1/1", "01/1", "1/01", "1/0", "0/2", "1/-2", "1/1\n", "1" * 257 + "/1"])
 def test_noncanonical_rationals_are_rejected(value):
     with pytest.raises(ValueError):
         validate_rational(value)
@@ -167,3 +167,59 @@ def test_zero_margin_never_establishes_pair_separation():
     result["replay"] = "not_run"
     with pytest.raises(ValidationError):
         DesignResult.model_validate(result)
+
+
+def test_new_profiles_require_reviewed_objective_and_design_choices(workflow):
+    with pytest.raises(ValidationError):
+        PlanBody.model_validate({**workflow["plan"], "scientific_profile": "counterdex.v1"})
+    body = {**workflow["plan"], "scientific_profile": "counterdex.v1", "objective": {
+        "question": "Can this interval be challenged?", "success_criterion": "A matched checked witness or unresolved outcome"}}
+    assert PlanBody.model_validate(body).objective.version == "research-objective.v1"
+    with pytest.raises(ValidationError):
+        DesignRequestBody.model_validate({**workflow["design_request"], "scientific_profile": "counterdex.v1"})
+    with pytest.raises(ValidationError):
+        DesignRequestBody.model_validate({**workflow["design_request"], "scientific_profile": "counterdex.v1",
+            "requested_tier": "checked_pair_separation", "allowance_origin": {"kind": "reviewed_hard_bound", "description": "explicit"},
+            "maximum_horizon": "7/1"})
+
+
+def test_legacy_identity_bytes_do_not_gain_null_profile_fields(workflow):
+    for key, model in (("plan", PlanBody), ("design_request", DesignRequestBody)):
+        body = model.model_validate(workflow[key]).model_dump(mode="json")
+        assert "scientific_profile" not in body
+        assert "objective" not in body
+        assert canonical_bytes(body) == canonical_bytes(workflow[key])
+
+
+def test_candidate_exclusion_is_distinct_from_corruption():
+    from bean_api.contracts import CandidateResult
+    result = CandidateResult(candidate_id="outside", verification="invalid", reason_code="measurement_incompatible",
+        violating_observation_ids=["new_row"], outside_closed_claim=True, is_counterexample=False)
+    assert result.verification == "invalid" and result.reason_code == "measurement_incompatible"
+    with pytest.raises(ValidationError):
+        CandidateResult.model_validate({**result.model_dump(), "is_counterexample": True})
+
+
+def test_authoritative_admission_golden_examples():
+    controls = json.loads((FIXTURES / "admission-golden.json").read_text())
+    for case in controls["rational_cases"]:
+        if case["accepted"]:
+            assert validate_rational(case["value"]) == case["value"]
+        else:
+            with pytest.raises(ValueError):
+                validate_rational(case["value"])
+    for case in [*controls["json_cases"], *controls["byte_cases"]]:
+        options = {"max_bytes": case["max_bytes"]} if "max_bytes" in case else {}
+        if case["accepted"]:
+            parse_json_strict(case["raw"], **options)
+        else:
+            with pytest.raises(ValueError):
+                parse_json_strict(case["raw"], **options)
+
+
+def test_strict_profile_fixture_has_separate_reproducible_identities():
+    fixture = json.loads((FIXTURES / "counterdex-reviewed-scope.json").read_text())
+    for key, model, kind in (("dataset", DatasetBody, "dataset"), ("problem", ProblemBody, "problem"),
+                             ("plan", PlanBody, "plan"), ("design_request", DesignRequestBody, "design-request")):
+        assert semantic_digest(kind, model.model_validate(fixture[key])) == fixture["digests"][kind]
+    assert fixture["scientific_result_asserted"] is False

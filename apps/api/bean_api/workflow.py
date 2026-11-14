@@ -219,6 +219,7 @@ class Workflow:
         from .contracts import DatasetBody
         body = DatasetBody.model_validate(_body(body)).model_dump(mode="json")
         def action(conn: sqlite3.Connection) -> dict:
+            parent = None
             if body.get("parent_id"):
                 parent = self._get(conn, actor, body["parent_id"], "dataset")
                 self._same_workspace(workspace_id, parent)
@@ -228,9 +229,14 @@ class Workflow:
                     raise DomainError("origin_mismatch", "A descendant containing hypothetical history must remain labeled hypothetical.", 422, ["origin"])
                 if parent["body"]["origin"] == "synthetic" and body["origin"] == "actual":
                     raise DomainError("origin_mismatch", "Synthetic parent observations cannot be relabeled actual measurements.", 422, ["origin"])
-            for row in body["rows"]:
+            source_parent_rows = {row["id"]: row for row in parent["body"]["rows"] if row.get("source_asset_id")} if parent else {}
+            for index, row in enumerate(body["rows"]):
+                if row["id"] in source_parent_rows and row != source_parent_rows[row["id"]]:
+                    raise DomainError("source_review_required", "A source-derived parent row cannot be changed or lose its source association without exact intake review.", 422, [f"rows.{index}"])
                 if row.get("source_asset_id"):
                     self._same_workspace(workspace_id, self._get(conn, actor, row["source_asset_id"], "source_asset"))
+                    if parent is None or row not in parent["body"]["rows"]:
+                        raise DomainError("source_review_required", "New or corrected source-derived rows must be materialized from an exact intake review.", 422, [f"rows.{index}"])
             result = self._insert(conn, actor, workspace_id, "dataset", body, body.get("parent_id"))
             conn.execute("UPDATE workspaces SET current_dataset_id=?,current_problem_id=NULL WHERE id=?", (result["id"], workspace_id))
             return result
@@ -436,9 +442,14 @@ class Workflow:
                 return {**dict(existing), "created_new": False}
             baseline = next(item for item in plan["body"]["scenarios"] if item["kind"] == "baseline")
             if scenario["kind"] != "baseline":
-                complete = conn.execute("SELECT state FROM scenario_reservations WHERE run_id=? AND scenario_id=?", (run_id, baseline["id"])).fetchone()
+                complete = conn.execute("SELECT state,result_id FROM scenario_reservations WHERE run_id=? AND scenario_id=?", (run_id, baseline["id"])).fetchone()
                 if complete is None or complete["state"] != "completed":
                     raise DomainError("baseline_required", "The mandatory baseline must return evidence before optional work.", 403)
+                eligible = scenario.get("eligible_baseline_outcomes")
+                if eligible:
+                    baseline_evidence = self._get(conn, actor, complete["result_id"], "evidence")
+                    if baseline_evidence["body"]["result"]["scientific_outcome"] not in eligible:
+                        raise DomainError("scenario_condition_ineligible", "The actual baseline outcome does not satisfy this scenario's reviewed eligibility condition.", 403)
             if job["scientific_reservations"] >= plan["body"]["budget"]["scientific_reservations"]:
                 raise DomainError("budget_exhausted", "No scientific reservations remain.")
             reservation_id = _id("scenario")
@@ -533,12 +544,21 @@ class Workflow:
             active = conn.execute("SELECT 1 FROM scenario_reservations WHERE run_id=? AND state IN ('reserved','running')", (job_id,)).fetchone()
             if active:
                 raise DomainError("worker_not_reconciled", "Child work must terminate or be reconciled before the parent finishes.")
+            if job["state"] == "cancel_requested":
+                # Cancellation may arrive after the worker's last state read.
+                # Preserve any supplied result, but honor the durable request
+                # after child computation has stopped.
+                state = "cancelled"
             if state == "completed" and job["kind"] == "run":
                 plan = self._get(conn, actor, job["plan_id"], "plan")
                 baseline = next(item for item in plan["body"]["scenarios"] if item["kind"] == "baseline")
                 baseline_row = conn.execute("SELECT state FROM scenario_reservations WHERE run_id=? AND scenario_id=?", (job_id, baseline["id"])).fetchone()
                 if baseline_row is None or baseline_row["state"] != "completed":
                     raise DomainError("baseline_required", "The mandatory baseline must have evidence before completion.")
+                for scenario in plan["body"]["scenarios"]:
+                    status = conn.execute("SELECT state FROM scenario_reservations WHERE run_id=? AND scenario_id=?", (job_id, scenario["id"])).fetchone()
+                    if status is None or status["state"] not in {"completed", "skipped"}:
+                        raise DomainError("scenario_accounting_incomplete", "Successful completion must account for every reviewed scenario as executed or explicitly skipped.")
             if job["kind"] == "design_job" and result is not None:
                 from .contracts import DesignResult
                 result = DesignResult.model_validate(_body(result)).model_dump(mode="json")
@@ -625,6 +645,23 @@ class Workflow:
             evidence = self._get(conn, actor, child["result_id"], "evidence")["body"]["result"]
             if evidence.get("expected_binding") == "mismatch":
                 raise DomainError("binding_mismatch", "Mismatched evidence cannot support a design proposal.", 422)
+            if request.get("scientific_profile") == "counterdex.v1":
+                from fractions import Fraction
+                from .scientific_projection import project_design, project_problem
+                problem = self._get(conn, actor, request["problem_id"], "problem")
+                dataset = self._get(conn, actor, problem["body"]["dataset_id"], "dataset")
+                historical_horizon = max(Fraction(row["time"]) for row in dataset["body"]["rows"] if row["included"])
+                if Fraction(request["maximum_horizon"]) < historical_horizon:
+                    raise DomainError("unavailable_horizon", "The reviewed horizon must cover the included historical observations.", 422, ["maximum_horizon"])
+                historical_artifacts = {artifact["id"]: artifact for artifact in evidence.get("artifacts", [])}
+                for artifact_id in request.get("source_artifact_ids", []):
+                    if artifact_id not in historical_artifacts:
+                        raise DomainError("artifact_not_in_scope", "A source artifact must belong to the selected historical scenario.", 422, ["source_artifact_ids"])
+                    artifact = self._get(conn, actor, artifact_id, "native_artifact")
+                    self._same_workspace(run["workspace_id"], artifact)
+                    if artifact["body"]["sha256"] != historical_artifacts[artifact_id]["sha256"]:
+                        raise DomainError("artifact_binding_mismatch", "Historical native artifact bytes differ from the selected reference.", 422, ["source_artifact_ids"])
+                project_design(request, project_problem(problem, dataset), [None, None])
             candidates = {item.get("id"): item for item in evidence.get("candidates", []) if isinstance(item, dict)}
             for candidate_id, vector in zip(request["candidate_ids"], request["candidate_vectors"], strict=True):
                 candidate = candidates.get(candidate_id)
@@ -633,8 +670,8 @@ class Workflow:
                 candidate_vector = candidate.get("parameter_vector")
                 if candidate_vector != vector:
                     raise DomainError("candidate_vector_mismatch", "The exact fixed vector differs from its historical candidate.", 422, ["candidate_vectors"])
-                if candidate.get("problem_id", request["problem_id"]) != request["problem_id"]:
-                    raise DomainError("binding_mismatch", "Candidate belongs to a different problem.", 422)
+                if candidate.get("problem_id") != request["problem_id"] or candidate.get("problem_digest") != request["problem_digest"]:
+                    raise DomainError("binding_mismatch", "Candidate belongs to a different immutable problem identity.", 422)
             request_record = self._insert(conn, actor, run["workspace_id"], "design_request", request)
             plan_body = DesignPlanBody(request=request, request_digest=request_record["digest"]).model_dump(mode="json")
             result = self._insert(conn, actor, run["workspace_id"], "design_plan", plan_body, request_record["id"])
@@ -654,6 +691,7 @@ class Workflow:
             source_id = body["row"].get("source_asset_id")
             if source_id:
                 self._same_workspace(workspace_id, self._get(conn, actor, source_id, "source_asset"))
+                raise DomainError("source_review_required", "Source-derived observations must be materialized from an exact intake review.", 422, ["row.source_asset_id"])
             return self._insert(conn, actor, workspace_id, "observation_proposal", body, dataset["id"])
         return self._perform(actor, workspace_id, "create:observation-proposal", key, body, action)
 
@@ -665,6 +703,8 @@ class Workflow:
             frozen = self._get(conn, actor, proposal_id, "observation_proposal")
             if review["proposal_digest"] != frozen["digest"] or review["parent_dataset_id"] != frozen["body"]["dataset_id"]:
                 raise DomainError("binding_mismatch", "Review must confirm this exact proposal and parent dataset.", 422)
+            if frozen["body"]["row"].get("source_asset_id"):
+                raise DomainError("source_review_required", "Source-derived observations must be materialized from an exact intake review.", 422, ["row.source_asset_id"])
             dataset = self._get(conn, actor, review["parent_dataset_id"], "dataset")
             current = self.authorize(actor, proposal["workspace_id"], conn)
             if current["current_dataset_id"] != dataset["id"]:
@@ -710,11 +750,34 @@ class Workflow:
             evidence = [self._get(conn, actor, child["result_id"], "evidence") for child in current["scenarios"] if child["result_id"]]
             scenario_inputs = []
             source_ids = set(plan["body"]["provider_disclosure"]["source_asset_ids"])
+            dataset_ids, problem_ids = set(), set()
             for scenario in plan["body"]["scenarios"]:
                 scenario_problem = self._get(conn, actor, scenario["problem_id"], "problem")
                 scenario_dataset = self._get(conn, actor, scenario_problem["body"]["dataset_id"], "dataset")
                 scenario_inputs.append({"scenario_id": scenario["id"], "problem": scenario_problem, "dataset": scenario_dataset})
                 source_ids.update(row["source_asset_id"] for row in scenario_dataset["body"]["rows"] if row["source_asset_id"])
+                problem_ids.add(scenario_problem["id"])
+                ancestor = scenario_dataset
+                while ancestor["id"] not in dataset_ids:
+                    dataset_ids.add(ancestor["id"])
+                    if not ancestor["parent_id"]:
+                        break
+                    ancestor = self._get(conn, actor, ancestor["parent_id"], "dataset")
+                    self._same_workspace(run["workspace_id"], ancestor)
+            materializations, reviews, proposals = [], {}, {}
+            for row in conn.execute("SELECT * FROM entities WHERE workspace_id=? AND kind='intake_materialization' ORDER BY created_at,id", (run["workspace_id"],)):
+                materialization = _record(row)
+                association = materialization["body"]
+                if association["dataset_id"] not in dataset_ids and association["problem_id"] not in problem_ids:
+                    continue
+                review = self._get(conn, actor, association["review_id"], "intake_review")
+                proposal = self._get(conn, actor, review["body"]["proposal_id"], "intake_proposal")
+                self._same_workspace(run["workspace_id"], review)
+                self._same_workspace(run["workspace_id"], proposal)
+                materializations.append(materialization)
+                reviews[review["id"]] = review
+                proposals[proposal["id"]] = proposal
+                source_ids.add(association["source_asset_id"])
             sources = []
             for source_id in sorted(source_ids):
                 source = self._get(conn, actor, source_id, "source_asset")
@@ -732,9 +795,24 @@ class Workflow:
                 design_job = self._job(conn, actor, job_row["id"], "design_job") if job_row else None
                 suggestion = self._get(conn, actor, design_job["result_id"], "suggestion") if design_job and design_job["result_id"] else None
                 designs.append({"plan": design, "job": design_job, "suggestion": suggestion})
+            native_artifacts = {}
+            for result in [*evidence, *(item["suggestion"] for item in designs if item["suggestion"])]:
+                result_body = result["body"].get("result", result["body"])
+                for reference in result_body.get("artifacts", []):
+                    # Legacy results may name externally retained artifacts.
+                    # Include locally persisted metadata only, never blob locators.
+                    row = conn.execute("SELECT * FROM entities WHERE id=? AND kind='native_artifact'", (reference["id"],)).fetchone()
+                    if row is None:
+                        continue
+                    artifact = _record(row)
+                    self._same_workspace(run["workspace_id"], artifact)
+                    metadata = {name: value for name, value in artifact["body"].items() if name not in {"blob_key", "storage_path", "signed_url", "content_base64"}}
+                    native_artifacts[artifact["id"]] = {"id": artifact["id"], "metadata": metadata, "created_at": artifact["created_at"]}
             manifest = {"schema_version": "DB-SC-1", "policy_version": "GF-2", "run": current,
                         "plan": plan, "problem": problem, "dataset": dataset, "evidence": evidence,
                         "scenario_inputs": scenario_inputs, "source_assets": sources, "designs": designs,
+                        "intake_materializations": materializations, "intake_reviews": list(reviews.values()),
+                        "intake_proposals": list(proposals.values()), "native_artifacts": list(native_artifacts.values()),
                         "replay": "unsupported", "source_reconstruction": "Source assets remain separately authenticated; raw bytes are not embedded in this manifest."}
             return self._insert(conn, actor, run["workspace_id"], "report", manifest)
         return self._perform(actor, run["workspace_id"], f"report:{run_id}", key, {"run_id": run_id}, action)

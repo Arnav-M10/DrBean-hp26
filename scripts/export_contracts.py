@@ -86,6 +86,32 @@ def main() -> None:
     }
     write_json(destination / "fixtures" / "synthetic-workflow.json", fixtures)
 
+    # Additive strict-profile example. Do not rewrite the legacy fixture's
+    # historical identities when introducing newly reviewed scientific scope.
+    reviewed_problem = ProblemBody.model_validate({**problem.model_dump(mode="json"), "domain": {
+        "A": {"lower": "1/1000", "upper": "30/1"},
+        "ke": {"lower": "3/200", "upper": "7/20"},
+        "ka": {"lower": "2/5", "upper": "8/1"}}})
+    reviewed_digest = semantic_digest("problem", reviewed_problem)
+    reviewed_plan = PlanBody.model_validate({**plan.model_dump(mode="json"), "problem_digest": reviewed_digest,
+        "scientific_profile": "counterdex.v1", "objective": {
+            "question": "Do the reviewed observations admit a candidate outside the closed ke claim?",
+            "success_criterion": "Retain exact checked evidence or an explicit unresolved outcome; never infer a universal claim from a pair."},
+        "scenarios": [{"id": "baseline", "kind": "baseline", "label": "Reviewed synthetic baseline",
+            "problem_id": "synthetic_problem", "problem_digest": reviewed_digest}]})
+    reviewed_design = DesignRequestBody.model_validate({**design.model_dump(mode="json"), "problem_digest": reviewed_digest,
+        "scientific_profile": "counterdex.v1", "requested_tier": "checked_pair_separation",
+        "allowance_origin": {"kind": "hypothetical", "description": "Team-selected future hard bound, requiring explicit human review; not extracted from the source image."},
+        "maximum_horizon": "8/1", "allow_construction": True, "allow_continuation": True,
+        "source_artifact_ids": ["synthetic_native_artifact"]})
+    write_json(destination / "fixtures" / "counterdex-reviewed-scope.json", {
+        "synthetic": True, "scientific_result_asserted": False,
+        "note": "Schema-only preview with reviewed assumptions. Pair vectors are invented placeholders; replace them and all IDs with immutable real baseline output. This fixture grants no approval or verification.",
+        "dataset": dataset.model_dump(mode="json"), "problem": reviewed_problem.model_dump(mode="json"),
+        "plan": reviewed_plan.model_dump(mode="json"), "design_request": reviewed_design.model_dump(mode="json"),
+        "digests": {"dataset": semantic_digest("dataset", dataset), "problem": reviewed_digest,
+            "plan": semantic_digest("plan", reviewed_plan), "design-request": semantic_digest("design-request", reviewed_design)}})
+
     # Literal expected bytes make escaping/Unicode controls reviewable separately
     # from the implementation under test. No user or provider content is included.
     canonical_cases = [
@@ -100,6 +126,21 @@ def main() -> None:
             raise RuntimeError(f"Golden canonical byte mismatch: {name}")
         golden.append({"name": name, "value": value, "canonical_utf8_hex": expected_bytes.hex(), "kind": "report", "semantic_sha256": hashlib.sha256(b"dr-bean:report:v1\n" + expected_bytes).hexdigest()})
     write_json(destination / "fixtures" / "canonical-golden.json", golden)
+    write_json(destination / "fixtures" / "admission-golden.json", {
+        "version": "db-sc-1-admission.v1",
+        "limits": {"canonical_json_bytes": 1048576, "http_json_bytes_default": 262144,
+            "nested_levels": 32, "rational_digits_per_component": 256, "counter_maximum": 9007199254740991},
+        "rational_cases": [{"value": value, "accepted": accepted} for value, accepted in [
+            ("1/1", True), ("1/1\n", False), ("-0/1", False), ("0/1", True),
+            ("1" * 256 + "/1", True), ("1" * 257 + "/1", False)]],
+        "json_cases": [{"raw": raw, "accepted": accepted} for raw, accepted in [
+            ('{"counter":-0}', False), ('{"counter":0}', True),
+            ("[" * 32 + "0" + "]" * 32, True), ("[" * 33 + "0" + "]" * 33, False)]],
+        "byte_cases": [
+            {"raw": '{"x":"é"}', "max_bytes": 10, "accepted": True},
+            {"raw": '{"x":"é"}', "max_bytes": 9, "accepted": False}],
+        "byte_note": "Limits count encoded UTF-8 bytes, not characters. The compact byte controls use an explicit test limit; production default limits above are independently enforced by canonical parsing and HTTP admission.",
+        "engine_note": "Counterdex projection adds stricter exact rational bit, row and domain admission; application admission does not claim engine qualification."})
 
     errors = [
         (401, "unauthorized", "Authentication is required", False, None, []),
@@ -114,7 +155,7 @@ def main() -> None:
         "success": {"request": {"method": "POST", "path": "/api/bean/v1/plans/synthetic_plan/runs", "headers": {"Idempotency-Key": "synthetic_operation_key"}, "body": {"approval_id": "synthetic_approval", "expected_plan_digest": semantic_digest("plan", plan)}}, "response": {"status": 202, "body": {"id": "synthetic_run", "status": "queued", "request_id": "synthetic_request"}}, "retry_behavior": "An identical accepted request returns the same run; a changed body under this key conflicts. Fresh keys cannot rerun an already reserved plan."},
         "errors": [{"status": status, "body": ApiError(code=code, message=message, retryable=retryable, current_revision_id=revision, field_paths=paths, request_id="synthetic_request").model_dump(mode="json")} for status, code, message, retryable, revision, paths in errors],
     })
-    print(f"Exported {len(schemas)} shared schemas and three synthetic fixture files to {destination}")
+    print(f"Exported {len(schemas)} shared schemas and five fixture files to {destination}")
 
 
 if __name__ == "__main__":

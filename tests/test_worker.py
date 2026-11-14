@@ -13,7 +13,6 @@ import time
 
 import pytest
 
-from bean_api.coordinator import run_coordinator as real_coordinator
 from bean_api.ledger import ProviderLedger
 from bean_api.providers import ProviderConfig
 from bean_api.science import UnavailableAdapter
@@ -79,7 +78,7 @@ def test_real_unavailable_worker_preserves_scientific_axes_and_skips_optional(fl
     workflow, workspace = flow
     _, _, plan, approval = prepared(flow, optional=True)
     job = workflow.start_run('alice', plan['id'], approval['id'], 'start')
-    finished = asyncio.run(Worker(workflow).execute(job))
+    finished = asyncio.run(Worker(workflow, adapter=UnavailableAdapter()).execute(job))
     assert finished['state'] == 'completed'
     run = workflow.get_run('alice', job['id'])
     children = {child['scenario_id']: child for child in run['scenarios']}
@@ -92,7 +91,7 @@ def test_real_unavailable_worker_preserves_scientific_axes_and_skips_optional(fl
     assert evidence['reason_code'] == 'groundwork_adapter_not_installed'
     assert run['scientific_reservations'] == 1
     assert ProviderLedger(workflow.store).list_attempts('alice', workspace) == []
-    assert Worker(workflow).tick() == 0  # Completed reservation is not redispatched.
+    assert Worker(workflow, adapter=UnavailableAdapter()).tick() == 0  # Completed reservation is not redispatched.
 
 
 def test_unqualified_adapter_cannot_publish_valid_evidence(flow):
@@ -118,7 +117,7 @@ def test_queued_design_expiry_is_checked_before_any_scientific_dispatch(flow, mo
         dispatched.append(True)
         raise AssertionError('Expired approval reached scientific dispatch')
     monkeypatch.setattr('bean_api.worker.run_bounded', forbidden_dispatch)
-    finished = asyncio.run(Worker(workflow).execute(job))
+    finished = asyncio.run(Worker(workflow, adapter=UnavailableAdapter()).execute(job))
     assert finished['state'] == 'failed'
     assert finished['error_code'] == 'approval_expired'
     assert finished['result_id'] is None
@@ -192,19 +191,16 @@ def test_worker_actual_framework_uses_durable_attempts_and_frozen_evidence(flow,
     config = ProviderConfig(api_key='synthetic-no-network', model=model.model_name,
                             account_gate_passed=True, account_decision_id='controlled-fixture-only')
 
-    async def controlled_coordinator(*args, **kwargs):
-        return await real_coordinator(*args, **kwargs, chat_model=model)
-
-    monkeypatch.setattr('bean_api.worker.run_coordinator', controlled_coordinator)
-    finished = asyncio.run(Worker(workflow, provider_config=config, ledger=ledger).execute(job))
+    finished = asyncio.run(Worker(workflow, adapter=UnavailableAdapter(), provider_config=config, ledger=ledger, controlled_model=model).execute(job))
     assert finished['state'] == 'completed', finished['error_code']
     run = workflow.get_run('alice', job['id'])
     assert run['scientific_reservations'] == 1
     assert run['provider_turns'] == 2
-    attempts = ledger.list_attempts('alice', workspace)
+    assert ledger.list_attempts('alice', workspace) == []
+    attempts = workflow.list_records('alice', workspace, 'controlled_attempt')
     assert len(attempts) == 2
-    assert all(attempt['state'] == 'completed' for attempt in attempts)
-    assert all(attempt['metadata']['context']['consent_id'] == consent['id'] for attempt in attempts)
+    assert len(workflow.list_records('alice', workspace, 'controlled_outcome')) == 2
+    assert all(attempt['body']['context']['consent_id'] == consent['id'] for attempt in attempts)
     summary = workflow.get('alice', finished['result_id'], 'run_summary')['body']
     assert summary['runtime']['execution_lane'] == 'controlled_model'
     assert summary['runtime']['live_qualified'] is False
@@ -215,5 +211,5 @@ def test_worker_actual_framework_uses_durable_attempts_and_frozen_evidence(flow,
     event_records = workflow.list_records('alice', workspace, 'agent_event')
     assert any(item['body']['type'] == 'model_request' for item in event_records)
     assert any(item['body']['type'] == 'tool_result' for item in event_records)
-    assert Worker(workflow, provider_config=config, ledger=ledger).tick() == 0
-    assert len(ledger.list_attempts('alice', workspace)) == 2
+    assert Worker(workflow, adapter=UnavailableAdapter(), provider_config=config, ledger=ledger, controlled_model=model).tick() == 0
+    assert len(workflow.list_records('alice', workspace, 'controlled_attempt')) == 2

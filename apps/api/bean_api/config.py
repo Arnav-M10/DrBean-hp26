@@ -17,6 +17,9 @@ class Settings:
     allowed_origins: tuple[str, ...] = ("http://localhost:8000", "http://127.0.0.1:8000")
     max_json_bytes: int = 262_144
     max_upload_bytes: int = 5 * 1024 * 1024
+    artifact_dir: str = "var/artifacts"
+    science_adapter: str = "counterdex"
+    counterdex_python: str = "python3.11"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -37,6 +40,9 @@ class Settings:
             blob_dir=os.getenv("BEAN_BLOB_DIR", "var/sources"),
             auth_file=auth_file,
             auth_tokens=tokens,
+            artifact_dir=os.getenv("BEAN_ARTIFACT_DIR", "var/artifacts"),
+            science_adapter=os.getenv("BEAN_SCIENCE_ADAPTER", "counterdex"),
+            counterdex_python=os.getenv("BEAN_COUNTERDEX_PYTHON", "python3.11"),
             allowed_origins=tuple(
                 origin.strip() for origin in os.getenv(
                     "BEAN_ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"

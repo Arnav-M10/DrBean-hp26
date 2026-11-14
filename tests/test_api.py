@@ -19,7 +19,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
     settings = Settings(database_path=str(tmp_path / "db.sqlite3"), blob_dir=str(tmp_path / "sources"),
-                        auth_tokens={"alice": "a" * 40, "bob": "b" * 40})
+                        auth_tokens={"alice": "a" * 40, "bob": "b" * 40}, science_adapter="unavailable", artifact_dir=str(tmp_path / "artifacts"))
     with TestClient(create_app(settings)) as active:
         active.headers["Authorization"] = "Bearer " + "a" * 40
         yield active
@@ -51,7 +51,7 @@ def test_manual_http_approval_worker_and_exact_export(client):
     body = {"approval_id": approval["id"], "expected_plan_digest": plan["digest"]}
     run = post(client, f"/plans/{plan['id']}/runs", body, "run")
     assert post(client, f"/plans/{plan['id']}/runs", body, "different-retry-key")["id"] == run["id"]
-    assert Worker(client.app.state.workflow).tick() == 1
+    assert Worker(client.app.state.workflow, adapter=client.app.state.adapter, settings=client.app.state.settings).tick() == 1
     finished = client.get(PREFIX + f"/runs/{run['id']}").json()
     assert finished["state"] == "completed"
     evidence = client.get(PREFIX + f"/records/{finished['scenarios'][0]['result_id']}").json()
@@ -102,7 +102,7 @@ def test_cancel_queued_job_waits_for_worker_acknowledgement(client):
     run = post(client, f"/plans/{plan['id']}/runs", {"approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "run")
     cancelled = post(client, f"/runs/{run['id']}/cancel", {}, "cancel")
     assert cancelled["state"] == "cancel_requested"
-    Worker(client.app.state.workflow).tick()
+    Worker(client.app.state.workflow, adapter=client.app.state.adapter, settings=client.app.state.settings).tick()
     assert client.get(PREFIX + f"/runs/{run['id']}").json()["state"] == "cancelled"
 
 
