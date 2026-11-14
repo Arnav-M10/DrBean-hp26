@@ -1,4 +1,8 @@
 import multiprocessing
+import os
+from pathlib import Path
+import subprocess
+import sys
 import time
 
 from bean_api.science import UnavailableAdapter, run_bounded
@@ -8,6 +12,35 @@ class SlowAdapter:
     def investigate(self, *args):
         time.sleep(10)
         return {"should_not_arrive": True}
+
+
+class DescendantAdapter:
+    def investigate(self, problem, dataset, limits):
+        descendant = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        Path(problem["pid_file"]).write_text(str(descendant.pid))
+        if problem.get("return_early"):
+            return {"descendant_pid": descendant.pid}
+        time.sleep(30)
+        return {}
+
+
+def process_running(pid):
+    # A dead process awaiting its OS reaper is no longer executing computation.
+    stat = Path(f"/proc/{pid}/stat")
+    if stat.exists() and stat.read_text().split()[2] == "Z":
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def assert_descendant_terminated(pid):
+    deadline = time.monotonic() + 2
+    while process_running(pid) and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert not process_running(pid), "The owned descendant remained running after parent acknowledgement"
 
 
 def test_unconfigured_science_has_no_checked_capability():
@@ -32,3 +65,19 @@ def test_cancel_is_acknowledged_after_process_termination():
     result = run_bounded(SlowAdapter(), "investigate", ({}, {}, {}), wall_seconds=5, cancelled=lambda: True)
     assert result == {"worker_error": "cancelled"}
     assert {child.pid for child in multiprocessing.active_children()} == before
+
+
+def test_cancellation_terminates_descendants(tmp_path):
+    pid_file = tmp_path / "child.pid"
+    result = run_bounded(DescendantAdapter(), "investigate", ({"pid_file": str(pid_file)}, {}, {}),
+                         wall_seconds=5, cancelled=pid_file.exists)
+    assert result == {"worker_error": "cancelled"}
+    assert_descendant_terminated(int(pid_file.read_text()))
+
+
+def test_descendant_cannot_escape_by_outliving_adapter(tmp_path):
+    pid_file = tmp_path / "child.pid"
+    result = run_bounded(DescendantAdapter(), "investigate",
+                         ({"pid_file": str(pid_file), "return_early": True}, {}, {}), wall_seconds=5)
+    assert "descendant_pid" in result
+    assert_descendant_terminated(result["descendant_pid"])

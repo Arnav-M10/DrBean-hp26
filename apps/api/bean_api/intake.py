@@ -65,22 +65,31 @@ def inspect_image(raw: bytes, declared_mime: str) -> dict:
         )
     except subprocess.TimeoutExpired as exc:
         raise _error("source_decode_timeout", "Image decoding exceeded its limit; use a smaller image.") from exc
+    except OSError:
+        raise _error("decoder_setup_failed", "The isolated image worker could not be started.", status=503) from None
     if result.returncode:
         # Worker errors never expose decoder internals or source content.
         allowed = {
             "pixel_limit", "decoded_memory_limit", "animated_image_unsupported",
-            "orientation_unsupported", "image_mode_unsupported",
+            "orientation_unsupported", "image_mode_unsupported", "decoder_setup_failed",
         }
         last = result.stderr.decode("utf-8", errors="replace").strip().splitlines()
         code = last[-1].split(": ")[-1] if last else "malformed_image"
         code = code if code in allowed else "malformed_image"
+        if code == "decoder_setup_failed":
+            raise _error(code, "The image worker could not establish its required runtime guards.", status=503)
         message = (
             "Rotate and save the image with normal orientation before uploading it."
             if code == "orientation_unsupported" else
             "The image is malformed or exceeds the supported decoding limits; use a simpler image or manual input."
         )
         raise _error(code, message)
-    metadata = json.loads(result.stdout)
+    try:
+        metadata = json.loads(result.stdout)
+        if not isinstance(metadata, dict) or set(metadata) != {"observed_media_type", "width", "height"}:
+            raise ValueError("invalid worker envelope")
+    except (ValueError, TypeError):
+        raise _error("decoder_setup_failed", "The image worker returned an invalid infrastructure response.", status=503) from None
     if metadata["observed_media_type"] != observed:
         raise _error("media_type_mismatch", "The image decoder found a different media type.")
     return metadata

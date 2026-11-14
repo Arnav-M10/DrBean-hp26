@@ -1,8 +1,8 @@
 """Owner01 adapter seam and killable, bounded scientific process boundary.
 
-No scientific theorem implementation is imported by this backend. The default
-adapter reports unavailable. A qualified adapter is supplied explicitly by the
-integration owner; a model can never select an import, path, or command.
+The server chooses the prepared adapter and runtime; a model can never select
+an import, path, or command. The explicit unavailable adapter remains useful
+for deployment diagnosis and isolated workflow tests.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ import os
 import signal
 import time
 from typing import Any, Callable, Protocol
+
+from .resource_policy import ResourceSetupError, apply_limits
 
 
 class ScienceAdapter(Protocol):
@@ -44,20 +46,22 @@ class UnavailableAdapter:
 
 def _child(connection: Any, adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], wall: int, memory: int, result_cap: int) -> None:
     try:
-        os.setsid()
+        try:
+            os.setsid()
+        except (AttributeError, OSError) as exc:
+            raise ResourceSetupError("process_session_setup_failed") from exc
+        connection.send_bytes(b'{"_worker_control":"session_started"}')
         # The scientific process needs neither provider nor application credentials.
         os.environ.clear()
-        import resource
-        resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
-        resource.setrlimit(resource.RLIMIT_CPU, (wall + 1, wall + 1))
-        resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
-        resource.setrlimit(resource.RLIMIT_NPROC, (32, 32))
+        apply_limits(memory_bytes=memory, cpu_seconds=wall + 1)
         result = getattr(adapter, operation)(*args)
         encoded = json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
         if len(encoded) > result_cap:
             connection.send_bytes(b'{"worker_error":"artifact_size_limit"}')
         else:
             connection.send_bytes(encoded)
+    except ResourceSetupError:
+        connection.send_bytes(b'{"worker_error":"scientific_worker_setup_failed"}')
     except BaseException:
         connection.send_bytes(b'{"worker_error":"scientific_worker_failed"}')
     finally:
@@ -75,6 +79,7 @@ def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], 
     started = time.monotonic()
     process.start()
     sender.close()
+    owned_session = False
     try:
         while time.monotonic() - started < wall_seconds:
             if cancelled():
@@ -86,13 +91,22 @@ def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], 
                     return {"worker_error": "scientific_worker_failed"}
                 if not isinstance(result, dict):
                     return {"worker_error": "invalid_adapter_output"}
+                if result == {"_worker_control": "session_started"} and not owned_session:
+                    owned_session = True
+                    continue
                 return result
             if not process.is_alive():
                 return {"worker_error": "scientific_worker_failed"}
         return {"worker_error": "scientific_wall_limit"}
     finally:
-        if process.is_alive():
-            # Target only this process's new session; never kill a shared worker group.
+        # Clean the owned process group even when its leader returned or exited:
+        # descendants may still hold resources after an adapter spawns a child.
+        if owned_session:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        elif process.is_alive():
             try:
                 if os.getpgid(process.pid) == process.pid:
                     os.killpg(process.pid, signal.SIGKILL)

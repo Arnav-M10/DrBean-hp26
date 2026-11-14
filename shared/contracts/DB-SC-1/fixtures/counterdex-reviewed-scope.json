@@ -1,0 +1,212 @@
+{
+  "synthetic": true,
+  "scientific_result_asserted": false,
+  "note": "Schema-only preview with reviewed assumptions. Pair vectors are invented placeholders; replace them and all IDs with immutable real baseline output. This fixture grants no approval or verification.",
+  "dataset": {
+    "schema_version": "DB-SC-1",
+    "experiment_id": "synthetic_experiment",
+    "time_origin": "Elapsed hours from this synthetic experiment's declared t=0",
+    "rows": [
+      {
+        "id": "row_1",
+        "time": "1/4",
+        "concentration": "24/5",
+        "hard_allowance": "1/2",
+        "included": true,
+        "original_values": {
+          "time": "0.25",
+          "concentration": "4.80",
+          "hard_allowance": "0.50"
+        },
+        "source_asset_id": null,
+        "notes": ""
+      },
+      {
+        "id": "row_2",
+        "time": "1/2",
+        "concentration": "36/5",
+        "hard_allowance": "1/2",
+        "included": true,
+        "original_values": {
+          "time": "0.5",
+          "concentration": "7.20",
+          "hard_allowance": "0.50"
+        },
+        "source_asset_id": null,
+        "notes": ""
+      },
+      {
+        "id": "row_3",
+        "time": "1/1",
+        "concentration": "8/1",
+        "hard_allowance": "1/2",
+        "included": true,
+        "original_values": {
+          "time": "1",
+          "concentration": "8.00",
+          "hard_allowance": "0.50"
+        },
+        "source_asset_id": null,
+        "notes": ""
+      },
+      {
+        "id": "row_4",
+        "time": "2/1",
+        "concentration": "34/5",
+        "hard_allowance": "1/2",
+        "included": true,
+        "original_values": {
+          "time": "2",
+          "concentration": "6.80",
+          "hard_allowance": "0.50"
+        },
+        "source_asset_id": null,
+        "notes": ""
+      },
+      {
+        "id": "row_5",
+        "time": "4/1",
+        "concentration": "57/10",
+        "hard_allowance": "1/2",
+        "included": true,
+        "original_values": {
+          "time": "4",
+          "concentration": "5.70",
+          "hard_allowance": "0.50"
+        },
+        "source_asset_id": null,
+        "notes": ""
+      }
+    ],
+    "parent_id": null,
+    "change_reason": "Synthetic transcription oracle; no scientific result is asserted",
+    "origin": "synthetic"
+  },
+  "problem": {
+    "schema_version": "DB-SC-1",
+    "dataset_id": "synthetic_dataset",
+    "dataset_digest": "5fb550e8373409a658a2757c98edac5ec562385aa7b9c5fd64552503f05ebfd9",
+    "model": "two_rate_concentration",
+    "domain": {
+      "A": {
+        "lower": "1/1000",
+        "upper": "30/1"
+      },
+      "ke": {
+        "lower": "3/200",
+        "upper": "7/20"
+      },
+      "ka": {
+        "lower": "2/5",
+        "upper": "8/1"
+      },
+      "rate_order": "ke_lt_ka"
+    },
+    "initial_concentration": "0/1",
+    "observable": "concentration",
+    "time_unit": "h",
+    "concentration_unit": "mg/L",
+    "rate_unit": "1/h",
+    "target": {
+      "parameter": "ke",
+      "lower": "1/10",
+      "upper": "17/100",
+      "closed": true
+    }
+  },
+  "plan": {
+    "schema_version": "DB-SC-1",
+    "problem_id": "synthetic_problem",
+    "problem_digest": "601d2b069417ea27ce1b9caf258b0d2e7b181f27994d022d1b700b96126426ad",
+    "dataset_id": "synthetic_dataset",
+    "scenarios": [
+      {
+        "id": "baseline",
+        "problem_id": "synthetic_problem",
+        "problem_digest": "601d2b069417ea27ce1b9caf258b0d2e7b181f27994d022d1b700b96126426ad",
+        "kind": "baseline",
+        "label": "Reviewed synthetic baseline"
+      }
+    ],
+    "permitted_tools": [
+      "read_scoped_evidence",
+      "execute_approved_scenario",
+      "record_allowed_skip",
+      "return_grounded_explanation"
+    ],
+    "budget": {
+      "provider_turns": 0,
+      "tool_calls": 2,
+      "scientific_reservations": 1,
+      "wall_seconds": 120,
+      "scientific_wall_seconds": 120
+    },
+    "provider_disclosure": {
+      "provider": "none",
+      "model": null,
+      "source_asset_ids": [],
+      "context_fields": [],
+      "permission_id": null
+    },
+    "parent_plan_id": null,
+    "scientific_profile": "counterdex.v1",
+    "objective": {
+      "version": "research-objective.v1",
+      "question": "Do the reviewed observations admit a candidate outside the closed ke claim?",
+      "success_criterion": "Retain exact checked evidence or an explicit unresolved outcome; never infer a universal claim from a pair."
+    }
+  },
+  "design_request": {
+    "schema_version": "DB-SC-1",
+    "historical_run_id": "synthetic_run",
+    "scenario_id": "baseline",
+    "problem_id": "synthetic_problem",
+    "problem_digest": "601d2b069417ea27ce1b9caf258b0d2e7b181f27994d022d1b700b96126426ad",
+    "candidate_ids": [
+      "synthetic_candidate_a",
+      "synthetic_candidate_b"
+    ],
+    "candidate_vectors": [
+      {
+        "A": "10/1",
+        "ke": "1/10",
+        "ka": "2/1"
+      },
+      {
+        "A": "12/1",
+        "ke": "1/5",
+        "ka": "3/1"
+      }
+    ],
+    "observable": "concentration",
+    "feasible_times": [
+      "6/1",
+      "8/1"
+    ],
+    "future_hard_allowance": "1/5",
+    "allow_construction": true,
+    "allow_continuation": true,
+    "budget": {
+      "wall_seconds": 120,
+      "fixed_vector_constructions": 2,
+      "pair_verifications": 2,
+      "bundle_bytes": 4194304
+    },
+    "scientific_profile": "counterdex.v1",
+    "requested_tier": "checked_pair_separation",
+    "allowance_origin": {
+      "kind": "hypothetical",
+      "description": "Team-selected future hard bound, requiring explicit human review; not extracted from the source image."
+    },
+    "maximum_horizon": "8/1",
+    "source_artifact_ids": [
+      "synthetic_native_artifact"
+    ]
+  },
+  "digests": {
+    "dataset": "5fb550e8373409a658a2757c98edac5ec562385aa7b9c5fd64552503f05ebfd9",
+    "problem": "601d2b069417ea27ce1b9caf258b0d2e7b181f27994d022d1b700b96126426ad",
+    "plan": "8a3198a18530623e59f06976a684b055a286e3f5abb9af3519a68020bf2d0919",
+    "design-request": "ab115416334d904dedf2c998aff82911c179856aee307dc0bcce2e269ed04211"
+  }
+}

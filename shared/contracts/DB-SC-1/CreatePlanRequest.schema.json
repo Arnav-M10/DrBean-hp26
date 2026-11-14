@@ -115,6 +115,30 @@
           ],
           "default": null,
           "title": "Parent Plan Id"
+        },
+        "scientific_profile": {
+          "anyOf": [
+            {
+              "const": "counterdex.v1",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scientific Profile"
+        },
+        "objective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResearchObjective"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -191,6 +215,35 @@
       "title": "ProviderDisclosure",
       "type": "object"
     },
+    "ResearchObjective": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "research-objective.v1",
+          "default": "research-objective.v1",
+          "title": "Version",
+          "type": "string"
+        },
+        "question": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "success_criterion": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Success Criterion",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "success_criterion"
+      ],
+      "title": "ResearchObjective",
+      "type": "object"
+    },
     "Scenario": {
       "additionalProperties": false,
       "properties": {
@@ -226,6 +279,45 @@
           "minLength": 1,
           "title": "Label",
           "type": "string"
+        },
+        "purpose": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Purpose"
+        },
+        "eligible_baseline_outcomes": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "certified_counterexample",
+                  "numerical_candidate",
+                  "no_counterexample_found",
+                  "inconclusive",
+                  "unsupported",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              "maxItems": 6,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eligible Baseline Outcomes"
         }
       },
       "required": [
