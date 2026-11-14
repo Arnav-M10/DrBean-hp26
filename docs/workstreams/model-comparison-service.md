@@ -85,3 +85,16 @@ selection rates or fitted-parameter uncertainty. No model truth probabilities,
 exact certificates, real-instrument calibration or experimental data are claimed.
 All application providers remain disabled; no keys, private researcher material,
 new infrastructure or sponsor integration was used.
+
+## Merge qualification
+
+After PR #56 merged into main at `2138437`, its exact changes were merged into
+this branch without conflicts (candidate `47bebcb`). The combined source passed
+all 81 focused physics/computation/API/registry tests and all seven actual
+Chromium transport/service checks. CI now places this checkout's separate
+numerical package on the backend test path, so the adapter test runs instead of
+being skipped. This changes test coverage, not the approved production fitter.
+The UI owner confirmed adoption of the service contract in PR #55 and retains
+ownership of its additional view/module static routes. No unresolved review
+thread or scientific blocker prevents independent service integration. Final
+merge SHA and resulting-commit checks are retained in the PR discussion.

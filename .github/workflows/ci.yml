@@ -53,6 +53,7 @@ jobs:
         run: |
           export BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python"
           export PATH="$PWD/.venv-engine/bin:$PATH"   # some tests look up python3.11 on PATH
+          export PYTHONPATH="$PWD/packages/counterdex_models"  # exercise the current-source numerical adapter
           uv run pytest -q tests --ignore=tests/integration -rs
       - run: uv run ruff check apps tests scripts
       - name: exported schemas match the committed ones
@@ -76,6 +77,10 @@ jobs:
           python -m counterdex replay packages/groundwork_adapter/fixtures/checked_success.bundle.json \
             --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json > replay.json
           python -c "import json; r=json.load(open('replay.json')); assert r['replay']=='passed' and r['expected_binding']=='matches' and r['verification']=='valid', r"
+      - name: numerical model comparison (separate counterdex-models package)
+        run: |
+          python -m unittest discover -s packages/counterdex_models/tests
+          python packages/counterdex_models/examples/demo.py
 
   web:
     name: web unit tests

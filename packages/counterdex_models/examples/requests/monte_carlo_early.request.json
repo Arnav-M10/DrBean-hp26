@@ -1,0 +1,41 @@
+{
+  "schema_version": "counterdex-models.request.v1",
+  "analysis": "monte_carlo",
+  "truth": {
+    "model": "public.two-exponential-mixture",
+    "parameters": {
+      "A1": 6.0,
+      "k1": 0.9,
+      "A2": 2.0,
+      "k2": 0.06
+    }
+  },
+  "candidates": [
+    "public.single-exponential",
+    "public.two-exponential-mixture"
+  ],
+  "times": [
+    0.25,
+    0.5,
+    1,
+    1.5,
+    2,
+    3,
+    4
+  ],
+  "noise": {
+    "absolute_sd": 0.05,
+    "relative_sd": 0.08,
+    "label": "Stated synthetic assay noise (standard deviation)"
+  },
+  "detection_threshold": {
+    "value": 0.1,
+    "label": "Stated synthetic detection threshold"
+  },
+  "replicates": 200,
+  "seed": 1,
+  "fit": {
+    "starts": 4,
+    "max_iterations": 100
+  }
+}
