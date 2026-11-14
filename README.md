@@ -21,7 +21,7 @@
 
 Dr. Bean is a research assistant for examining what scientific data support and deciding what to measure next. It combines file analysis with **Google Gemini**, research coordination with **LangChain Deep Agents**, and deterministic scientific computation with **Counterdex**.
 
-The main interface is the **study workspace** at `/study/`. Researchers bring files and a question, review the proposed analysis, inspect the answer, and choose a next step. Supported scientific checks retain the reviewed inputs, assumptions, computation, and evidence needed to inspect or replay a result.
+The main interface is the **study workspace** at `/study/app`, introduced by a front page at `/study/`. Researchers bring files and a question, review the proposed analysis, inspect the answer, and choose a next step. Supported scientific checks retain the reviewed inputs, assumptions, computation, and evidence needed to inspect or replay a result.
 
 <p align="center">
   <img src="docs/images/study-workspace.png" alt="Dr. Bean study workspace with a question, file intake, and the Data, Approval, Answer, and Next step stages" width="100%">

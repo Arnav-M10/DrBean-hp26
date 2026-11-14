@@ -199,3 +199,54 @@ test('the published example answer reads with its quotes, and its tables can sta
   assert.equal(table.rows.length, first.rows.length)
   assert.ok(G.nextSteps(m).includes('Review the values'))
 })
+
+// --- The front page ---------------------------------------------------------------------------------
+// Every number and sentence the front page shows comes from home-data.mjs. Read the saved runs again
+// and check that the copy is exact and words the same as the study page.
+test('the front page shows the saved runs exactly, worded as the study page words them', async () => {
+  const H = await import('./home-data.mjs'), R = await import('./results.mjs'), C = await import('./compare.mjs')
+  const dir = new URL('./fixtures/', import.meta.url)
+  const names = readdirSync(dir).filter(name => name.startsWith('dr-bean-'))
+  const m = summarize(fromTexts(Object.fromEntries(names.map(name => [name, readFileSync(new URL(name, dir), 'utf8')]))))
+  const d = H.doseStudy()
+  assert.deepEqual(d.included.map(({ t, v, e, time, value, allowance }) => ({ t, v, e, time, value, allowance })),
+    m.included.map(({ t, v, e, time, value, allowance }) => ({ t, v, e, time, value, allowance })))
+  assert.deepEqual(d.candidates.map(({ tone, outside, exact, params }) => ({ tone, outside, exact, params })),
+    m.candidates.map(({ tone, outside, exact, params }) => ({ tone, outside, exact, params })))
+  assert.deepEqual([d.claim.low, d.claim.high, d.outcome, d.search, d.created, d.checker.version, d.objective],
+    [m.claim.low, m.claim.high, m.outcome, m.search, m.created, m.checker.version, m.objective])
+  const shown = times => times.map(({ t, separated, margin, centers, ranges }) => ({ t, separated, margin, centers, ranges }))
+  assert.deepEqual(d.next.times, shown(m.next.times))
+  assert.deepEqual([d.next.tier, d.next.selected, d.next.allowance, d.next.horizon], [m.next.tier, m.next.selected, m.next.allowance, m.next.horizon])
+  assert.deepEqual(R.finding(d), R.finding(m))
+  assert.deepEqual(R.nextFinding(d), R.nextFinding(m))
+  assert.equal(R.nextTable(d), R.nextTable(m))
+  assert.equal(H.DOSE.replay, m.replay[0])
+  // The exact fraction set large on the page is the rate of the curve outside the claim.
+  assert.equal(d.candidates.find(c => c.outside).exact.ke, '101/1016')
+  assert.ok(101 * 10 < 1016 * 1, 'the fraction is below the claimed 0.10')
+
+  const cm = C.readComparison({ id: 'cmp_fixture', body: fixture('synthetic.response.json'), created_at: null })
+  assert.deepEqual(H.CURRENTS.groups, C.resultGroups(cm))
+  assert.deepEqual(C.comparisonFinding(H.currentsStudy()), C.comparisonFinding(cm))
+  assert.deepEqual(H.CURRENTS.cases, cm.cases.map(c => [C.micro(c.sigma_A), C.caseFinding(cm, c).headline]))
+})
+
+test('the front page links only to the study, its own sections and the source, and loads nothing from elsewhere', () => {
+  const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8')
+  const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]))
+  for (const [, href] of html.matchAll(/\shref="([^"]*)"/g)) {
+    if (href.startsWith('#')) assert.ok(href === '#main' || ids.has(href.slice(1)), `missing section ${href}`)
+    else assert.ok(['app', './', 'https://github.com/Arnav-M10/DrBean-hp26'].includes(href) || /^(fonts|vendor)\/|\.css$/.test(href), `unexpected link ${href}`)
+  }
+  for (const [, src] of html.matchAll(/\ssrc="([^"]*)"/g)) assert.doesNotMatch(src, /^(https?:)?\/\//)
+  assert.equal([...html.matchAll(/data-start/g)].length, 3)
+  // Its sections never take a study step's name: those links open the study (the redirect in <head>).
+  for (const step of ['data', 'check', 'result', 'next']) assert.ok(!ids.has(step), step)
+  assert.match(html, /\^#\(data\|check\|result\|next\)\(-\|\$\)/)
+  // The front page reads the study page's storage key to offer the saved study.
+  const key = readFileSync(new URL('./app.mjs', import.meta.url), 'utf8').match(/const STORE = '([^']+)'/)[1]
+  assert.ok(readFileSync(new URL('./home.mjs', import.meta.url), 'utf8').includes(`'${key}'`))
+  // The study page's logo leads back to the front page.
+  assert.match(readFileSync(new URL('./app.html', import.meta.url), 'utf8'), /<a class="brand" href="\.\/">/)
+})

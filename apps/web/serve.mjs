@@ -197,7 +197,9 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (path.startsWith('/study/')) {
-    const rest = path.slice('/study/'.length) || 'index.html';
+    // /study/ is the front page; the study itself is /study/app (study/app.html).
+    const asked = path.slice('/study/'.length);
+    const rest = { '': 'index.html', app: 'app.html' }[asked] ?? asked;
     const type = { html: 'text/html; charset=utf-8', mjs: 'text/javascript; charset=utf-8', js: 'text/javascript; charset=utf-8',
       css: 'text/css; charset=utf-8', woff2: 'font/woff2' }[rest.split('.').pop()];
     if (!type || !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*$/.test(rest.replace(/\.[a-z0-9]+$/, ''))

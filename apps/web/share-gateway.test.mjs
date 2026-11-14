@@ -111,7 +111,8 @@ test('following an external link admits only the entry document, never cross-sit
   assert.equal((await send(f.port, { path: '/index.html', method: 'HEAD', headers: navigation })).status, 200)
   assert.equal((await send(f.port, { path: '/', headers: { ...navigation, 'sec-fetch-site': 'same-site' } })).status, 200)
   assert.equal((await send(f.port, { path: '/study/', headers: navigation })).status, 200)
-  assert.equal(f.statics.length, 4)
+  assert.equal((await send(f.port, { path: '/study/app', headers: navigation })).status, 200)
+  assert.equal(f.statics.length, 5)
   assert.equal(f.calls.length, 0)
   for (const path of ['/api/bean/v1/shared-session', '/api/bean/v1/workspaces', '/session.mjs', '/styles.css', '/study/app.mjs', '/study/styles.css']) {
     assert.equal((await send(f.port, { path, headers: navigation })).status, 403)
@@ -121,7 +122,7 @@ test('following an external link admits only the entry document, never cross-sit
   for (const headers of [{ host: 'evil.test' }, { 'x-forwarded-proto': 'http' }, { origin: 'https://evil.test' }, { 'sec-fetch-site': 'unknown' }]) {
     assert.equal((await send(f.port, { path: '/', headers: { ...navigation, ...headers } })).status, 403)
   }
-  assert.equal(f.statics.length, 4)
+  assert.equal(f.statics.length, 5)
   assert.equal(f.calls.length, 0)
 })
 

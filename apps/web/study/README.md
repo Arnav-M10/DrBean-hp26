@@ -1,12 +1,24 @@
 # Study page
 
-A second browser front end for the same local app, served at `/study/` by `apps/web/serve.mjs`.
-The page at `/` is unchanged. Start the app as usual (`scripts/dev/launcher.py start`), then open
-`http://127.0.0.1:4173/study/` (or whatever web port the launcher prints).
+A second browser front end for the same local app, served by `apps/web/serve.mjs`: a front page at
+`/study/` and the study itself at `/study/app`. The page at `/` is unchanged. Start the app as usual
+(`scripts/dev/launcher.py start`), then open `http://127.0.0.1:4173/study/` (or whatever web port the
+launcher prints). Links to a study step, such as `/study/#data`, open the study directly.
 
-It uses the real API through the local proxy: the private browser session, research assets, the
-general research service, datasets, problems, research sessions with their review gates, the
-numerical model comparison service and the signed downloads. Nothing on the page is mocked.
+The study uses the real API through the local proxy: the private browser session, research assets,
+the general research service, datasets, problems, research sessions with their review gates, the
+numerical model comparison service and the signed downloads. Nothing in the study is mocked.
+
+## Front page
+
+`index.html` shows what a study does, using the study's own screens: its markup, `styles.css` and
+the functions that word and draw its results (`results.mjs`, `compare.mjs`, `chart.mjs`,
+`channel-chart.mjs`, `math.mjs`). `home.mjs` fills them from `home-data.mjs`, which copies two saved
+runs: the concentration study in `fixtures/` (the claim check and the next measurement) and the
+electron comparison in `fixtures/model-comparison/synthetic.response.json`. `study.test.mjs` reads
+those files again and checks every value. The file list and the assistant's answer on the front page
+are mock-ups of those screens, and the page says so. The front page sends nothing to the server and
+opens no workspace; its buttons lead to `/study/app`, which reopens a study saved in the browser.
 
 ## One flow for any files
 
@@ -50,7 +62,8 @@ The study id is kept in `localStorage`, so a reload reopens it.
 
 | File | What it does |
 | --- | --- |
-| `index.html`, `styles.css` | The page and its styles (dark, one accent) |
+| `app.html`, `styles.css` | The study page and its styles (dark, one accent) |
+| `index.html`, `home.css`, `home.mjs`, `home-data.mjs` | The front page, its layout, and the saved runs it shows |
 | `app.mjs` | Files and question, the overview, routing, and the exact-check steps |
 | `general-app.mjs`, `general.mjs` | The assistant's steps, and which checks a table fits |
 | `compare-app.mjs`, `compare.mjs` | The electron-current steps, and the request, checks and wording behind them |
@@ -63,4 +76,4 @@ The study id is kept in `localStorage`, so a reload reopens it.
 | `fixtures/` | Files from a real run of the app on the sample, used by `study.test.mjs` |
 
 `node --test` in `apps/web` runs `study.test.mjs` with the other web tests; `serve.test.mjs` and
-`share-gateway.test.mjs` cover the `/study/` route.
+`share-gateway.test.mjs` cover the `/study/` and `/study/app` routes.
