@@ -191,3 +191,16 @@ def test_checked_design_vetoes_known_bad_native_evidence_even_if_its_fact_is_unc
 ])
 def test_a_valid_clause_cannot_hide_an_unrecognized_scientific_assertion(suffix):
     assert commentary_rejection("This does not prove the interval. " + suffix, FACTS) == "unsupported_claim"
+
+
+@pytest.mark.parametrize("split_gate", [None, "design_tier", "verification", "expected_binding", "replay"])
+def test_checked_design_assistant_facts_require_all_gates_from_the_same_record(split_gate):
+    values = {"selected_time": "8/1", "future_hard_allowance": "1/5", "design_tier": "checked_pair_separation",
+              "verification": "valid", "expected_binding": "matches", "replay": "passed"}
+    facts = [{"id": f"suggestion_guard:{field}", "record_id": "suggestion_guard", "field": field, "value": value}
+             for field, value in values.items()]
+    if split_gate is not None:
+        fact = next(item for item in facts if item["field"] == split_gate)
+        fact.update(record_id="other_suggestion", id=f"other_suggestion:{split_gate}")
+    prose = "The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair."
+    assert commentary_rejection(prose, facts) == (None if split_gate is None else "unsupported_claim")
