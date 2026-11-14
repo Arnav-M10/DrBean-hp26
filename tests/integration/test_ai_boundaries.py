@@ -77,12 +77,14 @@ def make_app(tmp_path, monkeypatch):
     from bean_api.main import create_app
     clients = []
 
-    def make(responses: dict):
+    def make(responses: dict, adapter=None):
         provider = ControlledProvider(responses)
         settings = Settings(database_path=str(tmp_path / f"db{len(clients)}.sqlite3"),
                             blob_dir=str(tmp_path / f"blobs{len(clients)}"),
+                            artifact_dir=str(tmp_path / f"artifacts{len(clients)}"),  # never the repo's var/
                             auth_tokens={"alice": "a" * 40, "bob": "b" * 40})
-        client = TestClient(create_app(settings, provider=provider))
+        client = TestClient(create_app(settings, provider=provider, adapter=adapter))
+        client.adapter = adapter
         client.headers["Authorization"] = "Bearer " + "a" * 40
         clients.append(client)
         return client, provider
@@ -514,6 +516,9 @@ def test_exaggerated_final_explanation_is_rejected_but_evidence_is_preserved():
     assert [fact["id"] for fact in result.evidence] == ["evidence-baseline"]  # science survives bad prose
 
 
+@pytest.mark.xfail(strict=True, reason="F-COORDINATOR-OPTIONAL-STATUS (P2, Owner 3): the coordinator module still "
+                   "returns completed; the requirement is enforced at the worker/workflow boundary, proven by "
+                   "test_worker_refuses_completion_when_a_reviewed_optional_scenario_vanishes")
 def test_reviewed_optional_scenario_cannot_silently_vanish():
     """Completion must account for every reviewed optional scenario: executed, skipped, or unresolved by failure."""
     def finish_early(observed):
@@ -528,6 +533,9 @@ def test_reviewed_optional_scenario_cannot_silently_vanish():
         "neither executed nor explicitly skipped")
 
 
+@pytest.mark.xfail(strict=True, reason="F-COORDINATOR-PROVIDER-LABEL (P2, Owner 3): coordinator metadata names "
+                   "provider gemini for controlled turns; the worker stores it only inside controlled_attempt records, "
+                   "proven by test_worker_records_controlled_turns_outside_the_provider_ledger")
 def test_controlled_turns_never_masquerade_as_live_provider_attempts():
     tools = Tools("certified_counterexample")
     _, ledger = run_graph(scripted_model(adaptive), tools)
@@ -537,3 +545,118 @@ def test_controlled_turns_never_masquerade_as_live_provider_attempts():
     assert not labelled, (
         f"finding F-CONTROLLED-PROVENANCE (Owner 3): {len(labelled)} controlled-model turn(s) were reserved as provider "
         "'gemini' attempts with no controlled/placeholder marker; in the worker these land in the real provider ledger")
+
+
+# ----------------------------------------------------------------------------- integrated worker boundary
+
+class ControlledScienceAdapter:
+    """CONTROLLED tool outcome (labelled) inside the real bounded child, worker and workflow. Not Counterdex."""
+
+    def __init__(self, outcome):
+        self.outcome = outcome
+
+    def capabilities(self):
+        return {"implemented": True, "configured": True, "available": True, "verified_in_environment": False,
+                "adapter": "controlled-test-adapter", "baseline_discovery": True, "native_replay": False,
+                "design_tiers": [], "claim_families": [], "browser_replay": False}
+
+    def admit(self, problem, dataset):
+        return None
+
+    def investigate(self, problem, dataset, limits):
+        return {"scientific_outcome": self.outcome, "verification": "not_checked", "expected_binding": "not_supplied",
+                "replay": "not_run", "reason_code": "controlled_tool_outcome", "problem_id": problem["id"],
+                "problem_digest": problem["digest"], "candidates": [], "artifacts": []}
+
+    def design(self, request, historical_evidence):
+        raise NotImplementedError
+
+
+def agent_run(make_app, outcome, script):
+    """Approve an AI-disclosed plan with one reviewed optional comparison and run the real Worker once."""
+    from bean_api.providers import ProviderConfig
+    from bean_api.worker import Worker
+    adapter = ControlledScienceAdapter(outcome)
+    client, _ = make_app({}, adapter=adapter)
+    workspace, dataset, problem = problem_workspace(client)
+    permission = post(client, f"/workspaces/{workspace}/provider-consents", {
+        "provider": "gemini", "model": PLACEHOLDER_MODEL, "source_asset_ids": [],
+        "context_fields": ["problem", "dataset"], "problem_id": problem["id"], "accepted": True}, "consent")
+    scenario = {"problem_id": problem["id"], "problem_digest": problem["digest"]}
+    plan = post(client, f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"], "plan": {
+        "problem_id": problem["id"], "problem_digest": problem["digest"], "dataset_id": dataset["id"],
+        "scientific_profile": "counterdex.v1",
+        "objective": {"version": "research-objective.v1", "question": "Is the reviewed comparison still needed?",
+                      "success_criterion": "Account for every reviewed scenario."},
+        "scenarios": [{"id": "baseline", "kind": "baseline", "label": "baseline", **scenario},
+                      {"id": "optional", "kind": "optional", "label": "comparison", **scenario,
+                       "purpose": "Run the reviewed comparison only if the baseline found no counterexample.",
+                       "eligible_baseline_outcomes": ["no_counterexample_found", "inconclusive"]}],
+        "provider_disclosure": {"provider": "gemini", "model": PLACEHOLDER_MODEL,
+                                "context_fields": ["problem", "dataset"], "permission_id": permission["id"]}}}, "plan")
+    approval = post(client, f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
+                    "expected_current_revision_id": problem["id"], "accepted": True}, "approve")
+    run = post(client, f"/plans/{plan['id']}/runs", {"approval_id": approval["id"],
+               "expected_plan_digest": plan["digest"]}, "start")
+    config = ProviderConfig(api_key="DRBEAN-DUMMY-KEY-0001", model=PLACEHOLDER_MODEL, account_gate_passed=True,
+                            account_decision_id="DRBEAN-DUMMY-DECISION-0001")
+    worker = Worker(client.app.state.workflow, adapter=adapter, provider_config=config,
+                    controlled_model=scripted_model(script), settings=client.app.state.settings)
+    assert worker.tick() == 1
+    final = client.get(PREFIX + f"/runs/{run['id']}").json()
+    return client, workspace, final
+
+
+def worker_adaptive(observed):
+    """Same objective; the optional comparison is eligible only after no_counterexample_found / inconclusive.
+
+    Controlled outcomes must still satisfy the result contract: an unchecked tool outcome cannot be a certified
+    counterexample, so the contrast uses numerical_candidate (not eligible -> skip) versus no_counterexample_found.
+    """
+    if not observed:
+        return "execute_approved_scenario", {"scenario_id": "baseline"}
+    first = observed[0] if isinstance(observed[0], dict) else {}
+    if len(observed) == 1 and first.get("scientific_outcome") == "numerical_candidate":
+        return "record_allowed_skip", {"scenario_id": "optional", "reason_code": "not_relevant"}
+    if len(observed) == 1:
+        return "execute_approved_scenario", {"scenario_id": "optional"}
+    return "return_grounded_explanation", {"fact_ids": [first.get("id")], "text": "The evidence has a conditional scope.",
+                                           "next_action": "stop"}
+
+
+def test_worker_refuses_completion_when_a_reviewed_optional_scenario_vanishes(make_app):
+    def finish_early(observed):
+        if not observed:
+            return "execute_approved_scenario", {"scenario_id": "baseline"}
+        first = observed[0] if isinstance(observed[0], dict) else {}
+        return "return_grounded_explanation", {"fact_ids": [first.get("id")], "text": "Done.", "next_action": "stop"}
+    _, _, final = agent_run(make_app, "no_counterexample_found", finish_early)
+    states = {s["scenario_id"]: s["state"] for s in final["scenarios"]}
+    accounted = states.get("optional") in {"completed", "skipped"}
+    assert final["state"] != "completed" or accounted, (
+        f"F-OPTIONAL-VANISHES: run {final['state']} with scenario states {states}")
+    assert final["state"] == "failed" and final["error_code"] == "scenario_accounting_incomplete", final
+
+
+def test_worker_same_objective_different_evidence_changes_disposition(make_app):
+    _, _, witnessed = agent_run(make_app, "numerical_candidate", worker_adaptive)
+    _, _, inconclusive = agent_run(make_app, "no_counterexample_found", worker_adaptive)
+    assert witnessed["state"] == inconclusive["state"] == "completed", (witnessed, inconclusive)
+    assert {s["scenario_id"]: s["state"] for s in witnessed["scenarios"]} == {"baseline": "completed", "optional": "skipped"}
+    assert {s["scenario_id"]: s["state"] for s in inconclusive["scenarios"]} == {"baseline": "completed",
+                                                                                 "optional": "completed"}
+
+
+def test_worker_records_controlled_turns_outside_the_provider_ledger(make_app):
+    client, workspace, final = agent_run(make_app, "numerical_candidate", worker_adaptive)
+    assert final["state"] == "completed", final
+    with client.app.state.workflow.store.read() as conn:
+        provider_rows = conn.execute("SELECT count(*) FROM provider_attempts").fetchone()[0]
+        controlled = [json.loads(row[0]) for row in conn.execute(
+            "SELECT body FROM entities WHERE kind='controlled_attempt'")]
+    assert provider_rows == 0, "controlled turns must never become provider-ledger attempts"
+    assert controlled and all(c["execution_lane"] == "controlled_placeholder" and c["external_provider_calls"] == 0
+                              and c["actual_model_tokens"] == 0 for c in controlled)
+    summary = client.get(PREFIX + f"/records/{final['result_id']}").json()["body"]
+    assert summary["execution_lane"] == "controlled_placeholder" and summary["external_provider_calls"] == 0
+    assert client.get(PREFIX + f"/workspaces/{workspace}/provider-attempts").json() == []

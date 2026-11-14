@@ -169,6 +169,9 @@ def main(argv=None) -> int:
                           f"- **Input:** {f.get('minimal_input', '')}", f"- **Command:** `{f['command']}`",
                           f"- **Expected:** {f.get('expected', '')}", f"- **Observed:** {f.get('observed', '')}",
                           f"- **Evidence:** {json.dumps(f.get('evidence', {}), sort_keys=True)}"]
+                for item in f.get("retests", []):
+                    lines.append(f"- **Retest at {item['at_commit']}:** {item['result']} "
+                                 f"(evidence: {json.dumps(item.get('evidence', {}), sort_keys=True)})")
         with open(os.path.join(ROOT, "FINDINGS.md"), "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines) + "\n")
         print("wrote evaluation/FINDINGS.md")

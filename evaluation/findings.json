@@ -1,150 +1,457 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T05:15:00Z",
-  "application_code_commit": "586fb9bd260406b07d00241a69e38909ec32ed7c",
-  "observed_at_harness_commit": "da5ecdc3f6ad",
+  "updated_at": "2026-11-14T04:10:00Z",
+  "application_code_commit": "adac9452 (origin/main, merged into claude/adversarial-validation as 1862ebf)",
+  "observed_at_harness_commit": "d2d3c53",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
     {
-      "id": "F-PLATFORM-RLIMIT", "severity": "P0", "owner": "2", "status": "open",
+      "id": "F-PLATFORM-RLIMIT",
+      "severity": "P0",
+      "owner": "2",
+      "status": "retested",
       "title": "Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected)",
       "minimal_input": "fixtures/intake/clean.png (sha256 6363da39...0b06); any approved manual plan",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --only RS-HERO-FULL",
       "expected": "POST source-assets -> 201 (1200x1550 PNG); baseline run completes with evidence",
       "observed": "422 malformed_image; run state failed, error scientific_worker_failed, scenario scientific_attempt_failed. setrlimit(RLIMIT_AS) raises ValueError 'current limit exceeds maximum limit' (soft/hard already RLIM_INFINITY) in _image_decode.py and science.py _child",
-      "evidence": {"attempts": ["att_95b6fad90f3740e4", "att_e74991a9307e41d4"],
-                   "tests": ["tests/test_evaluation.py::test_synthetic_corpus_passes_real_media_admission",
-                             "tests/integration/test_http_lifecycle_and_science.py::test_hero_full_loop_real_science_design_download_and_native_replay"],
-                   "baseline_suite": "136 passed, 17 failed, 11 errors at 586fb9b (identical to the audit)"}
+      "evidence": {
+        "attempts": [
+          "att_95b6fad90f3740e4",
+          "att_e74991a9307e41d4"
+        ],
+        "tests": [
+          "tests/test_evaluation.py::test_synthetic_corpus_passes_real_media_admission",
+          "tests/integration/test_http_lifecycle_and_science.py::test_hero_full_loop_real_science_design_download_and_native_replay"
+        ],
+        "baseline_suite": "136 passed, 17 failed, 11 errors at 586fb9b (identical to the audit)"
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Image decoder fixed on this Mac: valid clean.png admitted 1200x1550 through the real API (resource policy now reports RLIMIT_AS unavailable on Darwin). Scientific-worker failures on the Mac now have a different cause, tracked as F-MAC-NPROC.",
+          "evidence": {
+            "attempts": [
+              "att_87537746fa40470d (source_image_admitted passed)"
+            ],
+            "backend_suite": "265 passed, 4 failed (was 136/17/11); the RLIMIT_AS image tests pass"
+          }
+        }
+      ]
     },
     {
-      "id": "F-ADAPTER-SELECTION", "severity": "P0", "owner": "2 (with 1 for the runtime bridge)", "status": "open",
+      "id": "F-ADAPTER-SELECTION",
+      "severity": "P0",
+      "owner": "2 (with 1 for the runtime bridge)",
+      "status": "retested",
       "title": "Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP",
       "minimal_input": "default launch (python -m uvicorn bean_api.main:create_app --factory; python -m bean_api.worker)",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch",
       "expected": "readiness.science.ready true (implemented, configured, verified_in_environment) and real discovery/checking on supplied input",
       "observed": "capabilities.science {implemented:false, configured:false, verified_in_environment:false, reason:groundwork_adapter_not_installed} (lane-runs.jsonl subject_start.readiness)",
-      "evidence": {"lane_run": "last entry of evaluation/results/lane-runs.jsonl", "attempts": ["att_95b6fad90f3740e4"]}
+      "evidence": {
+        "lane_run": "last entry of evaluation/results/lane-runs.jsonl",
+        "attempts": [
+          "att_95b6fad90f3740e4"
+        ]
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Ordinary API startup selects Counterdex (capabilities.science: implemented, configured, available via the 3.11 probe); the worker uses the same factory.",
+          "evidence": {
+            "lane_run": "lane-runs.jsonl readiness at d2d3c53: science.runtime_available true, baseline_discovery false"
+          }
+        }
+      ]
     },
     {
-      "id": "F-BASELINE-DISCOVERY", "severity": "P0", "owner": "1", "status": "open",
+      "id": "F-BASELINE-DISCOVERY",
+      "severity": "P0",
+      "owner": "1 (producer) and 2 (adapter wiring)",
+      "status": "open",
       "title": "Counterdex has no bounded baseline candidate-discovery operation (investigate)",
       "minimal_input": "evaluation/cases/science/hero-v1.json",
       "command": "PYTHONPATH=packages/groundwork_adapter python3.11 -c 'import counterdex; print(counterdex.__all__)'",
       "expected": "an operation that searches the supplied reviewed input, freezes exact vectors and freshly checks them",
       "observed": "public API exposes normalize/create_suggestion/replay_bundle for a supplied fixed pair only",
-      "evidence": {"note": "engine-level fixed-pair controls pass (controls.jsonl); discovery is the missing join, not the checker"}
+      "evidence": {
+        "note": "engine-level fixed-pair controls pass (controls.jsonl); discovery is the missing join, not the checker"
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Still open on main: CounterdexAdapter.investigate returns unsupported/baseline_producer_unavailable by design (Owner 2 BACKEND_INTEGRATION.md). Counterdex baseline.py/search.py are merged but not wired; the unmerged branch backend/browser-baseline (cc779bf) appears to wire computed baseline evidence and is next to preview.",
+          "evidence": {
+            "backend_test": "tests/test_scientific_http.py::test_ordinary_http_baseline_is_honestly_blocked_without_a_producer"
+          }
+        }
+      ]
     },
     {
-      "id": "F-NATIVE-BYTES", "severity": "P0", "owner": "2 (bytes, anchor record) and 1 (complete packet)", "status": "open",
+      "id": "F-NATIVE-BYTES",
+      "severity": "P0",
+      "owner": "2 (bytes, anchor record) and 1 (complete packet)",
+      "status": "fixed_pending_retest",
       "title": "No authenticated route returns native packet bytes; /artifacts/{id} serves the entity envelope; records expose no scientific anchors",
       "minimal_input": "any completed run with ArtifactReference entries",
       "command": "RS-HERO-FULL checks baseline_native_bytes_downloadable and *_anchor_from_authenticated_record",
       "expected": "GET returns exact referenced bytes (sha/length/media type match reference and X-Artifact-SHA256); replay anchors come from the expected-run record",
       "observed": "not yet reachable through HTTP at this commit because F-PLATFORM-RLIMIT/F-ADAPTER-SELECTION stop the run first; code inspection: main.py artifact() returns canonical_bytes(record) for evidence/suggestion/report kinds only",
-      "evidence": {"harness": "evaluation/drbean_eval/science_flow.py Flow.download tries /artifacts/{id} and /artifacts/{id}/content and classifies envelopes",
-                   "anchor_field_names_accepted": "evaluation/drbean_eval/native.py ANCHOR_KEYS (agree final names with Owner 2)"}
+      "evidence": {
+        "harness": "evaluation/drbean_eval/science_flow.py Flow.download tries /artifacts/{id} and /artifacts/{id}/content and classifies envelopes",
+        "anchor_field_names_accepted": "evaluation/drbean_eval/native.py ANCHOR_KEYS (agree final names with Owner 2)"
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Implemented on main: GET /artifacts/{id} returns native bytes with X-Artifact-SHA256 and GET /artifacts/{id}/anchor returns scientific_problem_digest / native_suggestion_digest. Not yet exercised through HTTP here: no run produces artifacts (discovery unavailable; F-MAC-NPROC on this Mac). Harness updated to use the anchor route.",
+          "evidence": {
+            "code": "apps/api/bean_api/main.py artifact(), artifact_anchor()"
+          }
+        }
+      ]
     },
     {
-      "id": "F-FOLLOWUP-FEEDBACK", "severity": "P0", "owner": "1 and 2", "status": "open",
+      "id": "F-FOLLOWUP-FEEDBACK",
+      "severity": "P0",
+      "owner": "1 and 2",
+      "status": "open",
       "title": "No application route reports candidate-specific outcomes for the prior pair after a hypothetical reading",
       "minimal_input": "hero design pair + hypothetical 3.4 / 4.57 / 4.0 mg/L at the selected time, allowance 0.2",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --only RS-HERO-FULL RS-FOLLOWUP",
       "expected": "new hypothetical lineage + new approval, then per-candidate compatible/excluded for the prior pair that agrees with the independent decimal oracle; aggregate exclusion reported as scientific feedback, not corruption",
       "observed": "lineage, origin labelling and new-approval requirement work over HTTP; per-candidate feedback has no route (harness accepts prior_candidate_results / candidate_results); blocked behind the hero run",
-      "evidence": {"attempts": ["att_003a52ad356c4088"], "engine_controls": "followup:3.4/4.57/4.0 pass at engine level"}
+      "evidence": {
+        "attempts": [
+          "att_003a52ad356c4088"
+        ],
+        "engine_controls": "followup:3.4/4.57/4.0 pass at engine level"
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "ScientificResult now carries candidate_results; Owner 1's unmerged codex/science-next adds original-candidate observation rechecks. No integrated HTTP route yet exercised here (blocked behind the hero run).",
+          "evidence": {
+            "attempts": [
+              "att_86aae8c45eb24619"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "F-PLACEHOLDER-AUTO", "severity": "P0", "owner": "3", "status": "open",
+      "id": "F-PLACEHOLDER-AUTO",
+      "severity": "P0",
+      "owner": "3",
+      "status": "retested",
       "title": "The legacy documented live switch (dummy values only) constructs google.genai.Client and attempts dispatch",
       "minimal_input": "GEMINI_API_KEY=DRBEAN-DUMMY-KEY-0001 GEMINI_MODEL=drbean-placeholder-model BEAN_GEMINI_ACCOUNT_GATE=approved BEAN_GEMINI_ACCOUNT_DECISION_ID=DRBEAN-DUMMY-DECISION-0001 BEAN_GEMINI_IMAGE_TOKEN_BOUND=1000; POST /workspaces/{id}/assistant-turns (explain, consented)",
       "command": ".venv/bin/python -m pytest tests/integration/test_zero_dispatch.py -k legacy_documented_live_switch",
       "expected": "no network-capable client construction or dispatch unless a NEW explicit mode switch (authorized by a new user instruction) is set; placeholder by default",
       "observed": "egress guard recorded provider_client_blocked google.genai.Client from main.py:assistant_turn -> conversation.py:363 submit -> providers.py:231 generate for each consented turn, and the worker coordinator path; the guard refused it so nothing left the machine",
-      "evidence": {"tests": ["tests/integration/test_zero_dispatch.py::test_legacy_documented_live_switch_with_dummy_values_still_cannot_dispatch"],
-                   "clean_paths": "default configuration and dummy key alone: zero attempts (tests pass)"}
+      "evidence": {
+        "tests": [
+          "tests/integration/test_zero_dispatch.py::test_legacy_documented_live_switch_with_dummy_values_still_cannot_dispatch"
+        ],
+        "clean_paths": "default configuration and dummy key alone: zero attempts (tests pass)"
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Fixed on main: provider_config_from_env() returns ProviderConfig() and reads no Gemini variable; the legacy documented live switch with dummy values now produces zero client constructions and zero egress.",
+          "evidence": {
+            "tests": [
+              "tests/integration/test_zero_dispatch.py::test_legacy_documented_live_switch_with_dummy_values_still_cannot_dispatch (passed)"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "F-PLACEHOLDER-MODE", "severity": "P1", "owner": "3", "status": "open",
+      "id": "F-PLACEHOLDER-MODE",
+      "severity": "P1",
+      "owner": "3",
+      "status": "retested",
       "title": "Capabilities declare no explicit placeholder/disabled provider mode",
       "minimal_input": "GET /api/bean/v1/capabilities on a default launch",
       "command": ".venv/bin/python -m pytest tests/integration/test_zero_dispatch.py -k placeholder_mode_is_explicit",
       "expected": "capabilities.gemini.mode (or provider_mode) = placeholder / disabled / controlled_placeholder",
       "observed": "no mode field; only configured:false / unavailable_reason provider_not_configured",
-      "evidence": {"lane": "RS-ZERO-DISPATCH informational check explicit_placeholder_mode_reported = blocked"}
+      "evidence": {
+        "lane": "RS-ZERO-DISPATCH informational check explicit_placeholder_mode_reported = blocked"
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Fixed on main: capabilities.ai_mode = disabled_placeholder, gemini.dispatch_enabled = false, live_qualification not_run.",
+          "evidence": {
+            "tests": [
+              "tests/integration/test_zero_dispatch.py::test_placeholder_mode_is_explicit_in_capabilities (passed)"
+            ],
+            "attempts": [
+              "att_096ce3cf92d44583 (explicit_placeholder_mode_reported passed)"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "F-OPTIONAL-VANISHES", "severity": "P1", "owner": "3 (graph) and 2 (callbacks)", "status": "open",
+      "id": "F-OPTIONAL-VANISHES",
+      "severity": "P1",
+      "owner": "3 (graph) and 2 (callbacks)",
+      "status": "retested",
       "title": "The actual deepagents graph completes while a reviewed optional scenario is neither executed nor skipped",
       "minimal_input": "scripted model: execute baseline, then return_grounded_explanation",
       "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k optional_scenario_cannot_silently_vanish",
       "expected": "completion only when every reviewed optional scenario is executed or explicitly skipped; otherwise unresolved/failed",
       "observed": "CoordinatorResult status completed, optional scenario unaccounted",
-      "evidence": {"tests": ["tests/integration/test_ai_boundaries.py::test_reviewed_optional_scenario_cannot_silently_vanish"]}
+      "evidence": {
+        "tests": [
+          "tests/integration/test_ai_boundaries.py::test_reviewed_optional_scenario_cannot_silently_vanish"
+        ]
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Resolved at the integrated boundary: Workflow.finish_run refuses completion (scenario_accounting_incomplete) unless every reviewed scenario is completed or skipped; the real Worker + deepagents graph with a controlled model ends failed. The coordinator module alone still reports completed (residual P2 F-COORDINATOR-OPTIONAL-STATUS).",
+          "evidence": {
+            "tests": [
+              "tests/integration/test_ai_boundaries.py::test_worker_refuses_completion_when_a_reviewed_optional_scenario_vanishes (passed)"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "F-CONTROLLED-PROVENANCE", "severity": "P1", "owner": "3", "status": "open",
+      "id": "F-CONTROLLED-PROVENANCE",
+      "severity": "P1",
+      "owner": "3",
+      "status": "retested",
       "title": "Controlled-model turns are reserved as provider 'gemini' attempts with no placeholder marker",
       "minimal_input": "run_coordinator with a controlled chat_model",
       "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k masquerade",
       "expected": "controlled turns carry explicit controlled/placeholder provenance and never read as live-provider attempts",
       "observed": "BudgetMiddleware begin_attempt metadata provider=gemini, framework deepagents, no execution_lane/transport marker; in the worker these rows enter the real provider_attempts table",
-      "evidence": {"tests": ["tests/integration/test_ai_boundaries.py::test_controlled_turns_never_masquerade_as_live_provider_attempts"]}
+      "evidence": {
+        "tests": [
+          "tests/integration/test_ai_boundaries.py::test_controlled_turns_never_masquerade_as_live_provider_attempts"
+        ]
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Resolved at the integrated boundary: the Worker records controlled turns as controlled_attempt/controlled_outcome records (execution_lane controlled_placeholder, zero calls and tokens); provider_attempts stays empty. The coordinator's own metadata still says provider gemini inside simulated_reservation (residual P2 F-COORDINATOR-PROVIDER-LABEL). My earlier claim that these rows reach the real provider ledger was true of 586fb9b's worker path only as a risk and is not true on main.",
+          "evidence": {
+            "tests": [
+              "tests/integration/test_ai_boundaries.py::test_worker_records_controlled_turns_outside_the_provider_ledger (passed)"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "F-REVIEW-MATERIALIZATION", "severity": "P1", "owner": "2", "status": "open",
+      "id": "F-REVIEW-MATERIALIZATION",
+      "severity": "P1",
+      "owner": "2",
+      "status": "fixed_pending_retest",
       "title": "An accepted intake review creates no dataset association (source values never reach execution)",
       "minimal_input": "controlled clean proposal, every field confirmed",
       "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k clean_proposal_stays_unreviewed",
       "expected": "a server-enforced review -> exact dataset materialization (still requiring separate plan approval)",
       "observed": "intake_review record only; zero datasets (safe: nothing is auto-accepted, but the join is missing)",
-      "evidence": {"audit": "AUDIT_AND_NEXT_STEPS P1 'Bind reviewed source values to execution'"}
+      "evidence": {
+        "audit": "AUDIT_AND_NEXT_STEPS P1 'Bind reviewed source values to execution'"
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "main adds POST /workspaces/{id}/intake-reviews/{review_id}/materialize and refuses direct datasets citing a source (source_review_required, verified over HTTP in RS-HERO-FULL). Materialization itself not yet exercised by this harness.",
+          "evidence": {
+            "attempts": [
+              "att_87537746fa40470d (source_linked_values_require_review passed)"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "F-RESTART-UNOBSERVABLE", "severity": "P1", "owner": "2 (after F-PLATFORM-RLIMIT)", "status": "open",
+      "id": "F-RESTART-UNOBSERVABLE",
+      "severity": "P1",
+      "owner": "2 (after F-PLATFORM-RLIMIT)",
+      "status": "open",
       "title": "Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet",
       "minimal_input": "RS-CANCEL-RESTART",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --only RS-CANCEL-RESTART",
       "expected": "a live scientific child at cancel / worker kill, gone afterwards; interrupted run not redispatched",
       "observed": "queued cancellation and recovery semantics pass; running-child checks not_observed (child dies at setup)",
-      "evidence": {"attempts": ["att_ea42f9e1c5bf4b23"]}
+      "evidence": {
+        "attempts": [
+          "att_ea42f9e1c5bf4b23"
+        ]
+      },
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Still unobservable on this Mac: no scientific child survives setup (F-MAC-NPROC). Queued cancellation passes.",
+          "evidence": {
+            "attempts": [
+              "att_e1326b12871140f2"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "F-LINT-CHECKLIST", "severity": "P2", "owner": "4", "status": "open",
+      "id": "F-LINT-CHECKLIST",
+      "severity": "P2",
+      "owner": "4",
+      "status": "open",
       "title": "Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract)",
       "minimal_input": "repository at 586fb9b",
       "command": ".venv/bin/ruff check apps tests scripts",
       "expected": "All checks passed",
       "observed": "F401 scripts/release/checklist.py:25 drbean_eval.contract imported but unused",
+      "evidence": {},
+      "retests": [
+        {
+          "at_commit": "adac945 via merge 1862ebf (harness d2d3c53)",
+          "result": "Still failing on main: ruff check apps tests scripts reports 1 error.",
+          "evidence": {
+            "command": ".venv/bin/ruff check apps tests scripts"
+          }
+        }
+      ]
+    },
+    {
+      "id": "F-MAC-NPROC",
+      "severity": "P0",
+      "owner": "2",
+      "status": "open",
+      "title": "On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11",
+      "minimal_input": "macOS 26.7 arm64 user with 649 processes; resource policy process cap 32 (process_count: rlimit_nproc_per_user)",
+      "command": ".venv/bin/python -c \"import os,resource,subprocess; pid=os.fork()\\nif pid==0:\\n resource.setrlimit(resource.RLIMIT_NPROC,(32,32)); subprocess.run(['/usr/bin/true'])\"  -> BlockingIOError Errno 35; also BEAN_COUNTERDEX_PYTHON=/opt/homebrew/bin/python3.11 .venv/bin/python -m pytest tests/test_science_boundary.py tests/test_scientific_http.py",
+      "expected": "the supervised child launches the prepared CPython 3.11 runtime on the team's Mac; process-tree containment comes from the owned session/process group",
+      "observed": "spawn fails with EAGAIN at caps 32 and 64 (passes at 4000); runs end failed with scientific_runtime_unavailable / scientific_worker_failed; 4 backend tests fail on the Mac only (Linux run passed)",
+      "evidence": {
+        "attempts": [
+          "att_87537746fa40470d",
+          "att_adf816f75f9b4d1a"
+        ],
+        "backend_tests": [
+          "test_science_boundary.py::test_cancellation_terminates_descendants",
+          "test_science_boundary.py::test_descendant_cannot_escape_by_outliving_adapter",
+          "test_scientific_http.py::test_ordinary_http_baseline_is_honestly_blocked_without_a_producer",
+          "test_scientific_http.py::test_explicit_seed_pair_real_design_download_and_independent_replay"
+        ],
+        "suggested_seam": "treat RLIMIT_NPROC on Darwin like RLIMIT_AS (report unavailable) or set it to current user process count + a small margin; keep the owned-session kill and wall clock"
+      }
+    },
+    {
+      "id": "F-COORDINATOR-OPTIONAL-STATUS",
+      "severity": "P2",
+      "owner": "3",
+      "status": "open",
+      "title": "run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow)",
+      "minimal_input": "scripted model: execute baseline, then return_grounded_explanation",
+      "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k optional_scenario_cannot_silently_vanish",
+      "expected": "the coordinator itself reports an unresolved disposition",
+      "observed": "status completed (strict xfail)",
       "evidence": {}
     },
     {
-      "id": "H-ORACLE-BOUNDARIES", "severity": "P1", "owner": "5", "status": "retested",
+      "id": "F-COORDINATOR-PROVIDER-LABEL",
+      "severity": "P2",
+      "owner": "3",
+      "status": "open",
+      "title": "Coordinator attempt metadata names provider gemini for controlled-model turns",
+      "minimal_input": "run_coordinator with a controlled chat_model",
+      "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k masquerade",
+      "expected": "controlled turns carry an explicit controlled/placeholder marker at the source",
+      "observed": "metadata provider=gemini; the worker wraps it in controlled_attempt records, so no live-looking row reaches the provider ledger (strict xfail)",
+      "evidence": {}
+    },
+    {
+      "id": "F-TEST-VAR-LEAK",
+      "severity": "P2",
+      "owner": "2",
+      "status": "open",
+      "title": "Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts",
+      "minimal_input": "tests/test_api.py client fixture (Settings(database_path=..., blob_dir=..., auth_tokens=...))",
+      "command": ".venv/bin/python -m pytest -q tests/test_api.py; ls var/artifacts",
+      "expected": "test runs write only to tmp_path",
+      "observed": "an empty var/artifacts appeared in the working tree (removed)",
+      "evidence": {
+        "note": "Workstream 5's own fixture had the same omission and now sets artifact_dir"
+      }
+    },
+    {
+      "id": "H-ORACLE-BOUNDARIES",
+      "severity": "P1",
+      "owner": "5",
+      "status": "retested",
       "title": "Harness contract oracle accepted inputs the API rejects (trailing newline, -0, depth 64, digit caps)",
-      "fixed_in": "5b66b2b", "evidence": {"tests": ["evaluation/tests/test_contract_boundaries.py"]}
+      "fixed_in": "5b66b2b",
+      "evidence": {
+        "tests": [
+          "evaluation/tests/test_contract_boundaries.py"
+        ]
+      }
     },
     {
-      "id": "H-BUDGET-USAGE", "severity": "P1", "owner": "5", "status": "retested",
+      "id": "H-BUDGET-USAGE",
+      "severity": "P1",
+      "owner": "5",
+      "status": "retested",
       "title": "Harness JSONL budget accepted negative usage and counted one request per reservation",
-      "fixed_in": "5b66b2b", "evidence": {"tests": ["evaluation/tests/test_offline_lane.py::BudgetHardening"]}
+      "fixed_in": "5b66b2b",
+      "evidence": {
+        "tests": [
+          "evaluation/tests/test_offline_lane.py::BudgetHardening"
+        ]
+      }
     },
     {
-      "id": "H-COMPLETED-QUALIFIES", "severity": "P0", "owner": "5", "status": "retested",
+      "id": "H-COMPLETED-QUALIFIES",
+      "severity": "P0",
+      "owner": "5",
+      "status": "retested",
       "title": "Merged harness passed a case-less full-stack entry on state == completed alone",
-      "fixed_in": "31a73b1", "evidence": {"tests": ["evaluation/tests/test_offline_lane.py::OfflineLaneRunner"]}
+      "fixed_in": "31a73b1",
+      "evidence": {
+        "tests": [
+          "evaluation/tests/test_offline_lane.py::OfflineLaneRunner"
+        ]
+      }
     },
     {
-      "id": "H-VACUOUS-ORPHAN", "severity": "P1", "owner": "5", "status": "retested",
+      "id": "H-VACUOUS-ORPHAN",
+      "severity": "P1",
+      "owner": "5",
+      "status": "retested",
       "title": "First lane run passed orphan/restart checks vacuously (child died at setup); attempt retained",
-      "fixed_in": "5bcc917, da5ecdc", "evidence": {"vacuous_attempt": "att_2928947236dd4eab (31a73b1, passed)", "corrected_attempt": "att_ea42f9e1c5bf4b23 (da5ecdc, unrun)"}
+      "fixed_in": "5bcc917, da5ecdc",
+      "evidence": {
+        "vacuous_attempt": "att_2928947236dd4eab (31a73b1, passed)",
+        "corrected_attempt": "att_ea42f9e1c5bf4b23 (da5ecdc, unrun)"
+      }
     },
     {
-      "id": "H-DIRTY-FLAG", "severity": "P1", "owner": "5", "status": "retested",
+      "id": "H-DIRTY-FLAG",
+      "severity": "P1",
+      "owner": "5",
+      "status": "retested",
       "title": "git_state stripped porcelain output and marked every record dirty (since harness 0.1.0)",
-      "fixed_in": "da5ecdc", "evidence": {"tests": ["evaluation/tests/test_offline_lane.py::DirtyFlag"],
-                                          "affected_records": "records at 31a73b1 and 5bcc917 carry worktree_dirty=true although only evaluation/results changed; the 34 pre-merge records are unaffected"}
+      "fixed_in": "da5ecdc",
+      "evidence": {
+        "tests": [
+          "evaluation/tests/test_offline_lane.py::DirtyFlag"
+        ],
+        "affected_records": "records at 31a73b1 and 5bcc917 carry worktree_dirty=true although only evaluation/results changed; the 34 pre-merge records are unaffected"
+      }
     }
-  ]
+  ],
+  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14."
 }
