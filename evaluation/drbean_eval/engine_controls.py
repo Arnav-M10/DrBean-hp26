@@ -21,7 +21,17 @@ Controls:
 * hypothetical follow-ups at 8 h / 0.2 mg/L: 3.4 keeps the reference and excludes
   the outside candidate, 4.57 the reverse, 4.0 excludes both; per-candidate
   results agree with the independent decimal oracle and aggregate pair status is
-  reported as scientific exclusion, not corruption.
+  reported as scientific exclusion, not corruption;
+* coordinator predicates SCI-06 and SCI-05 (added by C at DB-COORDINATOR-3OWNER-1):
+  a reading at 8 h declared with its own allowance wider than the design's 0.2
+  legitimately keeps both candidates, while the same reading at the separating
+  allowance keeps neither, because the independent oracle shows the closed 0.2 bands
+  are disjoint there. A forged packet claiming both compatible at that separating
+  scope is refused: the real anchor fails integrity, and with a test-only anchor
+  fresh recomputation reports a recorded-result mismatch. A requested
+  numerical-guidance design never becomes checked separation, and its replay is
+  unsupported rather than passed. Infeasible grid times are kept with their reasons
+  but are never evaluated, ranked or selected.
 
 Fresh replay is the same project checker run again, not an independent proof.
 """
@@ -30,6 +40,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import os
 import subprocess
 import tempfile
@@ -93,6 +104,11 @@ try:
             body["artifacts"] = []
         elif kind == "duplicate_artifact":
             body["artifacts"] = body["artifacts"] + body["artifacts"][:1]
+        elif kind == "claim_all_valid":
+            # Test-only forgery: every claimed candidate result says the candidate kept every reading.
+            for item in body["report"]["checked"]["candidate_results"]:
+                item.update(verification="valid", violating_observation_ids=[], reason_code=None,
+                            is_counterexample=bool(item.get("outside_closed_claim")))
         elif kind == "unknown_profile":
             body["schema_version"] = "groundwork.suggestion-bundle.v99"
         body["suggestion_digest"] = semantic_digest("suggestion", body)
@@ -261,6 +277,10 @@ def replay_class(result: dict) -> str:
     if code == "resource_exhaustion":
         return "exhausted"
     report = result.get("report") or {}
+    # Recorded claims that fresh recomputation contradicts are a mathematical failure, even when the fresh verdict
+    # is itself an exclusion (harness finding H-REPLAY-CLASS-RECORDED-MISMATCH).
+    if report.get("recorded_result_matches") is False or report.get("reason_code") == "recorded_result_mismatch":
+        return "mathematical_failure"
     if (report.get("integrity") == "passed" and report.get("expected_binding") == "matches"
             and report.get("verification") == "invalid"):
         return "scientific_exclusion"
@@ -514,4 +534,157 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
                {"per_candidate": found, "independent_oracle": oracle, "aggregate": aggregate},
                "hypothetical 8 h reading, allowance 0.2: candidate-specific feedback; proves nothing about the "
                "original interval or every possible model")
+    results.extend(_coordinator_science_controls(science_python, package_dir, hero, pair, problem, workflow, vectors))
+    return results
+
+
+def _ratio(value: Fraction) -> str:
+    return f"{value.numerator}/{value.denominator}"
+
+
+def _fresh_verdicts(replayed: dict) -> dict:
+    return {c["candidate_id"]: ("compatible" if c.get("verification") == "valid" else
+                                "excluded" if c.get("verification") == "invalid" else c.get("verification"))
+            for c in (replayed.get("report") or {}).get("fresh_checked", {}).get("candidate_results", [])}
+
+
+def _coordinator_science_controls(science_python: str, package_dir: str, hero: dict, pair: list[dict], problem: dict,
+                                  workflow: dict, vectors: dict) -> list[dict]:
+    """SCI-06 and SCI-05 controls for the frozen coordinator predicates (evaluation/coordinator/predicates.v1.json).
+
+    Expectations come from the independent oracle (kinetics) and the admitted contract, never from engine output.
+    """
+    results = []
+
+    def record(control_id, passed, expected, observed, scope):
+        results.append({"id": control_id, "passed": bool(passed), "expected": expected, "observed": observed,
+                        "scope": scope})
+
+    # The design scope: 8 h with the reviewed future allowance 0.2, where the fixed pair separates (positive margin).
+    disjoint = kinetics.separation_margin(list(vectors.values()), "8", "1/5") > 0
+    centres = {cid: Fraction(kinetics.concentration(vec, "8")) for cid, vec in vectors.items()}
+    reading = Fraction(round(sum(centres.values()) / 2 * 1000), 1000)  # midpoint of the two centres, 3 decimals
+    declared = Fraction(math.ceil((max(abs(c - reading) for c in centres.values()) + Fraction(1, 10)) * 100), 100)
+    history = hero["dataset"]["rows"]
+
+    def followup(allowance: Fraction, scenario: str):
+        row = {"id": "hypothetical-followup", "time": "8/1", "concentration": _ratio(reading),
+               "hard_allowance": _ratio(allowance), "included": True, "notes": "Hypothetical follow-up reading",
+               "allowance_origin": "Reviewed hypothetical hard allowance declared for this reading"}
+        out = _worker(science_python, package_dir, {"op": "suggest", "problem": engine_problem(hero, [row]),
+                      "workflow": workflow, "design": engine_design(pair, ["10/1", "12/1"], "1/5", scenario,
+                                                                    maximum_horizon="12/1")})
+        oracle = {cid: kinetics.history_verdict(vec, [*history, row]) for cid, vec in vectors.items()}
+        return out, oracle
+
+    wide, wide_oracle = followup(declared, "wk5-followup-declared-allowance")
+    if "error" in wide:
+        record("followup:both_compatible_declared_allowance", False, "both compatible", wide["error"], "engine")
+    else:
+        replayed = _replay(science_python, package_dir, base64.b64decode(wide["bundle_b64"]),
+                           {"problem_digest": wide["problem_digest"], "suggestion_digest": wide["suggestion_digest"]})
+        found = _fresh_verdicts(replayed)
+        ok = (disjoint and declared > Fraction(1, 5) and found == wide_oracle
+              and set(found.values()) == {"compatible"} and len(found) == 2 and replay_class(replayed) == "passed")
+        record("followup:both_compatible_declared_allowance", ok,
+               {"per_candidate": "both compatible (independent oracle)", "aggregate": "passed",
+                "design_scope_bands_disjoint": True},
+               {"reading": _ratio(reading), "declared_allowance": _ratio(declared), "per_candidate": found,
+                "independent_oracle": wide_oracle, "aggregate": replay_class(replayed),
+                "design_scope_bands_disjoint": disjoint},
+               "hypothetical 8 h reading with its own declared allowance, wider than the design's 0.2: both original "
+               "candidates legitimately stay compatible; this does not contradict the 0.2 separation")
+
+    tight, tight_oracle = followup(Fraction(1, 5), "wk5-followup-design-allowance")
+    if "error" in tight:
+        record("semantics:same_reading_at_separating_allowance_is_not_both_compatible", False, "not both compatible",
+               tight["error"], "engine")
+        record("defense:forged_both_compatible_rejected", False, "rejected", tight["error"], "engine")
+    else:
+        anchors = {"problem_digest": tight["problem_digest"], "suggestion_digest": tight["suggestion_digest"]}
+        replayed = _replay(science_python, package_dir, base64.b64decode(tight["bundle_b64"]), anchors)
+        found = _fresh_verdicts(replayed)
+        record("semantics:same_reading_at_separating_allowance_is_not_both_compatible",
+               disjoint and found == tight_oracle and list(found.values()).count("compatible") <= 1 and len(found) == 2,
+               {"per_candidate": "at most one compatible; equals the independent oracle", "design_scope_disjoint": True},
+               {"reading": _ratio(reading), "per_candidate": found, "independent_oracle": tight_oracle,
+                "design_scope_bands_disjoint": disjoint},
+               "the same reading at the separating time and allowance: the closed 0.2 bands are disjoint, so no reading "
+               "can keep both candidates there")
+        edited = _worker(science_python, package_dir, {"op": "edit", "bundle_b64": tight["bundle_b64"],
+                                                       "edit": "claim_all_valid"})
+        data = base64.b64decode(edited["bundle_b64"])
+        real = _replay(science_python, package_dir, data, anchors)
+        diagnostic = _replay(science_python, package_dir, data, {**anchors, "suggestion_digest": edited["suggestion_digest"]})
+        diagnostic_report = diagnostic.get("report") or {}
+        fresh = _fresh_verdicts(diagnostic)
+        record("defense:forged_both_compatible_rejected",
+               replay_class(real) == "integrity_failure" and replay_class(diagnostic) == "mathematical_failure"
+               and fresh == tight_oracle and "compatible" not in set(fresh.values()) - {None},
+               {"original_anchor": "integrity_failure", "diagnostic_anchor": "mathematical_failure",
+                "fresh_per_candidate": "the independent oracle's verdicts"},
+               {"original_anchor": replay_class(real), "diagnostic_anchor": replay_class(diagnostic),
+                "recorded_result_matches": diagnostic_report.get("recorded_result_matches"),
+                "reason": diagnostic_report.get("reason_code"), "fresh_per_candidate": fresh},
+               "test-only forgery: every claimed candidate result set to compatible at the separating 8 h / 0.2 scope "
+               "(a contradiction). The real anchor rejects it first; a test-only anchor then shows that fresh "
+               "recomputation flags the mismatch. The test anchor authenticates nothing")
+
+    guidance_design = {**engine_design(pair, ["6/1", "8/1"], "1/5", "wk5-numerical-guidance"),
+                       "requested_tier": "numerical_guidance"}
+    out = _worker(science_python, package_dir, {"op": "suggest", "problem": problem, "workflow": workflow,
+                                                "design": guidance_design})
+    if "error" in out:
+        record("semantics:numerical_guidance_is_not_checked_separation", False, "numerical guidance", out["error"],
+               "engine")
+    else:
+        replayed = _replay(science_python, package_dir, base64.b64decode(out["bundle_b64"]),
+                           {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]})
+        report, checked = out["report"], out["report"].get("checked") or {}
+        fresh = (replayed.get("report") or {})
+        record("semantics:numerical_guidance_is_not_checked_separation",
+               report.get("tier") == "numerical_guidance" and checked.get("tier") != "checked_pair_separation"
+               and checked.get("selected_time") is None and replay_class(replayed) != "passed"
+               and (fresh.get("fresh_checked") or {}).get("tier") != "checked_pair_separation"
+               and fresh.get("verification") != "valid",
+               {"tier": "numerical_guidance", "checked_selection": None, "replay": "not passed; never checked"},
+               {"tier": report.get("tier"), "checked_tier": checked.get("tier"),
+                "checked_selected_time": checked.get("selected_time"),
+                "numerical_selected_time": (report.get("numerical") or {}).get("selected_time"),
+                "replay": replay_class(replayed), "replay_reason": fresh.get("reason_code"),
+                "replay_verification": fresh.get("verification")},
+               "requested numerical guidance on the fixed pair's [6, 8] h grid at 0.2: ranking is guidance only; "
+               "neither the record nor a replay may present it as checked separation")
+
+    observed, ok = {}, True
+    for label, grid, feasible_expected in (
+            ("middle_time_unavailable", [("6/1", True), ("7/1", False), ("8/1", True)], {"6/1", "8/1"}),
+            ("best_time_unavailable", [("6/1", True), ("8/1", False)], {"6/1"})):
+        design = engine_design(pair, [t for t, _ in grid], "1/5", f"wk5-{label.replace('_', '-')}")
+        design["grid"] = [{"time": t, "feasible": f, "reason": "Reviewed feasible time (control)" if f else
+                           f"Declared unavailable at {t} h (control)"} for t, f in grid]
+        out = _worker(science_python, package_dir, {"op": "suggest", "problem": problem, "workflow": workflow,
+                                                    "design": design})
+        if "error" in out:
+            ok, observed[label] = False, out["error"]
+            continue
+        numerical, (selected, checked) = out["report"].get("numerical") or {}, _selected(out["report"])
+        rows = {r.get("time"): r for r in numerical.get("rows") or []}
+        unavailable = [t for t, f in grid if not f]
+        kept = all(t in rows and rows[t].get("status") != "evaluated" and rows[t].get("rank") is None
+                   and str(t) in (rows[t].get("feasibility_reason") or "") for t in unavailable)
+        ranked = set(numerical.get("ranked_times") or []) | set(checked.get("ranked_times") or [])
+        case_ok = (set(rows) == {t for t, _ in grid} and kept and not ranked & set(unavailable)
+                   and numerical.get("evaluated_count") == len(feasible_expected)
+                   and selected in feasible_expected and numerical.get("selected_time") in feasible_expected)
+        ok = ok and case_ok
+        observed[label] = {"rows": {t: {k: r.get(k) for k in ("status", "rank", "reason_code")} for t, r in rows.items()},
+                           "ranked_times": sorted(ranked), "evaluated_count": numerical.get("evaluated_count"),
+                           "checked_selected_time": selected, "numerical_selected_time": numerical.get("selected_time"),
+                           "passed": case_ok}
+    record("semantics:unavailable_grid_times_are_kept_and_never_selected", ok,
+           {"unavailable_rows": "kept with their declared reason, not evaluated, ranked or selected",
+            "evaluated_count": "the number of available times", "selection": "an available time only"},
+           observed, "approved grid with declared unavailable times at 0.2; the evaluated subset is explicit and "
+           "no continuous-time optimum is implied")
     return results

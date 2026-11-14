@@ -55,6 +55,7 @@ Application code commit `299a356`, observed with harness `bb503a7` on macOS 26.7
 | F-PAPER-IDENTITY-CONTRACTS | P2 | B (canonical contracts; was Owner 2) with A | open | Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written |
 | F-SESSION-CAPACITY-EXHAUSTION | P2 | B (private browser sessions, shared gateway) | open | Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors |
 | H-LAUNCHER-OPTIN-FORMAT | P3 | C (harness) | retested | The launcher opt-in doctor test assumed PR #36's opt-in file format and wording, so it failed against main's stricter launcher |
+| H-REPLAY-CLASS-RECORDED-MISMATCH | P3 | C (harness) | retested | The engine-control replay classifier called a recorded-result mismatch a scientific exclusion when the fresh verdict was itself an exclusion |
 | F-UPLOAD-LIMIT-MESSAGE | P3 | B (upload boundary and general-file admission) | open | An oversized research upload is refused with a generic message that names neither the size limit nor the other limits the file exceeds |
 | F-CI-BROWSER-CHECK-INTERMITTENT | P3 | B (apps/web/check-backend.mjs and CI wiring) | open | B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s |
 
@@ -508,6 +509,15 @@ Application code commit `299a356`, observed with harness `bb503a7` on macOS 26.7
 - **Observed:** AssertionError 'doctor did not report the opt-in state': main's launcher validates documented keys (free-tier flag, token bounds, image bound) and reports gemini_live.opt_in_state in doctor --json; the key was never printed
 - **Evidence:** {"regression": "tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key"}
 - **Retest at C branch merged with main 299a356 (before commit):** passes; the dummy key is never printed and the state is reported as configured (evidence: {})
+
+## H-REPLAY-CLASS-RECORDED-MISMATCH (P3, owner C (harness), retested)
+
+- **Input:** a follow-up packet whose claimed candidate results were edited to 'valid' (test-only forgery), replayed with a test-only anchor; the report has integrity passed, binding matches, verification invalid, recorded_result_matches false and reason recorded_result_mismatch
+- **Command:** `python3.11 evaluation/cli.py controls (control defense:forged_both_compatible_rejected)`
+- **Expected:** a packet whose recorded claims contradict fresh recomputation is classified mathematical_failure
+- **Observed:** engine_controls.replay_class returned scientific_exclusion, the class for a genuine computed exclusion, because it tested integrity, binding and verification before the recorded-result comparison. No earlier control or record produced this combination, so no past result changes. The checker itself flagged the mismatch
+- **Evidence:** {"fix": "evaluation/drbean_eval/engine_controls.py replay_class", "regression": "control defense:forged_both_compatible_rejected; evaluation/tests/test_gates_controls.py::ReplayClassification"}
+- **Retest at C working tree before the harness commit (development run into a scratch results directory, not release evidence):** 27/27 controls pass, including the five new coordinator controls; the forged packet is integrity_failure with the real anchor and mathematical_failure with the test anchor (evidence: {})
 
 ## F-UPLOAD-LIMIT-MESSAGE (P3, owner B (upload boundary and general-file admission), open)
 

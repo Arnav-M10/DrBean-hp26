@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
+import re
 import threading
 import time
 from fractions import Fraction
@@ -1062,6 +1064,13 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
         else:
             checks.add("unresolved_followup_constructed", "blocked", "needs own-time rechecks, a checked hero design "
                        "with an inside-claim candidate and the engine interpreter to read its enclosure", level=INFO)
+        if (((flow.capabilities().get("science") or {}).get("native_followup") or {})
+                .get("selected_time_and_allowance_only") is False):
+            # SCI-06: the reading and its own allowance are derived from this branch's design pair in the loop.
+            followups.append({"branch": "both-compatible-declared-allowance", "declared_scope_both_compatible": True})
+        else:
+            checks.add("both_compatible_followup_constructed", "blocked", "needs follow-up readings with their own "
+                       "declared allowance", level=INFO)
     for index, branch in enumerate(followups):
         name = branch["branch"]
         label = f"fu-{name}"
@@ -1077,6 +1086,13 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
         request = (design or {}).get("request") or {}
         pair_ids = request.get("candidate_ids") or []
         vectors = dict(zip(pair_ids, request.get("candidate_vectors") or []))
+        if branch.get("declared_scope_both_compatible"):
+            declared = _declared_both_compatible_reading(design, vectors)
+            if declared is None:
+                checks.add(f"{name}_constructed", "blocked", "needs a checked design with a selected time, its future "
+                           "allowance and two candidate vectors", finding="F-HERO-NO-PAIR")
+                continue
+            branch = {**branch, **declared}
         parent = base["dataset"]
         time_value = branch["time"]
         origin = branch.get("origin", "hypothetical")
@@ -1180,6 +1196,17 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
             agree = all(expected[c] == "indeterminate" or per_candidate.get(c) == expected[c] for c in expected)
             checks.expect(f"{name}_per_candidate_outcome", agree,
                           f"application {per_candidate}, independent oracle {expected}")
+            design_body = ((design or {}).get("suggestion") or {}).get("body") or {}
+            if (design_body.get("design_tier") == "checked_pair_separation" and design_body.get("selected_time")
+                    and design_body.get("future_hard_allowance") and F(time_value) == F(design_body["selected_time"])
+                    and F(branch["allowance"]) == F(design_body["future_hard_allowance"])):
+                # SCI-06: at the design's own separating time and allowance no reading can keep both candidates.
+                checks.expect(f"{name}_not_both_compatible_at_separating_scope",
+                              list(per_candidate.values()).count("compatible") <= 1,
+                              f"application {per_candidate} at the checked design's selected {time_value} h and "
+                              f"allowance {branch['allowance']}")
+            if branch.get("separating_scope"):
+                _check_declared_scope_both_compatible(checks, name, branch, vectors, expected, per_candidate)
         observed = {"branch": name, "workspace_id": base["workspace_id"], "time": time_value,
                     "dataset_id": revised["id"], "run_id": run["id"], "run_state": finished.get("state"),
                     "design_bound": bool(scope), "observation_origin": origin, "oracle_expectation": expected,
@@ -1235,6 +1262,77 @@ def _check_unresolved_construction(checks: Checks, name: str, branch: dict, time
                   finding=None if lo <= value <= hi else "F-ENGINE-ENCLOSURE")
     checks.expect(f"{name}_band_strictly_inside_enclosure", lo < reading - allowance and reading + allowance < hi,
                   "reviewed band is the middle half of the engine enclosure")
+
+
+def _declared_both_compatible_reading(design: dict | None, vectors: dict) -> dict | None:
+    """SCI-06: a reading at the checked design's selected time, declared with its own allowance wider than the design's.
+
+    The independent oracle places the reading midway between the two original candidates' values at that time (3
+    decimals) and sizes the declared allowance to keep both with at least a 0.1 mg/L margin. It is legitimate only
+    because the allowance is the reading's own: at the design allowance the closed bands are disjoint.
+    """
+    body = ((design or {}).get("suggestion") or {}).get("body") or {}
+    if (body.get("design_tier") != "checked_pair_separation" or not body.get("selected_time")
+            or not body.get("future_hard_allowance") or len(vectors) != 2):
+        return None
+    time_value = body["selected_time"]
+    centres = [Fraction(kinetics.concentration(vec, time_value)) for vec in vectors.values()]
+    reading = Fraction(round(sum(centres) / 2 * 1000), 1000)
+    declared = Fraction(math.ceil((max(abs(c - reading) for c in centres) + Fraction(1, 10)) * 100), 100)
+    return {"time": time_value, "reading": f"{reading.numerator}/{reading.denominator}",
+            "allowance": f"{declared.numerator}/{declared.denominator}", "reading_spelling": f"{float(reading):.3f}",
+            "separating_scope": {"time": time_value, "allowance": body["future_hard_allowance"]}}
+
+
+def _check_declared_scope_both_compatible(checks: Checks, name: str, branch: dict, vectors: dict, expected: dict,
+                                          per_candidate: dict | None) -> None:
+    """Both original candidates keep the reading under its own wider allowance (the legitimate both-compatible case),
+    while the independent oracle shows the design's closed bands are disjoint, so at the design allowance the same
+    reading keeps at most one candidate: the result is attributable to the declared allowance, not a contradiction."""
+    scope = branch["separating_scope"]
+    disjoint = kinetics.separation_margin(list(vectors.values()), scope["time"], scope["allowance"]) > 0
+    at_design = {cid: kinetics.band_verdict(vec, scope["time"], branch["reading"], scope["allowance"])
+                 for cid, vec in vectors.items()}
+    checks.expect(f"{name}_declared_allowance_differs_from_the_separating_scope",
+                  disjoint and F(branch["allowance"]) > F(scope["allowance"])
+                  and set(expected.values()) == {"compatible"} and list(at_design.values()).count("compatible") <= 1,
+                  f"declared allowance {branch['allowance']} vs design {scope['allowance']} at {scope['time']} h; "
+                  f"design bands disjoint: {disjoint}; independent oracle at the declared allowance {expected}, "
+                  f"at the design allowance {at_design}")
+    checks.expect(f"{name}_both_original_candidates_compatible",
+                  per_candidate is not None and len(per_candidate) == 2
+                  and set(per_candidate.values()) == {"compatible"}, f"application {per_candidate}")
+
+
+# SCI-07: affirmative wording that would claim the interval proved or every other model excluded. A negation shortly
+# before a match ("does not prove the interval") is not a claim.
+_OVERCLAIMS = (
+    re.compile(r"\b(interval|claim|range)\s+(is|was|has been|have been)\s+(now\s+)?(proven|proved|verified|confirmed|"
+               r"established)\b", re.I),
+    re.compile(r"\b(proves?|proved|proven|confirms?|confirmed|verif(?:y|ies|ied))\s+(that\s+)?(the\s+)?"
+               r"(claimed\s+|closed\s+)?(interval|claim|range)\b", re.I),
+    re.compile(r"\ball\s+(other\s+|outside\s+|alternative\s+|possible\s+)?(models?|parameter\s+(?:values|vectors)|"
+               r"candidates)\s+(are|were|have been)\s+(excluded|eliminated|ruled out|rejected)\b", re.I),
+    re.compile(r"\bno\s+(other|outside|alternative)\s+(model|parameter\s+value|candidate)\s+(fits|survives|remains|"
+               r"is compatible)\b", re.I),
+)
+_NEGATION = re.compile(r"\b(not|never|cannot|can't|nor|without|no)\b[^.;]{0,24}$", re.I)
+
+
+def _overclaims(value) -> list[str]:
+    found = []
+    if isinstance(value, dict):
+        for item in value.values():
+            found += _overclaims(item)
+    elif isinstance(value, list):
+        for item in value:
+            found += _overclaims(item)
+    elif isinstance(value, str):
+        for pattern in _OVERCLAIMS:
+            for match in pattern.finditer(value):
+                if not _NEGATION.search(value[max(0, match.start() - 40):match.start()]):
+                    found.append(value[max(0, match.start() - 20):match.end() + 20])
+    return found
 
 
 def _followup_scope(design: dict | None, proposal: dict) -> dict | None:
@@ -1301,6 +1399,21 @@ def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, ev
         checks.expect(f"{name}_no_claim_from_excluded_candidates",
                       result.get("scientific_outcome") != "certified_counterexample" and not claims,
                       f"outcome {result.get('scientific_outcome')}; counterexample flags {claims}")
+    # SCI-07: candidate dispositions and the pair-level proposition are separate fields, and no result wording claims
+    # the interval proved or every outside model excluded (excluding candidates proves neither).
+    outcome = result.get("scientific_outcome")
+    scope_text = ((result.get("native_replay") or {}).get("outcome") or {}).get("scope")
+    separate = (len(items) == len(vectors) > 0 and isinstance(outcome, str)
+                and all(isinstance(c.get("verification"), str) and isinstance(c.get("is_counterexample"), bool)
+                        for c in items)
+                and isinstance(scope_text, str) and bool(scope_text.strip()))
+    checks.expect(f"{name}_candidate_dispositions_separate_from_pair_outcome", separate,
+                  f"{len(items)} candidate results for {len(vectors)} rechecked candidates; outcome {outcome!r}; "
+                  f"scope {scope_text!r}")
+    claims_text = _overclaims(result)
+    checks.expect(f"{name}_no_interval_proof_or_whole_model_claim",
+                  outcome in ("inconclusive", "certified_counterexample") and not claims_text,
+                  f"outcome {outcome}; overclaiming wording {claims_text}")
     # The outcome follows from the verdicts: a counterexample remains iff an original candidate the oracle keeps
     # lies outside the closed claim (exact rational comparison; an indeterminate verdict leaves it undecided).
     survivors_outside = [c for c in vectors if expected[c] == "compatible" and kinetics.outside_closed_claim(

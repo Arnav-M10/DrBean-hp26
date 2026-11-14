@@ -29,7 +29,12 @@ REQUIRED_CONTROLS = ("fixed_pair:grid-6-8-allowance-0.2", "fixed_pair:grid-6-all
                      "defense:truncated_packet", "defense:oversized_packet", "defense:another_runs_valid_packet",
                      "defense:drop_artifacts", "defense:duplicate_artifact", "defense:unknown_profile",
                      "metamorphic:tightened_row_allowance", "metamorphic:widened_allowances_keep_compatibility",
-                     "metamorphic:excluded_row_is_not_a_constraint", "metamorphic:swapped_pair_order")
+                     "metamorphic:excluded_row_is_not_a_constraint", "metamorphic:swapped_pair_order",
+                     # Coordinator predicates SCI-06 and SCI-05 (DB-COORDINATOR-3OWNER-1)
+                     "followup:both_compatible_declared_allowance",
+                     "semantics:same_reading_at_separating_allowance_is_not_both_compatible",
+                     "defense:forged_both_compatible_rejected", "semantics:numerical_guidance_is_not_checked_separation",
+                     "semantics:unavailable_grid_times_are_kept_and_never_selected")
 
 
 # Changes here cannot alter the application or the harness's behaviour: recorded evidence and its written

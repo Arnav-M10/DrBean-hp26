@@ -134,3 +134,20 @@ class ThroughTheReleaseGate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReplayClassification(unittest.TestCase):
+    """H-REPLAY-CLASS-RECORDED-MISMATCH: recorded claims that fresh recomputation contradicts are a mathematical
+    failure, while a genuine computed exclusion stays a scientific exclusion."""
+
+    BOUND = {"integrity": "passed", "expected_binding": "matches", "verification": "invalid", "replay": "failed"}
+
+    def test_recorded_result_mismatch_is_a_mathematical_failure(self):
+        forged = {"status": "failed", "report": {**self.BOUND, "recorded_result_matches": False,
+                                                 "reason_code": "recorded_result_mismatch"}}
+        self.assertEqual(engine_controls.replay_class(forged), "mathematical_failure")
+
+    def test_a_genuine_exclusion_is_still_a_scientific_exclusion(self):
+        genuine = {"status": "failed", "report": {**self.BOUND, "recorded_result_matches": True,
+                                                  "reason_code": "historical_compatibility_unresolved"}}
+        self.assertEqual(engine_controls.replay_class(genuine), "scientific_exclusion")

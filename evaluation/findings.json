@@ -1911,6 +1911,29 @@
       ]
     },
     {
+      "id": "H-REPLAY-CLASS-RECORDED-MISMATCH",
+      "severity": "P3",
+      "owner": "C (harness)",
+      "status": "retested",
+      "title": "The engine-control replay classifier called a recorded-result mismatch a scientific exclusion when the fresh verdict was itself an exclusion",
+      "minimal_input": "a follow-up packet whose claimed candidate results were edited to 'valid' (test-only forgery), replayed with a test-only anchor; the report has integrity passed, binding matches, verification invalid, recorded_result_matches false and reason recorded_result_mismatch",
+      "command": "python3.11 evaluation/cli.py controls (control defense:forged_both_compatible_rejected)",
+      "expected": "a packet whose recorded claims contradict fresh recomputation is classified mathematical_failure",
+      "observed": "engine_controls.replay_class returned scientific_exclusion, the class for a genuine computed exclusion, because it tested integrity, binding and verification before the recorded-result comparison. No earlier control or record produced this combination, so no past result changes. The checker itself flagged the mismatch",
+      "impact": "harness only: control output could have labelled a forged follow-up packet a computed exclusion",
+      "suggested_fix": "classify recorded_result_matches false, or reason recorded_result_mismatch, as mathematical_failure before the exclusion rule",
+      "evidence": {
+        "fix": "evaluation/drbean_eval/engine_controls.py replay_class",
+        "regression": "control defense:forged_both_compatible_rejected; evaluation/tests/test_gates_controls.py::ReplayClassification"
+      },
+      "retests": [
+        {
+          "at_commit": "C working tree before the harness commit (development run into a scratch results directory, not release evidence)",
+          "result": "27/27 controls pass, including the five new coordinator controls; the forged packet is integrity_failure with the real anchor and mathematical_failure with the test anchor"
+        }
+      ]
+    },
+    {
       "id": "F-UPLOAD-LIMIT-MESSAGE",
       "severity": "P3",
       "owner": "B (upload boundary and general-file admission)",
