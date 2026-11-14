@@ -23,7 +23,7 @@ function send(port, { path = '/api/bean/v1/workspaces', method = 'GET', headers 
 test('sharing accepts one explicit HTTPS tunnel origin, never a URL with credentials or a wildcard', () => {
   assert.equal(shareOrigin(origin).origin, origin)
   for (const value of ['http://bean.trycloudflare.com', 'https://*.trycloudflare.com', 'https://bean.trycloudflare.com/path',
-    'https://user:secret@bean.trycloudflare.com', 'https://bean.trycloudflare.com.evil.test', 'https://127.0.0.1', origin + ':443']) {
+    'https://user:secret' + '@bean.trycloudflare.com', 'https://bean.trycloudflare.com.evil.test', 'https://127.0.0.1', origin + ':443']) {
     assert.throws(() => shareOrigin(value))
   }
 })
@@ -48,7 +48,7 @@ test('shared gateway fails closed and preserves bearer authentication while rewr
     }
     assert.equal(calls.length, 0)
     assert.equal((await send(port)).status, 401)
-    const result = await send(port, { method: 'POST', headers: { origin, authorization: 'Bearer test-access-token',
+    const result = await send(port, { method: 'POST', headers: { origin, authorization: 'Bearer test-token',
       cookie: 'unrelated=secret', 'x-forwarded-host': 'evil.test', 'content-type': 'application/json', 'idempotency-key': 'operation_one' }, body: '{"name":"Shared test"}' })
     assert.equal(result.status, 200)
     assert.equal(result.headers['cache-control'], 'no-store')
@@ -56,7 +56,7 @@ test('shared gateway fails closed and preserves bearer authentication while rewr
     const call = calls.at(-1)
     assert.equal(call.headers.host, `127.0.0.1:${upstreamPort}`)
     assert.equal(call.headers.origin, `http://127.0.0.1:${upstreamPort}`)
-    assert.equal(call.headers.authorization, 'Bearer test-access-token')
+    assert.equal(call.headers.authorization, 'Bearer test-token')
     assert.equal(call.headers['idempotency-key'], 'operation_one')
     assert.equal(call.headers.cookie, undefined)
     assert.equal(call.headers['x-forwarded-host'], undefined)

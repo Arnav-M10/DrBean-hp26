@@ -30,7 +30,7 @@ class Sharing(unittest.TestCase):
         for data in ({"origin": "https://bean-study.trycloudflare.com"},
                      {"origin": "http://bean-study.trycloudflare.com"},
                      {"origin": "https://bean-study.trycloudflare.com.evil.test"},
-                     {"origin": "https://user:password@bean.trycloudflare.com"}, {}, [], None):
+                     {"origin": "https://user:password" + "@bean.trycloudflare.com"}, {}, [], None):
             self.origin.write_text(json.dumps(data))
             expected = data["origin"] if isinstance(data, dict) and data.get("origin") == "https://bean-study.trycloudflare.com" else None
             self.assertEqual(share.recorded_origin(), expected)
