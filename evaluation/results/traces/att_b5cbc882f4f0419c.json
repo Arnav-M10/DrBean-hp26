@@ -1,0 +1,776 @@
+{
+  "attempt_id": "att_b5cbc882f4f0419c",
+  "controlled": null,
+  "entry_id": "RS-CANCEL-RESTART",
+  "input": null,
+  "lane": "offline_real_science",
+  "observation": {
+    "app_under_test": {
+      "branch": "claude/adversarial-validation",
+      "commit": "c51bbaeb10a3857d9116ce779902eb563ec8fabf",
+      "dirty": false,
+      "is_harness_checkout": true
+    },
+    "approvals_created": 0,
+    "case_sha256": "26406091af610edd72676873c0dde5d69c74425c8a1aeb55b3a792a1c095cbae",
+    "checks": [
+      {
+        "detail": "cancel_requested",
+        "id": "queued_cancel_requested",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "state cancelled, 0 scenario reservation(s)",
+        "id": "queued_cancel_acknowledged_without_science",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "state cancelled",
+        "id": "running_cancel_terminal",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "1 live scientific child(ren) at cancel; still alive: []",
+        "id": "no_orphan_after_cancel",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "1 live scientific child(ren) when the worker was killed; still alive: []",
+        "id": "no_orphan_after_worker_kill",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "state after recovery interrupted (error worker_restart)",
+        "id": "interrupted_not_redispatched",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "state interrupted",
+        "id": "interrupted_stays_interrupted",
+        "level": "required",
+        "outcome": "passed"
+      }
+    ],
+    "details": {
+      "children_alive_after_worker_kill": [],
+      "deterministic_barrier": false,
+      "interruption_workload": {
+        "construction": "exact replicates of the declared synthetic input",
+        "origin": "synthetic",
+        "rows": 128
+      },
+      "queued_run": "run_ba82e2ff6172446ea73a37cc2d23746b",
+      "running_cancel_state": "cancelled"
+    },
+    "diagnostic_overrides": [],
+    "disclosed_text": [],
+    "entry_id": "RS-CANCEL-RESTART",
+    "evidence_index": {},
+    "exchanges": [
+      {
+        "latency_ms": 2.164,
+        "method": "POST",
+        "request_id": "21366885-9036-418b-9cf6-2384eb131317",
+        "response_bytes": 204,
+        "response_sha256": "10d33f6eb84fad4dacf880b9c6a778465cf72e28e0996ae9ba91d70035e4b724",
+        "route": "/workspaces",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.331,
+        "method": "POST",
+        "request_id": "6f1316f9-173d-4af3-ac9d-d5fdb716abde",
+        "response_bytes": 1628,
+        "response_sha256": "d6756947457462ee8139b09d94566dadb1b86b3f99c69510971c395a1e99e290",
+        "route": "/workspaces/{id}/datasets",
+        "status": 201
+      },
+      {
+        "latency_ms": 1.869,
+        "method": "POST",
+        "request_id": "ac7ed4be-f853-4fd7-a586-d8fa0a376043",
+        "response_bytes": 831,
+        "response_sha256": "4d0f8076cfc109acf427ef554c9ef3094249c2b458d59efe2e010f031171718f",
+        "route": "/workspaces/{id}/problems",
+        "status": 201
+      },
+      {
+        "latency_ms": 46.354,
+        "method": "POST",
+        "request_id": "e569da61-02d6-4814-87a3-8ae77ae58aca",
+        "response_bytes": 1523,
+        "response_sha256": "ad4af1c29145999d237e77a470643157a79b881b2be8f22bb77d81402f32fc28",
+        "route": "/workspaces/{id}/plans",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.731,
+        "method": "POST",
+        "request_id": "8bb732f5-b0b3-483e-8ba7-facecdae9c83",
+        "response_bytes": 431,
+        "response_sha256": "ec4d14a45c5af140fa8af2fad7503f8150d089f9ae213a0884a7b4f6e577d371",
+        "route": "/plans/{id}/approvals",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.959,
+        "method": "POST",
+        "request_id": "6b90143d-2c79-427f-841d-a0c6f2f0b94e",
+        "response_bytes": 469,
+        "response_sha256": "dfcdcd2e8b1e90608e9f5ece8cfa2fbb0e9060bfa70067c83c0ff685e5f1fc87",
+        "route": "/plans/{id}/runs",
+        "status": 202
+      },
+      {
+        "latency_ms": 2.762,
+        "method": "POST",
+        "request_id": "aa628699-43d7-4f65-a763-b02036ad4578",
+        "response_bytes": 479,
+        "response_sha256": "9363673a2d1c43c9f9e034725f96633ce7855050e8724c7550bbd55df6d01dff",
+        "route": "/runs/{id}/cancel",
+        "status": 202
+      },
+      {
+        "latency_ms": 1.845,
+        "method": "GET",
+        "request_id": "9014c689-436a-4833-9131-bafa1cd4217c",
+        "response_bytes": 479,
+        "response_sha256": "9363673a2d1c43c9f9e034725f96633ce7855050e8724c7550bbd55df6d01dff",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.348,
+        "method": "GET",
+        "request_id": "786b0870-573c-4d49-8888-a831102056f6",
+        "response_bytes": 494,
+        "response_sha256": "e0e59957f55bfd0473004e65b653dabf65cf9ecd5698e4180b7d26cbfa49032d",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 10.429,
+        "method": "POST",
+        "request_id": "687b3df5-cd9e-4b21-826b-9240aa37460c",
+        "response_bytes": 29161,
+        "response_sha256": "a245d0ace595230323d89ce71aa101e41940225b12512b1319fa9ed2466571c0",
+        "route": "/workspaces/{id}/datasets",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.706,
+        "method": "POST",
+        "request_id": "22319731-f76b-4656-a69d-33ecdde853e4",
+        "response_bytes": 831,
+        "response_sha256": "22f4b10edeee70ee50e50b0c85d2ed0c8a37e00a8cb3c721e5b1a30a02f2f4d0",
+        "route": "/workspaces/{id}/problems",
+        "status": 201
+      },
+      {
+        "latency_ms": 58.02,
+        "method": "POST",
+        "request_id": "28d09629-ba50-43df-8cf9-5f704e5d1cc5",
+        "response_bytes": 1524,
+        "response_sha256": "0afe51174948927ea32169c602745770e0e1791deea9574ebb6a8d3d4ec4907a",
+        "route": "/workspaces/{id}/plans",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.59,
+        "method": "POST",
+        "request_id": "692273d6-6f52-4fc7-8aa9-a225fbc30468",
+        "response_bytes": 431,
+        "response_sha256": "641545cd0168ddd5fc80a2ce2c92fe4f582ebcc0ab7fe1d024a72fb9a7fd7f73",
+        "route": "/plans/{id}/approvals",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.546,
+        "method": "POST",
+        "request_id": "289b3022-00c4-4b58-9461-5c21f4cc72a7",
+        "response_bytes": 469,
+        "response_sha256": "fca4bb6b346839a6ea4d69fc400382688dd5dfe0210db30186f159ff76bb8204",
+        "route": "/plans/{id}/runs",
+        "status": 202
+      },
+      {
+        "latency_ms": 1.221,
+        "method": "GET",
+        "request_id": "4ef1796b-fdfb-47a6-8549-b9b0a1260f72",
+        "response_bytes": 469,
+        "response_sha256": "fca4bb6b346839a6ea4d69fc400382688dd5dfe0210db30186f159ff76bb8204",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.703,
+        "method": "GET",
+        "request_id": "fa863256-3bd5-449b-ac28-772811658660",
+        "response_bytes": 469,
+        "response_sha256": "fca4bb6b346839a6ea4d69fc400382688dd5dfe0210db30186f159ff76bb8204",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.774,
+        "method": "GET",
+        "request_id": "71428615-c52a-4e47-9184-0e2bdeddcf37",
+        "response_bytes": 765,
+        "response_sha256": "3aab66c690f5fb9b16528c9331f17b4afe85b73f01e2942fb8071261864bb009",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.616,
+        "method": "GET",
+        "request_id": "a968bb5d-25c3-4a82-89ac-ecbad625e48f",
+        "response_bytes": 765,
+        "response_sha256": "3aab66c690f5fb9b16528c9331f17b4afe85b73f01e2942fb8071261864bb009",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.827,
+        "method": "GET",
+        "request_id": "c3399312-a9e5-4855-9a65-cf1232209cc5",
+        "response_bytes": 765,
+        "response_sha256": "3aab66c690f5fb9b16528c9331f17b4afe85b73f01e2942fb8071261864bb009",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.988,
+        "method": "POST",
+        "request_id": "f1cb2d5c-447f-4f47-bac1-a5db8851b560",
+        "response_bytes": 774,
+        "response_sha256": "d8ad260ce770bd439b01d00eb543e8cbe078a751d4394dd0d0d243b9f1f6a84d",
+        "route": "/runs/{id}/cancel",
+        "status": 202
+      },
+      {
+        "latency_ms": 1.763,
+        "method": "GET",
+        "request_id": "6bb92900-167d-4976-80ee-cb81f868c5a4",
+        "response_bytes": 774,
+        "response_sha256": "d8ad260ce770bd439b01d00eb543e8cbe078a751d4394dd0d0d243b9f1f6a84d",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.063,
+        "method": "GET",
+        "request_id": "7efe2c5b-2794-4bab-b14d-d7903cb0a8fc",
+        "response_bytes": 840,
+        "response_sha256": "a0047e19873fb4956e9765235c9b9039c865a94ff2088e3014213407f6cee38b",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 9.605,
+        "method": "POST",
+        "request_id": "cfeff6bc-94d2-4d2a-8177-0bf7609c80fc",
+        "response_bytes": 29161,
+        "response_sha256": "399ee0953dfcb2a430698e8c7fa092f09a6e8d3fa131c81c98c13ddc29dc044e",
+        "route": "/workspaces/{id}/datasets",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.568,
+        "method": "POST",
+        "request_id": "7ea373c8-942c-401a-bfba-9b69e903a4b3",
+        "response_bytes": 831,
+        "response_sha256": "93a5de204a31d64c84b9220a0480bccb5c4033bcbcdc0e5e309a456bbfe1c02f",
+        "route": "/workspaces/{id}/problems",
+        "status": 201
+      },
+      {
+        "latency_ms": 61.559,
+        "method": "POST",
+        "request_id": "317bcce9-fa94-44fd-b10a-841914433dc8",
+        "response_bytes": 1524,
+        "response_sha256": "499f64fd88fc547ee1d6b9997e72944b1d3fffe485be691610dd97779cc62ea5",
+        "route": "/workspaces/{id}/plans",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.692,
+        "method": "POST",
+        "request_id": "37fadf61-dbb0-410e-a298-4be747a0000e",
+        "response_bytes": 431,
+        "response_sha256": "252bccb2640c760e2e7d7b7fb4c34ea3e2c6f3703482c5e197138d597e57cf94",
+        "route": "/plans/{id}/approvals",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.51,
+        "method": "POST",
+        "request_id": "f94f69ae-610c-434a-9fd1-d927986516cc",
+        "response_bytes": 469,
+        "response_sha256": "101dad5c9a0774357be09d3447031ac0505eb1c5d25525a27cf7bae81a7d7049",
+        "route": "/plans/{id}/runs",
+        "status": 202
+      },
+      {
+        "latency_ms": 0.982,
+        "method": "GET",
+        "request_id": "68418489-8af0-45e1-930a-266d4886ad7b",
+        "response_bytes": 469,
+        "response_sha256": "101dad5c9a0774357be09d3447031ac0505eb1c5d25525a27cf7bae81a7d7049",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.854,
+        "method": "GET",
+        "request_id": "0213a1fe-61f4-48ec-b293-06e191ae5fd3",
+        "response_bytes": 469,
+        "response_sha256": "101dad5c9a0774357be09d3447031ac0505eb1c5d25525a27cf7bae81a7d7049",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.802,
+        "method": "GET",
+        "request_id": "5b9fa302-593c-48bf-8ebc-e9a236d197ca",
+        "response_bytes": 469,
+        "response_sha256": "101dad5c9a0774357be09d3447031ac0505eb1c5d25525a27cf7bae81a7d7049",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.156,
+        "method": "GET",
+        "request_id": "2893862b-8c3c-4944-b602-199413388171",
+        "response_bytes": 765,
+        "response_sha256": "4614ce7fe9879655fe4a600f8f2313b56aaaba0d7ba22f890dff7b71ea9a55a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.689,
+        "method": "GET",
+        "request_id": "8963f6c3-b17d-4386-9353-3d0068961c25",
+        "response_bytes": 765,
+        "response_sha256": "4614ce7fe9879655fe4a600f8f2313b56aaaba0d7ba22f890dff7b71ea9a55a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.75,
+        "method": "GET",
+        "request_id": "9a197a55-3543-4709-9afe-208335f2a1bc",
+        "response_bytes": 765,
+        "response_sha256": "4614ce7fe9879655fe4a600f8f2313b56aaaba0d7ba22f890dff7b71ea9a55a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.962,
+        "method": "GET",
+        "request_id": "a403aa27-3efb-438a-83af-517b7f9226ca",
+        "response_bytes": 765,
+        "response_sha256": "4614ce7fe9879655fe4a600f8f2313b56aaaba0d7ba22f890dff7b71ea9a55a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.975,
+        "method": "GET",
+        "request_id": "e89c4977-b8c0-4e4d-936d-baeb18b3a554",
+        "response_bytes": 841,
+        "response_sha256": "fe94c5002bea3f5c88f89ea90a3759e323888c7e29a689cc68f9147310fac481",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 4.803,
+        "method": "GET",
+        "request_id": "91424c57-6fe6-4524-a61f-7bfe331379bf",
+        "response_bytes": 841,
+        "response_sha256": "fe94c5002bea3f5c88f89ea90a3759e323888c7e29a689cc68f9147310fac481",
+        "route": "/runs/{id}",
+        "status": 200
+      }
+    ],
+    "external_dispatch": {
+      "attempt_sites": [],
+      "client_constructions": 0,
+      "credential_names_present": [],
+      "egress_attempts": 0,
+      "guarded_processes": 52,
+      "verified": true
+    },
+    "job_ids": [
+      "run_64af2fc02f5b42e9b035d77a8d5a88e2",
+      "run_78fd2b01e6444d6cb5449f8e98165d7f",
+      "run_ba82e2ff6172446ea73a37cc2d23746b"
+    ],
+    "lane": "offline_real_science",
+    "lane_version": 1,
+    "native_artifacts": [],
+    "operation": "science",
+    "provider": {
+      "note": "manual plans; no model, controlled or live, was invoked by these scenarios",
+      "placeholder_identity": null,
+      "transport": "none"
+    },
+    "provider_requests": 0,
+    "readiness": {
+      "ai_mode": "disabled_placeholder",
+      "api": {
+        "health": {
+          "contract_version": "DB-SC-1",
+          "resource_policy": {
+            "address_space": "unavailable",
+            "address_space_reason": "platform_guard_not_supported",
+            "cpu": "rlimit_cpu",
+            "open_files": "rlimit_nofile",
+            "output_bytes": "parent_enforced",
+            "platform": "darwin",
+            "policy_version": "process-guards-v3",
+            "process_count": "inherited_rlimit_nproc_per_user",
+            "process_count_job_quota": "unavailable",
+            "process_count_reason": "account_wide_limit_not_job_quota",
+            "process_tree": "owned_posix_session",
+            "wall_clock": "parent_enforced"
+          },
+          "science": {
+            "adapter": "Counterdex",
+            "adapter_version": "0.3.0",
+            "available": true,
+            "baseline_discovery": true,
+            "browser_replay": false,
+            "claim_families": [
+              "closed_ke_interval_counterexample"
+            ],
+            "configured": true,
+            "design_tiers": [
+              "numerical_guidance",
+              "checked_pair_separation",
+              "no_separation_established"
+            ],
+            "implemented": true,
+            "native_design": true,
+            "native_design_requested_tiers": [
+              "numerical_guidance",
+              "checked_pair_separation"
+            ],
+            "native_followup": {
+              "available": true,
+              "hypothetical_only": false,
+              "operation": "recheck",
+              "requires_checked_separation": false,
+              "requires_fresh_checked_design": true,
+              "selected_time_and_allowance_only": false
+            },
+            "native_recheck": true,
+            "native_replay": true,
+            "projection_version": "DB-SC-1-to-groundwork-v1",
+            "qualification": "Runtime availability; each result requires actual checking and fresh native replay.",
+            "reason": null,
+            "runtime": {
+              "adapter_version": "0.3.0",
+              "canonicalization_profile": "DB-SC-1",
+              "python": "3.11.17",
+              "runtime": "CPython",
+              "source_digest": "90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8",
+              "source_manifest": [
+                {
+                  "file": "__init__.py",
+                  "sha256": "f47568559e15bc3561ee6cbfa66be77a6d00088f9cc8ad5ddea1ac2b79b9af91"
+                },
+                {
+                  "file": "__main__.py",
+                  "sha256": "bb17b4c0b4483e22f4591e6f203cf24a7affb424c7d9a1f0f51e7595f2d8ccf1"
+                },
+                {
+                  "file": "analytical.py",
+                  "sha256": "cbb3667ab38b90dce2b9f2fcd11b007356ce0d12cd8736aa98e604c3abb2799b"
+                },
+                {
+                  "file": "application.py",
+                  "sha256": "5a32d149cba99e265df79e3033b153567ed75332ad4035e05dd277db474cb5a1"
+                },
+                {
+                  "file": "arithmetic.py",
+                  "sha256": "761bed63451e1b1c888eca4b9608fb99c1542267d7d86231ba27dc216a82cbb3"
+                },
+                {
+                  "file": "baseline.py",
+                  "sha256": "126176cae32258d9cc4625ca0177651e3be0ddb5a980c43abeb97f5cb5eea6a6"
+                },
+                {
+                  "file": "bridge.py",
+                  "sha256": "d2061903f848852c9ac232599b4684cb71f6768601f7d8c40ce5d4ef6e7e037b"
+                },
+                {
+                  "file": "capabilities.py",
+                  "sha256": "46a884fe1c026d1be09d33a40f48fa803bd43bd1863b5cb02c41c5c3673d8868"
+                },
+                {
+                  "file": "checked.py",
+                  "sha256": "ac19e8cedd032eddd521d0704375b551ac072f9f2311a0b04cebf2cd7070aa0c"
+                },
+                {
+                  "file": "errors.py",
+                  "sha256": "2e766b7acbbaa4a96c739943aec4a2022a561a864146a7a27804fc7b6e6c8648"
+                },
+                {
+                  "file": "exact.py",
+                  "sha256": "7153911b1a60b4baf4f14199c010baf43d4f83b2366ed24f744df99072974806"
+                },
+                {
+                  "file": "followup.py",
+                  "sha256": "e08e9959119c3d25fe198be312dc6321809ec428be0ec1d0f156cb83d59065f9"
+                },
+                {
+                  "file": "historical.py",
+                  "sha256": "2d30cf250f477384069cdf2881f99e09b690dd676d2a0a9c3e3d9c7499df4255"
+                },
+                {
+                  "file": "identity.py",
+                  "sha256": "fdd5f8edac0a067d0bfa3e420cc8bcc959b73ad934e8828e8cf1579842519884"
+                },
+                {
+                  "file": "interpretation.py",
+                  "sha256": "c14d6e23c389545e8856aa7b0e4022ab542acfd0c0059b610c3e2be3c9544d0f"
+                },
+                {
+                  "file": "models.py",
+                  "sha256": "e117b6371fa0db4b2671f96f1ae54778459da4891209608a6245276c021ce6c2"
+                },
+                {
+                  "file": "native_packet.py",
+                  "sha256": "7b3332f1dcb0e991da989c13cba64903d1f99dcfdce072b7d501554a33c51c8a"
+                },
+                {
+                  "file": "numerical.py",
+                  "sha256": "8afc883e0117f1d943bfc5e5912d1befeb6110b50582d33df66bcda2464116c9"
+                },
+                {
+                  "file": "pipeline.py",
+                  "sha256": "42fc0611c42efbaf3f2a81052cc7143f057c50a709c766b7e1bd31fc29f8bfe6"
+                },
+                {
+                  "file": "replay.py",
+                  "sha256": "3a2db116dc51a22da048be7e739789d2221216b81d6a693950e31605b75b1fce"
+                },
+                {
+                  "file": "replay_baseline.py",
+                  "sha256": "2edd3584e7e63e3eb9822991de567148d298d75f46110891582033361bd9fe31"
+                },
+                {
+                  "file": "replay_numeric.py",
+                  "sha256": "6933d6be6982a026f63aa6c4bd629917c1c8e182f15f0c0a5bf054b5b44921af"
+                },
+                {
+                  "file": "resource.py",
+                  "sha256": "0c741d5ac94070523a501c4452bea85a7147baba943c2ec790eb88e13e96ff3f"
+                },
+                {
+                  "file": "search.py",
+                  "sha256": "009c11003e4223f68ff0c3667a4f94ea9eb211d60cbb8bf6ce7cd68441f53d94"
+                }
+              ]
+            },
+            "verified_in_environment": false
+          },
+          "service": "dr-bean",
+          "status": "api_reachable",
+          "worker": {
+            "reason": "Start the worker using the same database and runtime configuration.",
+            "state": "not_observed"
+          }
+        },
+        "ready": true
+      },
+      "science": {
+        "baseline_discovery": true,
+        "native_replay": true,
+        "ready": true,
+        "reason": null,
+        "reported": {
+          "adapter": "Counterdex",
+          "adapter_version": "0.3.0",
+          "available": true,
+          "baseline_discovery": true,
+          "browser_replay": false,
+          "claim_families": [
+            "closed_ke_interval_counterexample"
+          ],
+          "configured": true,
+          "design_tiers": [
+            "numerical_guidance",
+            "checked_pair_separation",
+            "no_separation_established"
+          ],
+          "implemented": true,
+          "native_design": true,
+          "native_design_requested_tiers": [
+            "numerical_guidance",
+            "checked_pair_separation"
+          ],
+          "native_followup": {
+            "available": true,
+            "hypothetical_only": false,
+            "operation": "recheck",
+            "requires_checked_separation": false,
+            "requires_fresh_checked_design": true,
+            "selected_time_and_allowance_only": false
+          },
+          "native_recheck": true,
+          "native_replay": true,
+          "projection_version": "DB-SC-1-to-groundwork-v1",
+          "qualification": "Runtime availability; each result requires actual checking and fresh native replay.",
+          "reason": null,
+          "runtime": {
+            "adapter_version": "0.3.0",
+            "canonicalization_profile": "DB-SC-1",
+            "python": "3.11.17",
+            "runtime": "CPython",
+            "source_digest": "90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8",
+            "source_manifest": [
+              {
+                "file": "__init__.py",
+                "sha256": "f47568559e15bc3561ee6cbfa66be77a6d00088f9cc8ad5ddea1ac2b79b9af91"
+              },
+              {
+                "file": "__main__.py",
+                "sha256": "bb17b4c0b4483e22f4591e6f203cf24a7affb424c7d9a1f0f51e7595f2d8ccf1"
+              },
+              {
+                "file": "analytical.py",
+                "sha256": "cbb3667ab38b90dce2b9f2fcd11b007356ce0d12cd8736aa98e604c3abb2799b"
+              },
+              {
+                "file": "application.py",
+                "sha256": "5a32d149cba99e265df79e3033b153567ed75332ad4035e05dd277db474cb5a1"
+              },
+              {
+                "file": "arithmetic.py",
+                "sha256": "761bed63451e1b1c888eca4b9608fb99c1542267d7d86231ba27dc216a82cbb3"
+              },
+              {
+                "file": "baseline.py",
+                "sha256": "126176cae32258d9cc4625ca0177651e3be0ddb5a980c43abeb97f5cb5eea6a6"
+              },
+              {
+                "file": "bridge.py",
+                "sha256": "d2061903f848852c9ac232599b4684cb71f6768601f7d8c40ce5d4ef6e7e037b"
+              },
+              {
+                "file": "capabilities.py",
+                "sha256": "46a884fe1c026d1be09d33a40f48fa803bd43bd1863b5cb02c41c5c3673d8868"
+              },
+              {
+                "file": "checked.py",
+                "sha256": "ac19e8cedd032eddd521d0704375b551ac072f9f2311a0b04cebf2cd7070aa0c"
+              },
+              {
+                "file": "errors.py",
+                "sha256": "2e766b7acbbaa4a96c739943aec4a2022a561a864146a7a27804fc7b6e6c8648"
+              },
+              {
+                "file": "exact.py",
+                "sha256": "7153911b1a60b4baf4f14199c010baf43d4f83b2366ed24f744df99072974806"
+              },
+              {
+                "file": "followup.py",
+                "sha256": "e08e9959119c3d25fe198be312dc6321809ec428be0ec1d0f156cb83d59065f9"
+              },
+              {
+                "file": "historical.py",
+                "sha256": "2d30cf250f477384069cdf2881f99e09b690dd676d2a0a9c3e3d9c7499df4255"
+              },
+              {
+                "file": "identity.py",
+                "sha256": "fdd5f8edac0a067d0bfa3e420cc8bcc959b73ad934e8828e8cf1579842519884"
+              },
+              {
+                "file": "interpretation.py",
+                "sha256": "c14d6e23c389545e8856aa7b0e4022ab542acfd0c0059b610c3e2be3c9544d0f"
+              },
+              {
+                "file": "models.py",
+                "sha256": "e117b6371fa0db4b2671f96f1ae54778459da4891209608a6245276c021ce6c2"
+              },
+              {
+                "file": "native_packet.py",
+                "sha256": "7b3332f1dcb0e991da989c13cba64903d1f99dcfdce072b7d501554a33c51c8a"
+              },
+              {
+                "file": "numerical.py",
+                "sha256": "8afc883e0117f1d943bfc5e5912d1befeb6110b50582d33df66bcda2464116c9"
+              },
+              {
+                "file": "pipeline.py",
+                "sha256": "42fc0611c42efbaf3f2a81052cc7143f057c50a709c766b7e1bd31fc29f8bfe6"
+              },
+              {
+                "file": "replay.py",
+                "sha256": "3a2db116dc51a22da048be7e739789d2221216b81d6a693950e31605b75b1fce"
+              },
+              {
+                "file": "replay_baseline.py",
+                "sha256": "2edd3584e7e63e3eb9822991de567148d298d75f46110891582033361bd9fe31"
+              },
+              {
+                "file": "replay_numeric.py",
+                "sha256": "6933d6be6982a026f63aa6c4bd629917c1c8e182f15f0c0a5bf054b5b44921af"
+              },
+              {
+                "file": "resource.py",
+                "sha256": "0c741d5ac94070523a501c4452bea85a7147baba943c2ec790eb88e13e96ff3f"
+              },
+              {
+                "file": "search.py",
+                "sha256": "009c11003e4223f68ff0c3667a4f94ea9eb211d60cbb8bf6ce7cd68441f53d94"
+              }
+            ]
+          },
+          "verified_in_environment": false
+        },
+        "runtime_available": true
+      },
+      "startup_path": {
+        "api": "python -m uvicorn bean_api.main:create_app --factory --host 127.0.0.1",
+        "counterdex_python_configured": true,
+        "diagnostic_overrides": [],
+        "launcher": "evaluation harness isolated launch (Owner 4 launcher not yet used)",
+        "pythonpath": [
+          "evaluation guard",
+          "apps/api"
+        ],
+        "science_adapter": "counterdex",
+        "state": "fresh temporary SQLite, sources and artifacts; in-memory bearer tokens",
+        "worker": "python -m bean_api.worker"
+      },
+      "worker": {
+        "holds_sqlite_worker_lock": true,
+        "process_alive": true,
+        "ready": true
+      }
+    },
+    "records": null,
+    "reviewer_approvals": 3,
+    "schema": "eval-observation/v1",
+    "scientific_jobs": 3,
+    "state": "passed",
+    "tested_commit": "c51bbaeb10a3857d9116ce779902eb563ec8fabf",
+    "timings": {
+      "basis": "local loopback wall time measured by the harness; not provider latency",
+      "http_exchanges": 36,
+      "http_latency_ms_max": 61.559,
+      "http_latency_ms_total": 254.516
+    },
+    "tools": {
+      "transport": "real"
+    }
+  }
+}

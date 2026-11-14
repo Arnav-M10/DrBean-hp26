@@ -8,6 +8,12 @@ record commits to the last legacy line, so later edits to legacy lines are caugh
 
 A modified, reordered or deleted line, or a changed trace or evidence file, makes
 :func:`verify` report a problem; gates refuse to qualify a release from such a history.
+
+Fork segments: when two branches append to the same history concurrently, a merge keeps the
+integrated chain in ``attempts.jsonl`` and moves the other side's records, byte for byte, into
+``forks/<name>.jsonl``. Each segment must be fully chained, start from a line of the main chain
+(its fork point) and keep its trace/evidence digests; attempt ids stay unique across all files.
+Gates read only the main chain (fork records are at other commits); nothing is rewritten.
 """
 from __future__ import annotations
 
@@ -44,39 +50,64 @@ def file_digest(path: str) -> str | None:
         return hashlib.sha256(handle.read()).hexdigest()
 
 
+FORK_DIR = "forks"
+
+
+def _lines(path: str) -> list[bytes]:
+    with open(path, "rb") as handle:
+        return [line for line in handle if line.strip()]
+
+
 def verify(results_dir: str, filename: str = "attempts.jsonl") -> list[str]:
-    """Problems in the append-only history; an empty list means it verifies."""
+    """Problems in the append-only history (main chain and fork segments); empty means it verifies."""
     path = os.path.join(results_dir, filename)
     if not os.path.exists(path):
         return []
-    problems, previous, chained, seen = [], None, False, {}
-    with open(path, "rb") as handle:
-        lines = [line for line in handle if line.strip()]
+    lines = _lines(path)
+    seen: dict = {}
+    problems = _verify_chain(results_dir, lines, "", seen, fork_points=None)
+    fork_dir = os.path.join(results_dir, FORK_DIR)
+    if os.path.isdir(fork_dir):
+        main_digests = {line_digest(line) for line in lines}
+        for name in sorted(os.listdir(fork_dir)):
+            if name.endswith(".jsonl"):
+                problems += _verify_chain(results_dir, _lines(os.path.join(fork_dir, name)), f"{FORK_DIR}/{name} ",
+                                          seen, fork_points=main_digests)
+    return problems
+
+
+def _verify_chain(results_dir: str, lines: list[bytes], where: str, seen: dict, *,
+                  fork_points: set[str] | None) -> list[str]:
+    """One chain. A fork segment (``fork_points`` given) is fully chained from a line of the main chain."""
+    problems, previous, chained = [], None, fork_points is not None
     for number, raw in enumerate(lines, 1):
         try:
             record = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, ValueError):
-            problems.append(f"line {number}: not valid JSON")
+            problems.append(f"{where}line {number}: not valid JSON")
             previous = raw
             continue
         attempt_id = record.get("attempt_id")
         if attempt_id in seen:
-            problems.append(f"line {number}: duplicate attempt_id {attempt_id} (first on line {seen[attempt_id]})")
+            problems.append(f"{where}line {number}: duplicate attempt_id {attempt_id} (first at {seen[attempt_id]})")
         elif attempt_id:
-            seen[attempt_id] = number
-        expected_prev = line_digest(previous) if previous is not None else GENESIS
-        if "prev_record_sha256" in record:
+            seen[attempt_id] = f"{where}line {number}"
+        if previous is None and fork_points is not None:
+            if record.get("prev_record_sha256") not in fork_points:
+                problems.append(f"{where}line {number} ({record.get('entry_id')}): fork segment does not start "
+                                "from a line of the main chain")
+        elif "prev_record_sha256" in record:
             chained = True
-            if record["prev_record_sha256"] != expected_prev:
-                problems.append(f"line {number} ({record.get('entry_id')}): chain break; an earlier line was "
-                                "modified, removed or reordered")
+            if record["prev_record_sha256"] != (line_digest(previous) if previous is not None else GENESIS):
+                problems.append(f"{where}line {number} ({record.get('entry_id')}): chain break; an earlier line "
+                                "was modified, removed or reordered")
         elif chained:
-            problems.append(f"line {number} ({record.get('entry_id')}): unchained record after the chain began")
+            problems.append(f"{where}line {number} ({record.get('entry_id')}): unchained record after the chain began")
         trace = record.get("trace")
         if trace and record.get("trace_sha256"):
             actual = file_digest(os.path.join(results_dir, trace))
             if actual != record["trace_sha256"]:
-                problems.append(f"line {number} ({record.get('entry_id')}): trace {trace} "
+                problems.append(f"{where}line {number} ({record.get('entry_id')}): trace {trace} "
                                 f"{'missing' if actual is None else 'changed'}")
         evidence = record.get("evidence_dir")
         if evidence and record.get("evidence_index_sha256"):
@@ -85,13 +116,13 @@ def verify(results_dir: str, filename: str = "attempts.jsonl") -> list[str]:
                 with open(index_path, encoding="utf-8") as handle:
                     index = json.load(handle)
             except (OSError, ValueError):
-                problems.append(f"line {number}: evidence index missing")
+                problems.append(f"{where}line {number}: evidence index missing")
                 index = None
             if index is not None:
                 if index_digest(index) != record["evidence_index_sha256"]:
-                    problems.append(f"line {number}: evidence index changed")
+                    problems.append(f"{where}line {number}: evidence index changed")
                 for name, item in index.items():
                     if file_digest(os.path.join(results_dir, evidence, item["path"])) != item["sha256"]:
-                        problems.append(f"line {number}: evidence file {name} missing or changed")
+                        problems.append(f"{where}line {number}: evidence file {name} missing or changed")
         previous = raw
     return problems

@@ -64,6 +64,12 @@ class Owner4LaunchEnvironment(unittest.TestCase):
         self.assertIn("DRBEAN_DIAGNOSTIC_BARRIER", env)
         self.assertNotIn("DRBEAN_DIAGNOSTIC_OVERRIDES", self.stack().launcher_environment(import_path=False))
 
+    def test_cli_keeps_engine_previews_out_of_the_release_history(self):
+        out = subprocess.run([sys.executable, os.path.join(ROOT, "cli.py"), "controls", "--app-repo", REPO],
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(out.returncode, 1, out.stdout + out.stderr)
+        self.assertIn("separate --results", out.stdout)
+
     def test_cli_keeps_the_owner4_path_out_of_the_release_history(self):
         out = subprocess.run([sys.executable, os.path.join(ROOT, "cli.py"), "run", "--lane", "offline_real_science",
                               "--subject", "http-owner4-launcher"], capture_output=True, text=True, timeout=60)

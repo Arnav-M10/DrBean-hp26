@@ -149,3 +149,19 @@ def test_design_authority_is_separate_and_bound(flow):
 def test_hypothetical_followups_give_candidate_specific_feedback(flow):
     sf.scenario_hero(flow, HERO)
     require(sf.scenario_followup(flow, HERO))
+
+
+@pytest.mark.real_stack
+@pytest.mark.real_science
+def test_no_candidate_found_and_a_skipped_comparison_keep_their_own_meanings(flow):
+    """SCI-02 (C): bounded search without an outside witness and a skipped comparison are distinct, never a proof.
+    The third meaning, an infrastructure interruption, is RS-CANCEL-RESTART's interrupted_run_records_no_scientific_outcome."""
+    require(sf.scenario_non_positive_meanings(flow, HERO))
+
+
+@pytest.mark.real_stack
+@pytest.mark.real_science
+def test_numerical_guidance_design_never_reads_as_checked(flow):
+    """SCI-05 (C): the application record, options, replay and UI label of a requested numerical-guidance design."""
+    sf.scenario_hero(flow, HERO)
+    require(sf.scenario_numerical_guidance_records(flow, HERO))

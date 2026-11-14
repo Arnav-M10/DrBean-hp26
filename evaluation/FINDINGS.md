@@ -1,11 +1,11 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `d821202b339e`, observed with harness `d821202b339ed60720e3c919d6be47e450e3b894` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `4a0c616`, observed with harness `c6307df` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
 | F-ORPHAN-WORKER-KILL | P0 | 2 | retested | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
-| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | fixed_pending_retest | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
+| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | retested | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
 | F-PLATFORM-RLIMIT | P0 | 2 | retested | Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected) |
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
 | F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | retested | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
@@ -15,15 +15,15 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 | F-PLACEHOLDER-MODE | P1 | 3 | retested | Capabilities declare no explicit placeholder/disabled provider mode |
 | F-OPTIONAL-VANISHES | P1 | 3 (graph) and 2 (callbacks) | retested | The actual deepagents graph completes while a reviewed optional scenario is neither executed nor skipped |
 | F-CONTROLLED-PROVENANCE | P1 | 3 | retested | Controlled-model turns are reserved as provider 'gemini' attempts with no placeholder marker |
-| F-REVIEW-MATERIALIZATION | P1 | 2 | fixed_pending_retest | An accepted intake review creates no dataset association (source values never reach execution) |
+| F-REVIEW-MATERIALIZATION | P1 | 2 | retested | An accepted intake review creates no dataset association (source values never reach execution) |
 | F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
-| F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
+| F-LINT-CHECKLIST | P2 | 4 | retested | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
 | F-MAC-NPROC | P0 | 2 | retested | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
-| F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | fixed_pending_retest | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
-| F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | fixed_pending_retest | Coordinator attempt metadata names provider gemini for controlled-model turns |
-| F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
+| F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | retested | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
+| F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | retested | Coordinator attempt metadata names provider gemini for controlled-model turns |
+| F-TEST-VAR-LEAK | P2 | B (backend tests; was Owner 2) | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
 | F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | retested | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
-| F-SIBLING-FORKS | P2 | 2 | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
+| F-SIBLING-FORKS | P2 | B (worker/process supervision; was Owner 2) | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
 | H-ORACLE-BOUNDARIES | P1 | 5 | retested | Harness contract oracle accepted inputs the API rejects (trailing newline, -0, depth 64, digit caps) |
 | H-BUDGET-USAGE | P1 | 5 | retested | Harness JSONL budget accepted negative usage and counted one request per reservation |
 | H-COMPLETED-QUALIFIES | P0 | 5 | retested | Merged harness passed a case-less full-stack entry on state == completed alone |
@@ -31,10 +31,33 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 | H-DIRTY-FLAG | P1 | 5 | retested | git_state stripped porcelain output and marked every record dirty (since harness 0.1.0) |
 | H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
 | H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
-| H-CI-ENGINE | P1 | 5 | fixed_pending_retest | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
-| F-LAUNCHER-HIDDEN-PTH | P1 | 4 | open | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
-| F-LAUNCHER-ENV-READ | P2 | 4 | open | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
+| H-CI-ENGINE | P1 | 5 | retested | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
+| F-LAUNCHER-HIDDEN-PTH | P1 | 4 | retested | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
+| F-LAUNCHER-ENV-READ | P2 | 4 | retested | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 | H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
+| F-EXPLANATION-QUALIFIER | P2 | 3 | retested | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
+| F-EXPLANATION-NUMBER-FORMS | P2 | 3 | retested | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
+| F-EXPLANATION-PARAPHRASE | P2 | 3 | retested | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
+| F-RESTART-EPERM | P0 | 2 | retested | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
+| H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
+| F-LEDGER-TOTALS | P2 | 2 | retested | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
+| F-LEDGER-MALFORMED | P2 | 2 | retested | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
+| F-EXPLANATION-CHECKED-GATES | P2 | 3 | retested | 'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates |
+| H-GATE-CONTROLS-DIRTY | P1 | 5 | retested | native_engine_controls gate admitted dirty (and otherwise unqualified) control records |
+| F-NARRATION-OVERSUPPRESSION | P2 | A (narration guard in conversation/coordinator; was Owner 3) | retested | The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record |
+| H-SOURCE-RETRY-KEY | P2 | 5 | retested | Harness source-review test treated a new idempotency key as a retry |
+| F-PAPER-CITATION-SUBSTRING | P1 | A (PR #35 paper proposal validator; was Owner 3) | open | A paper citation that is only a fragment of a longer printed number is accepted as the exact cited value (4.6 for 4.62; 538 ng/mL for 5380 ng/mL) |
+| F-PAPER-QUOTE-NORMALIZATION | P2 | A (PR #35 validator) with B (file services; was Owners 3 and 4) | open | An authentic quote that crosses a text-layer line break, or uses an NFKC-equivalent character (µ U+00B5 vs μ U+03BC), discards the whole paper proposal |
+| F-PAPER-HARD-BOUND-CONTEXT | P2 | A (PR #35 validator; was Owner 3) | open | A stated hard bound is refused, and the whole proposal discarded, when an unrelated SD or CI appears anywhere on the same page |
+| F-PAPER-EXPONENT-FLATTENING | P2 | A (PR #35 validator) with B (parser; was Owners 3 and 4) | open | A superscript exponent flattened by the PDF text layer ('1.1 × 10' + superscript '1' read as '1.1 × 101') is accepted as the exact value 101 with no visual-review flag |
+| H-LANE-ENGINE-PRECONDITION | P2 | 5 (harness) | retested | Lane reports judged the engine precondition by the engine interpreter's installed copy, so checkouts without one (preview worktrees) were reported failed although the application ran the repository source |
+| F-PAPER-RENDER-MEMORY | P1 | B (PR #36 papers worker and resource policy; was Owners 4 and 2) | open | On macOS a page preview of a small PDF whose content inflates to gigabytes drives the PDF worker to multiple GiB: memory is bounded only by time |
+| F-PAPER-IDENTITY-CONTRACTS | P2 | B (canonical contracts; was Owner 2) with A | open | Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written |
+| F-SESSION-CAPACITY-EXHAUSTION | P2 | B (private browser sessions, shared gateway) | open | Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors |
+| H-LAUNCHER-OPTIN-FORMAT | P3 | C (harness) | retested | The launcher opt-in doctor test assumed PR #36's opt-in file format and wording, so it failed against main's stricter launcher |
+| H-REPLAY-CLASS-RECORDED-MISMATCH | P3 | C (harness) | retested | The engine-control replay classifier called a recorded-result mismatch a scientific exclusion when the fresh verdict was itself an exclusion |
+| F-UPLOAD-LIMIT-MESSAGE | P3 | B (upload boundary and general-file admission) | open | An oversized research upload is refused with a generic message that names neither the size limit nor the other limits the file exceeds |
+| F-CI-BROWSER-CHECK-INTERMITTENT | P3 | B (apps/web/check-backend.mjs and CI wiring) | open | B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -46,9 +69,16 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Retest at preview of backend/followup 8525cab (harness 1760df0; diagnostics relax_nproc + science_barrier):** Still reproduces: 1 live scientific child when the worker was SIGKILLed, still alive after `worker --recover` (the run itself is correctly marked interrupted and not redispatched). Running cancellation kills its child (passes). The harness released the barrier and reaped the orphan at teardown. (evidence: {"attempts": ["att_3cf444719093428e"], "results": "evaluation/results/previews/backend-followup-8525cab/relax_nproc+science_barrier"})
 - **Retest at merged main 80f95a4 via harness b827c61 and f992b48 (diagnostics relax_nproc + science_barrier):** Still reproduces on main, twice: the scientific child survives the worker SIGKILL and `worker --recover` (the run is correctly marked interrupted and not redispatched). Running cancellation still kills its child. Since f992b48 the harness terminates the orphan before releasing the barrier (H-ORPHAN-TEARDOWN). (evidence: {"attempts": ["att_d0b306605a744db4", "att_593e67a5ca214685"], "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier"})
 - **Retest at merged main 80f95a4, harness a1b28ae, tests/integration (science_barrier only; no product guard relaxed):** Reproduces without relax_nproc: the deterministic pytest test fails no_orphan_after_worker_kill (1 live scientific child after the worker SIGKILL). The barrier holds the child after setsid and the product's limits, so this is the product's own kill/recovery path. (evidence: {"pytest": "evaluation/results/integration/pytest-merged-main-a1b28ae.md"})
+- **Retest at main 61edad7, Linux CI (ubuntu runner, no diagnostics except the harness barrier):** Reproduces on Linux too: no_orphan_after_worker_kill, 1 live scientific child after the worker SIGKILL. Not a Mac-only effect. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
+- **Retest at preview of backend/restart-recovery c231be4 (PR #14; diagnostics relax_nproc + science_barrier):** Fixed by the PR's lifeline guard: the held child is stopped when the worker is SIGKILLed; nothing for the harness to terminate. Close after PR #14 merges with F-RESTART-EPERM resolved (otherwise normal completion fails on macOS). (evidence: {"attempts": ["att_2712c19d978049cb"], "results": "evaluation/results/previews/backend-restart-recovery-c231be4/relax_nproc+science_barrier"})
+- **Retest at preview of PR #15 9a6db61 (science_barrier only, no relaxed guard):** Still reproduces on PR #15 (it does not include PR #14's lifeline guard). Merge order matters: PR #14 fixes it but needs F-RESTART-EPERM fixed first, or PR #14 would break the science PR #15 just enabled on macOS. (evidence: {"attempts": ["att_5946ffbc58194fcd"], "results": "evaluation/results/previews/science-integration-fixes-9a6db61/science_barrier"})
 - **Retest at d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0):** Resolved on this supported Mac/runtime in the ordinary lane: one sustained live scientific child was observed before the worker SIGKILL and none remained afterwards; worker --recover marked the run interrupted with worker_restart and it stayed interrupted without redispatch. Running cancellation likewise observed one live child and none surviving. The separately declared cancellation workload contained 128 exact replicates of the synthetic input; no diagnostic barrier or relaxed guard was used. All seven required lifecycle checks passed. Earlier diagnostic failures remain historical; this is not a claim about every OS or every possible termination timing. (evidence: {"attempts": ["att_d77e70889700444b"], "interruption_workload": {"deterministic_barrier": false, "origin": "synthetic", "rows": 128}, "lane_run_id": "lane_872f1c39287144d1", "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])", "trace": "evaluation/results/traces/att_d77e70889700444b.json"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Independently confirmed: with the 128-row real workload (no diagnostic) 1 live scientific child at cancel and 1 at worker SIGKILL, none alive afterwards; recovery marks the run interrupted without redispatch. Same with the barrier diagnostic, where the harness had nothing to terminate. (evidence: {"attempts": ["att_a114e020f44547b2", "att_ee0e6b5f53c346ec"]})
+- **Retest at final candidate c8d39b5 = main 4b5f1f5 (PR #19 + PR #12) + this branch; macOS 26.7 arm64, no diagnostics:** Still holds after PR #12 merged: harness path 7/7, Owner 4's unmodified launcher 6/7 (cancel/restart is harness-path only), 22/22 engine controls, integration 66 passed + 19 strict xfail, web 30/30; no backend or engine code changed since 30ab5f8. (evidence: {"attempts": ["att_2b31cc969d37437d", "att_913292d16ae64365", "att_906bef01ac57453d"]})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still holds: harness path 7/7 (cancel/restart with a real 128-row workload, nothing survives worker loss or cancellation), Owner 4's unmodified launcher 6/7, barrier diagnostic passed. (evidence: {"attempts": ["att_0f60903bc15b4617", "att_9c18ee097daa4f73", "att_6ca787bfe84048e7", "att_690401b8bcf048c3"]})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls. (evidence: {"attempts": ["att_b6fc5431663f4693", "att_f66513d7ec274c82", "att_917faf93b8a14f96", "att_17ae63064bb84863"]})
 
-## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, fixed_pending_retest)
+## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, retested)
 
 - **Input:** origin/main 9cc90e0 merged locally with codex/gemini-offline-integration c95ab28 (clean merge)
 - **Command:** `in that worktree: BEAN_COUNTERDEX_PYTHON=<python3.11> .venv/bin/python -m pytest -q tests --ignore=tests/integration; .venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py`
@@ -56,6 +86,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Observed:** provider_placeholder_disabled from main's Worker._agent (it calls check_ready() on a placeholder config); failing: tests/test_worker.py::test_worker_actual_framework_uses_durable_attempts_and_frozen_evidence, tests/test_backend_offline.py::test_ordinary_provider_configuration_never_reads_provider_environment, ::test_http_intake_and_conversation_keep_provider_attempts_zero, and Workstream 5's three worker-boundary tests. Owner 3's own 74 tests and all zero-dispatch tests pass on the combination.
 - **Evidence:** {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"}
 - **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Resolved on that branch: the worker-boundary controlled-lane tests pass; zero-dispatch passes. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
+- **Retest at merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50:** Closed by retest on main: the worker-boundary controlled lane and real deepagents graph tests pass alongside the zero-dispatch suite (38 passed). (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"})
 
 ## F-PLATFORM-RLIMIT (P0, owner 2, retested)
 
@@ -153,7 +184,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Evidence:** {"tests": ["tests/integration/test_ai_boundaries.py::test_controlled_turns_never_masquerade_as_live_provider_attempts"]}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** Resolved at the integrated boundary: the Worker records controlled turns as controlled_attempt/controlled_outcome records (execution_lane controlled_placeholder, zero calls and tokens); provider_attempts stays empty. The coordinator's own metadata still says provider gemini inside simulated_reservation (residual P2 F-COORDINATOR-PROVIDER-LABEL). My earlier claim that these rows reach the real provider ledger was true of 586fb9b's worker path only as a risk and is not true on main. (evidence: {"tests": ["tests/integration/test_ai_boundaries.py::test_worker_records_controlled_turns_outside_the_provider_ledger (passed)"]})
 
-## F-REVIEW-MATERIALIZATION (P1, owner 2, fixed_pending_retest)
+## F-REVIEW-MATERIALIZATION (P1, owner 2, retested)
 
 - **Input:** controlled clean proposal, every field confirmed
 - **Command:** `.venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k clean_proposal_stays_unreviewed`
@@ -161,6 +192,8 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Observed:** intake_review record only; zero datasets (safe: nothing is auto-accepted, but the join is missing)
 - **Evidence:** {"audit": "AUDIT_AND_NEXT_STEPS P1 'Bind reviewed source values to execution'"}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** main adds POST /workspaces/{id}/intake-reviews/{review_id}/materialize and refuses direct datasets citing a source (source_review_required, verified over HTTP in RS-HERO-FULL). Materialization itself not yet exercised by this harness. (evidence: {"attempts": ["att_87537746fa40470d (source_linked_values_require_review passed)"]})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Not drivable over HTTP on main without a proposal source (controlled intake is PR #20). On the labelled combined preview (this branch + PR #20/#27/#28) review -> materialization associates the source and the corrected value reaches a separately approved real run (tests/integration/test_source_review_science.py passes there). Close when PR #20 merges and that test passes on main. (evidence: {"preview": "evaluation/results/previews/combined-6a69a55-pr20-pr27-pr28"})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Closed by retest on main: tests/integration/test_source_review_science.py passes on the candidate (controlled proposal with explicit authorship and zero provider attempts; same-key retry returns the same record; a human correction kept beside the original; materialization binds review -> dataset -> problem, keeps source linkage and the original spelling, is idempotent and grants no approval; a separately approved real run on the corrected inputs; native download, fresh replay and tamper controls; zero external attempts). (evidence: {"pytest": "73 passed, 27 xfailed at 1bc3604"})
 
 ## F-RESTART-UNOBSERVABLE (P1, owner 2 (after F-PLATFORM-RLIMIT), retested)
 
@@ -173,7 +206,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Retest at main 9cc90e0 with diagnostic science_barrier (harness d6a71c2):** Made observable with a deterministic diagnostic barrier inside the scientific child. Queued and running cancellation pass (held child killed, run cancelled); recovery marks the killed worker's run interrupted and never redispatches it. The worker-kill orphan this exposed is tracked as F-ORPHAN-WORKER-KILL. (evidence: {"results": "evaluation/results/previews/main-d6a71c2/science_barrier"})
 - **Retest at d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0):** The ordinary, non-barrier lane now observes sustained real scientific work for both cancellation and worker loss using a separately declared 128-row exact-replicate synthetic workload. One live child exists at each intervention, none survives, the cancelled run is terminal and the recovered worker-loss run stays interrupted without redispatch. This removes the earlier vacuity on this supported host; it does not weaken the sustained-observation criterion or promote earlier diagnostic evidence. (evidence: {"attempts": ["att_d77e70889700444b"], "lane_run_id": "lane_872f1c39287144d1", "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])"})
 
-## F-LINT-CHECKLIST (P2, owner 4, open)
+## F-LINT-CHECKLIST (P2, owner 4, retested)
 
 - **Input:** repository at 586fb9b
 - **Command:** `.venv/bin/ruff check apps tests scripts`
@@ -181,6 +214,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Observed:** F401 scripts/release/checklist.py:25 drbean_eval.contract imported but unused
 - **Evidence:** {}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** Still failing on main: ruff check apps tests scripts reports 1 error. (evidence: {"command": ".venv/bin/ruff check apps tests scripts"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by retest: `ruff check scripts/release/checklist.py` passes. (evidence: {})
 
 ## F-MAC-NPROC (P0, owner 2, retested)
 
@@ -195,9 +229,15 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Retest at backend/browser-design 8451c1f and codex/ai-offline-milestones c6f04c2 (previews):** Present on both newer branches: plain hero baseline fails on the Mac; Owner 3's new real-Counterdex coordinator test fails with scientific_runtime_unavailable. This is now the single blocker between the Mac and a passing acceptance hero run. (evidence: {"ai": "evaluation/results/previews/ai-offline-milestones-c6f04c2", "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"})
 - **Retest at 3b55843 (app code = main 9cc90e0; engine runtime now Owner 4's .venv-engine, CPython 3.11.17):** Still fails on both launch paths: harness path and Owner 4's launcher both report scientific_runtime_unavailable for the hero and changed-input baselines. With only the process-limit guard relaxed (diagnostic), the same launcher runs discovery, changed input, design authority and zero dispatch to a pass. (evidence: {"attempts": ["att_92546adc9fac471e", "att_fe675c60b66a4801", "att_8e959bd4324c48f8"], "results": "evaluation/results, evaluation/results/owner4-launcher, evaluation/results/owner4-launcher/relax_nproc"})
 - **Retest at merged main 80f95a4 via harness b827c61:** Unchanged on both launch paths (harness and Owner 4's launcher): hero and changed-input baselines fail with scientific_runtime_unavailable. It is now the only blocker between this Mac and release acceptance of the hero, design and follow-up path, which pass in full when only this guard is relaxed. (evidence: {"attempts": ["att_568062c9c3434610", "att_98ac5a9ee88048d1", "att_1ace0e6c87124367"]})
+- **Retest at main 61edad7, Linux CI:** Contrast: the same real-science HTTP tests (hero with checked design and fresh replay, changed input, design authority, design-bound follow-up) pass on the Linux runner, which owns about 64 processes. The failure on this Mac is the per-user process cap alone. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
+- **Retest at preview of codex/science-integration-fixes 9a6db61 (PR #15, stacked on PR #5; harness 2600456; NO diagnostics):** Fixed in PR #15: the process policy keeps the inherited per-user ceiling. On this Mac, with no diagnostic, 6/7 lane entries pass: hero (real discovery, checked design at 8 h, both packets replay fresh), changed input, retry/concurrency, design authority (v2 reuse probe included), design-bound follow-up (recheck; application, fresh replay and decimal oracle agree), zero dispatch. Close on main after PR #5/#15 merge. (evidence: {"attempts": ["att_c74f45e13b1c4522", "att_d6ae837f8bcc4541"], "results": "evaluation/results/previews/science-integration-fixes-9a6db61/plain"})
 - **Retest at d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0):** Resolved by an ordinary run on this Mac: all seven scheduled HTTP entries pass, including real baseline discovery, changed input, separate design, proposal-bound follow-up and sustained cancellation/restart. The prepared CPython 3.11 runtime launches under the product process-guards-v3 policy with inherited account-wide RLIMIT_NPROC; readiness explicitly reports that a per-job process-count quota is unavailable because the platform limit is account-wide. Owned POSIX sessions, wall-clock supervision and the other reported guards remain enabled. No relax_nproc or other diagnostic override was used. This verifies the reported Mac launch failure on this host, not a newly available per-job process quota or a cross-platform proof. (evidence: {"attempts": ["att_ec9cf987565e48ec", "att_1f692eebc2c34baa", "att_371f1d8c816441b4", "att_955cd7b2cbe240ed", "att_fd97aeac25fa4cae", "att_d77e70889700444b", "att_1a506101c468467d"], "lane_run_id": "lane_872f1c39287144d1", "native_controls": {"at": "2026-11-14T05:24:07+00:00", "expected": 22, "file": "evaluation/results/controls.jsonl", "passed": 22, "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker"}, "resource_policy": {"policy_version": "process-guards-v3", "process_count": "inherited_rlimit_nproc_per_user", "process_count_job_quota": "unavailable", "process_count_reason": "account_wide_limit_not_job_quota", "process_tree": "owned_posix_session"}, "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Independently confirmed on this Mac: the plain lane passes 7/7 through the harness launch path and 6/7 through Owner 4's launcher (cancel/restart is harness-path only), with real discovery, checked design, fresh replay and follow-up rechecks; no relaxed guard. (evidence: {"attempts": ["att_b9610a6030064d38", "att_a8d1f1b59cb845ef"]})
+- **Retest at final candidate c8d39b5 = main 4b5f1f5 (PR #19 + PR #12) + this branch; macOS 26.7 arm64, no diagnostics:** Still holds after PR #12 merged: harness path 7/7, Owner 4's unmodified launcher 6/7 (cancel/restart is harness-path only), 22/22 engine controls, integration 66 passed + 19 strict xfail, web 30/30; no backend or engine code changed since 30ab5f8. (evidence: {"attempts": ["att_2b31cc969d37437d", "att_913292d16ae64365", "att_906bef01ac57453d"]})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still holds: harness path 7/7 (cancel/restart with a real 128-row workload, nothing survives worker loss or cancellation), Owner 4's unmodified launcher 6/7, barrier diagnostic passed. (evidence: {"attempts": ["att_0f60903bc15b4617", "att_9c18ee097daa4f73", "att_6ca787bfe84048e7", "att_690401b8bcf048c3"]})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls. (evidence: {"attempts": ["att_b6fc5431663f4693", "att_f66513d7ec274c82", "att_917faf93b8a14f96", "att_17ae63064bb84863"]})
 
-## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, fixed_pending_retest)
+## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, retested)
 
 - **Input:** scripted model: execute baseline, then return_grounded_explanation
 - **Command:** `.venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k optional_scenario_cannot_silently_vanish`
@@ -206,8 +246,9 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Evidence:** {}
 - **Retest at preview: main 9cc90e0 + codex/gemini-offline-integration c95ab28 (local merge):** Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then. (evidence: {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"})
 - **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Strict-xfail test XPASSes on this branch too; remove the marker when it merges. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
+- **Retest at merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50:** Closed by retest: the coordinator no longer reports completed while a reviewed optional scenario is neither executed nor skipped; the strict-xfail test XPASSed and is now an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"})
 
-## F-COORDINATOR-PROVIDER-LABEL (P2, owner 3, fixed_pending_retest)
+## F-COORDINATOR-PROVIDER-LABEL (P2, owner 3, retested)
 
 - **Input:** run_coordinator with a controlled chat_model
 - **Command:** `.venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k masquerade`
@@ -216,14 +257,17 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Evidence:** {}
 - **Retest at preview: main 9cc90e0 + codex/gemini-offline-integration c95ab28 (local merge):** Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then. (evidence: {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"})
 - **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Strict-xfail test XPASSes on this branch too; remove the marker when it merges. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
+- **Retest at merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50:** Closed by retest: controlled turns are no longer labelled as bare provider gemini attempts; the strict-xfail test XPASSed and is now an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"})
 
-## F-TEST-VAR-LEAK (P2, owner 2, open)
+## F-TEST-VAR-LEAK (P2, owner B (backend tests; was Owner 2), open)
 
 - **Input:** tests/test_api.py client fixture (Settings(database_path=..., blob_dir=..., auth_tokens=...))
 - **Command:** `.venv/bin/python -m pytest -q tests/test_api.py; ls var/artifacts`
 - **Expected:** test runs write only to tmp_path
 - **Observed:** an empty var/artifacts appeared in the working tree (removed)
 - **Evidence:** {"note": "Workstream 5's own fixture had the same omission and now sets artifact_dir"}
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Reproduced twice at the candidate: with var/ absent, `BEAN_COUNTERDEX_PYTHON=.venv-engine/bin/python .venv/bin/python -m pytest -q tests --ignore=tests/integration` (588 passed) leaves an empty var/artifacts in the checkout. (evidence: {})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Reproduced again at 1bc3604: the backend suite (619 passed) leaves an empty var/artifacts in the checkout. (evidence: {})
 
 ## F-DESIGN-SOURCE-ARTIFACTS (P1, owner 2 (projection) and 1 (engine reuse format), retested)
 
@@ -237,7 +281,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Retest at merged main 80f95a4 (PR #9 + PR #11) via harness b827c61; diagnostic relax_nproc only (F-MAC-NPROC blocks every non-diagnostic run on this Mac):** Closed by retest: the documented design request WITH source_artifact_ids now returns checked_pair_separation at 8/1 with a strictly positive exact margin, valid verification and fresh replay of both packets; no isolation probe was needed. neighbouring entries in the same run: RS-HERO-FULL, RS-CHANGED-INPUT, RS-RETRY-CONCURRENT, RS-DESIGN-AUTHORITY, RS-FOLLOWUP, RS-ZERO-DISPATCH all pass. (evidence: {"attempts": ["att_1ace0e6c87124367"], "results": "evaluation/results/previews/main-b827c61/relax_nproc"})
 - **Retest at d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0):** Current Counterdex 0.3 qualification uses a newly reviewed design request with empty prospective source_artifact_ids, while the selected immutable baseline packet is supplied independently as mandatory history. This request completes at checked_pair_separation, selects 8/1 with a strictly positive exact margin, and freshly replays with valid matching evidence; there is no isolation probe or rewrite of an already approved request. The earlier successful nonempty-reuse observation describes the older consumer and is preserved above, not claimed as the current 0.3 reuse contract. (evidence: {"attempts": ["att_ec9cf987565e48ec"], "lane_run_id": "lane_872f1c39287144d1", "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])"})
 
-## F-SIBLING-FORKS (P2, owner 2, open)
+## F-SIBLING-FORKS (P2, owner B (worker/process supervision; was Owner 2), open)
 
 - **Input:** two hypothetical observation proposals against the same parent dataset in one workspace
 - **Command:** `review the second proposal after accepting the first`
@@ -245,29 +289,35 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Observed:** 409 stale_revision for the second fork (the first moved the current dataset); the harness now uses one workspace per branch
 - **Evidence:** {"note": "correct immutability behaviour; product/UX gap, not a safety defect"}
 
-## H-CI-ENGINE (P1, owner 5, fixed_pending_retest)
+## H-CI-ENGINE (P1, owner 5, retested)
 
 - **Input:** CI stack job: `python3 scripts/dev/launcher.py setup` then `.venv/bin/python -m pytest -q tests/integration` with no DRBEAN_SCIENCE_PYTHON and no python3.11 on PATH
 - **Command:** `.venv/bin/python -m pytest -q tests/integration`
 - **Expected:** the launched stack receives BEAN_COUNTERDEX_PYTHON for the qualified CPython 3.11 engine that setup prepared
 - **Observed:** Reported by Owner 1 from CI run 43556610563 (PR #5 merge 4fc3add): integration suite 36 passed, 7 failed, 2 xfailed; all seven failures were plan admission 503 scientific_runtime_missing. Harness 4ea7cb3 (the copy merged into main) resolves the engine only from DRBEAN_SCIENCE_PYTHON or python3.11 on PATH; the stack job prepares .venv-engine but exports neither, so LocalStack launched the API without BEAN_COUNTERDEX_PYTHON. A harness-environment defect, not a product one.
 - **Evidence:** {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43556610563", "reported_in": "origin/codex/science-next docs/workstreams/01-science.md (Post-push CI at 8af34e4)"}
+- **Retest at main 61edad7 (PR #16 merged 8bb1fbe), Linux CI:** Closed by retest: CI's integration suite now finds .venv-engine and runs real science: 43 passed, 3 failed (two strict-xfail XPASSes fixed by 1ae19ff, not yet in main; F-ORPHAN-WORKER-KILL). Hero, changed input, design authority and follow-up pass on Linux without diagnostics. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
 
-## F-LAUNCHER-HIDDEN-PTH (P1, owner 4, open)
+## F-LAUNCHER-HIDDEN-PTH (P1, owner 4, retested)
 
 - **Input:** checkout under ~/Documents on a Mac with iCloud Drive Desktop & Documents sync (an iCloud Drive File Provider domain); .venv created by `uv sync --locked`
 - **Command:** `DRBEAN_VAR_DIR=<isolated> python3 scripts/dev/launcher.py setup (then start); harness: python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher`
 - **Expected:** setup finishes (local auth created); start serves API, worker and web; the doctor's 'backend runtime ok' implies the service entry points can import bean_api
 - **Observed:** setup stops at the auth step (`.venv/bin/python -m bean_api.bootstrap`: No module named 'bean_api'); start: the API and worker exit with ModuleNotFoundError, and the launcher correctly stops everything it started and frees both ports; doctor still reports the backend runtime ok because it checks package metadata, not importability. Cause verified on this host: within about 6 s of creation the iCloud Drive File Provider sets UF_HIDDEN recursively on dot-named directories under ~/Documents (the same probe in /private/tmp stays visible), and CPython 3.11.17 and 3.13.18 `site` skip hidden .pth files (probe: visible .pth importable, hidden .pth not), so `_editable_impl_dr_bean_backend.pth` is ignored. With apps/api added to PYTHONPATH (what Owner 2's documented commands do via --app-dir/PYTHONPATH and what the harness launch path does) the same unmodified launcher starts in under a second; readiness then distinguishes API, worker and science, and the product processes receive no provider credentials.
 - **Evidence:** {"attempts": ["att_fe675c60b66a4801", "att_acd3a5749edf4d22"], "reproduction": "evaluation/results/owner4-launcher/HIDDEN-PTH-REPRO.md", "results": "evaluation/results/owner4-launcher (lane-runs.jsonl: startup_path.launcher_runs shows the unmodified start exit 1, then the labelled retry exit 0)"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by retest: from the iCloud-synced checkout, `launcher.py setup` now completes (auth created) and the unmodified `launcher.py start` exits 0 with no workaround recorded; the launcher puts apps/api first on PYTHONPATH for every child. 6/7 entries pass through it, no orphans after `launcher.py stop`. (evidence: {"attempts": ["att_a8d1f1b59cb845ef", "att_b80e99662ebb4196"], "results": "evaluation/results/owner4-launcher"})
+- **Retest at final candidate c8d39b5 = main 4b5f1f5 (PR #19 + PR #12) + this branch; macOS 26.7 arm64, no diagnostics:** Still holds after PR #12 merged: harness path 7/7, Owner 4's unmodified launcher 6/7 (cancel/restart is harness-path only), 22/22 engine controls, integration 66 passed + 19 strict xfail, web 30/30; no backend or engine code changed since 30ab5f8. (evidence: {"attempts": ["att_2b31cc969d37437d", "att_913292d16ae64365", "att_906bef01ac57453d"]})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still holds: harness path 7/7 (cancel/restart with a real 128-row workload, nothing survives worker loss or cancellation), Owner 4's unmodified launcher 6/7, barrier diagnostic passed. (evidence: {"attempts": ["att_0f60903bc15b4617", "att_9c18ee097daa4f73", "att_6ca787bfe84048e7", "att_690401b8bcf048c3"]})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls. (evidence: {"attempts": ["att_b6fc5431663f4693", "att_f66513d7ec274c82", "att_917faf93b8a14f96", "att_17ae63064bb84863"]})
 
-## F-LAUNCHER-ENV-READ (P2, owner 4, open)
+## F-LAUNCHER-ENV-READ (P2, owner 4, retested)
 
 - **Input:** dummy GEMINI_API_KEY / GOOGLE_API_KEY / LANGSMITH_API_KEY (DRBEAN-DUMMY-OWNER4-SCRUB) in the launcher's own environment, egress guard on PYTHONPATH
 - **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher`
 - **Expected:** names-only filtering (iterate keys, read only the values that are kept) and a scrubbed environment for every child, including probes
 - **Observed:** the guard records a credential_read of each dummy value in the launcher process during cmd_start -> child_env() (`os.environ.items()` reads every value; the code comment says values are never read), and the doctor's backend probe (`.venv/bin/python -c ...`, env=None) starts with all three names present. The API and worker receive none of them: the scrubbing that matters works.
 - **Evidence:** {"attempts": ["att_acd3a5749edf4d22"], "results": "evaluation/results/owner4-launcher (lane-runs.jsonl subject_end.launcher_side_guard_events: credential_read in launcher.py, probe guard_installed with names present; product processes credential_names_present [])"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by retest: with dummy GEMINI/GOOGLE/LANGSMITH keys in the launcher's environment the guard records no credential_read in the launcher, and every doctor/backend probe starts with no credential names (out() now defaults to the scrubbed child environment). API and worker receive none. (evidence: {"attempts": ["att_b80e99662ebb4196"], "results": "evaluation/results/owner4-launcher (lane-runs subject_end)"})
 
 ## H-ORPHAN-TEARDOWN (P1, owner 5, retested)
 
@@ -277,6 +327,215 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Observed:** the scenario released the barrier while the orphaned spawn child was alive; the child resumed and started its CPython 3.11 engine grandchild after the last descendant snapshot; teardown tracked only by parent pid, reported no orphans, and the grandchild ran past the CLI's exit before finishing on its own
 - **Evidence:** {"results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier (first attempt)"}
 - **Retest at f992b48 on merged main 80f95a4:** the orphan (spawn child) was terminated before the barrier release; teardown found nothing left and no stack process outlived the CLI (evidence: {"attempts": ["att_593e67a5ca214685"], "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier"})
+
+## F-EXPLANATION-QUALIFIER (P2, owner 3, retested)
+
+- **Input:** 'Without any doubt this proves the interval.' / 'It is not an exaggeration to say this proves the interval.'
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
+- **Expected:** unsupported_claim: the exemption should apply only when the qualifier hedges or negates the claim itself ('does not prove', 'may prove')
+- **Observed:** accepted (None); `_QUALIFIER` matches 'without'/'not'/'whether' anywhere in the clause prefix, so an intensifier exempts the claim
+- **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there). (evidence: {"pytest": "72 passed, 28 xfailed at e791e91"})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate. (evidence: {"pytest": "73 passed, 27 xfailed"})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Fixed on main b8c5952: PR #32 brought PR #28's evidence-bound guard (declared COMMENTARY_POLICY_VERSION evidence-bound-statements.*), so the gap markers no longer apply and every case is an ordinary passing assertion. Closed by retest. (evidence: {"lane": "controlled_callbacks 81 passed, 4 xfailed (evaluation/results/lanes/reports.jsonl)", "pytest": "tests/integration: 98 passed, 11 xfailed (4 F-NARRATION-OVERSUPPRESSION, 7 NOT_AVAILABLE paper attacks); test_explanation_guard attack cases all pass"})
+
+## F-EXPLANATION-NUMBER-FORMS (P2, owner 3, retested)
+
+- **Input:** 'Sample again at 7hrs to separate them.' (no 7 h in any cited fact)
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
+- **Expected:** unsupported_numeric_claim, as for 'ke 0.05' and '15%'
+- **Observed:** accepted (None): `_NUMBER`'s lookarounds skip digits glued to letters or hyphens, and words/unicode fractions are never parsed
+- **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there). (evidence: {"pytest": "72 passed, 28 xfailed at e791e91"})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate. (evidence: {"pytest": "73 passed, 27 xfailed"})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Fixed on main b8c5952: PR #32 brought PR #28's evidence-bound guard (declared COMMENTARY_POLICY_VERSION evidence-bound-statements.*), so the gap markers no longer apply and every case is an ordinary passing assertion. Closed by retest. (evidence: {"lane": "controlled_callbacks 81 passed, 4 xfailed (evaluation/results/lanes/reports.jsonl)", "pytest": "tests/integration: 98 passed, 11 xfailed (4 F-NARRATION-OVERSUPPRESSION, 7 NOT_AVAILABLE paper attacks); test_explanation_guard attack cases all pass"})
+
+## F-EXPLANATION-PARAPHRASE (P2, owner 3, retested)
+
+- **Input:** 'This establishes that the interval is correct.', 'Every other model is ruled out by these data.', 'We identified the actual parameter of the drug.', '8 h is the optimal sampling time for any experiment.'
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
+- **Expected:** unsupported_claim (master brief 2.17: proof of the interval, elimination of outside models, physical truth, global optimality)
+- **Observed:** accepted (None)
+- **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there). (evidence: {"pytest": "72 passed, 28 xfailed at e791e91"})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate. (evidence: {"pytest": "73 passed, 27 xfailed"})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Fixed on main b8c5952: PR #32 brought PR #28's evidence-bound guard (declared COMMENTARY_POLICY_VERSION evidence-bound-statements.*), so the gap markers no longer apply and every case is an ordinary passing assertion. Closed by retest. (evidence: {"lane": "controlled_callbacks 81 passed, 4 xfailed (evaluation/results/lanes/reports.jsonl)", "pytest": "tests/integration: 98 passed, 11 xfailed (4 F-NARRATION-OVERSUPPRESSION, 7 NOT_AVAILABLE paper attacks); test_explanation_guard attack cases all pass"})
+
+## F-RESTART-EPERM (P0, owner 2, retested)
+
+- **Input:** any baseline on backend/restart-recovery c231be4 on Darwin 25.6.0; or killpg-eperm-repro.py (standard library)
+- **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <PR #14 checkout> --diagnostic relax_nproc --results <dir>`
+- **Expected:** baselines complete; cancellation leaves no live scientific or guard process
+- **Observed:** hero and changed-input baselines fail with worker_failed / scientific_attempt_failed; run_bounded with a trivial adapter raises PermissionError at science.py:180 (`os.killpg(process.pid, SIGKILL)` in finally, which catches only ProcessLookupError); cancellation without the barrier leaves 1 live child. Darwin returns EPERM for killpg on a group whose only member is an exited, unreaped leader (standalone repro, CPython 3.11.17 and 3.13.18); Linux returns ESRCH, so Linux validation passed. The exception also skips the rest of the cleanup, including closing the parent lifeline, which is why the guard survives a cancellation. A one-line local diagnostic patch catching PermissionError makes the same lane pass 6/7 (as on main) and cancel/restart with the barrier pass.
+- **Evidence:** {"readme": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md", "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/killpg-eperm-repro.py", "results": "evaluation/results/previews/backend-restart-recovery-c231be4"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by independent retest. The original reproduction (trivial adapter through run_bounded) now returns its result instead of PermissionError; PR #19's _kill_owned_session reaps the leader and retries on Darwin EPERM. All 7 lane entries pass with real computation (10 follow-up jobs complete normally), cancellation and worker loss leave no live process with and without the barrier. integration 66 passed + 19 strict xfail (known P2 gaps only); backend 559 passed; engine 291 OK; harness 131 unit tests; 22/22 engine controls. (evidence: {"attempts": ["att_b9610a6030064d38", "att_33baea51713b4574", "att_a114e020f44547b2", "att_ee0e6b5f53c346ec"], "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md (probe rerun on 30ab5f8)"})
+- **Retest at final candidate c8d39b5 = main 4b5f1f5 (PR #19 + PR #12) + this branch; macOS 26.7 arm64, no diagnostics:** Still holds after PR #12 merged: harness path 7/7, Owner 4's unmodified launcher 6/7 (cancel/restart is harness-path only), 22/22 engine controls, integration 66 passed + 19 strict xfail, web 30/30; no backend or engine code changed since 30ab5f8. (evidence: {"attempts": ["att_2b31cc969d37437d", "att_913292d16ae64365", "att_906bef01ac57453d"]})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still holds: harness path 7/7 (cancel/restart with a real 128-row workload, nothing survives worker loss or cancellation), Owner 4's unmodified launcher 6/7, barrier diagnostic passed. (evidence: {"attempts": ["att_0f60903bc15b4617", "att_9c18ee097daa4f73", "att_6ca787bfe84048e7", "att_690401b8bcf048c3"]})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls. (evidence: {"attempts": ["att_b6fc5431663f4693", "att_f66513d7ec274c82", "att_917faf93b8a14f96", "att_17ae63064bb84863"]})
+
+## F-LEDGER-TOTALS (P2, owner 2, retested)
+
+- **Input:** isolated store; reserve 100/20; reconcile usage {input 100, output 20, thought 0, total 5000} (the shape providers.sanitize_usage produces; Gemini totals include e.g. tool-use prompt tokens)
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail`
+- **Expected:** at least the reported total is charged (conservative totals)
+- **Observed:** main charges 120 tokens for a reported total of 5000
+- **Evidence:** {"tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"}
+- **Retest at preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in:** fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges. (evidence: {"command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py. (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at main 2d2993d (ledger fixes merged) via branch merge f29066d:** Closed by retest: the original assertion passes with --runxfail (15/15); the strict-xfail marker is removed and the test is an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -> 15 passed"})
+
+## F-LEDGER-MALFORMED (P2, owner 2, retested)
+
+- **Input:** isolated store; reconcile usage {input_tokens: '5000'}; then reserve again
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail`
+- **Expected:** refused at reconciliation, or later reservations refused with an explicit accounting error
+- **Observed:** main stores it; the next begin_attempt raises TypeError: '>' not supported between 'str' and 'int' (still fails closed: no new spending admitted, history untouched)
+- **Evidence:** {"tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"}
+- **Retest at preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in:** fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges. (evidence: {"command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py. (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at main 2d2993d (ledger fixes merged) via branch merge f29066d:** Closed by retest: the original assertion passes with --runxfail (15/15); the strict-xfail marker is removed and the test is an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -> 15 passed"})
+
+## F-EXPLANATION-CHECKED-GATES (P2, owner 3, retested)
+
+- **Input:** commentary_rejection('The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.', [fact]) with fact lacking design_tier/verification/replay/expected_binding, or with any of them negative, or with a known-bad native_replay on the same record
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -k needs_every_verification_gate --runxfail`
+- **Expected:** unsupported_claim unless the cited record shows checked_pair_separation, verification valid, replay passed and binding matches (that supported statement must be kept)
+- **Observed:** main's phrase-list guard returns None (keeps the claim) in all 10 cases; this branch's former positive fixture relied on that and was scientifically invalid (PR #28's reported disagreement)
+- **Evidence:** {"tests": "tests/integration/test_explanation_guard.py (strict xfail on guards without the declared evidence-bound policy)"}
+- **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there). (evidence: {"pytest": "72 passed, 28 xfailed at e791e91"})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate. (evidence: {"pytest": "73 passed, 27 xfailed"})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Fixed on main b8c5952: PR #32 brought PR #28's evidence-bound guard (declared COMMENTARY_POLICY_VERSION evidence-bound-statements.*), so the gap markers no longer apply and every case is an ordinary passing assertion. Closed by retest. (evidence: {"lane": "controlled_callbacks 81 passed, 4 xfailed (evaluation/results/lanes/reports.jsonl)", "pytest": "tests/integration: 98 passed, 11 xfailed (4 F-NARRATION-OVERSUPPRESSION, 7 NOT_AVAILABLE paper attacks); test_explanation_guard attack cases all pass"})
+
+## H-GATE-CONTROLS-DIRTY (P1, owner 5, retested)
+
+- **Input:** controls.jsonl record naming the tested commit with worktree_dirty: true and every required control passed
+- **Command:** `python3.11 -m unittest evaluation.tests.test_gates_controls`
+- **Expected:** a dirty, preview, wrong-interpreter or wrong-engine record cannot satisfy the gate; the newest relevant record decides each control
+- **Observed:** gates.compute copied worktree_dirty into its per-control map but never enforced it: the gate reported passed (audit reproduction; the end-to-end regression fails with 'passed' != 'blocked' on the pre-fix gates.py). This defect did not by itself make the audited release pass: other gates were not passing at that audit.
+- **Evidence:** {"tests": "evaluation/tests/test_gates_controls.py (9 regressions incl. the audited case end to end)"}
+- **Retest at this branch after merging main 2d2993d:** 9/9 regressions pass; the same end-to-end test fails on the pre-fix gate (evidence: {})
+- **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** The candidate's control record is clean, executed acceptance, CPython 3.11.17, engine 0.3.0 imported from the repository with a matching source digest; the fixed gate admits it (22/22). (evidence: {"controls": "evaluation/results/controls.jsonl (tested_commit e791e91)"})
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls. (evidence: {"attempts": ["att_b6fc5431663f4693", "att_f66513d7ec274c82", "att_917faf93b8a14f96", "att_17ae63064bb84863"]})
+
+## F-NARRATION-OVERSUPPRESSION (P2, owner A (narration guard in conversation/coordinator; was Owner 3), retested)
+
+- **Input:** commentary_rejection('The returned design remains numerical guidance.', [{'id': 'design-evidence', 'problem_id': 'problem', 'design_tier': 'numerical_guidance'}]) and three similar limiting statements
+- **Command:** `local merge of PR #20 f3d424f + PR #28 623ae19: .venv/bin/python -m pytest tests/test_coordinator.py::test_separately_approved_design_has_one_completed_callback_observation`
+- **Expected:** a true, non-overclaiming statement that matches the cited tier/outcome is kept (legitimate supported narration)
+- **Observed:** PR #28 returns unsupported_claim for all four (main's guard keeps them). The PR #20 test passes on PR #20 alone and fails in the combination ('failed' != 'completed', explanation_unsupported_claim): 1 failed, 688 passed in the combined backend suite. Neither PR shows it alone.
+- **Evidence:** {"combined_backend": "1 failed, 688 passed at local merge 6a69a55", "tests": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept (strict xfail under the declared policy; passes on main)"}
+- **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Main 22c9a24 has PR #27's source review but neither PR #20's coordinator change nor PR #28; the conflict between those two open PRs is unchanged. (evidence: {})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Still present on main b8c5952: the evidence-bound guard withholds all four correct limiting statements (4 strict xfails hold). The cross-PR coordinator failure is resolved: PR #32 changed the coordinator fixture to neutral narration (eaa9d809), and the backend suite passes (704). The finding is narrowed to useful narration being suppressed; nothing is overclaimed. (evidence: {"backend": "704 passed", "pytest": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept: 4 xfailed (strict)"})
+- **Retest at A's PR #42 head 051b4d6 (component branch on main 299a356; not merged), as local overlay fbc08ee = 051b4d6 + C harness f278de6, not pushed; isolated uv-locked .venv CPython 3.13.18; macOS 26.7 arm64; controlled, no provider:** Fix reproduced on the component branch. Policy evidence-bound-statements.v3 keeps all four correct limiting statements: the strict xfails turn into XPASS(strict), and with --runxfail 37/37 pass. C's 14 new converse cases are all withheld under v3 and under main's v2: wrong or absent status, split or conflicting records, context-only support, appended overclaims and a replay upgrade. The suite gives 51 passed on the overlay and 47 passed plus 4 strict xfails on main. Still present on main 299a356 (v2). This finding closes only after a retest on B's integrated candidate once the fix is merged. (evidence: {"preview": "evaluation/results/previews/pr42-051b4d6/README.md", "tests": "tests/integration/test_explanation_guard.py at f278de6 (marker scoped to v1/v2; converse cases test_limiting_statements_without_matching_cited_support_are_withheld)"})
+- **Retest at 8a21323 (C branch merge of main 4a0c616 = A's PR #42; clean; macOS 26.7 arm64):** Fixed on main 4a0c616 (evidence-bound-statements.v3). The four correct limiting statements are kept as ordinary assertions: the v1/v2-scoped marker no longer applies. All 14 converse cases are withheld. Closed by retest on main. (evidence: {"lane": "controlled_callbacks lane_91d63d5f861a4ae7: 110 passed, 1 xfail (F-SESSION-CAPACITY-EXHAUSTION)", "tests": "tests/integration/test_explanation_guard.py: 51 passed"})
+
+## F-PAPER-CITATION-SUBSTRING (P1, owner A (PR #35 paper proposal validator; was Owner 3), open)
+
+- **Input:** validate_paper_proposal: page text 'Table 2. Individual plasma concentrations.\n0.5 4.62 µg/mL\n4.0 5380 ng/mL'; finding measurement/table_transcription raw_value '538', candidate_exact '538/1', unit 'ng/mL' (reported), citations quote '538' and quote 'ng/mL' (also raw '4.6' with quote '4.6')
+- **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_a_fragment_of_a_longer_printed_number_is_not_a_citation`
+- **Expected:** refused (or a blocking diagnostic): the page never prints the token 538 or 4.6; a quoted number must be a whole token in the page text, not a substring of a longer number
+- **Observed:** accepted; '538 ng/mL' passes with no diagnostic at all, '4.6' only with missing_unit. The quote check is a raw substring test against the page and the numeric-token boundary check runs on the quote, not on the page context
+- **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "repro": "10 controls pass, 6 known-defect xfails on the preview", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail; NOT_AVAILABLE on main)"}
+
+## F-PAPER-QUOTE-NORMALIZATION (P2, owner A (PR #35 validator) with B (file services; was Owners 3 and 4), open)
+
+- **Input:** page text 'a hard bound on the error of each individual reading in\nTable 2.' quoted as '... reading in Table 2'; page '0.5 4.62 \u00b5g/mL' quoted as '4.62 \u03bcg/mL'
+- **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_layout_whitespace_and_equivalent_characters_do_not_discard_an_authentic_quote`
+- **Expected:** the authentic quote is located (whitespace collapsed, Unicode-normalized on both sides) or only that citation is marked unresolved
+- **Observed:** PaperProposalError paper_citation_quote_mismatch for the whole proposal; through the gateway the request is charged and the extraction lost (retry policy none)
+- **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
+
+## F-PAPER-HARD-BOUND-CONTEXT (P2, owner A (PR #35 validator; was Owner 3), open)
+
+- **Input:** page: "The assay's maximum absolute error is 0.25 mg/L; we use 0.25 mg/L as a hard bound on each reading.\nIn the parent trial the mean at 2 h was 3.9 ± 0.8 mg/L (mean ± SD)."; hard_allowance finding quoting the first sentence
+- **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_unrelated_statistics_elsewhere_on_the_page_do_not_discard_a_stated_hard_bound`
+- **Expected:** accepted with the hard_allowance_requires_modeling_review diagnostic; the statistical words belong to another sentence
+- **Observed:** PaperProposalError paper_hard_allowance_unjustified: the statistical and negation patterns are searched in the whole retained text of the cited page
+- **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
+
+## F-PAPER-EXPONENT-FLATTENING (P2, owner A (PR #35 validator) with B (parser; was Owners 3 and 4), open)
+
+- **Input:** page text 'The mean plasma concentration at the first sample (5 min) was 1.1 × 101 mg/L.'; finding raw_value '101', candidate_exact '101/1', unit mg/L, quote '1.1 × 101 mg/L'
+- **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_a_flattened_exponent_is_flagged_for_visual_review`
+- **Expected:** a number adjacent to a multiplication sign and '10' (or any glyph raised off the baseline, reported by the parser) is refused as exact or carries a blocking visual-review diagnostic
+- **Observed:** accepted with no diagnostic; the text layer cannot represent the superscript, so the citation looks authentic
+- **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
+
+## H-LANE-ENGINE-PRECONDITION (P2, owner 5 (harness), retested)
+
+- **Input:** python3.11 evaluation/cli.py lanes run --lane controlled_callbacks --app-repo <worktree without .venv-engine> --results evaluation/results/previews/pr35-3a7816e
+- **Command:** `same; then inspect preconditions in evaluation/results/previews/pr35-3a7816e/lanes/reports.jsonl`
+- **Expected:** the precondition follows the import the application's scientific child performs (bean_api/counterdex_child.py puts packages/groundwork_adapter first on sys.path) and passes when that resolves to the tested source
+- **Observed:** precondition FAILED ('installed Counterdex None differs in None'); 111 passed / 10 xfailed and 17 passed / 7 NOT_AVAILABLE were recorded as failed lane reports
+- **Evidence:** {"failed_reports": ["lane_3022c056c95f4f23", "lane_95503c92ead24a0d"], "regression": "evaluation/tests/test_lanes.py::EnginePreconditionTests"}
+- **Retest at harness e12c512 against previews 3a7816e (PR #35) and d0148aa (PR #33):** The same preview runs now pass their preconditions (application import resolves the repository source; no installed copy in the worktree interpreter). Closed by retest. (evidence: {"reports": ["lane_1c86a89352b248ec", "lane_65fd953469e04b65", "lane_14457236e1b143be", "lane_e403723180574529"]})
+- **Retest at harness after 10c302c (combined preview e67c3cf of PRs #33, #35, #36):** The first fix over-relaxed the check: it made a stale installed copy informational. The combined preview showed that native replay (python -I -m counterdex) imports the installed copy, and 20 backend tests failed with source_version_mismatch while the copy was stale. Corrected: an installed copy, when present, must equal the source; absence still passes on the child import path. Regression updated. (evidence: {"combined_backend_with_stale_copy": "20 failed / 878 passed, all source_version_mismatch"})
+
+## F-PAPER-RENDER-MEMORY (P1, owner B (PR #36 papers worker and resource policy; was Owners 4 and 2), open)
+
+- **Input:** a 4.2 MB PDF (under the 20 MiB cap) whose page-1 content stream FlateDecode-inflates to 4 GiB (hostile_pdfs._compressed_zeros(4 GiB) as the page's content stream)
+- **Command:** `PR #36 preview + its proposed route patch: DRBEAN_HEAVY_RESOURCE_ATTACKS=1 .venv/bin/python -m pytest -q tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (watchdog samples the application's process tree every 50 ms and kills children above 1.5 GiB)`
+- **Expected:** the preview is refused (resource_limit) or completes within the worker's 768 MiB memory bound, as on Linux where RLIMIT_AS enforces it
+- **Observed:** without the watchdog kill: the request returned 200 after the process tree peaked at 2440 MiB; with it: killed at 1549 MiB, then a 422 resource_limit. resource_policy reports address_space 'unavailable' on darwin, so only RLIMIT_CPU (12 s) and the 15 s wall clock bound the renderer; inspection stays bounded (pypdf caps decompression; 236 MiB peak)
+- **Evidence:** {"library_probe": "inspect: 236 MiB peak; render: watchdog killed at 2228 MiB in 0.93 s", "preview": "7139c90 = 500ba3c + PR #36 081bbdc, plus f02e2a6 applying docs/proposals/owner2-paper-routes.patch (unreviewed by Owner 2) and an unlocked uv resolution of pypdf 7.1.0 / pypdfium2 5.15.2; labelled preview", "regression": "tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (opt-in; strict xfail on darwin)"}
+
+## F-PAPER-IDENTITY-CONTRACTS (P2, owner B (canonical contracts; was Owner 2) with A, open)
+
+- **Input:** compare: PR #34 shared/contracts/RESEARCH_AGENT_HANDOFF.json identity.page_identity; PR #35 ai_prompts.PaperPageContext/PaperCitation; PR #36 papers/_pdf_worker.inspect() page records and papers/citations.validate_citation()
+- **Command:** `read-only comparison of the three branches (no execution needed)`
+- **Expected:** one agreed page identity (id, physical page, digest of what), one citation coordinate space (units, origin, rotation, render scale) and one disclosure digest that the parser emits, the proposal validator checks and the ledger binds
+- **Observed:** PR #34: page_id, physical_page_number, source_sha256, text_reference, image_reference, parser_version; disclosure binds selected_page_manifest_digest. PR #35: page_id + page_sha256 per page; citation bbox = four integers within an admitted pixel width/height with top < bottom (top-left pixel space at an unstated render scale); page_manifest_digest and selected_page_subset_digest. PR #36: no page_id or page_sha256 (text_sha256 = hash of extracted text); boxes in PDF points with a bottom-left origin before /Rotate, plus render_box() to map to preview pixels at a given scale; digests manifest_sha256, selection_sha256, subset_sha256
+- **Evidence:** {"branches": {"pr34": "33dc7f4", "pr35": "c952c35", "pr36": "081bbdc"}}
+
+## F-SESSION-CAPACITY-EXHAUSTION (P2, owner B (private browser sessions, shared gateway), open)
+
+- **Input:** trusted-gateway request to GET /api/bean/v1/shared-session without a cookie, repeated capacity times (default 4096), each followed by logout
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors (capacity 3 for speed; strict xfail)`
+- **Expected:** a new visitor can still start a private workspace once earlier sessions are logged out or expired, or anonymous issuance is rate-limited so it cannot exhaust capacity
+- **Observed:** after 3 bootstrap+logout cycles with browser_session_capacity=3 the next GET /shared-session returns 429 shared_session_capacity; BrowserSessions._capacity counts every row in browser_sessions including revoked ones, and apps/web/share-gateway.mjs has no request rate limit. The default capacity is 4096 and is not configurable from the environment
+- **Evidence:** {"candidate": "main 299a356 (application tree identical on the C branch)", "regression": "tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors"}
+
+## H-LAUNCHER-OPTIN-FORMAT (P3, owner C (harness), retested)
+
+- **Input:** tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key on the C branch merged with main 299a356
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_zero_dispatch.py -k doctor`
+- **Expected:** the test exercises the launcher actually on the candidate: a well-formed dummy opt-in in its documented format, and the safety predicate that the key is never printed
+- **Observed:** AssertionError 'doctor did not report the opt-in state': main's launcher validates documented keys (free-tier flag, token bounds, image bound) and reports gemini_live.opt_in_state in doctor --json; the key was never printed
+- **Evidence:** {"regression": "tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key"}
+- **Retest at C branch merged with main 299a356 (before commit):** passes; the dummy key is never printed and the state is reported as configured (evidence: {})
+
+## H-REPLAY-CLASS-RECORDED-MISMATCH (P3, owner C (harness), retested)
+
+- **Input:** a follow-up packet whose claimed candidate results were edited to 'valid' (test-only forgery), replayed with a test-only anchor; the report has integrity passed, binding matches, verification invalid, recorded_result_matches false and reason recorded_result_mismatch
+- **Command:** `python3.11 evaluation/cli.py controls (control defense:forged_both_compatible_rejected)`
+- **Expected:** a packet whose recorded claims contradict fresh recomputation is classified mathematical_failure
+- **Observed:** engine_controls.replay_class returned scientific_exclusion, the class for a genuine computed exclusion, because it tested integrity, binding and verification before the recorded-result comparison. No earlier control or record produced this combination, so no past result changes. The checker itself flagged the mismatch
+- **Evidence:** {"fix": "evaluation/drbean_eval/engine_controls.py replay_class", "regression": "control defense:forged_both_compatible_rejected; evaluation/tests/test_gates_controls.py::ReplayClassification"}
+- **Retest at C working tree before the harness commit (development run into a scratch results directory, not release evidence):** 27/27 controls pass, including the five new coordinator controls; the forged packet is integrity_failure with the real anchor and mathematical_failure with the test anchor (evidence: {})
+- **Retest at 644ad8c (clean C harness commit; application = main 299a356):** 27/27 required controls pass in the release batch; defense:forged_both_compatible_rejected classifies the forged packet integrity_failure (real anchor) and mathematical_failure (test anchor, recorded_result_mismatch) (evidence: {"controls": "evaluation/results/controls.jsonl (run at 644ad8c)"})
+
+## F-UPLOAD-LIMIT-MESSAGE (P3, owner B (upload boundary and general-file admission), open)
+
+- **Input:** POST /workspaces/{id}/research-assets with zolleral_26-converted.pdf (9,848,487 bytes, 12 pages) or sokolowskial_25.pdf (19,073,679 bytes, 11 pages), Content-Type application/pdf
+- **Command:** `PR #40 producer at 3f9c2e9 (which includes main 299a356) registered on a fixture app; TestClient upload of each paper`
+- **Expected:** an accurate, useful refusal (brief S8, predicate FILE-02): name the 5 MiB per-file limit and, for these papers, that they also exceed the 10-page limit; nothing truncated
+- **Observed:** 413 request_too_large 'Request exceeds the admitted byte limit.' for both papers, from the RequestBoundary middleware; the advertised capabilities state max_file_bytes 5242880 and max_pdf_pages 10. Nothing is truncated or analysed (honest). The merged UI pre-validates selection and shows a clear 5 MiB message, so only API callers see the generic text
+- **Evidence:** {"candidate": "PR #40 producer (author check: Claude authored PR #40; production maintenance is B's)", "measurements": "zolleral_26: 9.39 MiB, 12 pages; sokolowskial_25: 18.19 MiB, 11 pages (local only, not committed)"}
+
+## F-CI-BROWSER-CHECK-INTERMITTENT (P3, owner B (apps/web/check-backend.mjs and CI wiring), open)
+
+- **Input:** CI job 'browser review, approved design and native replay' (node apps/web/check-backend.mjs, BEAN_AI_MODE=placeholder) on the application tree of main 299a356
+- **Command:** `GitHub Actions run 43599924443 (pull_request event, head d6d2792), job 132462300488`
+- **Expected:** the browser check passes deterministically on an unchanged tree, or its failure names the state the page was in
+- **Observed:** locator.click: Timeout 30000ms exceeded while waiting for getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }) at apps/web/check-backend.mjs:156. The same application tree passed in the other 6 runs: d6d2792 push, be3d18d push and PR, 8580d3e push and PR, and main 299a356 push. That is 1 failure in 7 runs. It also passed locally on bb503a7. The cause is not determined, because no screenshot or page state is captured on failure.
+- **Evidence:** {"failed_run": "43599924443 job 132462300488", "passing_runs_same_application_tree": ["43599921100", "43600308045", "43600313049", "43598913026", "43598918655", "43594992900"]}
 
 ## Check-level finding ids (raised only when the check fails)
 
@@ -290,6 +549,7 @@ Finding ids that a check names when it fails. They are not observed findings: an
 | F-DESIGN-AUTHORITY | 2 | a design was proposed, approved or started without its own separate, current authority |
 | F-DESIGN-JOB | 2 | a design job ended non-completed without a named worker or runtime cause |
 | F-DESIGN-TIER | 1 and 2 | a reviewed design request returned an unexpected or unexplained tier |
+| F-ENGINE-ENCLOSURE | 1 | the 80-digit independent value of C(t) lies outside the engine's own exact concentration enclosure (unsound enclosure) |
 | F-EXTERNAL-ATTEMPT | 2 and 3 | the egress guard recorded an external connection or a provider client construction |
 | F-FALSE-CHECKED | 1 and 2 | checked separation claimed without a strictly positive exact margin, valid verification, passed replay and matching binding |
 | F-FOLLOWUP-BINDING | 2 | a follow-up plan accepted a tampered, substituted or foreign design scope |
@@ -303,3 +563,4 @@ Finding ids that a check names when it fails. They are not observed findings: an
 | F-SOURCE-BYPASS | 2 | a dataset citing a source asset was accepted without review and materialization |
 | F-STALE-APPROVAL | 2 | an approval for an outdated plan or revision still started work |
 | F-WORKER | 2 | a run failed with worker_failed |
+| H-ENGINE-STALE | 5 (environment) | the engine the application runs (its capability source manifest) differs from the repository source, e.g. a stale .venv-engine copy; rerun scripts/dev/launcher.py setup before qualifying |

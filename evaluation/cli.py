@@ -7,6 +7,9 @@
   python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch
                                                     launch an isolated local API + worker, drive real HTTP
   python3.11 evaluation/cli.py controls             engine-level native controls (fresh CPython 3.11 replay)
+  python3.11 evaluation/cli.py lanes run --lane controlled_callbacks|controlled_science|historical_replay
+  python3.11 evaluation/cli.py lanes report [--output FILE]   newest report per lane at this source identity
+  python3.11 evaluation/cli.py lanes verify         hash chain and artifact digests of the lane reports
   python3.11 evaluation/cli.py gate [--require release] [--output FILE]
                                                     machine-readable release gates; nonzero if a requested gate fails
   python3.11 evaluation/cli.py inventory            offline inventory (same gates, informational, exit 0)
@@ -32,7 +35,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(ROOT)
 sys.path.insert(0, ROOT)
 
-from drbean_eval import admission, gates, history, manifest, report, runner  # noqa: E402
+from drbean_eval import admission, gates, history, lanes, manifest, report, runner  # noqa: E402
 from drbean_eval.assertions import grade  # noqa: E402
 from drbean_eval.budget import BudgetLedger  # noqa: E402
 from drbean_eval.subject import make_subject  # noqa: E402
@@ -116,6 +119,15 @@ def _main(argv, guard_log) -> int:
                           "acceptance; requires --results")
     controls = sub.add_parser("controls")
     controls.add_argument("--results", default=RESULTS)
+    controls.add_argument("--app-repo", help="preview another checkout's engine package (e.g. a teammate worktree); "
+                          "recorded as preview evidence, never acceptance; requires --results")
+    lane_cmd = sub.add_parser("lanes")
+    lane_cmd.add_argument("action", choices=("run", "report", "verify"))
+    lane_cmd.add_argument("--lane", choices=tuple(lanes.LANES))
+    lane_cmd.add_argument("--results", default=RESULTS)
+    lane_cmd.add_argument("--app-repo", help="preview another checkout; recorded as preview evidence, never "
+                          "acceptance; requires --results")
+    lane_cmd.add_argument("--output")
     gate = sub.add_parser("gate")
     gate.add_argument("--require", choices=("release",))
     gate.add_argument("--results", default=RESULTS)
@@ -178,7 +190,12 @@ def _main(argv, guard_log) -> int:
         print(f"{args.lane}: {len(records)} attempt(s) recorded: {tally}")
         return 0 if all(r["status"] == "passed" for r in records) else 2
     if args.command == "controls":
-        return run_controls(args.results, guard_log)
+        if args.app_repo and os.path.abspath(args.results) == os.path.abspath(RESULTS):
+            print("refused: previews must write to a separate --results directory; they are never release acceptance")
+            return 1
+        return run_controls(args.results, guard_log, app_repo=args.app_repo)
+    if args.command == "lanes":
+        return run_lanes(args)
     if args.command in ("gate", "inventory"):
         state = runner.git_state(REPO)
         result = gates.compute(ROOT, args.results, state["commit"], state["dirty"],
@@ -244,21 +261,68 @@ def _main(argv, guard_log) -> int:
     return 1
 
 
-def run_controls(results_dir: str, guard_log: str | None = None) -> int:
+def run_lanes(args) -> int:
+    if args.action == "verify":
+        problems = lanes.verify(args.results)
+        for problem in problems:
+            print("PROBLEM:", problem)
+        print(f"lane reports {'OK' if not problems else 'FAILED'}: {len(lanes.read_reports(args.results))} report(s)")
+        return 1 if problems else 0
+    if args.action == "report":
+        result = lanes.summary(args.results, REPO)
+        text = json.dumps(result, indent=2, sort_keys=True)
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as handle:
+                handle.write(text + "\n")
+        for name, item in result["lanes"].items():
+            print(f"{name:<22} {item['status']:<26} {item.get('report_id') or ''} {json.dumps(item.get('counts'))}")
+        print(f"evidence_lanes gate: {result['gate']['status']}")
+        return 0
+    if not args.lane:
+        print("lanes run needs --lane")
+        return 1
+    if args.lane == "live_gemini":
+        print("refused:", lanes.LIVE_NOT_RUN)
+        return 1
+    if args.app_repo and os.path.abspath(args.results) == os.path.abspath(RESULTS):
+        print("refused: previews must write to a separate --results directory; they are never release acceptance")
+        return 1
+    if args.lane == "historical_replay":
+        if args.app_repo:
+            print("refused: historical replay checks this checkout's retained evidence with its own checker")
+            return 1
+        report_ = lanes.run_historical_lane(REPO, args.results)
+    else:
+        report_ = lanes.run_pytest_lane(args.lane, REPO, args.results, app_repo=args.app_repo)
+    usage = (report_.get("requests_and_usage") or {}).get("external_model_requests") or {}
+    print(f"{report_['lane']}: {report_['status']} ({report_['report_id']}) counts="
+          f"{json.dumps((report_.get('results') or {}).get('counts'))} external_model_requests="
+          f"{usage.get('status')} duration={report_.get('duration_s')}s")
+    for item in report_.get("preconditions") or []:
+        print(f"  precondition {item['id']}: {'passed' if item['passed'] else 'FAILED'} ({item['detail']})")
+    return 0 if report_["status"] == "passed" else 2
+
+
+def run_controls(results_dir: str, guard_log: str | None = None, app_repo: str | None = None) -> int:
     """Engine-level native controls in fresh CPython 3.11 processes; appended to controls.jsonl."""
     from datetime import datetime, timezone
     from drbean_eval import engine_controls, launcher
     engine_controls.GUARD_LOG = guard_log
     state = runner.git_state(REPO)
+    app = os.path.abspath(app_repo or REPO)
     try:
-        python = launcher.science_python()
+        python = launcher.science_python(app)
     except launcher.StackError as error:
         print("blocked:", error)
         return 2
-    results = engine_controls.run(python, os.path.join(REPO, "packages", "groundwork_adapter"), REPO)
+    results = engine_controls.run(python, os.path.join(app, "packages", "groundwork_adapter"), REPO)
     entry = {"schema": "drbean-engine-controls/v1", "tested_commit": state["commit"],
              "worktree_dirty": state["dirty"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             "interpreter": launcher.interpreter_identity(python), "results": results,
+             "interpreter": launcher.interpreter_identity(python),
+             "engine": engine_controls.engine_identity(python, os.path.join(app, "packages", "groundwork_adapter")),
+             "results": results,
+             "evidence_class": "preview" if app_repo else "executed_acceptance",
+             "app_under_test": launcher.git_commit(app) if app_repo else None,
              "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker"}
     os.makedirs(results_dir, exist_ok=True)
     with open(os.path.join(results_dir, "controls.jsonl"), "a", encoding="utf-8") as handle:

@@ -236,7 +236,21 @@ class LocalStack:
         self.events.append({"event": "spawned", "name": name, "pid": process.pid, "at": time.time()})
         return process
 
+    def _archive(self, suffix: str, source: str | None = None) -> None:
+        """Lane accounting: when DRBEAN_STACK_GUARD_ARCHIVE names a directory, mark this stack as started and, at
+        cleanup, keep a copy of its egress-guard log there so a lane report can count every stack's events."""
+        archive = os.environ.get("DRBEAN_STACK_GUARD_ARCHIVE")
+        if not archive or not os.path.isdir(archive):
+            return
+        target = os.path.join(archive, f"{os.path.basename(self.workdir)}.{suffix}")
+        if source is None:
+            with open(target, "w", encoding="utf-8") as handle:
+                handle.write(json.dumps({"started_at": time.time(), "pid": os.getpid()}) + "\n")
+        elif os.path.exists(source):
+            shutil.copyfile(source, target)
+
     def start(self) -> "LocalStack":
+        self._archive("started")
         os.makedirs(os.path.dirname(self.database), exist_ok=True, mode=0o700)
         self._spawn("api", [self.python, "-m", "uvicorn", "bean_api.main:create_app", "--factory",
                             "--host", "127.0.0.1", "--port", str(self.port), "--log-level", "warning",
@@ -414,6 +428,7 @@ class LocalStack:
         return report
 
     def cleanup(self) -> None:
+        self._archive("guard.jsonl", self.guard_log)
         if self._own_workdir:
             shutil.rmtree(self.workdir, ignore_errors=True)
 
@@ -463,8 +478,14 @@ class Owner4LauncherStack(LocalStack):
 
     API_PORT, WEB_PORT = 8000, 4173
 
-    def __init__(self, repo: str, *, diagnostic_overrides: tuple[str, ...] = (), startup_timeout: float = 90.0):
+    def __init__(self, repo: str, *, diagnostic_overrides: tuple[str, ...] = (), startup_timeout: float = 90.0,
+                 live_opt_in: dict[str, str] | None = None):
         super().__init__(repo, diagnostic_overrides=diagnostic_overrides, startup_timeout=startup_timeout)
+        if live_opt_in is not None:
+            key = live_opt_in.get("GEMINI_API_KEY")
+            if key is not None and not DUMMY_VALUE.match(key):
+                raise StackError("refused: a live opt-in file written by the harness may only carry a DRBEAN-DUMMY key")
+        self.live_opt_in = live_opt_in
         self.launcher = os.path.join(self.repo, "scripts", "dev", "launcher.py")
         if not os.path.isfile(self.launcher):
             raise StackError("Owner 4's launcher (scripts/dev/launcher.py) is not present in the application checkout")
@@ -524,8 +545,17 @@ class Owner4LauncherStack(LocalStack):
             except (OSError, ValueError):
                 continue
 
+    def _write_live_opt_in(self) -> None:
+        """A dummy opt-in file in the stack's own var directory (never the developer's), mode 0600."""
+        if self.live_opt_in is None:
+            return
+        fd = os.open(os.path.join(self.var, "gemini.local.json"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(self.live_opt_in, handle)
+
     def start(self) -> "Owner4LauncherStack":
         self._write_auth()
+        self._write_live_opt_in()
         first = self._launcher("start", import_path=False)
         if first["exit"] != 0:
             self._launcher("stop", import_path=False)
