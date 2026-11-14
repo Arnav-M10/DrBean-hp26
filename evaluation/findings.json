@@ -2,8 +2,8 @@
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
   "updated_at": "2026-11-14",
-  "application_code_commit": "80f95a454ec95248690c6aeee1652886741340fc",
-  "observed_at_harness_commit": "f992b48",
+  "application_code_commit": "d821202b339ed60720e3c919d6be47e450e3b894",
+  "observed_at_harness_commit": "d821202b339ed60720e3c919d6be47e450e3b894",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -11,7 +11,7 @@
       "id": "F-ORPHAN-WORKER-KILL",
       "severity": "P0",
       "owner": "2",
-      "status": "open",
+      "status": "retested",
       "title": "A scientific child survives its worker's death and keeps computing after the job is marked interrupted",
       "minimal_input": "hero-v2 baseline on main 9cc90e0; scientific child held inside the adapter by the harness barrier (after setsid and limits); SIGKILL the worker process group",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --diagnostic science_barrier --results evaluation/results/previews/x --only RS-CANCEL-RESTART",
@@ -49,6 +49,23 @@
           "result": "Reproduces without relax_nproc: the deterministic pytest test fails no_orphan_after_worker_kill (1 live scientific child after the worker SIGKILL). The barrier holds the child after setsid and the product's limits, so this is the product's own kill/recovery path.",
           "evidence": {
             "pytest": "evaluation/results/integration/pytest-merged-main-a1b28ae.md"
+          }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "Resolved on this supported Mac/runtime in the ordinary lane: one sustained live scientific child was observed before the worker SIGKILL and none remained afterwards; worker --recover marked the run interrupted with worker_restart and it stayed interrupted without redispatch. Running cancellation likewise observed one live child and none surviving. The separately declared cancellation workload contained 128 exact replicates of the synthetic input; no diagnostic barrier or relaxed guard was used. All seven required lifecycle checks passed. Earlier diagnostic failures remain historical; this is not a claim about every OS or every possible termination timing.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_d77e70889700444b"
+            ],
+            "trace": "evaluation/results/traces/att_d77e70889700444b.json",
+            "interruption_workload": {
+              "rows": 128,
+              "origin": "synthetic",
+              "deterministic_barrier": false
+            }
           }
         }
       ]
@@ -107,6 +124,17 @@
             ],
             "backend_suite": "265 passed, 4 failed (was 136/17/11); the RLIMIT_AS image tests pass"
           }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "Ordinary HTTP retest admits the valid PNG as 1200x1550 image/png and completes baseline and design. Darwin readiness still reports address-space enforcement unavailable with platform_guard_not_supported; the policy does not claim RLIMIT_AS support on this platform.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_ec9cf987565e48ec"
+            ]
+          }
         }
       ]
     },
@@ -132,6 +160,18 @@
           "result": "Ordinary API startup selects Counterdex (capabilities.science: implemented, configured, available via the 3.11 probe); the worker uses the same factory.",
           "evidence": {
             "lane_run": "lane-runs.jsonl readiness at d2d3c53: science.runtime_available true, baseline_discovery false"
+          }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "Ordinary startup selects configured and available Counterdex 0.3.0 with baseline discovery, native design and native recheck. Real HTTP baseline, design and follow-up complete and replay fresh. Capability verified_in_environment remains false as the probe-level disclosure; these attempts supply the separate execution evidence.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_ec9cf987565e48ec",
+              "att_fd97aeac25fa4cae"
+            ]
           }
         }
       ]
@@ -178,6 +218,18 @@
             "results": "evaluation/results/previews/main-b827c61/relax_nproc",
             "attempts": [
               "att_1ace0e6c87124367"
+            ]
+          }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "The ordinary HTTP baseline completes with two distinct exact in-domain candidates, both independently compatible with the historical observations, including a freshly valid strict outside witness; scientific_outcome is certified_counterexample. Its authenticated native packet passes fresh replay. The changed-input case also passes without any diagnostic override.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_ec9cf987565e48ec",
+              "att_1f692eebc2c34baa"
             ]
           }
         }
@@ -227,6 +279,26 @@
             "attempts": [
               "att_1ace0e6c87124367"
             ]
+          }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "Ordinary HTTP retest verifies exact recorded bytes, digest response header, length and media type for baseline, design and all four follow-up packets. Complete replay anchors come from authenticated application records; fresh replay passes with matching binding, and altered-byte and wrong-problem-anchor controls are rejected. The 22 separate engine controls also pass; their deliberately changed test anchors only isolate checker/format behavior and authenticate no altered packet.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_ec9cf987565e48ec",
+              "att_fd97aeac25fa4cae"
+            ],
+            "native_controls": {
+              "file": "evaluation/results/controls.jsonl",
+              "at": "2026-11-14T05:24:07+00:00",
+              "passed": 22,
+              "expected": 22,
+              "interpreter": "CPython 3.11.17 Darwin arm64",
+              "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker"
+            }
           }
         }
       ]
@@ -290,6 +362,19 @@
             "attempts": [
               "att_3adc20dee66049ee"
             ]
+          }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "Ordinary HTTP qualification now exercises proposal-bound operation recheck on four separately reviewed and approved single-append branches, with full proposal body/id/digest and parent/design binding independently checked. All 130 required checks pass: original vectors are retained without discovery; complete historical rows and byte-identical design evidence remain; fresh native replay, public candidate outcomes and the independent decimal oracle agree. For the actually discovered pairs, hypothetical 3.4 retains only the inside candidate (inconclusive), 4.57 excludes both (inconclusive), and 4.0 retains a compatible outside candidate (certified_counterexample). A separately labelled actual-origin declaration at 79/10 h with allowance 7/20 excludes both (inconclusive); its ancestry and resulting dataset remain synthetic, so it is not a real experimental measurement. Tampered design digest, baseline substitution and foreign scope are rejected, and old approvals do not authorize the new work. Earlier narrow legacy-review observations remain historical rather than being relabelled recheck evidence.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_fd97aeac25fa4cae"
+            ],
+            "trace": "evaluation/results/traces/att_fd97aeac25fa4cae.json",
+            "scope": "fresh checked design parent; one appended observation; no repeated-follow-up or live-experiment qualification"
           }
         }
       ]
@@ -460,6 +545,17 @@
           "evidence": {
             "results": "evaluation/results/previews/main-d6a71c2/science_barrier"
           }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "The ordinary, non-barrier lane now observes sustained real scientific work for both cancellation and worker loss using a separately declared 128-row exact-replicate synthetic workload. One live child exists at each intervention, none survives, the cancelled run is terminal and the recovered worker-loss run stays interrupted without redispatch. This removes the earlier vacuity on this supported host; it does not weaken the sustained-observation criterion or promote earlier diagnostic evidence.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_d77e70889700444b"
+            ]
+          }
         }
       ]
     },
@@ -488,7 +584,7 @@
       "id": "F-MAC-NPROC",
       "severity": "P0",
       "owner": "2",
-      "status": "open",
+      "status": "retested",
       "title": "On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11",
       "minimal_input": "macOS 26.7 arm64 user with 649 processes; resource policy process cap 32 (process_count: rlimit_nproc_per_user)",
       "command": ".venv/bin/python -c \"import os,resource,subprocess; pid=os.fork()\\nif pid==0:\\n resource.setrlimit(resource.RLIMIT_NPROC,(32,32)); subprocess.run(['/usr/bin/true'])\"  -> BlockingIOError Errno 35; also BEAN_COUNTERDEX_PYTHON=/opt/homebrew/bin/python3.11 .venv/bin/python -m pytest tests/test_science_boundary.py tests/test_scientific_http.py",
@@ -559,6 +655,37 @@
               "att_98ac5a9ee88048d1",
               "att_1ace0e6c87124367"
             ]
+          }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "Resolved by an ordinary run on this Mac: all seven scheduled HTTP entries pass, including real baseline discovery, changed input, separate design, proposal-bound follow-up and sustained cancellation/restart. The prepared CPython 3.11 runtime launches under the product process-guards-v3 policy with inherited account-wide RLIMIT_NPROC; readiness explicitly reports that a per-job process-count quota is unavailable because the platform limit is account-wide. Owned POSIX sessions, wall-clock supervision and the other reported guards remain enabled. No relax_nproc or other diagnostic override was used. This verifies the reported Mac launch failure on this host, not a newly available per-job process quota or a cross-platform proof.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_ec9cf987565e48ec",
+              "att_1f692eebc2c34baa",
+              "att_371f1d8c816441b4",
+              "att_955cd7b2cbe240ed",
+              "att_fd97aeac25fa4cae",
+              "att_d77e70889700444b",
+              "att_1a506101c468467d"
+            ],
+            "resource_policy": {
+              "policy_version": "process-guards-v3",
+              "process_count": "inherited_rlimit_nproc_per_user",
+              "process_count_job_quota": "unavailable",
+              "process_count_reason": "account_wide_limit_not_job_quota",
+              "process_tree": "owned_posix_session"
+            },
+            "native_controls": {
+              "file": "evaluation/results/controls.jsonl",
+              "at": "2026-11-14T05:24:07+00:00",
+              "passed": 22,
+              "expected": 22,
+              "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker"
+            }
           }
         }
       ]
@@ -669,6 +796,17 @@
             "results": "evaluation/results/previews/main-b827c61/relax_nproc",
             "attempts": [
               "att_1ace0e6c87124367"
+            ]
+          }
+        },
+        {
+          "at_commit": "d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0)",
+          "result": "Current Counterdex 0.3 qualification uses a newly reviewed design request with empty prospective source_artifact_ids, while the selected immutable baseline packet is supplied independently as mandatory history. This request completes at checked_pair_separation, selects 8/1 with a strictly positive exact margin, and freshly replays with valid matching evidence; there is no isolation probe or rewrite of an already approved request. The earlier successful nonempty-reuse observation describes the older consumer and is preserved above, not claimed as the current 0.3 reuse contract.",
+          "evidence": {
+            "lane_run_id": "lane_872f1c39287144d1",
+            "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])",
+            "attempts": [
+              "att_ec9cf987565e48ec"
             ]
           }
         }
@@ -860,7 +998,7 @@
       ]
     }
   ],
-  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14.",
+  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here.",
   "check_catalog": {
     "note": "Finding ids that a check names when it fails. They are not observed findings: an id appears in `findings` only after a check actually failed or was blocked. Every id cited by evaluation/drbean_eval or tests/integration must be a finding or listed here (enforced by evaluation/tests).",
     "ids": {
