@@ -1,0 +1,920 @@
+{
+  "$defs": {
+    "Channel": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9_-]{1,48}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "angle_deg": {
+          "title": "Angle Deg",
+          "type": "string"
+        },
+        "energy_min_eV": {
+          "title": "Energy Min Ev",
+          "type": "string"
+        },
+        "energy_max_eV": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Energy Max Ev"
+        }
+      },
+      "required": [
+        "id",
+        "angle_deg",
+        "energy_min_eV",
+        "energy_max_eV"
+      ],
+      "title": "Channel",
+      "type": "object"
+    },
+    "ConditionalSimulation": {
+      "additionalProperties": false,
+      "properties": {
+        "generating_model_id": {
+          "enum": [
+            "electron_isotropic_maxwellian.v1",
+            "electron_gyrotropic_bimaxwellian.v1"
+          ],
+          "title": "Generating Model Id",
+          "type": "string"
+        },
+        "samples": {
+          "maximum": 1024,
+          "minimum": 32,
+          "title": "Samples",
+          "type": "integer"
+        },
+        "failures": {
+          "const": 0,
+          "title": "Failures",
+          "type": "integer"
+        },
+        "outcomes": {
+          "$ref": "#/$defs/Outcomes"
+        }
+      },
+      "required": [
+        "generating_model_id",
+        "samples",
+        "failures",
+        "outcomes"
+      ],
+      "title": "ConditionalSimulation",
+      "type": "object"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "Failure",
+      "type": "object"
+    },
+    "FitResult": {
+      "additionalProperties": false,
+      "properties": {
+        "model_id": {
+          "enum": [
+            "electron_isotropic_maxwellian.v1",
+            "electron_gyrotropic_bimaxwellian.v1"
+          ],
+          "title": "Model Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "bounded_grid_completed",
+            "no_finite_candidate"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "parameter_count": {
+          "maximum": 3,
+          "minimum": 2,
+          "title": "Parameter Count",
+          "type": "integer"
+        },
+        "evaluations": {
+          "minimum": 0,
+          "title": "Evaluations",
+          "type": "integer"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "maxLength": 40,
+            "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+            "type": "string"
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
+        "predictions": {
+          "items": {
+            "$ref": "#/$defs/Prediction"
+          },
+          "title": "Predictions",
+          "type": "array"
+        },
+        "sensitivity": {
+          "items": {
+            "$ref": "#/$defs/Sensitivity"
+          },
+          "title": "Sensitivity",
+          "type": "array"
+        },
+        "rank_estimate": {
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Rank Estimate",
+          "type": "integer"
+        },
+        "rank_deficient": {
+          "title": "Rank Deficient",
+          "type": "boolean"
+        },
+        "boundary_limited": {
+          "title": "Boundary Limited",
+          "type": "boolean"
+        },
+        "chi_square": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Chi Square"
+        },
+        "reduced_chi_square": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reduced Chi Square"
+        },
+        "degrees_of_freedom": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Degrees Of Freedom"
+        },
+        "rmse_A": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rmse A"
+        },
+        "adequate_under_declared_threshold": {
+          "title": "Adequate Under Declared Threshold",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "model_id",
+        "status",
+        "parameter_count",
+        "evaluations",
+        "parameters",
+        "predictions",
+        "sensitivity",
+        "rank_estimate",
+        "rank_deficient",
+        "boundary_limited",
+        "chi_square",
+        "reduced_chi_square",
+        "degrees_of_freedom",
+        "rmse_A",
+        "adequate_under_declared_threshold"
+      ],
+      "title": "FitResult",
+      "type": "object"
+    },
+    "FitScope": {
+      "additionalProperties": false,
+      "properties": {
+        "density_min_m3": {
+          "title": "Density Min M3",
+          "type": "string"
+        },
+        "density_max_m3": {
+          "title": "Density Max M3",
+          "type": "string"
+        },
+        "temperature_grid_eV": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 25,
+          "minItems": 2,
+          "title": "Temperature Grid Ev",
+          "type": "array"
+        },
+        "max_evaluations": {
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Evaluations",
+          "type": "integer"
+        },
+        "max_reduced_chi_square": {
+          "title": "Max Reduced Chi Square",
+          "type": "string"
+        }
+      },
+      "required": [
+        "density_min_m3",
+        "density_max_m3",
+        "temperature_grid_eV",
+        "max_evaluations",
+        "max_reduced_chi_square"
+      ],
+      "title": "FitScope",
+      "type": "object"
+    },
+    "Frequency": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "frequency": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Frequency",
+          "type": "string"
+        },
+        "wilson_95": {
+          "items": {
+            "maxLength": 40,
+            "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Wilson 95",
+          "type": "array"
+        }
+      },
+      "required": [
+        "count",
+        "frequency",
+        "wilson_95"
+      ],
+      "title": "Frequency",
+      "type": "object"
+    },
+    "Instrument": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "idealized_normal_energy_planar_collector",
+          "title": "Kind",
+          "type": "string"
+        },
+        "acceptance": {
+          "const": "full_incident_half_space",
+          "title": "Acceptance",
+          "type": "string"
+        },
+        "current_convention": {
+          "const": "electron_current_magnitude",
+          "title": "Current Convention",
+          "type": "string"
+        },
+        "area_m2": {
+          "title": "Area M2",
+          "type": "string"
+        },
+        "efficiency": {
+          "title": "Efficiency",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "acceptance",
+        "current_convention",
+        "area_m2",
+        "efficiency"
+      ],
+      "title": "Instrument",
+      "type": "object"
+    },
+    "ModelComparisonRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "DB-MODEL-COMPARISON-1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "approval": {
+          "const": "approved_for_this_request",
+          "title": "Approval",
+          "type": "string"
+        },
+        "review": {
+          "$ref": "#/$defs/Review"
+        },
+        "instrument": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Instrument"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "channels": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 24,
+          "minItems": 1,
+          "title": "Channels",
+          "type": "array"
+        },
+        "observations": {
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Observations",
+          "type": "array"
+        },
+        "selected_channel_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 24,
+          "minItems": 1,
+          "title": "Selected Channel Ids",
+          "type": "array"
+        },
+        "fit": {
+          "$ref": "#/$defs/FitScope"
+        },
+        "noise": {
+          "$ref": "#/$defs/NoiseScope"
+        },
+        "feasible_settings": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Feasible Settings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "approval",
+        "review",
+        "channels",
+        "observations",
+        "selected_channel_ids",
+        "fit",
+        "noise",
+        "feasible_settings"
+      ],
+      "title": "ModelComparisonRequest",
+      "type": "object"
+    },
+    "NoiseCase": {
+      "additionalProperties": false,
+      "properties": {
+        "sigma_A": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Sigma A",
+          "type": "string"
+        },
+        "z_threshold": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Z Threshold",
+          "type": "string"
+        },
+        "selected_channel_bands_separated_numerically": {
+          "title": "Selected Channel Bands Separated Numerically",
+          "type": "boolean"
+        },
+        "decision": {
+          "title": "Decision",
+          "type": "string"
+        },
+        "selected_channel_simulations": {
+          "items": {
+            "$ref": "#/$defs/ConditionalSimulation"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Selected Channel Simulations",
+          "type": "array"
+        },
+        "settings": {
+          "items": {
+            "$ref": "#/$defs/SettingComparison"
+          },
+          "title": "Settings",
+          "type": "array"
+        },
+        "suggested_setting_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Suggested Setting Id"
+        }
+      },
+      "required": [
+        "sigma_A",
+        "z_threshold",
+        "selected_channel_bands_separated_numerically",
+        "decision",
+        "selected_channel_simulations",
+        "settings",
+        "suggested_setting_id"
+      ],
+      "title": "NoiseCase",
+      "type": "object"
+    },
+    "NoiseScope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "independent_gaussian",
+          "title": "Kind",
+          "type": "string"
+        },
+        "sigma_grid_A": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Sigma Grid A",
+          "type": "array"
+        },
+        "z_thresholds": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Z Thresholds",
+          "type": "array"
+        },
+        "seed": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "samples": {
+          "maximum": 1024,
+          "minimum": 32,
+          "title": "Samples",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "sigma_grid_A",
+        "z_thresholds",
+        "seed",
+        "samples"
+      ],
+      "title": "NoiseScope",
+      "type": "object"
+    },
+    "Observation": {
+      "additionalProperties": false,
+      "properties": {
+        "channel_id": {
+          "title": "Channel Id",
+          "type": "string"
+        },
+        "current_A": {
+          "title": "Current A",
+          "type": "string"
+        },
+        "sigma_A": {
+          "title": "Sigma A",
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel_id",
+        "current_A",
+        "sigma_A"
+      ],
+      "title": "Observation",
+      "type": "object"
+    },
+    "Outcomes": {
+      "additionalProperties": false,
+      "properties": {
+        "generating_band_only": {
+          "$ref": "#/$defs/Frequency"
+        },
+        "other_band_only": {
+          "$ref": "#/$defs/Frequency"
+        },
+        "both_bands": {
+          "$ref": "#/$defs/Frequency"
+        },
+        "neither_band": {
+          "$ref": "#/$defs/Frequency"
+        }
+      },
+      "required": [
+        "generating_band_only",
+        "other_band_only",
+        "both_bands",
+        "neither_band"
+      ],
+      "title": "Outcomes",
+      "type": "object"
+    },
+    "Prediction": {
+      "additionalProperties": false,
+      "properties": {
+        "observation_index": {
+          "minimum": 0,
+          "title": "Observation Index",
+          "type": "integer"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "type": "string"
+        },
+        "observed_A": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Observed A",
+          "type": "string"
+        },
+        "predicted_A": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Predicted A",
+          "type": "string"
+        },
+        "residual_A": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Residual A",
+          "type": "string"
+        },
+        "sigma_A": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Sigma A",
+          "type": "string"
+        }
+      },
+      "required": [
+        "observation_index",
+        "channel_id",
+        "observed_A",
+        "predicted_A",
+        "residual_A",
+        "sigma_A"
+      ],
+      "title": "Prediction",
+      "type": "object"
+    },
+    "Review": {
+      "additionalProperties": false,
+      "properties": {
+        "reviewed": {
+          "const": true,
+          "title": "Reviewed",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "synthetic",
+          "title": "Origin",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewed",
+        "origin",
+        "description"
+      ],
+      "title": "Review",
+      "type": "object"
+    },
+    "Sensitivity": {
+      "additionalProperties": false,
+      "properties": {
+        "parameter": {
+          "title": "Parameter",
+          "type": "string"
+        },
+        "derivative": {
+          "const": "d_current_d_log_parameter",
+          "title": "Derivative",
+          "type": "string"
+        },
+        "unit": {
+          "const": "A",
+          "title": "Unit",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "maxLength": 40,
+            "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+            "type": "string"
+          },
+          "title": "Values",
+          "type": "array"
+        },
+        "relative_step": {
+          "const": "0.0001",
+          "title": "Relative Step",
+          "type": "string"
+        }
+      },
+      "required": [
+        "parameter",
+        "derivative",
+        "unit",
+        "values",
+        "relative_step"
+      ],
+      "title": "Sensitivity",
+      "type": "object"
+    },
+    "SettingComparison": {
+      "additionalProperties": false,
+      "properties": {
+        "setting_id": {
+          "title": "Setting Id",
+          "type": "string"
+        },
+        "signal_to_noise": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Signal To Noise",
+          "type": "string"
+        },
+        "numerical_band_margin_A": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Numerical Band Margin A",
+          "type": "string"
+        },
+        "conditional_simulations": {
+          "items": {
+            "$ref": "#/$defs/ConditionalSimulation"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Conditional Simulations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "setting_id",
+        "signal_to_noise",
+        "numerical_band_margin_A",
+        "conditional_simulations"
+      ],
+      "title": "SettingComparison",
+      "type": "object"
+    },
+    "SettingPrediction": {
+      "additionalProperties": false,
+      "properties": {
+        "setting": {
+          "$ref": "#/$defs/Channel"
+        },
+        "predictions_A": {
+          "additionalProperties": {
+            "maxLength": 40,
+            "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "electron_isotropic_maxwellian.v1",
+              "electron_gyrotropic_bimaxwellian.v1"
+            ]
+          },
+          "title": "Predictions A",
+          "type": "object"
+        },
+        "absolute_difference_A": {
+          "maxLength": 40,
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+          "title": "Absolute Difference A",
+          "type": "string"
+        }
+      },
+      "required": [
+        "setting",
+        "predictions_A",
+        "absolute_difference_A"
+      ],
+      "title": "SettingPrediction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "DB-MODEL-COMPARISON-RESULT-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "unsupported",
+        "fit_failed",
+        "budget_exceeded"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "request": {
+      "$ref": "#/$defs/ModelComparisonRequest"
+    },
+    "input_digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Input Digest",
+      "type": "string"
+    },
+    "source_digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Digest",
+      "type": "string"
+    },
+    "numerical_backend": {
+      "title": "Numerical Backend",
+      "type": "string"
+    },
+    "exact_verification": {
+      "const": "not_performed",
+      "title": "Exact Verification",
+      "type": "string"
+    },
+    "methods": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Methods",
+      "type": "object"
+    },
+    "simulation_seed": {
+      "title": "Simulation Seed",
+      "type": "integer"
+    },
+    "simulation_samples": {
+      "title": "Simulation Samples",
+      "type": "integer"
+    },
+    "model_ids": {
+      "items": {
+        "enum": [
+          "electron_isotropic_maxwellian.v1",
+          "electron_gyrotropic_bimaxwellian.v1"
+        ],
+        "type": "string"
+      },
+      "title": "Model Ids",
+      "type": "array"
+    },
+    "units": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Units",
+      "type": "object"
+    },
+    "fits": {
+      "items": {
+        "$ref": "#/$defs/FitResult"
+      },
+      "title": "Fits",
+      "type": "array"
+    },
+    "settings": {
+      "items": {
+        "$ref": "#/$defs/SettingPrediction"
+      },
+      "title": "Settings",
+      "type": "array"
+    },
+    "noise_sweep": {
+      "items": {
+        "$ref": "#/$defs/NoiseCase"
+      },
+      "title": "Noise Sweep",
+      "type": "array"
+    },
+    "failures": {
+      "items": {
+        "$ref": "#/$defs/Failure"
+      },
+      "title": "Failures",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "decision": {
+      "title": "Decision",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "request",
+    "input_digest",
+    "source_digest",
+    "numerical_backend",
+    "exact_verification",
+    "methods",
+    "simulation_seed",
+    "simulation_samples",
+    "model_ids",
+    "units",
+    "fits",
+    "settings",
+    "noise_sweep",
+    "failures",
+    "limitations",
+    "decision"
+  ],
+  "title": "ModelComparisonResult",
+  "type": "object"
+}

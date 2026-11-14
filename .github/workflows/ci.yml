@@ -159,6 +159,8 @@ jobs:
       - name: private sessions through actual HTTPS gateway and API
         if: always()
         run: node tests/integration/shared-session-browser.mjs
+      - name: private model comparison transport with actual numerical computation
+        run: node tests/integration/model_comparison_browser.mjs --results /tmp/drbean-comparison-browser-evidence
       - name: ordinary Deep Agents browser investigation and separate checked pair-design
         run: |
           export NODE_PATH="$PWD/tests/integration/node_modules"
