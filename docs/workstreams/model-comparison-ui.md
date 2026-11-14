@@ -1,26 +1,28 @@
 # Model-comparison interface
 
-Owner: frontend. Branch: `codex/model-comparison-ui`; base main `af71dd6`.
+Owner: frontend. Branch / review: `codex/model-comparison-ui`, PR55.
 
-Current task: extend `workspace-preview` with data/model selection, explicit
-review, computed-result charts and a readable self-contained report.
-Retain the existing layout and bean identity; use the app's neutral dark palette.
-No numerical/physics implementation, backend routing, auth or approval changes.
+Built: preferred `workspace-preview` researcher journey, current-channel CSV,
+synthetic source and explicit-review controls, response/fit/noise/setting editors,
+actual bound numerical results, residual/sensitivity/noise/MC views, immutable
+history, stale-draft labels, result reuse and readable HTML + server JSON +
+provenance. Existing saved concentration mockup remains visibly separate.
 
-Works before this task: saved two-rate synthetic mockup and the separate qualified
-Counterdex application. The mockup is not a plasma-analysis service.
+Integrated the numerical owner's published PR57 and production private transport;
+no physics, computation, auth or API implementation was independently rebuilt.
+Initial missing-service dependency was resolved by its subsequent publication.
+Only five fixed static allowlist entries/tests change outside the frontend.
 
-Dependency: numerical-service owner must supply its published branch, supported
-model/data catalog, request/result contract and trusted same-origin connection.
-Main/published branches and the available local Codex handoff were inspected;
-no plasma comparison service is published yet. Connected acceptance is blocked
-until that implementation exists. No saved example will replace a failed run.
+Verified so far: 13 actual launcher/browser gates; 15 frontend tests; 108 existing
+web tests. Backend source at the service integration passed 1,372 tests with one
+optional numerical-package skip (to be covered against latest main's package).
+No provider calls, new public service, ledger reset or process-limit changes.
 
-Design: keep the study rail and Data / Assumptions / Review views; results lead
-with shared fit, differences, detectability, uncertainty and feasible settings.
-Use system sans, 16px body, neutral #151619 / #1c1e22 surfaces, #f0f1f3 text,
-#a0a5b0 helper text and restrained #b8cdf0 focus. Charts carry model identity.
-Noise controls select actual returned sweep computations, never local simulation.
+Current task: merge current main, rerun the final assembled browser candidate,
+retain screenshots/receipts, push the focused PR for integration. Exact SHA and
+final CI status belong in PR55; separate branch results are not release acceptance.
 
-Next handoff: publish the frontend consumer seam and focused PR early, then
-integrate the numerical owner's exact contract and qualify the connected browser.
+Limits: synthetic observations only; no calibrated experimental plasma, independent
+instrument detection floor, hard allowance, queue/cancel endpoint, or exact
+certificate. No physical device/Safari qualification. Cloud Chromium blocks
+file://; the exact downloaded HTML renders with networking disabled instead.

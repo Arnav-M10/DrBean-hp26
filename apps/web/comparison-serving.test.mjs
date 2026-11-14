@@ -36,6 +36,11 @@ test('trusted server exposes a fixed preview and connector route set, never arbi
   const mappings = [
     ['/workspace-preview/', '../../workspace-preview/index.html'],
     ['/workspace-preview/index.html', '../../workspace-preview/index.html'],
+    ['/workspace-preview/comparison.mjs', '../../workspace-preview/comparison.mjs'],
+    ['/workspace-preview/comparison-core.mjs', '../../workspace-preview/comparison-core.mjs'],
+    ['/workspace-preview/comparison-view.mjs', '../../workspace-preview/comparison-view.mjs'],
+    ['/workspace-preview/comparison.css', '../../workspace-preview/comparison.css'],
+    ['/workspace-preview/saved-example.html', '../../workspace-preview/saved-example.html'],
     ['/workspace-preview/app.mjs', '../../workspace-preview/app.mjs'],
     ['/workspace-preview/styles.css', '../../workspace-preview/styles.css'],
     ['/workspace-preview/reference.json', '../../workspace-preview/reference.json'],
