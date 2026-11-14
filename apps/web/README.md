@@ -12,7 +12,7 @@ node apps/web/serve.mjs
 
 Open `http://127.0.0.1:4173`. The proxy targets `127.0.0.1:8000` by default. A trusted local launch can set `BEAN_WEB_API_PORT` to a different loopback API port; browser requests cannot select another destination. The proxy rejects foreign hosts/origins and forwards neither cookies nor browser origin headers. This remains a local serving lane, not hosted authentication.
 
-Open **Local backend connection**, enter an authorized researcher bearer token, and choose or create a workspace. Credentials stay in memory and are cleared from the password field after connecting. They never enter URLs, downloads, cookies or browser storage. Reloading requires reconnecting.
+Open **Server connection**, enter an authorized researcher access token, and choose or create a workspace. Credentials stay in memory and are cleared from the password field after connecting. They never enter URLs, downloads, cookies or browser storage. Reloading requires reconnecting. For teammates using the owner's one server and Gemini key, open its shared HTTPS link instead; see [Shared server](../../docs/shared-server.md). No per-person Gemini key is required.
 
 ## Baseline workflow
 

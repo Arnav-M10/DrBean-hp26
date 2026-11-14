@@ -36,7 +36,7 @@ scripts/dev/doctor.py
 
 Reports, as separate facts: API ready, worker ready, scientific adapter available and qualified, native replay supported, and Gemini opt-in/server dispatch state. Configuration and readiness do not establish live qualification.
 
-Open `http://127.0.0.1:4173`, expand **Local backend connection**, and paste the bearer token from the private file `var/auth.json`. The token stays in memory only. Never put it in a URL, a screenshot or chat. API documentation is at `http://127.0.0.1:8000/docs`.
+Open `http://127.0.0.1:4173`, expand **Server connection**, and paste the researcher access token from the private file `var/auth.json`. The token stays in memory only. Never put it in a URL, a screenshot or chat. API documentation is at `http://127.0.0.1:8000/docs`.
 
 If a start fails, the launcher prints the log tail and stops what it started. Port already in use: it refuses and kills nothing. After an unclean stop, run `python3 scripts/dev/launcher.py recover` before the next start. Details: [docs/release-runbook.md](docs/release-runbook.md).
 
@@ -56,6 +56,25 @@ This free-tier flag records your assertion about the Google project. The applica
 After connecting and selecting a workspace, upload one public or synthetic PNG/JPEG, review the image disclosure, and choose **Ask Gemini to read this image**. Live images are limited to 1600 × 1600 pixels and 5 MiB. Review each proposed value and complete missing assumptions before scientific approval. With a completed run open, **Ask Gemini about this investigation** sends the question and selected research context after separate consent. The app shows server-owned scientific statements separately from model commentary and withholds commentary that fails grounding checks.
 
 **Show Gemini call budget** reads the local ledger without calling a model. The live ledger permits at most eight requests with total conservative reservations of 64,000 input and 16,000 output tokens. These limits apply across the local store, not separately to each workspace or to Google's quota. Failed/uncertain requests retain reservations, and the app makes no automatic retry. Manual discovery, measurement design, follow-up checking and native replay make no model calls. PDF intake and live autonomous coordination remain unavailable. A local smoke test does not satisfy the formal live release gate.
+
+## One shared server for teammates
+
+Run the app and configure Gemini once on the owner's Mac. Install Cloudflare's `cloudflared` tool (`brew install cloudflared` on macOS), then run:
+
+```sh
+python3 scripts/dev/share.py start
+python3 scripts/dev/share.py status
+```
+
+The printed HTTPS link opens the same running server, data and Gemini configuration for teammates. They expand **Server connection**, enter a researcher access token supplied privately by the owner, then choose or create a workspace. They do not enter a Gemini key or start a local backend. The existing prototype token represents a shared researcher identity; people using it can see that identity's workspaces. All workspaces share the same conservative Gemini budget, including earlier tests; sharing never resets or increases that budget.
+
+The API, web server and sharing gateway remain bound to loopback. The gateway admits the exact current HTTPS tunnel origin and preserves bearer authentication. It never reads or sends the Gemini key. This is a temporary development preview: keep the Mac on and connected; the URL changes on a new sharing session. Status/health checks make no model calls. Stop the public link separately with:
+
+```sh
+python3 scripts/dev/share.py stop
+```
+
+Cloudflare Quick Tunnel behavior and limitations are documented at <https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/>. Detailed setup and verification are in [Shared server](docs/shared-server.md).
 
 ## What works, and how it is checked
 
@@ -97,7 +116,7 @@ A checked candidate outside a claimed interval shows that the reviewed measureme
 
 ## Scope
 
-One model, `C(t) = A*(exp(-ke*t) - exp(-ka*t))`, hours and mg/L. One PNG or JPEG source. Local SQLite. No PDF intake, hosted deployment, second database, blockchain, messaging or extra model provider. All data in this repository is synthetic.
+One model, `C(t) = A*(exp(-ke*t) - exp(-ka*t))`, hours and mg/L. One PNG or JPEG source. Local SQLite with optional temporary HTTPS sharing from the owner's Mac. No PDF intake, managed production deployment, second database, blockchain, messaging or extra model provider. All data in this repository is synthetic.
 
 ## Documents
 
