@@ -15,3 +15,15 @@ Numerical comparison remains available at comparison.html with its existing
 working integration. Static serving stays labelled draft/sample-only. Controlled
 execution and real Counterdex/native evidence will be tested; live calls are not
 part of this frontend task. No framework, redesign, new animation or backend rewrite.
+
+Implemented in the preferred shell: exact CSV/manual review, actual private
+research sessions, persisted public plan/events, canonical investigation and
+separate design approval, automatic read-only result retrieval, readable retained
+HTML and real native/anchor downloads. Numerical comparison is preserved at
+`/workspace-preview/comparison.html`. Static mode cannot execute.
+
+Author checks against main + this frontend: 9 controlled browser checks passed,
+including actual scientific children, changed claim/evidence-dependent clarification,
+refresh, native replay, and a separately injected post-science model-failure
+worker. Preserved numerical browser checks passed. Final CI/combined-backend
+qualification is pending. No provider call or credential inspection was performed.

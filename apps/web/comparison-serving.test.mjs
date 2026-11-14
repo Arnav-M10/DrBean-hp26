@@ -35,6 +35,10 @@ test('trusted server exposes a fixed preview and connector route set, never arbi
   const port = await server(t)
   const mappings = [
     ['/workspace-preview/', '../../workspace-preview/index.html'],
+    ['/workspace-preview/comparison.html', '../../workspace-preview/comparison.html'],
+    ['/workspace-preview/research-ui.mjs', '../../workspace-preview/research-ui.mjs'],
+    ['/workspace-preview/research-view.mjs', '../../workspace-preview/research-view.mjs'],
+    ['/research-api.mjs', 'research-api.mjs'],
     ['/workspace-preview/index.html', '../../workspace-preview/index.html'],
     ['/workspace-preview/comparison.mjs', '../../workspace-preview/comparison.mjs'],
     ['/workspace-preview/comparison-core.mjs', '../../workspace-preview/comparison-core.mjs'],
@@ -62,8 +66,11 @@ test('trusted server exposes a fixed preview and connector route set, never arbi
     request_schema: 'DB-MODEL-COMPARISON-1', result_schema: 'DB-MODEL-COMPARISON-RESULT-1',
   })
   assert.equal((await send(port, '/workspace-preview/comparison-service.json', {}, 'POST')).status, 405)
+  const researchManifest = await send(port, '/workspace-preview/research-service.json')
+  assert.deepEqual(JSON.parse(researchManifest.text), {schema_version:'DB-RESEARCH-CONNECTION-1',available:true,mode:'private_session',module:'/research-api.mjs'})
+  assert.equal((await send(port, '/workspace-preview/research-service.json', {}, 'POST')).status, 405)
   for (const path of ['/workspace-preview/README.md', '/workspace-preview/../apps/api/bean_api/main.py',
-    '/workspace-preview/%2e%2e/apps/api/bean_api/main.py', '/workspace-preview/.env', '/comparison-api.test.mjs', '/fixtures/model-comparison/synthetic.request.json']) {
+    '/workspace-preview/%2e%2e/apps/api/bean_api/main.py', '/workspace-preview/.env', '/comparison-api.test.mjs', '/research-api.test.mjs', '/workspace-preview/tests/failure_worker.py', '/workspace-preview/check-research.mjs', '/fixtures/model-comparison/synthetic.request.json']) {
     assert.equal((await send(port, path)).status, 404, path)
   }
   assert.equal((await send(port, '/api/bean/v1/shared-session')).status, 503, 'Manifest alone cannot bypass absent private-access configuration')
@@ -82,7 +89,7 @@ test('shared entry navigation admits the preview document, but not its manifest,
   t.after(async () => { await close(gateway); await close(api); await rm(directory, { recursive: true, force: true }) })
   const headers = { host: new URL(origin).host, 'x-forwarded-proto': 'https', 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }
   for (const path of ['/workspace-preview/', '/workspace-preview/index.html']) assert.equal((await send(port, path, headers)).status, 200)
-  for (const path of ['/workspace-preview/app.mjs', '/workspace-preview/comparison-service.json', '/comparison-api.mjs', '/api/bean/v1/shared-session']) assert.equal((await send(port, path, headers)).status, 403)
+  for (const path of ['/workspace-preview/app.mjs', '/workspace-preview/comparison-service.json', '/workspace-preview/research-service.json', '/comparison-api.mjs', '/research-api.mjs', '/api/bean/v1/shared-session']) assert.equal((await send(port, path, headers)).status, 403)
   assert.equal(calls.length, 0)
   const sameOrigin = { ...headers, 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' }
   assert.equal((await send(port, '/workspace-preview/comparison-service.json', sameOrigin)).status, 200)
