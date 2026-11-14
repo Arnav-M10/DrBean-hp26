@@ -1,0 +1,262 @@
+{
+  "A": {
+    "fails": [
+      {
+        "must_fail": [
+          "C11A-2",
+          "C11A-3",
+          "C11A-4"
+        ],
+        "name": "equality accepted as separation",
+        "observation": {
+          "approvals_created": 0,
+          "design": {
+            "claims": [],
+            "options": [
+              {
+                "delta": "1/5",
+                "margin": "0/1",
+                "option_id": "touch",
+                "state": "evaluated",
+                "tier": "checked_pair_separation",
+                "time": "1/5"
+              }
+            ],
+            "selected_checked": {
+              "option_id": "touch"
+            },
+            "tier": "checked_pair_separation"
+          },
+          "disclosed_text": [],
+          "lane": "fixture_contract",
+          "operation": "design",
+          "provider": {
+            "transport": "controlled"
+          },
+          "provider_requests": 0,
+          "schema": "eval-observation/v1",
+          "state": "completed",
+          "tools": {
+            "transport": "controlled"
+          }
+        }
+      },
+      {
+        "must_fail": [
+          "C11A-1"
+        ],
+        "name": "margin computed in floating point",
+        "observation": {
+          "approvals_created": 0,
+          "design": {
+            "claims": [],
+            "options": [
+              {
+                "delta": "1/5",
+                "margin": "0.0",
+                "option_id": "touch",
+                "state": "evaluated",
+                "tier": "no_separation_established",
+                "time": "1/5"
+              }
+            ],
+            "tier": "no_separation_established"
+          },
+          "disclosed_text": [],
+          "lane": "fixture_contract",
+          "operation": "design",
+          "provider": {
+            "transport": "controlled"
+          },
+          "provider_requests": 0,
+          "schema": "eval-observation/v1",
+          "state": "completed",
+          "tools": {
+            "transport": "controlled"
+          }
+        }
+      }
+    ],
+    "pass": {
+      "approvals_created": 0,
+      "design": {
+        "claims": [],
+        "options": [
+          {
+            "delta": "1/5",
+            "margin": "0/1",
+            "option_id": "touch",
+            "state": "evaluated",
+            "tier": "no_separation_established",
+            "time": "1/5"
+          }
+        ],
+        "tier": "no_separation_established"
+      },
+      "disclosed_text": [],
+      "lane": "fixture_contract",
+      "operation": "design",
+      "provider": {
+        "transport": "controlled"
+      },
+      "provider_requests": 0,
+      "schema": "eval-observation/v1",
+      "state": "completed",
+      "tools": {
+        "transport": "controlled"
+      }
+    }
+  },
+  "B": {
+    "fails": [
+      {
+        "must_fail": [
+          "C11B-3",
+          "C11B-4"
+        ],
+        "name": "selection follows the raw gap ranking",
+        "observation": {
+          "approvals_created": 0,
+          "design": {
+            "claims": [
+              "pair_separated_at_selected_time"
+            ],
+            "options": [
+              {
+                "delta": "1/2",
+                "margin": "-1/10",
+                "option_id": "high-score",
+                "raw_score": "5/1",
+                "state": "evaluated",
+                "tier": "checked_pair_separation",
+                "time": "1/1"
+              },
+              {
+                "delta": "1/4",
+                "margin": "1/20",
+                "option_id": "low-score",
+                "raw_score": "5/2",
+                "state": "evaluated",
+                "tier": "checked_pair_separation",
+                "time": "2/1"
+              }
+            ],
+            "selected_checked": {
+              "option_id": "high-score"
+            },
+            "selection_policy": "positive margin, then larger exact margin, then earlier time, then candidate ids",
+            "tier": "checked_pair_separation"
+          },
+          "disclosed_text": [],
+          "lane": "fixture_contract",
+          "operation": "design",
+          "provider": {
+            "transport": "controlled"
+          },
+          "provider_requests": 0,
+          "schema": "eval-observation/v1",
+          "state": "completed",
+          "tools": {
+            "transport": "controlled"
+          }
+        }
+      },
+      {
+        "must_fail": [
+          "C11B-1"
+        ],
+        "name": "checked errors left out of the margin",
+        "observation": {
+          "approvals_created": 0,
+          "design": {
+            "claims": [
+              "pair_separated_at_selected_time"
+            ],
+            "options": [
+              {
+                "delta": "1/2",
+                "margin": "3/10",
+                "option_id": "high-score",
+                "raw_score": "5/1",
+                "state": "evaluated",
+                "tier": "no_separation_established",
+                "time": "1/1"
+              },
+              {
+                "delta": "1/4",
+                "margin": "1/20",
+                "option_id": "low-score",
+                "raw_score": "5/2",
+                "state": "evaluated",
+                "tier": "checked_pair_separation",
+                "time": "2/1"
+              }
+            ],
+            "selected_checked": {
+              "option_id": "low-score"
+            },
+            "selection_policy": "positive margin, then larger exact margin, then earlier time, then candidate ids",
+            "tier": "checked_pair_separation"
+          },
+          "disclosed_text": [],
+          "lane": "fixture_contract",
+          "operation": "design",
+          "provider": {
+            "transport": "controlled"
+          },
+          "provider_requests": 0,
+          "schema": "eval-observation/v1",
+          "state": "completed",
+          "tools": {
+            "transport": "controlled"
+          }
+        }
+      }
+    ],
+    "pass": {
+      "approvals_created": 0,
+      "design": {
+        "claims": [
+          "pair_separated_at_selected_time"
+        ],
+        "options": [
+          {
+            "delta": "1/2",
+            "margin": "-1/10",
+            "option_id": "high-score",
+            "raw_score": "5/1",
+            "state": "evaluated",
+            "tier": "no_separation_established",
+            "time": "1/1"
+          },
+          {
+            "delta": "1/4",
+            "margin": "1/20",
+            "option_id": "low-score",
+            "raw_score": "5/2",
+            "state": "evaluated",
+            "tier": "checked_pair_separation",
+            "time": "2/1"
+          }
+        ],
+        "selected_checked": {
+          "option_id": "low-score"
+        },
+        "selection_policy": "positive margin, then larger exact margin, then earlier time, then candidate ids",
+        "tier": "checked_pair_separation"
+      },
+      "disclosed_text": [],
+      "lane": "fixture_contract",
+      "operation": "design",
+      "provider": {
+        "transport": "controlled"
+      },
+      "provider_requests": 0,
+      "schema": "eval-observation/v1",
+      "state": "completed",
+      "tools": {
+        "transport": "controlled"
+      }
+    }
+  }
+}

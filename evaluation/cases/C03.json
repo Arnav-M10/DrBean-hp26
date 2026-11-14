@@ -1,0 +1,267 @@
+{
+  "case_id": "C03",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "No silent SD-to-hard-bound conversion; explicit hard-bound proposal retains source meaning and origin.",
+  "synthetic_ids_only": true,
+  "title": "Error semantics",
+  "variants": {
+    "A": {
+      "boundary": "error stated only as an assay standard deviation",
+      "controlled": {
+        "provider_script": [
+          {
+            "adversarial_hint": "model output labels the SD as a hard bound",
+            "kind": "structured_proposals",
+            "transcribes": "c03a"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C03A-1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "semantics": "hard_bound",
+            "status": "proposed"
+          },
+          "why": "a standard deviation is never proposed as a hard bound"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03A-2",
+          "path": "proposals",
+          "type": "any_match",
+          "where": {
+            "field": "row1_allowance",
+            "semantics": "standard_deviation"
+          },
+          "why": "the source meaning (standard deviation) is retained"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03A-3",
+          "path": "questions",
+          "type": "any_match",
+          "where": {
+            "topic": "hard_allowance"
+          },
+          "why": "the user is asked for a hard allowance"
+        },
+        {
+          "axis": "authority",
+          "id": "C03A-4",
+          "path": "plan_attempt.accepted",
+          "type": "eq",
+          "value": false,
+          "why": "no plan without a reviewed hard allowance"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03A-5",
+          "path": "state",
+          "type": "eq",
+          "value": "needs_clarification",
+          "why": "state reflects the open question"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03A-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03A-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C03A-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C03A-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C03A-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C03A-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C03A-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "source": "c03a",
+        "then": "attempt_plan_freeze"
+      },
+      "operation": "intake"
+    },
+    "B": {
+      "boundary": "error stated as a hard maximum discrepancy with units",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "structured_proposals",
+            "transcribes": "c03b"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C03B-1",
+          "path": "proposals",
+          "type": "any_match",
+          "where": {
+            "field": "row1_allowance",
+            "semantics": "hard_bound",
+            "status": "proposed",
+            "unit": "mg/L",
+            "value": "1/10"
+          },
+          "why": "explicit hard bound proposed with unit and meaning"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03B-2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "semantics": "standard_deviation"
+          },
+          "why": "a stated hard bound is not relabelled as an SD"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03B-3",
+          "path": "proposals[field=row1_allowance].origin",
+          "type": "eq",
+          "value": "source",
+          "why": "the proposal keeps its source origin"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03B-4",
+          "path": "proposals[field=row1_allowance].source_ref",
+          "type": "present",
+          "why": "the hard bound keeps its source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03B-5",
+          "path": "state",
+          "type": "eq",
+          "value": "review_ready",
+          "why": "nothing blocks review"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03B-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C03B-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C03B-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C03B-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C03B-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C03B-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C03B-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "source": "c03b"
+      },
+      "operation": "intake"
+    }
+  }
+}

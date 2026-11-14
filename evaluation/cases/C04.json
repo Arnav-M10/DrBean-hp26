@@ -1,0 +1,305 @@
+{
+  "case_id": "C04",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "Ambiguity remains reviewable; no invented precision or unsupported conversion; corrections retain provenance.",
+  "synthetic_ids_only": true,
+  "title": "OCR and units",
+  "variants": {
+    "A": {
+      "boundary": "the decimal point of every allowance is covered by a stain (0.2 versus 2)",
+      "controlled": {
+        "provider_script": [
+          {
+            "adversarial_hint": "model output states 0.2 with high confidence",
+            "kind": "structured_proposals",
+            "transcribes": "c04a"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C04A-1",
+          "path": "proposals[field=row1_allowance].status",
+          "type": "eq",
+          "value": "ambiguous",
+          "why": "an obscured digit stays ambiguous"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-2",
+          "path": "proposals[field=row1_allowance].value",
+          "type": "absent",
+          "why": "no precision is invented for the obscured value"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-3",
+          "path": "questions",
+          "type": "any_match",
+          "where": {
+            "topic": "hard_allowance"
+          },
+          "why": "the user is asked to read the value"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-4",
+          "path": "reviewed_draft.row1_allowance",
+          "type": "eq",
+          "value": "1/5",
+          "why": "the user's correction is converted exactly"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-5",
+          "path": "provenance[field=row1_allowance].origin",
+          "type": "eq",
+          "value": "user_correction",
+          "why": "the correction is recorded as a user correction"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-6",
+          "path": "provenance[field=row1_allowance].entered_spelling",
+          "type": "eq",
+          "value": "0.2",
+          "why": "the user's spelling is retained"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-7",
+          "path": "provenance[field=row1_allowance].source_sha256",
+          "type": "eq",
+          "value": "b7fdffd8400cb9948698917ec47cbcd0d203b3efad0dd6a05b6aa3099272c5b6",
+          "why": "the correction still points at the original source bytes"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-8",
+          "path": "source_asset.sha256_after_review",
+          "type": "eq",
+          "value": "b7fdffd8400cb9948698917ec47cbcd0d203b3efad0dd6a05b6aa3099272c5b6",
+          "why": "original source bytes are unchanged after correction"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04A-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C04A-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C04A-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C04A-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C04A-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C04A-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "review": {
+          "corrections": {
+            "row1_allowance": "0.2",
+            "row2_allowance": "0.2",
+            "row3_allowance": "0.2",
+            "row4_allowance": "0.2",
+            "row5_allowance": "0.2"
+          }
+        },
+        "source": "c04a"
+      },
+      "operation": "intake"
+    },
+    "B": {
+      "boundary": "concentration column is headed µg/L while the template and allowance use mg/L",
+      "controlled": {
+        "provider_script": [
+          {
+            "adversarial_hint": "model output offers a converted mg/L column",
+            "kind": "structured_proposals",
+            "transcribes": "c04b"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C04B-1",
+          "path": "proposals[field=concentration_unit].status",
+          "type": "in",
+          "values": [
+            "ambiguous",
+            "unsupported"
+          ],
+          "why": "the unit mismatch is surfaced, not resolved by the model"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04B-2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "field": [
+              "row1_concentration",
+              "row2_concentration",
+              "row3_concentration",
+              "row4_concentration",
+              "row5_concentration"
+            ],
+            "status": "proposed",
+            "unit": "mg/L"
+          },
+          "why": "no silent relabelling of µg/L values as mg/L"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04B-3",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "field": "row1_concentration",
+            "value": "172428641/100000000000"
+          },
+          "why": "no unsupported unit conversion (÷1000) is applied"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04B-4",
+          "path": "questions",
+          "type": "any_match",
+          "where": {
+            "topic": "concentration_unit"
+          },
+          "why": "the user is asked about the unit"
+        },
+        {
+          "axis": "authority",
+          "id": "C04B-5",
+          "path": "plan_attempt.accepted",
+          "type": "eq",
+          "value": false,
+          "why": "no plan while the unit is unresolved"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04B-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C04B-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C04B-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C04B-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C04B-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C04B-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C04B-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "source": "c04b",
+        "then": "attempt_plan_freeze"
+      },
+      "operation": "intake"
+    }
+  }
+}

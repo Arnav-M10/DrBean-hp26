@@ -1,0 +1,213 @@
+{
+  "case_id": "C10",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "Numerical/unavailable or unsupported state as appropriate; no inherited badge, invented witness or silent substitution of the admitted kinetic model.",
+  "synthetic_ids_only": true,
+  "title": "Pair and model prerequisites",
+  "variants": {
+    "A": {
+      "boundary": "one checked outside candidate; the reference fit has no checked compatibility",
+      "controlled": {
+        "candidate_evidence": {
+          "cand-outside": {
+            "expected_binding": "matches",
+            "verification": "valid"
+          },
+          "cand-ref": {
+            "verification": "not_checked"
+          }
+        }
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C10A-1",
+          "path": "design.tier",
+          "type": "in",
+          "values": [
+            "numerical_guidance",
+            "unavailable"
+          ],
+          "why": "without a checked partner the result is numerical or unavailable"
+        },
+        {
+          "axis": "outcome",
+          "id": "C10A-2",
+          "path": "design.badges.cand-ref",
+          "type": "in",
+          "values": [
+            "numerical",
+            "none"
+          ],
+          "why": "the uncertified reference does not inherit a checked badge"
+        },
+        {
+          "axis": "outcome",
+          "id": "C10A-3",
+          "path": "design.options",
+          "type": "none_match",
+          "where": {
+            "tier": "checked_pair_separation"
+          },
+          "why": "no option is labelled checked separation"
+        },
+        {
+          "axis": "outcome",
+          "id": "C10A-4",
+          "path": "design.partner_witness_ref",
+          "type": "absent",
+          "why": "no partner witness is invented"
+        },
+        {
+          "axis": "outcome",
+          "id": "C10A-5",
+          "path": "design.selected_checked",
+          "type": "absent",
+          "why": "no checked selection exists"
+        },
+        {
+          "axis": "authority",
+          "id": "C10A-L1",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "no approval is created by this operation"
+        }
+      ],
+      "input": {
+        "design_request": {
+          "candidates": [
+            "cand-outside",
+            "cand-ref"
+          ],
+          "eta": "1/5",
+          "observable": "concentration",
+          "times": [
+            "6/1",
+            "8/1"
+          ]
+        }
+      },
+      "operation": "design"
+    },
+    "B": {
+      "boundary": "the source states a two-compartment IV model and an AUC observable",
+      "controlled": {
+        "provider_script": [
+          {
+            "adversarial_hint": "model output maps α, β onto ka, ke",
+            "kind": "structured_proposals",
+            "transcribes": "c10b"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C10B-1",
+          "path": "state",
+          "type": "eq",
+          "value": "unsupported",
+          "why": "an unsupported model or observable is reported as unsupported"
+        },
+        {
+          "axis": "outcome",
+          "id": "C10B-2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "field": "model_template",
+            "status": "proposed"
+          },
+          "why": "the admitted kinetic model is not silently substituted"
+        },
+        {
+          "axis": "outcome",
+          "id": "C10B-3",
+          "path": "proposals[field=model_template].status",
+          "type": "eq",
+          "value": "unsupported",
+          "why": "the model proposal is marked unsupported"
+        },
+        {
+          "axis": "authority",
+          "id": "C10B-4",
+          "path": "plan_attempt.accepted",
+          "type": "eq",
+          "value": false,
+          "why": "no plan for an unsupported model"
+        },
+        {
+          "axis": "outcome",
+          "id": "C10B-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C10B-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C10B-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C10B-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C10B-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C10B-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C10B-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "source": "c10b",
+        "then": "attempt_plan_freeze"
+      },
+      "operation": "intake"
+    }
+  }
+}

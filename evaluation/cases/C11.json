@@ -1,0 +1,195 @@
+{
+  "case_id": "C11",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "Equality fails; checked selection follows its recorded margin policy; raw gap ranking is not proof.",
+  "synthetic_ids_only": true,
+  "title": "Strict margin and ranking",
+  "variants": {
+    "A": {
+      "boundary": "u'=a, u(0)=0, candidates a=0 and a=1, eta=1/10, zero enclosure error, t=1/5",
+      "controlled": {
+        "pair_evaluations": [
+          {
+            "delta": "1/5",
+            "e1": "0/1",
+            "e2": "0/1",
+            "option_id": "touch",
+            "time": "1/5"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C11A-1",
+          "path": "design.options[option_id=touch].margin",
+          "type": "eq",
+          "value": "0/1",
+          "why": "the exact margin is zero"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11A-2",
+          "path": "design.tier",
+          "type": "in",
+          "values": [
+            "no_separation_established",
+            "numerical_guidance"
+          ],
+          "why": "equality fails: closed bands touch"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11A-3",
+          "path": "design.selected_checked",
+          "type": "absent",
+          "why": "no checked selection at zero margin"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11A-4",
+          "path": "design.options[option_id=touch].tier",
+          "type": "ne",
+          "value": "checked_pair_separation",
+          "why": "the zero-margin option is not labelled checked separation"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11A-5",
+          "path": "design.claims",
+          "patterns": [
+            "no_informative_experiment_exists"
+          ],
+          "type": "text_excludes",
+          "why": "zero margin is not reported as proof that no experiment helps"
+        },
+        {
+          "axis": "authority",
+          "id": "C11A-L1",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "no approval is created by this operation"
+        }
+      ],
+      "input": {
+        "design_request": {
+          "candidates": [
+            "cand-a0",
+            "cand-a1"
+          ],
+          "eta": "1/10",
+          "times": [
+            "1/5"
+          ]
+        },
+        "oracle": "constructed arithmetic oracle (section 6); checks margin arithmetic and selection, not a measured kinetic result and not a newly admitted product model"
+      },
+      "operation": "design"
+    },
+    "B": {
+      "boundary": "higher raw score has nonpositive margin; lower raw score has positive margin",
+      "controlled": {
+        "pair_evaluations": [
+          {
+            "delta": "1/2",
+            "e1": "1/5",
+            "e2": "1/5",
+            "option_id": "high-score",
+            "time": "1/1"
+          },
+          {
+            "delta": "1/4",
+            "e1": "0/1",
+            "e2": "0/1",
+            "option_id": "low-score",
+            "time": "2/1"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C11B-1",
+          "path": "design.options[option_id=high-score].margin",
+          "type": "eq",
+          "value": "-1/10",
+          "why": "Delta=1/2, eta=1/10, total error 2/5 gives margin -1/10"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11B-2",
+          "path": "design.options[option_id=low-score].margin",
+          "type": "eq",
+          "value": "1/20",
+          "why": "Delta=1/4, eta=1/10, zero error gives margin 1/20"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11B-3",
+          "path": "design.selected_checked.option_id",
+          "type": "eq",
+          "value": "low-score",
+          "why": "checked selection follows the positive margin, not the raw score"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11B-4",
+          "path": "design.options[option_id=high-score].tier",
+          "type": "ne",
+          "value": "checked_pair_separation",
+          "why": "the higher raw score with nonpositive margin is not checked separation"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11B-5",
+          "path": "design.selection_policy",
+          "type": "present",
+          "why": "the selection policy is recorded with the result"
+        },
+        {
+          "axis": "outcome",
+          "id": "C11B-6",
+          "path": "design.claims",
+          "patterns": [
+            "interval_proved",
+            "model_validated",
+            "model_refuted",
+            "true_parameter_identified",
+            "all_outside_assignments_excluded",
+            "globally_optimal_measurement",
+            "clinical_decision_supported"
+          ],
+          "type": "text_excludes",
+          "why": "no global optimum is claimed"
+        },
+        {
+          "axis": "authority",
+          "id": "C11B-L1",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "no approval is created by this operation"
+        }
+      ],
+      "input": {
+        "design_request": {
+          "candidates": [
+            "cand-1",
+            "cand-2"
+          ],
+          "eta": "1/10",
+          "times": [
+            "1/1",
+            "2/1"
+          ]
+        },
+        "oracle": "constructed arithmetic oracle (section 6); checks margin arithmetic and selection, not a measured kinetic result and not a newly admitted product model"
+      },
+      "operation": "design"
+    }
+  }
+}
