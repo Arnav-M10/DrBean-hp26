@@ -24,7 +24,7 @@ try {
     server.on('exit', code => { clearTimeout(timeout); reject(new Error(`Web server exited ${code}`)) })
     server.on('error', reject)
   })
-  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] })
+  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] })
   const context = await browser.newContext()
   const page = await context.newPage()
   const errors = [], external = [], assets = new Map(), analyses = new Map(), requests = []
