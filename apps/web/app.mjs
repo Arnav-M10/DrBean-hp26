@@ -1,19 +1,21 @@
 import { parseMeasurementsCsv, validateMeasurements, parseExact } from './exact.mjs'
-import { validateQuestion } from './question.mjs'
+import { studyContextErrors, validateQuestion } from './question.mjs'
+import { investigationObjective } from './manual.mjs'
 import { setupWorkflow } from './workflow.mjs'
 import { setupGeneralWorkspace } from './general-workspace.mjs'
 import { setupResearch } from './research.mjs'
-import { concentrationChart, readable, toNumber } from './result-view.mjs'
+import { concentrationChart, toNumber } from './result-view.mjs'
 
 const byId = id => document.getElementById(id)
 const sections = ['start', 'inputs', 'question', 'review', 'investigations', 'result', 'next']
-const aliases = { '': 'start', research: 'start', report: 'next' }
+const aliases = { '': 'start', research: 'start', report: 'next', manual: 'review', 'run-history': 'investigations' }
 const stepOf = { start: 'start', inputs: 'inputs', question: 'inputs', review: 'inputs', investigations: 'investigations', result: 'result', next: 'next' }
-const pageTitles = { start: 'Start', inputs: 'Measurements', question: 'Claim and assumptions', review: 'Review and approve', investigations: 'Investigate', result: 'Result', next: 'Next measurement' }
+const pageTitles = { start: 'Start', inputs: 'Measurements', question: 'Claim and assumptions', review: 'Review inputs', investigations: 'Investigate', result: 'Result', next: 'Next measurement' }
 const exampleQuestion = { 'experiment-id': 'synthetic_example', 'time-origin': 'Synthetic dose time (t = 0 h)', aMin: '0.001', aMax: '30', keMin: '0.015', keMax: '0.35', kaMin: '0.4', kaMax: '8', targetMin: '0.10', targetMax: '0.17', allowanceOrigin: 'Team-selected synthetic hard allowance of 0.50 mg/L for every reading.' }
 const measurementFields = [
   ['time', 'Elapsed time'], ['concentration', 'Concentration'], ['epsilon', 'Hard allowance'],
 ]
+const hasMeasurements = () => rows.some(row => row.sourceId || measurementFields.some(([field]) => row[field] !== ''))
 const bounds = [
   ['A', 'Scale', 'mg/L', 'aMin', 'aMax'],
   ['ke', 'Elimination rate', 'h⁻¹', 'keMin', 'keMax'],
@@ -202,6 +204,7 @@ function currentQuestion() {
 
 function showQuestionErrors() {
   const result = validateQuestion(currentQuestion())
+  result.errors.unshift(...studyContextErrors(currentDraft().context))
   showErrors(byId('question-errors'), 'Check the research question', result.errors, error => byId(error.field))
   return result
 }
@@ -221,12 +224,16 @@ function renderReview() {
     row.append(element('dt', term), dd); list.append(row)
   }
   fact('Measurements', measurements.errors.length ? `The table has ${measurements.errors.length} problem${measurements.errors.length === 1 ? '' : 's'} to fix.` :
-    `${included.length} included readings at ${measurements.distinctTimes} distinct times, from ${readable(Math.min(...included.map(r => Number(r.time))))} to ${readable(Math.max(...included.map(r => Number(r.time))))} h.${rows.length > included.length ? ` ${rows.length - included.length} excluded.` : ''}`, '#inputs', measurements.errors.length > 0)
+    `${included.length} included readings at ${measurements.distinctTimes} distinct times.${rows.length > included.length ? ` ${rows.length - included.length} excluded.` : ''}`, '#inputs', measurements.errors.length > 0)
   const allowances = [...new Set(included.map(row => row.epsilon.trim()).filter(Boolean))]
   if (!measurements.errors.length) fact('Allowance', allowances.length === 1 ? `Every reading may differ from the curve by at most ±${allowances[0]} mg/L.` : `Readings use ${allowances.length} different allowances, each a hard bound in mg/L.`, '#inputs')
   fact('Claim tested', errors.some(e => e.field.startsWith('target')) ? 'The claimed range is incomplete.' : `The elimination rate ke lies between ${question.targetMin.trim()} and ${question.targetMax.trim()} per hour, endpoints included.`, '#question', errors.some(e => e.field.startsWith('target')))
   fact('Why the allowances hold', question.allowanceOrigin.trim() || 'Not explained yet.', '#question', !question.allowanceOrigin.trim())
-  fact('Dataset', context.experiment && context.timeOrigin && context.origin ? `${context.experiment}, ${context.origin} data, t = 0 is “${context.timeOrigin}”.` : 'Experiment name, t = 0 meaning or data origin is missing.', '#question', !(context.experiment && context.timeOrigin && context.origin))
+  const contextErrors = studyContextErrors(context)
+  fact('Dataset', contextErrors.length ? contextErrors.map(error => error.message).join(' ') : `${context.experiment}, ${context.origin} data, t = 0 is “${context.timeOrigin}”.`, '#question', Boolean(contextErrors.length))
+  if (exact.targetMin && exact.targetMax && !errors.some(error => error.field.startsWith('target'))) {
+    fact('Question to save', investigationObjective({ body: { target: { lower: exact.targetMin, upper: exact.targetMax } } }, question.goal).question, '#question')
+  }
   summary.append(list)
   if (errors.length) {
     const box = element('div', '', { class: 'note wait' })
@@ -275,13 +282,16 @@ function route(focusHeading = true) {
   const strip = document.querySelector('.steps'), currentLink = document.querySelector('#step-list > li[data-current] > a')
   if (strip && currentLink && strip.scrollWidth > strip.clientWidth) strip.scrollLeft = currentLink.offsetLeft - 16
   if (page === 'review') renderReview()
+  if (requested === 'manual') byId('manual-path').open = true
+  if (requested === 'run-history') byId('manual-investigations').open = true
   if (requested === 'research') byId('files-path').open = true
   renderWorkflow?.()
   placeSourcePanel(page)
   if (!focusHeading) return
-  const focusTarget = requested === 'research' ? byId('research-title') : requested === 'report' ? byId('report-title') : byId(`${page}-title`)
+  const focusTarget = requested === 'manual' ? byId('manual-path').querySelector('summary') : requested === 'run-history' ? byId('manual-investigations').querySelector('summary') :
+    requested === 'research' ? byId('research-title') : requested === 'report' ? byId('report-title') : byId(`${page}-title`)
   focusTarget.focus()
-  if (requested === 'research' || requested === 'report') focusTarget.scrollIntoView({ block: 'start' })
+  if (['research', 'report', 'manual', 'run-history'].includes(requested)) focusTarget.scrollIntoView({ block: 'start' })
   else scrollTo({ top: 0 })
 }
 
@@ -290,7 +300,7 @@ function updateChrome() {
   const status = renderWorkflow?.status?.() ?? {}
   const measurements = validateMeasurements(rows), question = validateQuestion(currentQuestion())
   const session = research?.controller?.state?.snapshot
-  const inputsReady = !measurements.errors.length && !question.errors.length
+  const inputsReady = !measurements.errors.length && !question.errors.length && !studyContextErrors(currentDraft().context).length
   const setStep = (step, state, text) => {
     const item = document.querySelector(`#step-list > li[data-step="${step}"]`)
     if (state) item.dataset.status = state; else delete item.dataset.status
@@ -298,13 +308,15 @@ function updateChrome() {
   }
   setStep('start', status.connected ? 'done' : 'attention', status.connected ? (status.workspace ? 'Connected' : 'Choose a workspace') : 'Not connected')
   setStep('inputs', status.approved ? 'done' : status.planned && status.planCurrent ? 'attention' : '',
-    status.approved ? 'Approved' : status.planned && status.planCurrent ? 'Waiting for your approval' : inputsReady ? 'Ready to review' : rows.some(row => row.time || row.concentration) ? 'In progress' : 'Not started')
+    status.approved ? 'Approved' : status.planned && status.planCurrent ? 'Waiting for your approval' : status.inputsCurrent ? 'Inputs saved' : inputsReady ? 'Ready to review' : rows.some(row => row.time || row.concentration) ? 'In progress' : 'Not started')
   const run = status.run
+  const agentEvidence = research?.controller?.state?.evidence ?? []
+  const agentFinding = agentEvidence.some(record => record.body.result?.scientific_outcome)
   const researchWaiting = session && ['waiting_review', 'waiting_observation'].includes(session.state)
   setStep('investigations', researchWaiting ? 'attention' : run && ['queued', 'running', 'cancel_requested'].includes(run.state) ? 'running' : run?.state === 'completed' ? 'done' : run && ['failed', 'interrupted'].includes(run.state) ? 'attention' : '',
-    researchWaiting ? 'Waiting for you' : run ? { queued: 'Waiting to start', running: 'Running', cancel_requested: 'Stopping', completed: 'Finished', failed: 'Failed', cancelled: 'Cancelled', interrupted: 'Interrupted' }[run.state] ?? run.state : session ? 'Research plan open' : 'Nothing running')
-  setStep('result', run?.evidence ? 'done' : '', run?.evidence ? { challenged: 'Claim not forced', none: 'No counterexample found', incomplete: 'Incomplete' }[run.tone] ?? 'Ready' : 'No result yet')
-  setStep('next', status.designPending ? 'running' : '', status.designPending ? 'Comparison running' : run?.pairReady ? 'Two candidates to compare' : 'Needs two fitting candidates')
+    researchWaiting ? 'Waiting for you' : session ? { queued: 'Waiting to start', running: 'Planning', waiting_child: 'Checker job pending', completed: 'Finished', failed: 'Stopped', needs_reconciliation: 'Needs recovery' }[session.state] ?? 'Research plan open' : run ? { queued: 'Waiting to start', running: 'Running', cancel_requested: 'Stopping', completed: 'Finished', failed: 'Failed', cancelled: 'Cancelled', interrupted: 'Interrupted' }[run.state] ?? run.state : 'Nothing running')
+  setStep('result', agentFinding || run?.evidence ? 'done' : '', agentFinding ? 'Evidence ready' : run?.evidence ? { challenged: 'Claim not forced', none: 'No counterexample found', incomplete: 'Incomplete' }[run.tone] ?? 'Ready' : 'No result yet')
+  setStep('next', status.designPending ? 'running' : '', agentEvidence.some(record => (record.body.result ?? record.body).design_tier) ? 'Comparison ready' : agentFinding ? 'Review next action' : status.designPending ? 'Comparison running' : run?.pairReady ? 'Two candidates to compare' : 'Needs two fitting candidates')
 
   const pill = byId('connection-pill')
   pill.dataset.state = status.connected ? 'on' : status.mode === 'session_error' ? 'error' : 'off'
@@ -322,7 +334,17 @@ function updateChrome() {
   const experiment = byId('experiment-id').value.trim()
   const included = rows.filter(row => row.included && row.time !== '' && row.concentration !== '').length
   const target = byId('targetMin').value.trim() && byId('targetMax').value.trim() ? `claim ke ${byId('targetMin').value.trim()}–${byId('targetMax').value.trim()} h⁻¹` : 'claim not set'
-  context.replaceChildren(element('strong', experiment || 'Untitled study'), ` — ${included} reading${included === 1 ? '' : 's'}, ${target}. `, status.planCurrent ? 'Inputs saved on the server.' : 'Draft in this tab only.')
+  context.replaceChildren(element('strong', experiment || 'Untitled study'), ` — ${included} reading${included === 1 ? '' : 's'}, ${target}. `, status.inputsCurrent ? 'Inputs saved on the server.' : 'Draft in this tab only.')
+  byId('draft-storage-text').textContent = status.inputsCurrent ? 'Reviewed inputs are saved in this workspace.' : 'Draft edits live in this tab until you save reviewed inputs.'
+  const assistantReady = status.connected && status.workspace && research?.controller.connection.capabilities?.deepagents?.dispatch_enabled === true
+  const path = byId('investigation-path')
+  const action = assistantReady && inputsReady
+  path.replaceChildren(element('h2', 'Research with the assistant'),
+    element('p', !status.connected ? 'Connect to your study workspace to continue. You can still edit or download this draft.' : !status.workspace ? 'Choose a study workspace to continue.' : !assistantReady ? 'The assistant is unavailable in this workspace. Open the manual check below to use Counterdex directly.' : !inputsReady ? 'Finish the measurements and assumptions above before you continue.' : 'Save the reviewed inputs on Investigate, then explicitly ask the assistant to plan a check. You’ll approve the proposed operation separately.'))
+  if (action) path.append(element('a', session ? 'Open research plan' : 'Research with the assistant', { href: '#investigations', class: 'button' }))
+  byId('backend-results').hidden = agentFinding && !run
+  byId('backend-next').hidden = Boolean(agentFinding && !run)
+  byId('backend-report').hidden = Boolean(agentFinding && !run)
   renderResume(status)
   const current = currentPage()
   if (current) placeSourcePanel(current.page)
@@ -351,7 +373,7 @@ function renderResume(status) {
   }
   if (!items.length) {
     const empty = element('p', status.connected ? 'No saved investigations in this workspace yet. To reopen an earlier check by its run identifier, go to ' : 'Connect to see investigations saved in your workspace. To reopen a check by its run identifier, go to ', { class: 'fine' })
-    empty.append(element('a', 'Investigate', { href: '#investigations' }), '.')
+    empty.append(element('a', 'run history', { href: '#run-history' }), '.')
     items.push(empty)
   }
   list.replaceChildren(...items)
@@ -381,21 +403,21 @@ function renderInputPlot() {
   if (chart) figure.prepend(chart)
 }
 
-function showImportPreview(importedRows, source) {
+function showImportPreview(importedRows, source, onReplace) {
   const container = byId('import-preview')
   const repeated = sources.some(existing => source.digest ? existing.digest === source.digest : existing.name === source.name)
-  const hasMeasurements = () => rows.some(row => row.sourceId || measurementFields.some(([field]) => row[field] !== ''))
   const hasDraft = hasMeasurements()
   const actions = element('div', '', { class: 'actions' })
   const commit = replace => {
     if (replace && !hasDraft && hasMeasurements()) {
-      showImportPreview(importedRows, source)
+      showImportPreview(importedRows, source, onReplace)
       return
     }
     if (replace) rows = []
     source.id = sources.length + 1
     sources.push(source)
     for (const row of importedRows) addRow(row, source.id)
+    if (replace) onReplace?.()
     container.hidden = true
     renderRows()
     byId('add-row').focus()
@@ -491,7 +513,8 @@ let renderWorkflow
 createBounds()
 let research
 const general = setupGeneralWorkspace({ root: byId('general-workspace'), onChange: () => research?.sourceContextChanged() })
-research = setupResearch({ root: byId('durable-research'), getDraft: currentDraft, getSources: () => general.controller.state.assets, getSourceQuestion: () => general.controller.state.question, onChange: () => updateChrome() })
+research = setupResearch({ root: byId('durable-research'), results: byId('research-results'), next: byId('research-next'), report: byId('research-report'),
+  getDraft: currentDraft, getSources: () => general.controller.state.assets, getSourceQuestion: () => general.controller.state.question, onChange: () => updateChrome() })
 renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
   const accepted = new Map()
   for (const field of review.body.reviewed_fields) {
@@ -510,13 +533,27 @@ renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
 }, { onConnectionChange: async connection => { await Promise.all([general.connectionChanged(connection), research.connectionChanged(connection)]) }, onRender: () => updateChrome() })
 
 byId('start-example').addEventListener('click', () => {
-  // Prefill only empty claim fields; every value stays visible and editable for review.
-  let filled = false
-  for (const [id, value] of Object.entries(exampleQuestion)) if (!byId(id).value.trim()) { byId(id).value = value; filled = true }
-  if (!byId('dataset-origin').value) byId('dataset-origin').value = 'synthetic'
-  byId('example-note').hidden = !filled
+  const fillExample = () => {
+    for (const [id, value] of Object.entries(exampleQuestion)) if (!byId(id).value.trim()) byId(id).value = value
+    byId('dataset-origin').value = 'synthetic'
+    byId('example-note').hidden = false
+  }
   location.hash = 'inputs'
-  byId('example').click()
+  const source = { name: 'Synthetic two-rate example', description: 'Five synthetic readings with a team-selected hard allowance of 0.50 mg/L.' }
+  const imported = parseMeasurementsCsv(exampleCsv)
+  previewToken++
+  if (hasMeasurements()) {
+    route(false)
+    showImportPreview(imported, source, fillExample)
+    return
+  }
+  sources = [{ ...source, id: 1 }]
+  rows = []
+  for (const row of imported) addRow(row, 1)
+  fillExample()
+  byId('import-preview').hidden = true
+  renderRows()
+  announce('Loaded five synthetic readings. Review them before continuing.')
 })
 byId('question-form').addEventListener('input', () => updateChrome())
 addRow()
@@ -527,5 +564,5 @@ addEventListener('hashchange', () => route())
 // The draft lives only in this tab until it is saved, so warn before it is lost.
 addEventListener('beforeunload', event => {
   const typed = rows.some(row => row.time || row.concentration) || byId('targetMin').value.trim()
-  if (typed && !renderWorkflow?.status?.().planCurrent) { event.preventDefault(); event.returnValue = '' }
+  if (typed && !renderWorkflow?.status?.().inputsCurrent) { event.preventDefault(); event.returnValue = '' }
 })
