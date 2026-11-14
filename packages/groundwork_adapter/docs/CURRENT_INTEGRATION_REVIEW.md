@@ -8,13 +8,17 @@ changes are needed. Gemini remains disabled; no application provider calls.
 
 ## Candidate and ownership
 
-Current integrated main is `37d8f6f6010e2fe8be3e55323bd6cc18f9112760`, the
+The initial integrated main was `37d8f6f6010e2fe8be3e55323bd6cc18f9112760`, the
 actual PR #19 merge. Its tree equals `fca07fe`; the historical head was not used
 as a reset target. The newer backend integration candidate is
 **`4f6c580553b666286177de8080a5e4e5d3d4d2b9`**, directly based on that main.
 It retains current design/recheck routing and adds Owner 2's ledger, bounded
 controlled facts and cleanup-handle corrections. Owner 1 adopted that authored
-commit without duplicating its implementation. Other worktrees remain intact.
+commit without duplicating its implementation. During qualification, main advanced
+to **`4b5f1f5b4f3e08223422106d8c6e8c6554611d76`**, merging the reviewed product
+branch. Owner 2 incorporated that merge and verification notes as
+`c44b010f4697c74cf9f3f05da6122f877df79a2e`; this owner branch merged that current
+candidate too. Other worktrees remain intact.
 
 This owner branch only adds scientific regressions, this handoff and receipts,
 and the Owner 1 progress entry. Its resulting commit is retested separately;
@@ -29,7 +33,8 @@ tests of a later commit.
 | Owner 1 full backend suite, including cleanup, controlled native evidence and ledger changes | clean candidate `4f6c580` | 588 passed, 86.03 s |
 | Owner 1 execution of the integrated ordinary HTTP harness | clean candidate `4f6c580` | 7/7 passed; no diagnostic overrides; guarded zero model dispatch |
 | Additional Owner 1 HTTP/worker unresolved-recheck test, downloaded bytes and installed CLI replay | clean candidate `4f6c580` | 1 passed, 2.52 s |
-| Owned bridge four-case regression, including separate-process replay | candidate production code plus owned test | passed; full initial package run: 292 tests, two dependency/runtime-configuration skips |
+| Owned bridge four-case regression, installed supervisor and separate-process replay | clean owner commit `1a678f6` before the product merge | 292 tests: 291 passed, one backend-dependency skip; the skipped authoritative DTO check separately passed under backend Python |
+| Owner 1 ordinary lane, native controls and unresolved HTTP/replay | same clean `1a678f6` | 7/7 ordinary; 22/22 native controls; unresolved HTTP passed again in 2.45 s; all scientific gate predicates passed |
 
 The [backend log](review-evidence/4f6c580/backend-full.txt),
 [ordinary execution summary](review-evidence/4f6c580/ordinary-http-summary.json)
@@ -117,7 +122,8 @@ guards. Owner 3's newer controlled-source branch `21cd940` also needs integratio
 onto current main before qualification. Their authored features were reviewed;
 their stale branch tips were not presented as current integrated candidates.
 
-Owner 4's product `9ba9c6a` is based on current main, but its new follow-up
+Owner 4's product `9ba9c6a`, now merged in main `4b5f1f5`, preserves the qualified
+backend, but its new follow-up
 display only handles `review` while current jobs emit `recheck`. A read-only
 Node reproduction with actual retained records omits the dedicated feedback
 table. It also labels aggregate `dataset_origin` as observation origin: an

@@ -9,7 +9,10 @@ and newer backend, product, AI and Claude branches in separate worktrees.
 No reset to the historical `fca07fe` reference. Adopted Owner 2's actual new
 candidate **`4f6c580553b666286177de8080a5e4e5d3d4d2b9`** by fast-forward,
 preserving its ledger/bounded-fact/cleanup implementation and teammate history.
-This user's assignment retains Owner 1 production ownership; no backend,
+During testing main advanced to `4b5f1f5b4f3e08223422106d8c6e8c6554611d76`
+with the reviewed product changes. Merged Owner 2's updated
+`c44b010f4697c74cf9f3f05da6122f877df79a2e`, which already includes that main,
+without replacing either owner's work. This user's assignment retains Owner 1 production ownership; no backend,
 frontend, provider or evaluator implementation was edited here.
 
 Exact clean Mac candidate results: **588 backend tests passed in 86.03 s**;
@@ -24,8 +27,11 @@ outside survives, both excluded and genuinely unresolved, at each proposal's
 own exact time/allowance, with fixed vectors, full history and separate-process
 replay. Corrected the synthetic proposal helper's original spellings to match
 its supplied values. No scientific implementation, protocol or package-version
-change. Initial full package run: 292 tests, two conditional skips; the final
-owner-branch commit is retested and its exact SHA/results recorded in the PR.
+change. At clean pre-product-merge owner commit `1a678f6`: 292 package tests
+(291 passed, one backend dependency skip), the authoritative DTO check separately
+passed under backend Python, 7/7 ordinary HTTP, 22/22 native controls and the
+unresolved HTTP/installed replay passed again. The final combined owner-branch
+commit is retested and its exact SHA/results recorded in the PR.
 
 Unresolved HTTP output correctly remains inconclusive despite valid packet
 verification and successful installed CLI replay. Candidate exclusion carries
