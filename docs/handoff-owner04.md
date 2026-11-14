@@ -1,4 +1,4 @@
-Current handoff (2026-11-14): see [integration status](INTEGRATION_STATUS.md) and [PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27). Local real browser source review, discovery, design, hypothetical follow-up and native replay pass. Strict clean-clone qualification is in progress. Human consultation, observed task and device rehearsal are pending.
+Current handoff (2026-11-14): [integration status](INTEGRATION_STATUS.md) and [PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27) identify the ordinary controlled-source and direct follow-up candidate. Source controls use Owner 2's API and Owner 3's bounded proposer; there is no database producer or pasted proposal identifier. The fresh combined strict qualification passed all 5 gates and 12 boundaries; all six CI jobs passed. Exact candidate/commands and limitations: [qualification handoff](release-evidence/product-qualification-handoff.md). Human consultation, observed task and device rehearsal remain pending.
 
 The following dated handoff is retained as historical evidence; its unavailable states are not current capability claims.
 

@@ -1,6 +1,6 @@
 # Workstream 4 log: product, integration and release
 
-Current checkpoint: PR #27 supplies source review and both follow-up modes. Clean checkout 366dfe1 passed every offline gate; final actual-follow-up candidate 2b4080d is being qualified. The sections below preserve chronological observations; earlier unavailable states are historical. Human consultation, observed task and device rehearsal remain pending.
+Current checkpoint: PR #27 supplies ordinary controlled source intake and direct follow-up navigation for both origins. Clean checkout c4d1ad6, tree-identical to published 31a8ed3, passed all 5 offline gates and 12 boundaries; all six CI jobs passed. The sections below preserve chronological observations; earlier unavailable states are historical. Human consultation, observed task and device rehearsal remain pending.
 
 
 Standing brief: master document DB-MASTER-1, section 2. This log is a navigation aid; verify the repository before relying on it. Shared index: [issue ledger](../issue-ledger.md), [integration status](../INTEGRATION_STATUS.md).
@@ -124,3 +124,14 @@ Release automation now consumes that actual browser outcome for source and follo
 Clean checkout 366dfe1 passed strict offline qualification on Darwin 25.5 arm64: 5/5 gates, 12/12 boundaries, 588 backend tests, 47 HTTP tests, 31/31 launch checks and real-science counterexample with 2 candidates and native artifact. Retained immutable report: docs/release-evidence/offline-366dfe1-macos.json. All six CI jobs passed for equivalent published integration tree 6a3705a.
 
 The next extension adds declared actual follow-up with separately entered acquisition time, hard allowance and provenance. Tests use synthetic data and do not claim real observation. Dataset origin is labeled as such and preserves synthetic ancestry. Superseded observation parents are still rejected by the server; pending proposals can be revised before acceptance.
+
+
+## Ordinary source and follow-up completion
+
+User requested a usable loop without scripts/database manipulation/hidden identifiers. Consumed Owner 2's SOURCE_HANDOFF.md and source branch through 42f92b1; controlled proposer remains Owner 3's implementation. PR #27 published code 31a8ed3 has the same tree as local c4d1ad6. Removed the release DB producer and proposal-ID input. Added visible packaged-example/request actions, controlled/unavailable labels, explicit reviewed-row transfer, and direct queued follow-up navigation with execution polling. Preserved stale preview rejection and separate approval.
+
+Expanded browser tests exercise ordinary source POST, original/corrected values, changed-byte manual fallback, stale local preview refusal, real discovery on changed inputs, positive/no-separation designs, both follow-up origins and native downloads/fresh replay. Launcher option --controlled-source-examples explicitly configures only the packaged manifest; stack smoke exercises that start/restart path. No independent evaluator assertions were changed.
+
+Fresh combined strict clean checkout and CI are running. Earlier reports remain named for their original commits. Next actions: retain fresh candidate results, supply exact qualification commands to Claude, and complete authorized integration once the checks pass. Human research and rehearsal remain explicitly pending.
+
+Final combined qualification: c4d1ad6 / published 31a8ed3, all 5 gates and 12 boundaries passed. Full immutable report and code/tree mapping are in docs/release-evidence/offline-c4d1ad6-macos.json and product-candidate.json. Exact commands for Claude are in product-qualification-handoff.md. Only evidence/docs change after this code candidate; independent acceptance, consultation, observed task and device rehearsal remain pending.

@@ -22,7 +22,7 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 | I-014 | 1, 2 | **closed** | Two runtimes; the backend calls the engine in a child process on CPython 3.11 |
 | I-015 | 2, 4 | closed for named candidate | Clean checkout 366dfe1 on Darwin arm64 passes strict offline gates, 31/31 stack checks and real science; see release-evidence/offline-366dfe1-macos.json |
 | I-016 | 5 | delivered; current qualification required | HTTP/invariant suite runs in CI and strict qualification; retain current results |
-| I-017 | 4 | implemented; qualification in PR #27 | Source review, separately approved design and follow-up controls; local real browser check passes for source/hypothetical flow |
+| I-017 | 4 | closed for named candidate | Ordinary controlled source review and direct follow-up flow for both origins pass browser CI and strict clean qualification at 31a8ed3 / c4d1ad6; see product-qualification-handoff.md |
 | I-019 | 2, 4 | **closed** | PR #6 gates queueing on `science.available` and `baseline_discovery` (`baselineAvailable`), the same fields proposed |
 | I-018 | 2 | **partly fixed on `main` at `1f75bdc`; one test still fails on GitHub's runner** | Locally 5 of 5 as an unprivileged user owning 64 processes. On the runner (uid 1001, run 43554490810) 4 of 5: `test_descendant_cannot_escape_by_outliving_adapter` still fails. Whether an approved run completes there is shown by the stack smoke step in the same job. |
 
