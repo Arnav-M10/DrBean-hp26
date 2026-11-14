@@ -134,17 +134,18 @@ Owner 2 can use these paired request/response/native examples to wire the real w
 <!-- decision-run:start -->
 ## Recorded local execution
 
-The current fixtures were generated with Counterdex 0.2.0 on CPython 3.11.17. The engine source digest is `ca6b92b74f3afb840dc847881425b4912ae6b600aa0f1490c609f475612eaac2`. Seven scientific bridge subprocesses and seven separate replay subprocesses completed; all replayed successfully. Three separately labeled fixed-pair controls also freshly replayed.
+The current fixtures were generated with Counterdex 0.3.0 on CPython 3.11.17. The engine source digest is `90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`. 8 scientific bridge subprocesses and 8 separate replay subprocesses completed; all replayed successfully. Three separately labeled fixed-pair controls also freshly replayed.
 
 | Operation | Observed bridge seconds | Observed separate replay seconds | Native bytes |
 |---|---:|---:|---:|
-| `hero-baseline` | 0.242791 | 0.056017 | 53682 |
-| `hero-design` | 0.120191 | 0.088489 | 101162 |
-| `hero-reference-survives` | 0.173899 | 0.112199 | 164763 |
-| `hero-outside-survives` | 0.176929 | 0.113431 | 164779 |
-| `hero-both-excluded` | 0.175648 | 0.112877 | 164723 |
-| `alternate-baseline` | 0.241033 | 0.054582 | 53913 |
-| `alternate-design` | 0.116027 | 0.082407 | 101699 |
+| `hero-baseline` | 0.248512 | 0.061320 | 53814 |
+| `hero-design` | 0.123419 | 0.085150 | 110155 |
+| `hero-reference-survives` | 0.186701 | 0.120403 | 176887 |
+| `hero-outside-survives` | 0.187982 | 0.118107 | 176903 |
+| `hero-both-excluded` | 0.198816 | 0.120488 | 176847 |
+| `hero-own-time-recheck` | 0.193594 | 0.130803 | 178615 |
+| `alternate-baseline` | 0.246879 | 0.057049 | 54045 |
+| `alternate-design` | 0.123566 | 0.085169 | 110671 |
 
 These are measured local runs with no provider requests. The complete per-operation counters, source manifest and exact artifact hashes are retained in `fixtures/decision/manifest.json`; latencies are not an HTTP result or a general performance guarantee.
 <!-- decision-run:end -->

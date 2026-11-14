@@ -13,6 +13,40 @@ import launcher  # noqa: E402
 
 
 class ChildEnvironment(unittest.TestCase):
+    def test_provider_values_are_never_read_while_filtering_or_probing(self):
+        class NamesOnlySecrets(dict):
+            def __getitem__(self, name):
+                if name in {"GEMINI_API_KEY", "LANGSMITH_API_KEY", "OPENAI_API_KEY"}:
+                    raise AssertionError("A discarded provider value was read")
+                return super().__getitem__(name)
+
+        planted = NamesOnlySecrets(GEMINI_API_KEY="dummy", LANGSMITH_API_KEY="dummy", OPENAI_API_KEY="dummy",
+                                   PATH=os.defpath, PYTHONPATH="/operator/guard")
+        completed = subprocess.CompletedProcess([], 0, stdout="probe ok", stderr="")
+        with mock.patch.object(launcher.os, "environ", planted), \
+                mock.patch.object(launcher.subprocess, "run", return_value=completed) as run:
+            env = launcher.child_env()
+            self.assertEqual(launcher.out(["probe"]), (0, "probe ok"))
+        self.assertFalse(set(planted) & {"GEMINI_API_KEY", "LANGSMITH_API_KEY", "OPENAI_API_KEY"} & set(env))
+        self.assertEqual(run.call_args.kwargs["env"], env)
+        self.assertEqual(env["PYTHONPATH"].split(os.pathsep), [os.path.join(launcher.REPO, "apps", "api"), "/operator/guard"])
+
+    def test_application_import_does_not_depend_on_editable_pth_processing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            foreign = os.path.join(directory, "bean_api")
+            os.mkdir(foreign)
+            working = os.path.join(directory, "caller")
+            os.mkdir(working)
+            with open(os.path.join(foreign, "__init__.py"), "w", encoding="utf-8") as handle:
+                handle.write("raise AssertionError('An unrelated checkout shadowed the application')\n")
+            with mock.patch.dict(os.environ, {"PYTHONPATH": directory}):
+                env = launcher.child_env()
+            process = subprocess.run([sys.executable, "-S", "-c", "import bean_api; print(bean_api.__file__)"],
+                                     cwd=working, env=env, capture_output=True, text=True, timeout=10)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(os.path.realpath(process.stdout.strip()),
+                         os.path.join(launcher.REPO, "apps", "api", "bean_api", "__init__.py"))
+
     def test_provider_credentials_never_reach_a_child(self):
         planted = {"GEMINI_API_KEY": "decoy", "GEMINI_MODEL": "decoy", "GOOGLE_API_KEY": "decoy",
                    "GOOGLE_GENAI_USE_VERTEXAI": "1", "BEAN_GEMINI_ACCOUNT_GATE": "approved",
@@ -57,6 +91,22 @@ class OwnedProcesses(unittest.TestCase):
             bystander.kill()
             bystander.wait()
 
+    def test_missing_start_time_cannot_establish_ownership(self):
+        with open(launcher.pidfile("worker"), "w", encoding="utf-8") as handle:
+            json.dump({"pid": os.getpid(), "started_at": None}, handle)
+        with mock.patch.object(launcher, "started_at", return_value=None):
+            self.assertIsNone(launcher.owned("worker"))
+
+    def test_partial_spawn_failure_stops_services(self):
+        with mock.patch.object(launcher, "static_facts", return_value={}), \
+                mock.patch.object(launcher, "summarize", return_value=([], True)), \
+                mock.patch.object(launcher, "owned", return_value=None), \
+                mock.patch.object(launcher, "port_in_use", return_value=False), \
+                mock.patch.object(launcher, "spawn", side_effect=[{}, OSError("launch failed")]), \
+                mock.patch.object(launcher, "stop_one") as stop:
+            self.assertEqual(launcher.cmd_start(None), 1)
+        self.assertEqual(stop.call_args_list, [mock.call(name) for name in reversed(launcher.SERVICES)])
+
     def test_a_reused_or_foreign_pid_is_never_treated_as_ours(self):
         with open(launcher.pidfile("worker"), "w", encoding="utf-8") as handle:
             json.dump({"name": "worker", "pid": os.getpid(), "started_at": "Thu Jan  1 00:00:00 1970"}, handle)  # this test's own pid, wrong start time
@@ -67,9 +117,12 @@ class OwnedProcesses(unittest.TestCase):
     def test_start_refuses_a_port_held_by_someone_else_and_kills_nothing(self):
         listener = socket.socket()
         listener.bind((launcher.HOST, 0))
-        listener.listen(1)
+        # Both cmd_start and the survival assertion connect without an accept
+        # loop; leave room for both probes on Darwin's small listen backlog.
+        listener.listen(4)
         port = listener.getsockname()[1]
-        ready = {"uv": "uv", "node": "v22.0.0", "backend": {"python": "3.13.0", "packages": {"dr-bean-backend": "0"}},
+        ready = {"uv": "uv", "node": "v22.0.0", "backend": {"python": "3.13.0", "application_importable": True,
+                                                                  "packages": {"dr-bean-backend": "0"}},
                  "engine": {"python": "3.11.0", "runtime_qualified": True, "counterdex": "0",
                             "native_replay_supported": True}, "auth_file_present": True,
                  "os": "x", "os_release": "x", "arch": "x"}
@@ -86,7 +139,8 @@ class OwnedProcesses(unittest.TestCase):
 
 class Doctor(unittest.TestCase):
     def test_live_gemini_configuration_is_an_alert_not_a_pass(self):
-        static = {"uv": "uv", "node": "v22.0.0", "backend": {"python": "3.13.0", "packages": {"dr-bean-backend": "0"}},
+        static = {"uv": "uv", "node": "v22.0.0", "backend": {"python": "3.13.0", "application_importable": True,
+                                                                   "packages": {"dr-bean-backend": "0"}},
                   "engine": {"python": "3.11.0", "runtime_qualified": True, "counterdex": "0",
                              "native_replay_supported": True}, "auth_file_present": True,
                   "os": "x", "os_release": "x", "arch": "x"}
@@ -108,6 +162,15 @@ class Doctor(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(all("setup" in detail or "Install" in detail
                             for state, _, detail in rows if state == "MISSING" and "replay" not in _))
+
+    def test_package_metadata_without_application_import_does_not_qualify_backend(self):
+        static = {"uv": "uv", "node": "v22.0.0", "backend": {"python": "3.13.0", "application_importable": False,
+            "packages": {"dr-bean-backend": "0"}}, "engine": {"python": "3.11.0", "runtime_qualified": True,
+            "counterdex": "0", "native_replay_supported": True}, "auth_file_present": True,
+            "os": "x", "os_release": "x", "arch": "x"}
+        rows, ok = launcher.summarize(static, None)
+        self.assertFalse(ok)
+        self.assertTrue(any(state == "MISSING" and fact == "backend runtime (.venv)" for state, fact, _ in rows))
 
 
 if __name__ == "__main__":

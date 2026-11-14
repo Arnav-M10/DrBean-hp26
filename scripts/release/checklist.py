@@ -108,18 +108,20 @@ def contracts_current():
 def node_check(script, unrun_code=3, extra_env=None):
     if not shutil.which("node"):
         return {"status": "unrun", "detail": "node is not installed"}
-    probe = subprocess.run(["node", "-e", "require('playwright')"], cwd=os.path.join(REPO, "tests", "integration"),
-                           capture_output=True)
+    browser_env = {**ENV, **(extra_env or {})}
+    browser_env["NODE_PATH"] = os.path.join(REPO, "tests", "integration", "node_modules")
+    probe = subprocess.run(["node", "-e", "require(process.env.PLAYWRIGHT_MODULE || 'playwright')"], cwd=os.path.join(REPO, "tests", "integration"),
+                           env=browser_env, capture_output=True)
     if probe.returncode != 0:
         return {"status": "unrun", "detail": "playwright is not installed (npm install in tests/integration)"}
-    result = run(["node", script], env={**ENV, **(extra_env or {})}, timeout=300)
+    result = run(["node", script], env=browser_env, timeout=300)
     if result.get("exit_code") == unrun_code:
         result.update(status="unrun", detail="playwright is not installed")
     return result
 
 
 def stack_smoke():
-    result = run([sys.executable, "scripts/release/stack_smoke.py", "--record"], env=dict(os.environ), timeout=400)
+    result = run([sys.executable, "scripts/release/stack_smoke.py", "--record"], env=launcher.child_env(), timeout=400)
     path = os.path.join(REPO, "docs", "release-evidence", "stack-smoke.json")
     if result.get("status") == "unrun" or not os.path.exists(path):
         return {name: {"status": "unrun", "detail": result.get("detail", "")} for name in
@@ -150,7 +152,7 @@ def stack_smoke():
 
 def ordinary_user_science_boundary():
     """Backend scientific process boundary as an unprivileged user who already owns many processes."""
-    result = run([sys.executable, "scripts/release/user_conditions_check.py"], env=dict(os.environ), timeout=400)
+    result = run([sys.executable, "scripts/release/user_conditions_check.py"], env=launcher.child_env(), timeout=400)
     try:
         report = json.loads(result.get("output", "").strip().splitlines()[-1])
     except (ValueError, IndexError):
@@ -169,6 +171,7 @@ def check_env():
     scratch = tempfile.mkdtemp(prefix="drbean-checks-")
     # Tests that look up "python3.11" must find the qualified engine runtime, not another interpreter.
     env["PATH"] = os.path.dirname(ENGINE_PY) + os.pathsep + env.get("PATH", "")
+    env["DRBEAN_SCIENCE_PYTHON"] = ENGINE_PY
     env.update(BEAN_DATABASE_PATH=os.path.join(scratch, "bean.sqlite3"), BEAN_BLOB_DIR=os.path.join(scratch, "sources"),
                BEAN_AUTH_FILE=os.path.join(scratch, "auth.json"), BEAN_ARTIFACT_DIR=os.path.join(scratch, "artifacts"))
     return env, scratch
@@ -213,8 +216,8 @@ def _collect(fast):
         "owner5_http_suite": owner5_suite(),
         "web_source_review_browser_check": {"status": "unrun", "detail": "no source/value review control exists "
                                                                          "in the web workspace yet"},
-        "web_design_followup_browser_check": {"status": "unrun", "detail": "no next-measurement or follow-up "
-                                                                           "control exists in the web workspace yet"},
+        "web_design_followup_browser_check": {"status": "unrun", "detail": "design is covered by the backend browser check; "
+                                                                           "follow-up browser coverage remains pending"},
     }
     skipped = {"status": "unrun", "detail": "skipped by --fast"}
     if fast:

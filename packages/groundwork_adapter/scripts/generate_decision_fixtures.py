@@ -96,6 +96,9 @@ def design_request(name: str, baseline_request: dict, baseline: dict) -> dict:
         "scenario_id": baseline_request["scenario_id"], "problem_id": problem["id"], "problem_digest": problem["digest"],
         "candidate_ids": [c["id"] for c in candidates], "candidate_vectors": [c["parameter_vector"] for c in candidates],
         "observable": "concentration", "feasible_times": ["8/1", "6/1"], "future_hard_allowance": "1/5",
+        "scientific_profile": "counterdex.v1", "requested_tier": "checked_pair_separation",
+        "allowance_origin": {"kind": "hypothetical", "description": "Explicit controlled synthetic decision scenario; a hard measurement bound, not an acquired error estimate"},
+        "maximum_horizon": "10/1",
         "allow_construction": True, "allow_continuation": True,
         "budget": {"wall_seconds": 120, "fixed_vector_constructions": 2, "pair_verifications": 2, "bundle_bytes": 4194304}}
     evidence = {"run_id": baseline_request["run_id"], "scenario_id": baseline_request["scenario_id"],
@@ -124,6 +127,58 @@ def review_request(name: str, original: dict, design: dict, reading: str) -> dic
     return {"protocol": PROTOCOL, "operation": "review", "problem": problem, "dataset": dataset,
         "run_id": "run-" + name, "scenario_id": original["scenario_id"], "workflow": workflow(name),
         "limits": LIMITS, "historical_artifact": historical_artifact(design)}
+
+
+def recheck_request(name: str, original: dict, design: dict) -> dict:
+    """Append a complete proposal at its own reviewed time and hard allowance."""
+    problem, dataset = deepcopy(original["problem"]), deepcopy(original["dataset"])
+    proposal = {"id": "observation-" + name, "body": {
+        "dataset_id": dataset["id"], "experiment_id": dataset["body"]["experiment_id"],
+        "observable": "concentration", "origin": "hypothetical",
+        "row": {"id": "row-" + name, "time": "79/10", "concentration": "17/5", "hard_allowance": "7/20",
+            "included": True, "original_values": {"time": "7.9", "concentration": "3.4", "hard_allowance": "0.35"},
+            "source_asset_id": None, "notes": "Controlled hypothetical reading at its own time and allowance; not acquired data"},
+        "source_description": "Explicit synthetic control for rechecking the original discovered pair",
+        "change_reason": "Append the reviewed hypothetical 7.9-hour reading with a 0.35 mg/L hard bound; retain all historical rows",
+        "generating_choices": {
+            "time": "79/10 hours, deliberately different from the selected design time",
+            "concentration": "17/5 mg/L, an explicit controlled hypothetical input",
+            "hard_allowance": "7/20 mg/L, a separately reviewed absolute bound",
+            "candidate_policy": "Retain the original design pair without search or refitting"},
+        "time_unit": "h", "concentration_unit": "mg/L"}}
+    proposal["digest"] = artifact_digest(canonical_bytes(proposal["body"]))
+    dataset["id"] = "dataset-" + name
+    dataset["body"].update(parent_id=original["dataset"]["id"], origin="hypothetical",
+                            change_reason=proposal["body"]["change_reason"])
+    dataset["body"]["rows"].append(deepcopy(proposal["body"]["row"]))
+    problem["id"] = "problem-" + name
+    rebind(problem, dataset)
+    return {"protocol": PROTOCOL, "operation": "recheck", "problem": problem, "dataset": dataset,
+        "run_id": "run-" + name, "scenario_id": original["scenario_id"], "workflow": workflow(name),
+        "limits": LIMITS, "historical_artifact": historical_artifact(design), "observation_proposal": proposal}
+
+
+def verify_recheck(request: dict, native: bytes, replay: dict) -> None:
+    """Assert the independently replayed control retained exact vectors and row."""
+    packet = strict_json_loads(native)
+    scientific = strict_json_loads(base64.b64decode(packet["scientific"]["bytes_base64"], validate=True))
+    parent = strict_json_loads(base64.b64decode(request["historical_artifact"]["bytes_base64"], validate=True))
+    parent_scientific = strict_json_loads(base64.b64decode(parent["scientific"]["bytes_base64"], validate=True))
+    expected = {c["id"]: c["parameters"] for c in parent_scientific["design"]["candidates"]}
+    retained = {c["id"]: c["parameters"] for c in scientific["candidates"]}
+    replayed = {c["candidate_id"]: c["parameters"] for c in replay["result"]["candidate_results"]}
+    proposal = request["observation_proposal"]
+    row = proposal["body"]["row"]
+    observed = scientific["problem"]["observations"][-1]
+    if (retained != expected or replayed != expected
+            or packet["binding"]["observation_proposal"] != proposal
+            or observed["time"] != row["time"] or observed["allowance"] != row["hard_allowance"]
+            or observed["value"] != row["concentration"]):
+        raise RuntimeError("Recheck changed the original vectors, reviewed observation or full proposal provenance")
+    for candidate in replay["result"]["candidate_results"]:
+        checked = [item for item in candidate["rows"] if item["observation_id"] == row["id"]]
+        if len(checked) != 1 or checked[0]["time"] != row["time"] or checked[0]["allowance"] != row["hard_allowance"]:
+            raise RuntimeError("Fresh recheck did not preserve the exact reviewed row time and allowance")
 
 
 def display(request: dict, response: dict) -> dict:
@@ -173,6 +228,8 @@ def execute(name: str, request: dict, entries: list[dict]) -> tuple[dict, dict]:
     replay, replay_elapsed = bridge(replay_request)
     if replay["result"]["replay"] != "passed":
         raise RuntimeError("Controlled native artifact did not freshly replay")
+    if request["operation"] == "recheck":
+        verify_recheck(request, native, replay)
     readable = display(request, response)
     for suffix, value in (("request", request), ("response", response), ("anchors", response["anchors"]),
                           ("replay-request", replay_request), ("replay", replay), ("display", readable)):
@@ -253,7 +310,7 @@ def record_documented_run(manifest: dict) -> None:
     lines = [start, "## Recorded local execution", "",
         f"The current fixtures were generated with Counterdex {identity['adapter_version']} on CPython {manifest['python']}. "
         f"The engine source digest is `{identity['source_digest']}`. "
-        "Seven scientific bridge subprocesses and seven separate replay subprocesses completed; all replayed successfully. "
+        f"{len(manifest['bridge_executions'])} scientific bridge subprocesses and {len(manifest['bridge_executions'])} separate replay subprocesses completed; all replayed successfully. "
         "Three separately labeled fixed-pair controls also freshly replayed.", "",
         "| Operation | Observed bridge seconds | Observed separate replay seconds | Native bytes |",
         "|---|---:|---:|---:|"]
@@ -270,6 +327,83 @@ def record_documented_run(manifest: dict) -> None:
     else:
         text = text.rstrip() + "\n\n" + recorded
     destination.write_text(text, encoding="utf-8")
+
+
+def write_repro_pack(identity: dict) -> None:
+    """Copy an existing checked packet and independent anchors for portable replay."""
+    destination = ROOT / "fixtures" / "repro"
+    destination.mkdir(parents=True, exist_ok=True)
+    for suffix in ("request", "native", "anchors"):
+        name = f"hero-baseline.{suffix}.json"
+        (destination / name).write_bytes((DESTINATION / name).read_bytes())
+    (destination / "implementation.json").write_bytes(transport_bytes(identity) + b"\n")
+    (destination / "replay.py").write_text('''#!/usr/bin/env python3
+"""Replay the supplied immutable bytes with the caller's prepared CPython 3.11."""
+import base64
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+request = {
+    "protocol": "counterdex.bridge.v1", "operation": "replay",
+    "native_artifact_base64": base64.b64encode((HERE / "hero-baseline.native.json").read_bytes()).decode("ascii"),
+    "expected": json.loads((HERE / "hero-baseline.anchors.json").read_text(encoding="utf-8")),
+}
+result = subprocess.run(
+    [sys.executable, "-I", "-m", "counterdex.bridge"],
+    input=json.dumps(request, separators=(",", ":")).encode("utf-8"),
+    capture_output=True, timeout=125, env={"PATH": os.defpath, "LANG": "C.UTF-8"},
+)
+sys.stdout.buffer.write(result.stdout)
+sys.stderr.buffer.write(result.stderr)
+raise SystemExit(result.returncode)
+''', encoding="utf-8")
+    (destination / "README.md").write_text(f'''# Portable Counterdex baseline replay
+
+This folder copies the exact controlled hero baseline request, native packet and
+separately retained anchors from the decision fixtures. It does not run discovery
+again or constitute an HTTP evaluation. Inputs are synthetic, with no acquired
+measurements or provider calls.
+
+The recorded package is Counterdex **{identity['adapter_version']}**, with source
+digest `{identity['source_digest']}`. `implementation.json` retains the full
+implementation identity. Replay checks that identity and independently supplied
+anchors; a different source build cannot silently accept this packet.
+
+From this directory, prepare an isolated CPython 3.11 environment and install the
+matching released package when it is available:
+
+```sh
+python3.11 -m venv .replay-env
+.replay-env/bin/python -m pip install --no-deps counterdex=={identity['adapter_version']}
+.replay-env/bin/python replay.py
+```
+
+Before publication, install the matching reviewed wheel into that environment
+instead. The replay script never installs dependencies or selects a different
+executable: it invokes the caller's interpreter with `-I -m counterdex.bridge`.
+It reads `hero-baseline.native.json` unchanged and supplies
+`hero-baseline.anchors.json` independently. Keep both files; recomputing an
+expected anchor from changed bytes would discard the original identity check.
+
+Equivalent package CLI replay from this folder is:
+
+```sh
+.replay-env/bin/python -I -m counterdex replay-native \\
+  hero-baseline.native.json --anchors hero-baseline.anchors.json
+```
+
+The scoped claim is an exact outside witness to the reviewed closed `ke` interval
+under the retained two-rate model, complete parameter domain and per-row hard
+bounds. Two fixed candidate vectors freshly satisfy those historical bounds;
+one lies outside the closed claim. This does not establish search completeness,
+whole-model impossibility, a confidence interval, a global experiment optimum,
+an actual measurement or independent formal certification. Read the native
+packet for the exact rational inputs and scientific checks.
+''', encoding="utf-8")
 
 
 def main() -> None:
@@ -300,6 +434,13 @@ def main() -> None:
         if sorted(valid) != sorted(expected_valid):
             raise RuntimeError("Hypothetical reading did not produce the stated candidate-specific feedback")
         feedback[name] = {"reading": scalar(reading, "mg/L"), "valid_candidate_ids": valid, "display": readable}
+    recheck_input = recheck_request("hero-own-time-recheck", original, design)
+    rechecked, recheck_display = execute("hero-own-time-recheck", recheck_input, entries)
+    feedback["hero-own-time-recheck"] = {
+        "reading": scalar(recheck_input["observation_proposal"]["body"]["row"]["concentration"], "mg/L"),
+        "valid_candidate_ids": [c["id"] for c in rechecked["result"]["candidates"] if c["verification"] == "valid"],
+        "scope": "Original fixed pair rechecked at exactly 79/10 hours with a separately reviewed 7/20 mg/L hard allowance",
+        "display": recheck_display}
     alternate_problem, alternate_dataset = deepcopy(problem), deepcopy(dataset)
     alternate_problem["id"], alternate_dataset["id"] = "problem-alternate", "dataset-alternate"
     alternate_dataset["body"]["parent_id"] = dataset["id"]
@@ -351,6 +492,7 @@ def main() -> None:
         "timing_scope": "Observed local subprocess latency, not a throughput guarantee or an HTTP integration result"}
     write_json("manifest.json", manifest)
     record_documented_run(manifest)
+    write_repro_pack(identity)
     print(f"Generated {len(entries)} actual bridge executions with fresh offline replay and {len(controls)} fixed-pair controls.")
     print(f"Hero: {design['result']['design_tier']} at {design['result']['selected_time']}; alternate: {alternate_design['result']['design_tier']} at {alternate_design['result']['selected_time']}.")
 

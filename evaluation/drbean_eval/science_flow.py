@@ -164,16 +164,11 @@ class Flow:
                    "allow_continuation": bool(review.get("allow_continuation"))}
         props, _ = self.schema_properties("DesignRequestBody")
         if "scientific_profile" in props:  # every reviewed scope field is explicit; nothing is inherited
-            sources = []
-            for candidate in pair:
-                for artifact_id in candidate.get("artifact_ids") or []:
-                    if artifact_id not in sources:
-                        sources.append(artifact_id)
             request.update(scientific_profile=SCIENTIFIC_PROFILE, requested_tier="checked_pair_separation",
                            allowance_origin={"kind": review.get("allowance_origin", "hypothetical"),
                                              "description": review.get("allowance_description",
                                                                        "Reviewed future hard allowance")},
-                           maximum_horizon=review["maximum_horizon"], source_artifact_ids=sources[:2])
+                           maximum_horizon=review["maximum_horizon"], source_artifact_ids=[])
         return request
 
     # -- polling -----------------------------------------------------------
@@ -968,7 +963,12 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
     native_scope = "followup" in flow.schema_properties("PlanBody")[0]
     review = packet["design_review"]
     branches, earlier_scopes = [], []
-    for index, branch in enumerate(packet["followups"]):
+    followups = [*packet["followups"]]
+    if native_scope:
+        # A distinct reviewed declaration, not a change to the frozen hero or an acquired-data claim.
+        followups.append({"branch": "actual-own-time", "origin": "actual", "time": "79/10", "allowance": "7/20",
+                          "reading": "100/1", "reading_spelling": "100"})
+    for index, branch in enumerate(followups):
         name = branch["branch"]
         label = f"fu-{name}"
         if index == 0:
@@ -983,18 +983,20 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
         request = (design or {}).get("request") or {}
         pair_ids = request.get("candidate_ids") or []
         vectors = dict(zip(pair_ids, request.get("candidate_vectors") or []))
-        selected = (((design or {}).get("suggestion") or {}).get("body") or {}).get("selected_time")
         parent = base["dataset"]
-        time_value = selected or branch["time"]
+        time_value = branch["time"]
+        origin = branch.get("origin", "hypothetical")
         row = {"id": f"followup_{name.replace('.', '_').replace('-', '_')}", "time": time_value,
                "concentration": branch["reading"], "hard_allowance": branch["allowance"], "included": True,
                "original_values": {"concentration": branch["reading_spelling"]}, "source_asset_id": None,
-               "notes": "Hypothetical reading for a what-if branch; not a measurement."}
-        proposal = flow.client.post(f"/workspaces/{base['workspace_id']}/observation-proposals", {
+               "notes": f"Synthetic acceptance control declaring {origin} observation provenance."}
+        proposal_body = {
             "dataset_id": parent["id"], "experiment_id": parent["body"]["experiment_id"], "observable": "concentration",
-            "origin": "hypothetical", "row": row, "source_description": "Evaluation what-if branch",
-            "change_reason": f"Hypothetical {branch['reading_spelling']} mg/L at the selected time",
-            "generating_choices": {"generator": "evaluation-harness", "branch": name}}, label=f"fu-{name}")
+            "origin": origin, "row": row, "source_description": f"Synthetic acceptance control of a reviewed {origin} declaration",
+            "change_reason": f"Reviewed {origin} declaration: {branch['reading_spelling']} mg/L at {time_value} h"}
+        if origin == "hypothetical":
+            proposal_body["generating_choices"] = {"generator": "evaluation-harness", "branch": name}
+        proposal = flow.client.post(f"/workspaces/{base['workspace_id']}/observation-proposals", proposal_body, label=f"fu-{name}")
         try:
             revised = flow.client.post(f"/observation-proposals/{proposal['id']}/review",
                                        {"proposal_digest": proposal["digest"], "parent_dataset_id": parent["id"],
@@ -1002,9 +1004,10 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
         except ApiFailure as error:
             checks.add(f"{name}_lineage", "failed", f"review refused {error.status} {error.code}")
             continue
-        checks.expect(f"{name}_new_hypothetical_lineage",
+        expected_origin = "hypothetical" if "hypothetical" in (parent["body"]["origin"], origin) else parent["body"]["origin"]
+        checks.expect(f"{name}_new_reviewed_lineage",
                       revised["id"] != parent["id"] and revised.get("parent_id") == parent["id"]
-                      and revised["body"]["origin"] == "hypothetical"
+                      and revised["body"]["origin"] == expected_origin
                       and len(revised["body"]["rows"]) == len(parent["body"]["rows"]) + 1,
                       f"origin {revised['body']['origin']}, parent {revised.get('parent_id')}")
         # Independent expectation over the WHOLE revised dataset (every included row), not just the new reading.
@@ -1080,7 +1083,7 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
                           f"application {per_candidate}, independent oracle {expected}")
         observed = {"branch": name, "workspace_id": base["workspace_id"], "time": time_value,
                     "dataset_id": revised["id"], "run_id": run["id"], "run_state": finished.get("state"),
-                    "design_bound": bool(scope), "oracle_expectation": expected,
+                    "design_bound": bool(scope), "observation_origin": origin, "oracle_expectation": expected,
                     "application_per_candidate": per_candidate}
         if scope and evidence:
             observed.update(_check_native_followup(flow, checks, name, label, evidence[0], design, scope, vectors,
@@ -1159,8 +1162,8 @@ def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, ev
     survivors_outside = [c for c in vectors if expected[c] == "compatible" and kinetics.outside_closed_claim(
         vectors[c][target["parameter"]], target["lower"], target["upper"])]
     if all(v != "indeterminate" for v in expected.values()):
-        certified = result.get("scientific_outcome") == "certified_counterexample"
-        checks.expect(f"{name}_outcome_follows_from_survivors", certified == bool(survivors_outside),
+        expected_outcome = "certified_counterexample" if survivors_outside else "inconclusive"
+        checks.expect(f"{name}_outcome_follows_from_survivors", result.get("scientific_outcome") == expected_outcome,
                       f"outcome {result.get('scientific_outcome')}; surviving candidates outside the closed claim "
                       f"(independent oracle) {survivors_outside}")
     downloads = [flow.download(ref, f"{label}-review") for ref in result.get("artifacts") or []]
@@ -1176,8 +1179,8 @@ def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, ev
             expected[c] == "indeterminate" or fresh_verdicts.get(c) == expected[c] for c in expected)
         checks.expect(f"{name}_fresh_replay_per_candidate_agrees", agree,
                       f"fresh replay {fresh_verdicts}, application {application}, independent oracle {expected}")
-        checks.expect(f"{name}_fresh_replay_keeps_hypothetical_review",
-                      fresh.get("operation") == "review" and fresh.get("dataset_origin") == "hypothetical",
+        checks.expect(f"{name}_fresh_replay_keeps_recheck_scope",
+                      fresh.get("operation") == "recheck",
                       f"operation {fresh.get('operation')}, dataset origin {fresh.get('dataset_origin')}")
     elif downloads:
         checks.add(f"{name}_fresh_replay_per_candidate_agrees", "not_observed",
@@ -1197,6 +1200,7 @@ def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, ev
                   json.dumps(bound_suggestion, sort_keys=True) == json.dumps(design["suggestion"], sort_keys=True),
                   "bound design result re-fetched byte-identical after the follow-up")
     report = flow.client.post(f"/runs/{run_id}/reports", label=f"{label}-report")
+    flow.save_record(f"{label}-report", report)
     lineage = (report.get("body") or {}).get("followup") or {}
     metadata = (lineage.get("artifact") or {}).get("metadata") or {}
     leaked = sorted({"blob_key", "storage_path", "signed_url", "content_base64"} & set(metadata))
@@ -1204,6 +1208,14 @@ def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, ev
                   (lineage.get("design_result") or {}).get("id") == scope["design_result_id"]
                   and (lineage.get("observation_proposal") or {}).get("id") == scope["observation_proposal_id"]
                   and not leaked, f"report follow-up lineage keys {sorted(lineage)}; storage locators exposed {leaked}")
+    from . import qualify
+    records = qualify._records({"evidence_index": flow.evidence_index()}, flow.evidence_dir)
+    for check in qualify._followup_links(label, scope, records):
+        checks.expect(check["id"], check["passed"], check["detail"])
+    for downloaded in downloads:
+        if downloaded.get("data"):
+            check = qualify.followup_native_binding(label, json.loads(downloaded["data"]), records)
+            checks.expect(check["id"], check["passed"], check["detail"])
     return out
 
 
@@ -1251,6 +1263,15 @@ def scenario_cancel_restart(flow: Flow, packet: dict, stack) -> dict:
     # the adapter (after setsid and limits), so "running" is deterministic instead of a timing race.
     barrier = bool(getattr(stack, "has_barrier", False))
     observation["deterministic_barrier"] = barrier
+    if not barrier:
+        # A separately declared larger valid dataset makes actual computation
+        # observable without relaxing guards or changing the frozen hero.
+        packet = json.loads(json.dumps(packet))
+        rows = packet["dataset"]["rows"]
+        packet["dataset"]["rows"] = [{**rows[i % len(rows)], "id": f"interruption_replicate_{i}"} for i in range(128)]
+        packet["dataset"]["change_reason"] = "Reviewed cancellation/recovery workload: 128 exact synthetic replicates"
+        observation["interruption_workload"] = {"rows": 128, "origin": packet["dataset"]["origin"],
+                                               "construction": "exact replicates of the declared synthetic input"}
     if barrier:
         stack.hold_barrier()
     try:
@@ -1388,13 +1409,8 @@ def _science_children(stack) -> list[int]:
 
 
 def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
+    from .launcher import alive
+    return alive(pid)
 
 
 def _ids(base: dict) -> dict:

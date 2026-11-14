@@ -17,6 +17,7 @@ if [ -n "$(git -C "$repo" status --porcelain)" ]; then
   git -C "$repo" status --porcelain | head -20
 fi
 command -v uv >/dev/null || { echo "uv is required (https://docs.astral.sh/uv/)"; exit 1; }
+command -v npm >/dev/null || { echo "npm is required for the pinned browser checks"; exit 1; }
 work="$(mktemp -d)"
 cleanup() {
   # Stop only what the clone's own launcher started, then remove the clone.
@@ -34,8 +35,30 @@ run_clean() {
   env -u GEMINI_API_KEY -u GEMINI_MODEL -u GOOGLE_API_KEY -u GOOGLE_APPLICATION_CREDENTIALS \
       -u BEAN_GEMINI_ACCOUNT_GATE -u BEAN_GEMINI_ACCOUNT_DECISION_ID -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
       -u LANGSMITH_API_KEY -u LANGCHAIN_API_KEY -u DATABASE_URL -u DRBEAN_VAR_DIR -u DRBEAN_API_BASE \
+      -u PYTHONPATH -u PYTHONHOME -u PYTHONUSERBASE -u VIRTUAL_ENV -u CONDA_PREFIX -u UV_PROJECT_ENVIRONMENT \
+      -u UV_WORKING_DIRECTORY -u UV_PROJECT -u UV_PYTHON -u DRBEAN_BACKEND_PYTHON -u DRBEAN_SCIENCE_PYTHON \
+      -u BEAN_COUNTERDEX_PYTHON -u BEAN_COUNTERDEX_REPLAY_PYTHON -u BEAN_TEST_PYTHON \
+      -u BEAN_DATABASE_PATH -u BEAN_BLOB_DIR -u BEAN_ARTIFACT_DIR -u BEAN_AUTH_FILE -u BEAN_AUTH_TOKENS_JSON \
+      -u PLAYWRIGHT_MODULE -u NODE_PATH -u NODE_OPTIONS \
       BEAN_AI_MODE=placeholder "$@"
 }
 run_clean python3 scripts/dev/launcher.py setup
+mkdir -p "$work/npm"
+touch "$work/npm/global.npmrc"
+(
+  cd tests/integration
+  env -i PATH="$PATH" LANG=C.UTF-8 NPM_CONFIG_USERCONFIG=/dev/null \
+    NPM_CONFIG_GLOBALCONFIG="$work/npm/global.npmrc" NPM_CONFIG_CACHE="$work/npm/cache" \
+    npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+)
+if [ -n "${CHROMIUM_PATH:-}" ]; then
+  if [ ! -f "$CHROMIUM_PATH" ] || [ ! -x "$CHROMIUM_PATH" ]; then
+    echo "CHROMIUM_PATH must name an executable browser binary"
+    exit 1
+  fi
+  echo "Using operator-selected browser: $CHROMIUM_PATH"
+else
+  run_clean node tests/integration/node_modules/playwright/cli.js install chromium
+fi
 git status --porcelain | grep -q . && { echo "setup modified tracked files or left untracked ones:"; git status --porcelain; exit 1; }
 run_clean python3 scripts/release/checklist.py "$@"
