@@ -1,5 +1,5 @@
 import { escape as e, modelName, settingLabel } from './comparison-core.mjs';
-export const format = value => typeof value==='number' ? new Intl.NumberFormat('en',{maximumSignificantDigits:6}).format(value) : String(value ?? '—');
+export const format = value => typeof value==='number' ? new Intl.NumberFormat('en',{maximumSignificantDigits:6,notation:value!==0&&(Math.abs(value)<0.001||Math.abs(value)>=1e6)?'scientific':'standard'}).format(value) : String(value ?? '—');
 const colors=['#9bbcff','#ebc280','#9bd2c4','#c1aff0'];
 export function table(headers,rows,{caption=''}={}) {
   return `<div class="table-region" tabindex="0" role="region" aria-label="${e(caption||headers.join(', '))}"><table>${caption?`<caption>${e(caption)}</caption>`:''}<thead><tr>${headers.map(h=>`<th scope="col">${e(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(cell=>`<td>${e(format(cell))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
