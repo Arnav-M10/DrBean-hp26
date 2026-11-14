@@ -80,6 +80,20 @@ try:
         body["suggestion_digest"] = semantic_digest("suggestion", body)
         out = {"bundle_b64": base64.b64encode(canonical_bytes(body)).decode(), "suggestion_digest": body["suggestion_digest"],
                "old_pair_digest": old, "new_pair_digest": new}
+    elif job["op"] == "edit":
+        body = strict_json_loads(base64.b64decode(job["bundle_b64"]))
+        body.pop("suggestion_digest", None)
+        kind = job["edit"]
+        if kind == "drop_artifacts":
+            body["artifacts"] = []
+        elif kind == "duplicate_artifact":
+            body["artifacts"] = body["artifacts"] + body["artifacts"][:1]
+        elif kind == "unknown_profile":
+            body["schema_version"] = "groundwork.suggestion-bundle.v99"
+        body["suggestion_digest"] = semantic_digest("suggestion", body)
+        out = {"bundle_b64": base64.b64encode(json.dumps(body, sort_keys=True, separators=(",", ":"),
+                                                         ensure_ascii=False).encode()).decode(),
+               "suggestion_digest": body["suggestion_digest"]}
 except AdapterError as error:
     out = {"error": error.to_dict()}
 sys.stdout.write(json.dumps(out))
@@ -144,20 +158,35 @@ def _worker(science_python: str, package_dir: str, job: dict, timeout: float = 1
 
 
 def replay_class(result: dict) -> str:
-    """Name what a replay outcome establishes; exclusion is scientific feedback, not corruption."""
+    """Name what a replay outcome establishes; exclusion is scientific feedback, not corruption.
+
+    Classes: passed, binding_failure, integrity_failure, mathematical_failure, unsupported_format,
+    exhausted, infrastructure_failure, scientific_exclusion, incomplete_evidence, rejected:<code>.
+    """
     if result["status"] == "passed":
         return "passed"
+    if result["status"] in ("timed_out", "error"):
+        return "infrastructure_failure"
     error = result.get("error") or {}
-    if error.get("code") == "wrong_specification_binding":
+    code = error.get("code")
+    if code in ("wrong_specification_binding", "wrong_scenario_binding"):
         return "binding_failure"
-    if error.get("code") == "artifact_mismatch":
+    if code == "artifact_mismatch":
         return "integrity_failure"
-    if error.get("code") == "exact_check_failure":
+    if code == "exact_check_failure":
         return "mathematical_failure"
+    if code in ("invalid_input", "unsupported_profile", "unsupported_version", "unsupported_model"):
+        return "unsupported_format"
+    if code in ("incomplete_export", "missing_artifact"):
+        return "incomplete_evidence"
+    if code == "resource_exhaustion":
+        return "exhausted"
     report = result.get("report") or {}
     if (report.get("integrity") == "passed" and report.get("expected_binding") == "matches"
             and report.get("verification") == "invalid"):
         return "scientific_exclusion"
+    if report.get("reason_code") in ("incomplete_export", "missing_artifact") or report.get("replay") == "unsupported":
+        return "incomplete_evidence"
     return f"rejected:{error.get('code') or report.get('reason_code') or result['status']}"
 
 
@@ -266,6 +295,99 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
         else:
             record("semantics:touching_bands_do_not_separate", False, "centres available", centres,
                    "replay report did not expose centres at 8 h")
+
+    # Packet-format and dependency attacks (master brief 2.11). Each uses the supported public replay path.
+    if base and bundles.get("grid-6-allowance-0.2"):
+        bundle, out = base
+        anchors = {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]}
+        truncated = native.replay(science_python, package_dir, bundle[: len(bundle) // 2], anchors)
+        record("defense:truncated_packet", replay_class(truncated) not in ("passed", "infrastructure_failure"),
+               "rejected (not passed, not a crash)", {"class": replay_class(truncated),
+                                                       "code": (truncated.get("error") or {}).get("code")},
+               "packet cut in half; original anchors")
+        oversized = bundle[:-1] + b"," + b'"pad":"' + b"x" * (4 * 1024 * 1024) + b'"}'
+        big = native.replay(science_python, package_dir, oversized, anchors)
+        record("defense:oversized_packet", replay_class(big) in ("exhausted", "unsupported_format", "integrity_failure"),
+               "exhausted (byte cap) before any parsing work", {"class": replay_class(big),
+                                                                 "code": (big.get("error") or {}).get("code")},
+               "packet padded past the 4 MiB admitted limit")
+        other_bundle, other_out = bundles["grid-6-allowance-0.2"]
+        crossed = native.replay(science_python, package_dir, other_bundle, anchors)
+        record("defense:another_runs_valid_packet", replay_class(crossed) in ("integrity_failure", "binding_failure"),
+               "integrity or binding failure", {"class": replay_class(crossed),
+                                                "code": (crossed.get("error") or {}).get("code")},
+               "a valid packet of a different reviewed design replayed against this design's anchors")
+        for edit, wanted in (("drop_artifacts", ("incomplete_evidence", "unsupported_format", "integrity_failure")),
+                             ("duplicate_artifact", ("unsupported_format", "integrity_failure", "incomplete_evidence")),
+                             ("unknown_profile", ("unsupported_format",))):
+            edited = _worker(science_python, package_dir, {"op": "edit", "bundle_b64": out["bundle_b64"], "edit": edit})
+            data = base64.b64decode(edited["bundle_b64"])
+            real = native.replay(science_python, package_dir, data, anchors)
+            diagnostic = native.replay(science_python, package_dir, data,
+                                       {**anchors, "suggestion_digest": edited["suggestion_digest"]})
+            # A format check may legitimately run before the digest check, so the real anchor may yield either.
+            record(f"defense:{edit}", replay_class(real) in ("integrity_failure", "unsupported_format")
+                   and replay_class(diagnostic) in wanted,
+                   {"original_anchor": ["integrity_failure", "unsupported_format"], "diagnostic_anchor": list(wanted)},
+                   {"original_anchor": replay_class(real), "diagnostic_anchor": replay_class(diagnostic),
+                    "code": (diagnostic.get("error") or {}).get("code"),
+                    "reason": ((diagnostic.get("report") or {}).get("reason_code"))},
+                   "edited packet with recomputed suggestion digest: the real anchor rejects it first; a test-only "
+                   "anchor then isolates format/dependency handling (it authenticates nothing)")
+
+    # Metamorphic transformations (master brief 2.21): expectations follow from the admitted contract, and
+    # assert binding plus predicates, never "every change must change every conclusion".
+    def verdicts(rows_override=None, extra_rows=None, order=pair, times=("8/1",)):
+        packet = json.loads(json.dumps(hero))
+        if rows_override is not None:
+            packet["dataset"]["rows"] = rows_override
+        out = _worker(science_python, package_dir, {"op": "suggest", "problem": engine_problem(packet, extra_rows),
+                      "workflow": workflow, "design": engine_design(order, list(times), "1/5", "wk5-metamorphic")})
+        if "error" in out:
+            return None, out, None
+        replayed = native.replay(science_python, package_dir, base64.b64decode(out["bundle_b64"]),
+                                 {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]})
+        found = {c["candidate_id"]: ("compatible" if c.get("verification") == "valid" else
+                                     "excluded" if c.get("verification") == "invalid" else c.get("verification"))
+                 for c in (replayed.get("report") or {}).get("fresh_checked", {}).get("candidate_results", [])}
+        return found, out, replayed
+
+    rows = hero["dataset"]["rows"]
+    base_verdicts, base_out, base_replay = verdicts()
+    def oracle_rows(rs):
+        return {c["id"]: kinetics.history_verdict({k: exact(c[k]) for k in ("A", "ke", "ka")}, rs) for c in pair}
+    tightened = [dict(r) for r in rows]
+    tightened[2] = {**tightened[2], "hard_allowance": "1/20"}
+    t_verdicts, _, _ = verdicts(tightened)
+    record("metamorphic:tightened_row_allowance", t_verdicts == oracle_rows(tightened) and t_verdicts != base_verdicts,
+           {"engine_equals_independent_oracle": oracle_rows(tightened)}, {"engine": t_verdicts, "baseline": base_verdicts},
+           "row 3 allowance 0.5 -> 0.05; verdicts recomputed, compared with the independent decimal oracle")
+    widened = [{**r, "hard_allowance": "3/5"} for r in rows]
+    w_verdicts, _, _ = verdicts(widened)
+    record("metamorphic:widened_allowances_keep_compatibility",
+           bool(base_verdicts) and all(w_verdicts.get(c) == "compatible" for c, v in base_verdicts.items()
+                                       if v == "compatible"),
+           "every previously compatible candidate stays compatible", {"widened": w_verdicts, "baseline": base_verdicts},
+           "all historical allowances 0.5 -> 0.6 (monotonicity); identities change, conclusions may not regress")
+    wild = {"id": "excluded_wild_row", "time": "3/1", "concentration": "100/1", "hard_allowance": "1/2",
+            "included": False, "notes": "Excluded control row with an absurd value"}
+    x_verdicts, x_out, _ = verdicts(extra_rows=[wild])
+    record("metamorphic:excluded_row_is_not_a_constraint",
+           x_verdicts == base_verdicts and x_out.get("problem_digest") != base_out.get("problem_digest"),
+           {"verdicts": "unchanged", "problem_digest": "changes (complete-body identity)"},
+           {"verdicts": x_verdicts, "digest_changed": x_out.get("problem_digest") != base_out.get("problem_digest")},
+           "an excluded row with value 100 mg/L must not exclude any candidate, yet it is part of the reviewed record")
+    _, ordered, _ = verdicts(times=("6/1", "8/1"))
+    s_verdicts, swapped, _ = verdicts(order=list(reversed(pair)), times=("6/1", "8/1"))
+    sel_a, chk_a = _selected(ordered["report"]) if "report" in ordered else (None, {})
+    sel_b, chk_b = _selected(swapped["report"]) if "report" in swapped else (None, {})
+    def margin(chk, sel):
+        return next((r.get("margin") for r in chk.get("rows", []) if r.get("time") == sel), None)
+    record("metamorphic:swapped_pair_order", sel_a == sel_b and margin(chk_a, sel_a) == margin(chk_b, sel_b)
+           and s_verdicts == base_verdicts,
+           {"selected_time": sel_a, "margin": "identical", "verdicts_by_id": "identical"},
+           {"selected": [sel_a, sel_b], "margins_equal": margin(chk_a, sel_a) == margin(chk_b, sel_b),
+            "verdicts": s_verdicts}, "candidate order reversed; results keyed by candidate id, not position")
 
     # Endpoint equality: a candidate with ke exactly on the closed claim's lower endpoint is inside.
     endpoint = [dict(pair[0], id="endpoint-ke-0.10", ke="0.10"), pair[1]]

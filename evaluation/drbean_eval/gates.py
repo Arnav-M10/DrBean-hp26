@@ -24,7 +24,11 @@ REQUIRED_CONTROLS = ("fixed_pair:grid-6-8-allowance-0.2", "fixed_pair:grid-6-all
                      "fixed_pair:grid-6-8-allowance-0.6", "defense:wrong_expected_identity", "defense:changed_byte",
                      "defense:mutation_rejected_by_original_anchor", "defense:mutation_rejected_by_fresh_mathematics",
                      "semantics:touching_bands_do_not_separate", "semantics:closed_endpoint_is_inside",
-                     "followup:3.4", "followup:4.57", "followup:4.0")
+                     "followup:3.4", "followup:4.57", "followup:4.0",
+                     "defense:truncated_packet", "defense:oversized_packet", "defense:another_runs_valid_packet",
+                     "defense:drop_artifacts", "defense:duplicate_artifact", "defense:unknown_profile",
+                     "metamorphic:tightened_row_allowance", "metamorphic:widened_allowances_keep_compatibility",
+                     "metamorphic:excluded_row_is_not_a_constraint", "metamorphic:swapped_pair_order")
 
 
 def _latest(attempts: list[dict], commit: str, lane: str) -> dict[str, dict]:
