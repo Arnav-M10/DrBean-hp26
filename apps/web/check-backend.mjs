@@ -10,13 +10,16 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'node:net'
 import { randomBytes, createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
+import { captureDesign } from './design-capture.mjs'
 
 import { createRequire } from 'node:module'
 // require() honours NODE_PATH and CommonJS builds; PLAYWRIGHT_MODULE may name an explicit entry file.
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const temp = await mkdtemp(join(tmpdir(), 'drbean-web-baseline-'))
-const token = randomBytes(40).toString('hex')
+const token = `DRBEAN-DUMMY-${randomBytes(20).toString('hex')}`
+const localGatewayFile = join(temp, 'local-gateway.json')
+await writeFile(localGatewayFile, JSON.stringify({ version: 1, secret: `DRBEAN-DUMMY-${randomBytes(15).toString('hex')}` }), { mode: 0o600 })
 const freePort = async () => {
   const server = createServer()
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
@@ -31,7 +34,8 @@ const env = { PATH: process.env.PATH, PYTHONPATH: join(root, 'apps/api'),
   BEAN_DATABASE_PATH: join(temp, 'test.sqlite'), BEAN_BLOB_DIR: join(temp, 'sources'),
   BEAN_ARTIFACT_DIR: join(temp, 'artifacts'), BEAN_AUTH_TOKENS_JSON: JSON.stringify({ 'web-test': token }),
   BEAN_SOURCE_INTAKE_MODE: 'controlled', BEAN_CONTROLLED_SOURCE_MANIFEST: join(root, 'scripts/ai/fixtures/source-previews.v1.json'),
-  BEAN_SCIENCE_ADAPTER: 'counterdex', BEAN_COUNTERDEX_PYTHON: enginePython, BEAN_WEB_API_PORT: String(apiPort) }
+  BEAN_SCIENCE_ADAPTER: 'counterdex', BEAN_COUNTERDEX_PYTHON: enginePython, BEAN_WEB_API_PORT: String(apiPort),
+  BEAN_LOCAL_GATEWAY_FILE: localGatewayFile, BEAN_LOCAL_BROWSER_ORIGIN: base, BEAN_AI_MODE: 'placeholder' }
 const children = []
 const start = (command, args, childEnv = env) => {
   const child = spawn(command, args, { cwd: root, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -40,9 +44,13 @@ const start = (command, args, childEnv = env) => {
   children.push(child); return child
 }
 const python = process.env.BEAN_TEST_PYTHON || resolve(root, '.venv/bin/python')
+let browserContext
 const api = async path => {
-  const response = await fetch(`${base}/api/bean/v1${path}`, { headers: { Authorization: `Bearer ${token}` } })
-  assert.ok(response.ok, `HTTP ${response.status}: ${await response.clone().text()}`)
+  assert.ok(browserContext || path === '/capabilities', 'Private API evidence requires the actual browser context')
+  const response = browserContext ? await browserContext.request.get(`${base}/api/bean/v1${path}`)
+    : await fetch(`${base}/api/bean/v1${path}`)
+  const ok = browserContext ? response.ok() : response.ok, status = browserContext ? response.status() : response.status
+  assert.ok(ok, `HTTP ${status}: ${ok ? '' : await response.text()}`)
   return response.json()
 }
 const waitForExit = child => new Promise((resolve, reject) => {
@@ -52,7 +60,7 @@ const waitForExit = child => new Promise((resolve, reject) => {
 })
 let browser, activePage, lastApiResponse
 try {
-  const server = start(python, ['-m', 'uvicorn', 'bean_api.main:create_app', '--factory', '--host', '127.0.0.1', '--port', String(apiPort)])
+  const server = start(python, ['-m', 'uvicorn', 'bean_api.main:create_app', '--factory', '--host', '127.0.0.1', '--port', String(apiPort), '--no-proxy-headers'])
   const web = start(process.execPath, ['apps/web/serve.mjs', String(webPort)])
   let capabilities
   for (let i = 0; ; i++) {
@@ -67,6 +75,7 @@ try {
   start(python, ['-m', 'bean_api.worker'])
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] })
   const context = await browser.newContext({ acceptDownloads: true })
+  browserContext = context
   const page = await context.newPage(), errors = [], external = []
   activePage = page
   page.on('response', async response => {
@@ -84,13 +93,11 @@ try {
   // Pages are hash routes; changing the hash never reloads in-memory state.
   const go = async hash => { await page.evaluate(target => { location.hash = target }, hash); await page.waitForSelector(`#${hash}:not([hidden])`) }
   const openSourcePanel = () => page.locator('#source-path').evaluate(panel => { panel.open = true })
-  await page.locator('#connection-panel summary').click()
-  await page.fill('#bearer', token)
-  await page.getByRole('button', { name: 'Connect', exact: true }).click()
-  await page.waitForFunction(() => document.querySelector('#connection-status').textContent.includes('Connected'))
-  await page.fill('#workspace-name', 'Browser baseline computation')
-  await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('#workspace-select').value !== '')
+  assert.equal(await page.locator('#bearer').isVisible(), false)
+  const connected = await api('/shared-session/current')
+  assert.equal(connected.workspace_id, await page.locator('#workspace-select').inputValue())
+  assert.equal(connected.credentials, 'server_managed')
   await page.click('#example')
   await page.getByRole('button', { name: 'Use these rows', exact: true }).click()
   await page.click('#measurements button[type=submit]')
@@ -104,17 +111,17 @@ try {
   async function prepareApproveAndRun(expectCounterexample = true, prepared = false) {
     const manual = page.locator('#manual-path')
     if (await manual.getAttribute('open') === null) await manual.getByText('Run a manual check without the assistant', { exact: true }).click()
-    if (!prepared) await page.getByRole('button', { name: 'Save inputs and prepare plan' }).click()
+    if (!prepared) await page.getByRole('button', { name: 'Save inputs and prepare check' }).click()
     await page.waitForSelector('#approve-scope')
-    assert.equal(await page.getByRole('button', { name: 'Approve reviewed plan' }).isDisabled(), true)
-    assert.equal(await page.getByRole('button', { name: 'Queue approved manual run' }).isDisabled(), true)
+    assert.equal(await page.getByRole('button', { name: 'Approve check' }).isDisabled(), true)
+    assert.equal(await page.getByRole('button', { name: 'Run approved check' }).isDisabled(), true)
     assert.match(await page.locator('#backend-review').textContent(), /No witness found does not prove the claim/)
     await page.check('#approve-scope')
-    await page.getByRole('button', { name: 'Approve reviewed plan' }).click()
-    await page.getByRole('button', { name: 'Plan approved', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Approve check' }).click()
+    await page.getByRole('button', { name: 'Check approved', exact: true }).waitFor()
     const previousRunId = await page.locator('#run-id').inputValue()
     const response = page.waitForResponse(r => /\/plans\/[^/]+\/runs$/.test(r.url()) && r.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Queue approved manual run' }).click()
+    await page.getByRole('button', { name: 'Run approved check' }).click()
     assert.equal((await response).status(), 202)
     await page.waitForFunction(previous => {
       const id = document.querySelector('#run-id').value
@@ -158,8 +165,17 @@ try {
   await page.getByRole('button', { name: 'Accept reviewed source values', exact: true }).click()
   await page.getByRole('button', { name: 'Use reviewed values in measurement draft', exact: true }).click()
   await page.click('#measurements button[type=submit]')
+  await page.waitForFunction(() => location.hash === '#question'
+    && !document.querySelector('#question').hidden && document.activeElement?.id === 'question-title')
   await page.click('#question-form button[type=submit]')
-  await page.getByLabel('Explanation for the remaining manually reviewed inputs and assumptions', { exact: true }).fill('Reviewed synthetic example measurements, units, domain and claim entered explicitly for this browser test')
+  // Hash navigation rebuilds the source controls, then focuses the heading.
+  // Its textarea can already be visible while that navigation is pending.
+  await page.waitForFunction(() => location.hash === '#review'
+    && !document.querySelector('#review').hidden && document.activeElement?.id === 'review-title')
+  const assumptionExplanation = 'Reviewed synthetic example measurements, units, domain and claim entered explicitly for this browser test'
+  const assumptionField = page.getByLabel('Explanation for the remaining manually reviewed inputs and assumptions', { exact: true })
+  await assumptionField.fill(assumptionExplanation)
+  assert.equal(await assumptionField.inputValue(), assumptionExplanation)
   await page.getByRole('button', { name: 'Preview source-bound inputs', exact: true }).click()
   await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some(button => button.textContent === 'Accept preview and prepare investigation plan' && !button.disabled) || !document.querySelector('#backend-error').hidden)
   assert.equal(await page.locator('#backend-error').isVisible(), false, await page.locator('#backend-error').textContent())
@@ -188,13 +204,13 @@ try {
   async function downloadAndReplay(result, name, design = false) {
     const reference = result.artifacts[0]
     await go(design ? 'next' : 'result')
-    const [nativeDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download native design evidence' : 'Download native scientific evidence', exact: true }).first().click()])
+    const [nativeDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download comparison evidence file' : 'Download evidence file', exact: true }).first().click()])
     const nativePath = join(temp, `${name}.native.json`)
     await nativeDownload.saveAs(nativePath)
     const nativeBytes = await readFile(nativePath)
     assert.equal(nativeBytes.length, reference.byte_size)
     assert.equal(createHash('sha256').update(nativeBytes).digest('hex'), reference.sha256)
-    const [anchorDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download design replay anchors' : 'Download replay anchors', exact: true }).first().click()])
+    const [anchorDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download comparison replay anchors' : 'Download replay anchors', exact: true }).first().click()])
     const anchorPath = join(temp, `${name}.anchors.json`)
     await anchorDownload.saveAs(anchorPath)
     const replay = start(enginePython, ['-I', '-m', 'counterdex', 'replay-native', nativePath, '--anchors', anchorPath],
@@ -212,6 +228,7 @@ try {
     return fresh
   }
   await downloadAndReplay(evidence.body.result, 'first')
+  await captureDesign(activePage, 'manual-checked-baseline')
 
   // Design uses the actual returned pair, its own reviewed assumptions and approval.
   assert.equal(capabilities.science.native_design, true)
@@ -225,13 +242,13 @@ try {
   await page.check('#design-allowContinuation')
 
   async function prepareDesign() {
-    const preview = page.locator('#backend-design details').filter({ has: page.getByText('Exact frozen measurement design', { exact: true }) }).locator('pre')
+    const preview = page.locator('#backend-design details').filter({ has: page.getByText('Exact comparison plan', { exact: true }) }).locator('pre')
     const previous = await preview.count() ? await preview.textContent() : ''
     const response = page.waitForResponse(r => /\/runs\/[^/]+\/design-proposals$/.test(r.url()) && r.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Prepare measurement design', exact: true }).click()
+    await page.getByRole('button', { name: 'Prepare comparison', exact: true }).click()
     assert.equal((await response).status(), 201)
     await page.waitForFunction(previous => {
-      const details = [...document.querySelectorAll('#backend-design details')].find(item => item.querySelector('summary').textContent === 'Exact frozen measurement design')
+      const details = [...document.querySelectorAll('#backend-design details')].find(item => item.querySelector('summary').textContent === 'Exact comparison plan')
       return details && details.querySelector('pre').textContent !== previous
     }, previous)
     const plan = JSON.parse(await preview.textContent())
@@ -246,13 +263,13 @@ try {
   }
   async function approveDesign() {
     await page.check('#approve-design-scope')
-    await page.getByRole('button', { name: 'Approve reviewed design', exact: true }).click()
-    await page.getByRole('button', { name: 'Design approved', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Approve comparison', exact: true }).click()
+    await page.getByRole('button', { name: 'Comparison approved', exact: true }).waitFor()
   }
   async function runDesign(expectedTier, name) {
     const previousJobId = await page.locator('#design-job-id').inputValue()
     const response = page.waitForResponse(r => /\/design-plans\/[^/]+\/jobs$/.test(r.url()) && r.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Queue approved design', exact: true }).click()
+    await page.getByRole('button', { name: 'Run approved comparison', exact: true }).click()
     assert.equal((await response).status(), 202)
     // The application streams bounded bodies. Read its displayed returned ID
     // instead of depending on Chromium retaining a DevTools copy of that body.
@@ -272,6 +289,7 @@ try {
     assert.deepEqual(await page.locator('[aria-label="Measurement design grid"] tbody tr td:first-child').allTextContents(), ['8', '6'])
     assert.match(await page.locator('#backend-design').textContent(), new RegExp(`Design tier: ${expectedTier}`))
     await downloadAndReplay(suggestion.body, name, true)
+    await captureDesign(activePage, name)
     return { finished, suggestion }
   }
   const designPlan = await prepareDesign()
@@ -282,7 +300,7 @@ try {
   await page.fill('#design-allowance', '10')
   assert.equal(await page.locator('#approve-design-scope').isDisabled(), true)
   assert.equal(await page.locator('#queue-design').isDisabled(), true)
-  assert.match(await page.locator('#design-draft-state').textContent(), /Design inputs changed/)
+  assert.match(await page.locator('#design-draft-state').textContent(), /You changed the comparison inputs/)
   const noSeparationPlan = await prepareDesign()
   assert.notEqual(noSeparationPlan.id, designPlan.id)
   await approveDesign()
@@ -290,7 +308,7 @@ try {
   assert.match(await page.locator('#backend-design').textContent(), /does not rule out a useful time elsewhere/)
   assert.equal((await api(`/records/${positive.suggestion.id}`)).digest, positive.suggestion.digest)
   await page.fill('#design-job-id', positive.finished.id)
-  await page.getByRole('button', { name: 'Open or refresh design', exact: true }).click()
+  await page.getByRole('button', { name: 'Open comparison', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('#backend-design').textContent.includes('Design tier: checked_pair_separation'))
   assert.equal((await api(`/design-jobs/${noSeparation.finished.id}`)).state, 'completed')
 
@@ -303,12 +321,12 @@ try {
   }
   await page.fill('#followup-value', '3.4')
   await page.fill('#followup-reason', `Synthetic test of ${followupOrigin} declaration; reviewed acquisition log at 7 h and hard bound 0.3 mg/L. No real measurement claimed.`)
-  await page.getByRole('button', { name: `Prepare ${followupOrigin} observation`, exact: true }).click()
-  await page.getByRole('button', { name: `Accept reviewed ${followupOrigin} observation`, exact: true }).click()
-  await page.getByRole('button', { name: 'Prepare follow-up investigation plan', exact: true }).click()
+  await page.getByRole('button', { name: `Prepare ${followupOrigin} reading`, exact: true }).click()
+  await page.getByRole('button', { name: `Accept ${followupOrigin} reading`, exact: true }).click()
+  await page.getByRole('button', { name: 'Prepare recheck', exact: true }).click()
   await page.locator('#followup-approve-scope').check()
-  await page.getByRole('button', { name: 'Approve reviewed follow-up', exact: true }).click()
-  await page.getByRole('button', { name: 'Queue approved follow-up', exact: true }).click()
+  await page.getByRole('button', { name: 'Approve recheck', exact: true }).click()
+  await page.getByRole('button', { name: 'Run approved recheck', exact: true }).click()
   await page.waitForFunction(baselineId => {
     const status = document.querySelector('#backend-investigations [role="status"]')?.textContent
     const match = status?.match(/^(run_[a-zA-Z0-9]+) · execution:/)
@@ -335,7 +353,7 @@ try {
   assert.equal(followupEvidence.body.result.native_replay.operation, 'recheck')
   assert.equal(followupEvidence.body.result.native_replay.dataset_origin, followupOrigin === 'actual' ? 'synthetic' : 'hypothetical')
   await go('result')
-  await page.getByRole('region', { name: 'Follow-up candidate checks', exact: true }).waitFor()
+  await page.getByRole('region', { name: 'Recheck of the compared candidates', exact: true }).waitFor()
   assert.match(await page.locator('#backend-results').textContent(), new RegExp(`Dataset origin: ${followupOrigin === 'actual' ? 'synthetic' : 'hypothetical'}`))
 
   await downloadAndReplay(followupEvidence.body.result, 'followup')
@@ -345,14 +363,14 @@ try {
   await page.getByRole('textbox', { name: 'Row 1, concentration', exact: true }).fill('4.85')
   await page.getByRole('link', { name: 'Review', exact: true }).click()
   assert.equal(await page.locator('#approve-scope').isDisabled(), true)
-  assert.match(await page.locator('#backend-review').textContent(), /Draft changed/)
+  assert.match(await page.locator('#backend-review').textContent(), /You edited the draft after saving it/)
   const changed = await prepareApproveAndRun(false)
   assert.notEqual(changed.id, run.id)
   const changedEvidence = await api(`/records/${changed.scenarios[0].result_id}`)
   assert.notEqual(changedEvidence.body.result.problem_digest, evidence.body.result.problem_digest)
   assert.notEqual(changedEvidence.body.result.artifacts[0].sha256, reference.sha256)
   assert.equal(await page.locator('#design-job-id').inputValue(), '')
-  assert.equal(await page.getByRole('button', { name: 'Download native design evidence', exact: true }).count(), 0)
+  assert.equal(await page.getByRole('button', { name: 'Download comparison evidence file', exact: true }).count(), 0)
   await downloadAndReplay(changedEvidence.body.result, 'changed')
   assert.equal((await api(`/records/${evidence.id}`)).digest, evidence.digest)
   // Changed bytes cannot reuse a controlled extraction; accepted science stays intact.
@@ -373,20 +391,29 @@ try {
   assert.deepEqual(await api(`/workspaces/${workspace}/provider-attempts`), [])
 
   await page.getByRole('link', { name: 'Report', exact: true }).click()
-  await page.getByRole('button', { name: 'Create report for selected run' }).click()
-  const [reportDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download exact report JSON' }).click()])
+  await page.getByRole('button', { name: 'Create report' }).click()
+  const [reportDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download report (JSON)' }).click()])
   assert.equal(JSON.parse(await readFile(await reportDownload.path(), 'utf8')).body.run.id, changed.id)
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   assert.deepEqual(errors, [])
   assert.deepEqual(external, [])
-  assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0)
-  assert.equal((await context.cookies()).length, 0)
-  await page.click('#disconnect')
-  assert.match(await page.locator('#backend-review').textContent(), /Connect to a Dr\. Bean server/)
+  const storage = await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage }, readableCookie: document.cookie }))
+  assert.deepEqual(storage.local, { 'dr-bean.private-workspace.v1': workspace })
+  assert.deepEqual(storage.session, {})
+  assert.equal(storage.readableCookie, '')
+  const cookies = await context.cookies()
+  assert.equal(cookies.length, 1)
+  assert.equal(cookies[0].name, 'bean_local_session')
+  assert.equal(cookies[0].httpOnly, true)
+  assert.equal(cookies[0].sameSite, 'Strict')
+  const logout = await context.request.post(`${base}/api/bean/v1/shared-session/logout`, { headers: { Origin: base } })
+  assert.equal(logout.status(), 200)
+  const revoked = await context.request.get(`${base}/api/bean/v1/workspaces`)
+  assert.equal(revoked.status(), 401)
   const denied = await fetch(`${base}/api/bean/v1/workspaces`, { headers: { Origin: 'https://external.invalid' } })
   assert.equal(denied.status, 403)
-  console.log('Passed: actual browser review/approval/dispatch, real baseline discovery on two reviewed inputs, separately approved positive and no-separation designs from the actual pair, exact native and anchor downloads with installed-engine replay, preserved earlier evidence, reopened design history, zero provider attempts, memory-only credentials, and proxy origin rejection.')
+  console.log('Passed: automatic private browser session, actual browser review/approval/dispatch, real baseline discovery on two reviewed inputs, separately approved positive and no-separation designs from the actual pair, exact native and anchor downloads with installed-engine replay, preserved earlier evidence, reopened design history, zero provider attempts, HttpOnly credentials, explicit revocation, and proxy origin rejection.')
 } catch (error) {
   if (activePage) {
     const directory = process.env.BEAN_BROWSER_DIAGNOSTICS_DIR || join(root, 'var/test-evidence/browser-failures')

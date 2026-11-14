@@ -40,19 +40,19 @@ export function interpretResult(result) {
   switch (result.scientific_outcome) {
     case 'certified_counterexample':
       if (!checked) break
-      return { tone: 'challenged', state: ['ok', 'Checked'], statement: 'Your measurements do not force the claim. The checker found parameter values that fit every included reading within its allowance, yet put the elimination rate outside the claimed range.',
-        uncertain: 'This does not tell you the true elimination rate or that the model is right. It shows only that, under these allowances and search limits, the claim is not the only possibility.' }
+      return { tone: 'challenged', state: ['ok', 'Checked'], statement: 'Your readings do not force the claim. The checker found a candidate that fits every included reading within its allowance but has an elimination rate outside the claimed range.',
+        uncertain: 'This does not give the true elimination rate or show that the model is right. It shows that, with these allowances and search limits, the claim is not the only possibility.' }
     case 'no_counterexample_found':
-      return { tone: 'none', state: ['off', 'Nothing found'], statement: 'The bounded search found no parameter values that fit the readings and fall outside the claim.',
-        uncertain: 'This is not proof of the claim. A search with limits can miss a counterexample.' }
+      return { tone: 'none', state: ['off', 'None found'], statement: 'This search found no checked candidate outside the claimed range.',
+        uncertain: 'This does not prove the claim. The search covers only your search limits and can miss a counterexample.' }
     case 'numerical_candidate':
-      return { tone: 'incomplete', state: ['wait', 'Not checked'], statement: 'The search found a numerical candidate, but it was not confirmed by exact checking.',
-        uncertain: 'A numerical fit alone is not a checked counterexample. Treat this as a lead only.' }
+      return { tone: 'incomplete', state: ['wait', 'Not checked'], statement: 'The search found a possible candidate outside the claim, but exact checking did not confirm it.',
+        uncertain: 'Treat it as a lead, not a counterexample.' }
     case 'unsupported':
-      return { tone: 'incomplete', state: ['off', 'Unsupported'], statement: 'The configured checker does not support this investigation, so no scientific conclusion was reached.' }
+      return { tone: 'incomplete', state: ['off', 'Unsupported'], statement: 'The checker on this server does not support this kind of check, so there is no result.' }
   }
-  return { tone: 'incomplete', state: ['wait', 'Incomplete'], statement: 'Checking did not finish successfully, so this result does not support a conclusion.',
-    uncertain: 'Incomplete checking never proves the claim. Inspect the technical states below.' }
+  return { tone: 'incomplete', state: ['wait', 'Incomplete'], statement: 'Checking did not finish, so this result supports no conclusion.',
+    uncertain: 'An unfinished check never supports the claim. The technical details below show where it stopped.' }
 }
 
 function svg(tag, attributes = {}, text) {
@@ -97,9 +97,9 @@ export function keLine({ domain, target, candidates }) {
   candidates.forEach((candidate, index) => {
     const cx = x(candidate.ke), labelY = 12 + (index % 3) * 14
     root.append(svg('line', { x1: cx, x2: cx, y1: labelY + 3, y2: axisY - 9, stroke: candidate.color, 'stroke-width': 1, 'stroke-dasharray': '2 2' }))
-    root.append(svg('circle', { cx, cy: axisY - 9, r: 6, fill: candidate.color, stroke: '#fff', 'stroke-width': 2 }))
+    root.append(svg('circle', { cx, cy: axisY - 9, r: 6, fill: candidate.color, stroke: 'var(--surface)', 'stroke-width': 2 }))
     const anchor = cx > width - 110 ? 'end' : cx < 110 ? 'start' : 'middle'
-    root.append(svg('text', { class: 'label', x: anchor === 'end' ? cx - 4 : anchor === 'start' ? cx + 4 : cx, y: labelY, 'text-anchor': anchor, fill: candidate.color }, `${candidate.short} · ke ≈ ${readable(candidate.ke)}`))
+    root.append(svg('text', { class: 'candidate-label', x: anchor === 'end' ? cx - 4 : anchor === 'start' ? cx + 4 : cx, y: labelY, 'text-anchor': anchor, fill: candidate.color }, `${candidate.short} · ke ≈ ${readable(candidate.ke)}`))
   })
   return root
 }
@@ -150,5 +150,5 @@ export function concentrationChart({ rows, curves = [], markTime = null, height 
 }
 
 // Bean red is reserved for the claim, so candidates never use it.
-export const CANDIDATE_COLORS = ['#1f4f8a', '#b25b0e', '#1c6740', '#5b3f8f']
+export const CANDIDATE_COLORS = ['var(--plot-a)', 'var(--plot-b)', 'var(--plot-c)', 'var(--plot-d)']
 const narrow = () => (globalThis.innerWidth ?? 1024) < 640

@@ -24,7 +24,7 @@ export function researchSnapshot(value, workspace) {
       || !Number.isSafeInteger(value.revision) || value.revision < 0 || !['controlled', 'live'].includes(value.mode)
       || !Array.isArray(value.children) || value.children.length > 4 || !Array.isArray(value.reports) || value.reports.some(id => !ID.test(id))) throw new Error('Invalid or mismatched research snapshot.')
   if (value.pending_review && (!ID.test(value.pending_review.id) || !SHA.test(value.pending_review_digest)
-      || value.pending_review.workspace_id !== workspace || value.pending_review.digest !== value.pending_review_digest)) throw new Error('The pending review is not bound to this workspace and digest.')
+      || value.pending_review.workspace_id !== workspace || value.pending_review.digest !== value.pending_review_digest)) throw new Error('This approval request belongs to a different workspace or plan version. Refresh saved state and review it again.')
   return clone(value)
 }
 
@@ -46,7 +46,7 @@ export class ResearchController {
   emit() { this.changed(this.state) }
   persist() {
     try { this.storage?.setItem(this.key(), JSON.stringify({ sessionId: this.state.snapshot?.id ?? null, pending: this.state.pending, form: this.state.form })) }
-    catch { this.state.error = 'Browser storage is unavailable; keep this tab open to retain uncertain request identities.' }
+    catch { this.state.error = 'This browser cannot store data for this page. Keep the tab open until any unanswered request is resolved.' }
   }
   async connect(connection) {
     const same = this.connection.api === connection.api && this.connection.workspaceId === connection.workspaceId && this.connection.identityId === connection.identityId
@@ -81,7 +81,7 @@ export class ResearchController {
   }
   async mutate(path, body, key = crypto.randomUUID()) {
     if (this.state.busy) return
-    if (this.state.pending && (this.state.pending.key !== key || this.state.pending.path !== path)) throw new Error('Resolve the uncertain frozen request before starting another operation.')
+    if (this.state.pending && (this.state.pending.key !== key || this.state.pending.path !== path)) throw new Error('Resolve the unanswered request below before starting anything else.')
     const connection = this.connection, generation = this.generation
     this.state.pending = { path, body: clone(body), key }; this.state.busy = true; this.state.error = ''; this.persist(); this.emit()
     try {
@@ -89,7 +89,7 @@ export class ResearchController {
       if (path.endsWith('/provider-consents')) {
         if (!response || response.kind !== 'research_provider_consent' || response.workspace_id !== connection.workspaceId
             || response.body?.research_session_id !== this.state.snapshot?.id || response.body?.model !== body.model
-            || response.body?.context_digest !== body.expected_context_digest || response.body?.accepted !== true) throw new Error('Provider consent acknowledgement is not bound to this disclosure.')
+            || response.body?.context_digest !== body.expected_context_digest || response.body?.accepted !== true) throw new Error('Your consent does not match the disclosure shown. Read the disclosure and consent again.')
         response = await connection.api.json(`/research-sessions/${response.body.research_session_id}`)
       }
       const result = researchSnapshot(response, connection.workspaceId)
@@ -128,13 +128,13 @@ export class ResearchController {
     const s = this.state.snapshot, model = this.connection.capabilities?.gemini?.model
     if (s?.mode !== 'live' || !this.state.providerAccepted || !model) throw new Error('Review the exact provider disclosure and consent before live coordination.')
     await this.mutate(`/research-sessions/${s.id}/provider-consents`, { model, expected_context_digest: s.provider_disclosure.context_digest, accepted: true })
-    if (!this.state.pending && !this.state.error) this.state.error = 'Provider consent saved. Starting coordination still requires an explicit remaining allocation.'
+    if (!this.state.pending && !this.state.error) this.state.error = 'Consent saved. The assistant can continue only after the server owner allocates Gemini capacity.'
     this.state.providerAccepted = false; this.emit()
   }
   async advance() { const s = this.state.snapshot; if (s) await this.mutate(`/research-sessions/${s.id}/advance`, { expected_revision: s.revision }) }
   async decide(decision) {
     const s = this.state.snapshot, review = s?.pending_review
-    if (!review || (decision === 'approve' && this.state.reviewAccepted !== `${review.id}:${review.digest}`)) throw new Error('Review the exact pending scientific scope and select its approval checkbox.')
+    if (!review || (decision === 'approve' && this.state.reviewAccepted !== `${review.id}:${review.digest}`)) throw new Error('Read the exact pending scope below, then tick its approval box.')
     await this.mutate(`/research-sessions/${s.id}/decisions`, { expected_revision: s.revision, pending_review_id: review.id, expected_review_digest: review.digest, decision, accepted: true })
   }
   async retry() { const p = this.state.pending; if (p) await this.mutate(p.path, p.body, p.key) }
@@ -191,7 +191,14 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
   const save = (bytes, name) => { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/json' })); const a = element('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }
   const action = async callback => { try { await callback() } catch (error) { controller.state.error = error.message; render() } }
   const link = (text, href) => { const a = element('a', text, 'button secondary'); a.href = href; return a }
-  function button(parent, title, callback, disabled = false, className = '') { const item = element('button', title, className); item.type = 'button'; item.disabled = disabled || controller.state.busy; item.addEventListener('click', () => action(callback)); parent.append(item); return item }
+function button(parent, title, callback, disabled = false, className = '', download = false) {
+    const item = element('button', title, className); item.type = 'button'; item.disabled = disabled || controller.state.busy
+    item.addEventListener('click', () => action(async () => {
+      await callback()
+      if (download) item.dispatchEvent(new CustomEvent('bean:download-ready', { bubbles: true, detail: { target: item } }))
+    }))
+    parent.append(item); return item
+  }
   function details(parent, title, value, className = '') { const item = element('details', '', className); item.append(element('summary', title), element('pre', JSON.stringify(value, null, 2))); parent.append(item); return item }
   function field(parent, title, key, options = null) {
     const label = element('label', title, 'stack')
@@ -222,7 +229,7 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
     const state = controller.state, connection = controller.connection, s = state.snapshot, caps = connection.capabilities?.deepagents
     for (const destination of [results, next, report]) destination.replaceChildren()
     root.replaceChildren(element('h2', 'Research plan with the assistant'))
-    root.append(element('p', 'The research assistant keeps a step-by-step plan, proposes each scientific operation and stops for your approval before it runs. It is built with LangChain Deep Agents. Every mathematical result still comes from the Counterdex checker, never from the assistant.'))
+    root.append(element('p', 'The assistant keeps a step-by-step research plan. It proposes each check and stops for your approval before anything runs. It is built with LangChain Deep Agents. Mathematical results come only from the Counterdex checker, never from the assistant.'))
     if (!connection.api || !connection.workspaceId) {
       renderedDraft = JSON.stringify(getDraft())
       root.append(element('p', 'Connect to a private workspace to keep a research question and plan.', 'note'))
@@ -231,7 +238,7 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
     if (state.error) { const error = element('p', state.error, 'errors'); error.setAttribute('role', 'alert'); root.append(error) }
     const enabled = Boolean(caps?.dispatch_enabled)
     if (!enabled) root.append(element('p', 'The assistant is unavailable on this server. You can reopen saved research or run Counterdex directly.', 'note wait'), link('Go to manual check', '#manual'))
-    else root.append(element('p', caps.execution_mode === 'live' ? `Assistant model: Gemini ${connection.capabilities.gemini?.model || ''}, metered separately and limited to capacity the server operator allocates. Saving your inputs does not call the model.` : 'Assistant model: a local controlled policy run through Deep Agents. It makes no external model requests; the checker computes every result.', 'fine'))
+    else root.append(element('p', caps.execution_mode === 'live' ? `Assistant model: Gemini ${connection.capabilities.gemini?.model || ''}, metered separately and limited to capacity the server operator allocates. Saving your inputs does not call the model.` : 'Assistant model: the controlled test policy, run through Deep Agents. It sends nothing to an external model; the checker computes every result.', 'fine'))
     if (state.pending) {
       const box = element('div', '', 'callout'); root.append(box)
       box.append(element('h3', 'A request did not get a clear answer'), element('p', 'The server may or may not have accepted it. Refresh only reads saved state. Retry sends the same frozen request again, so it cannot be applied twice.'))
@@ -322,14 +329,14 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
       button(turn, 'Advance research plan', () => controller.advance(), blocked)
     } else if (s.state === 'completed' && s.reports.length && !s.children.some(child => child.kind === 'design_job')) {
       root.append(turn)
-      turn.append(element('h3', 'Plan the next measurement'), element('p', 'The investigation report is saved. The assistant can propose comparing measurement times next. That does not approve anything: the exact pair, times and allowance come back to you for a separate review.'))
+      turn.append(element('h3', 'Plan the next measurement'), element('p', 'The check report is saved. Next, the assistant can propose comparing measurement times. This approves nothing; you review the exact pair, times and allowance separately.'))
       const planNext = () => controller.advance()
       button(turn, 'Plan next step for separate review', planNext, blocked)
       next.append(element('h2', 'Compare feasible measurement times'), element('p', 'The assistant can propose a comparison based on the saved investigation. You’ll review the exact pair and approve the comparison separately.'))
       button(next, 'Plan next step for separate review', async () => { location.hash = 'investigations'; await planNext() }, blocked)
     } else if (s.state === 'needs_reconciliation') {
       root.append(turn)
-      turn.append(element('h3', 'Recover the interrupted step'), element('p', 'The last step stopped unexpectedly. Completed evidence and usage are kept. This assistant has not been qualified to continue automatically after a restart.'))
+      turn.append(element('h3', 'Recover the interrupted step'), element('p', 'The last step stopped unexpectedly. Completed evidence and usage counts are kept. The assistant does not resume by itself after a restart; reconcile the step to continue.'))
       button(turn, 'Reconcile interrupted action', () => controller.reconcile(), Boolean(state.pending))
     }
     if (s.action?.error_code) root.append(element('p', `The last step stopped: ${s.action.error_code}. Completed evidence is kept.`, 'note bad'))
@@ -348,8 +355,10 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
     if (!state.events.length) root.append(element('p', 'No recorded activity yet.', 'fine'))
     else {
       const recent = element('ol', '', 'timeline')
+      recent.dataset.motionStream = s.id
       for (const event of state.events.slice(-6)) {
         const item = element('li', '', event.event_type === 'review_required' || event.event_type === 'waiting_observation' ? 'waiting' : ['tool_finished', 'evidence_observed', 'decision_recorded', 'terminal'].includes(event.event_type) ? 'done' : '')
+        item.dataset.motionEvent = event.event_id
         const time = element('time', new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })); time.dateTime = event.timestamp
         item.append(time, element('strong', EVENT_LABELS[event.event_type] ?? event.event_type), event.summary ? ` — ${event.summary}` : '')
         recent.append(item)
@@ -359,7 +368,7 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
       for (const event of state.events) activity.append(element('li', `${event.timestamp} · ${event.event_type}: ${event.summary}`)); all.append(activity); root.append(all)
     }
     root.append(element('p', `Used ${s.usage.logical_turns} assistant turns, ${s.usage.tool_calls} tool calls and ${s.usage.child_count} checker jobs. Time spent waiting for you is not counted.`, 'meta'))
-    if (state.evidence.length) root.append(link('View checked results', '#result'), ' ', link('Next measurement and report', '#next'))
+    if (state.evidence.length) root.append(link('View results', '#result'), ' ', link('Next measurement and report', '#next'))
     for (const record of state.evidence) {
       const result = record.body.result ?? record.body, described = describeEvidence(record), card = element('section', '', 'callout'); card.style.borderLeftColor = 'var(--rule-strong)'
       card.append(element('h4', described.title), element('p', described.text))
@@ -371,8 +380,8 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
       for (const candidate of result.candidate_results ?? []) card.append(element('p', `${candidate.candidate_id}: ${{ valid: 'still fits', invalid: 'ruled out' }[candidate.verification] || 'unresolved'}. ${candidate.reason_code || ''}`, 'fine'))
       const row = element('div', '', 'actions'); card.append(row)
       for (const ref of result.artifacts ?? []) {
-        button(row, 'Download native evidence', async () => { const data = await connection.api.download(`/artifacts/${ref.id}`, ref); save(data.bytes, `dr-bean-${ref.id}.native.json`) }, false, 'secondary')
-        button(row, 'Download independent replay anchors', async () => { const data = await connection.api.download(`/artifacts/${ref.id}/anchor?download=true`); save(data.bytes, `dr-bean-${ref.id}.anchors.json`) }, false, 'secondary')
+        button(row, 'Download evidence file', async () => { const data = await connection.api.download(`/artifacts/${ref.id}`, ref); save(data.bytes, `dr-bean-${ref.id}.native.json`) }, false, 'secondary', true)
+        button(row, 'Download replay anchors', async () => { const data = await connection.api.download(`/artifacts/${ref.id}/anchor?download=true`); save(data.bytes, `dr-bean-${ref.id}.anchors.json`) }, false, 'secondary', true)
       }
       const tech = details(card, 'Technical details', { verification: result.verification, expected_binding: result.expected_binding || result.verification_record?.expected_binding, replay: result.replay, candidates: result.candidates, candidate_ids: result.candidate_ids, candidate_results: result.candidate_results, options: result.options, selected_time: result.selected_time, future_hard_allowance: result.future_hard_allowance }, 'technical')
       for (const ref of result.artifacts ?? []) tech.append(element('pre', `python3.11 -m counterdex replay-native dr-bean-${ref.id}.native.json --anchors dr-bean-${ref.id}.anchors.json`))
@@ -380,7 +389,7 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
     }
     if (state.evidence.some(record => !(record.body.result ?? record.body).design_tier)) results.append(link('Next measurement and report', '#next'))
     if (s.pending_review?.kind === 'design_plan') next.append(link('Review the proposed comparison', '#investigations'))
-    for (const id of s.reports) button(report, 'Download research report snapshot', async () => { const data = await connection.api.download(`/reports/${id}/download`); save(data.bytes, `dr-bean-${id}.json`) }, false, 'secondary')
+    for (const id of s.reports) button(report, 'Download research report snapshot', async () => { const data = await connection.api.download(`/reports/${id}/download`); save(data.bytes, `dr-bean-${id}.json`) }, false, 'secondary', true)
     details(root, 'Exact inputs this plan was created with', s.reviewed_context, 'technical')
     const controls = element('div', '', 'actions'); root.append(controls)
     button(controls, 'Refresh saved state', () => controller.refresh(), false, 'secondary')

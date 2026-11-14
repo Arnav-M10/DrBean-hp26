@@ -23,6 +23,8 @@ class Settings:
     source_intake_mode: str = "disabled"
     controlled_source_manifest_path: str | None = None
     shared_gateway_file: str | None = None
+    local_gateway_file: str | None = None
+    local_browser_origin: str | None = None
     browser_session_ttl_seconds: int = 86400
     browser_session_capacity: int = 4096
     research_mode: str = "controlled"
@@ -63,6 +65,8 @@ class Settings:
             browser_session_capacity=int(os.getenv("BEAN_BROWSER_SESSION_CAPACITY", "4096")),
             browser_session_ttl_seconds=int(os.getenv("BEAN_BROWSER_SESSION_TTL_SECONDS", "86400")),
             shared_gateway_file=os.getenv("BEAN_SHARE_GATEWAY_FILE", str(Path(os.getenv("BEAN_DATABASE_PATH", "var/bean.sqlite3")).parent / "share-gateway.json")) or None,
+            local_gateway_file=os.getenv("BEAN_LOCAL_GATEWAY_FILE") or None,
+            local_browser_origin=os.getenv("BEAN_LOCAL_BROWSER_ORIGIN") or None,
             allowed_origins=tuple(
                 origin.strip() for origin in os.getenv(
                     "BEAN_ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"

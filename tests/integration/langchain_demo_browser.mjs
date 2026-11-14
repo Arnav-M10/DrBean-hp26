@@ -141,16 +141,16 @@ try {
     const evidence = await json(`/records/${run.scenarios[0].result_id}`)
     const artifact = evidence.body.result.artifacts[0]
     await page.getByRole('button', { name: 'Refresh saved state', exact: true }).first().click()
-    await panel.getByRole('button', { name: 'Download native evidence', exact: true }).first().waitFor({ timeout: 60000 })
+    await panel.getByRole('button', { name: 'Download evidence file', exact: true }).first().waitFor({ timeout: 60000 })
     const download = async name => {
       const pending = page.waitForEvent('download')
       await panel.getByRole('button', { name, exact: true }).first().click()
       return readFile(await (await pending).path())
     }
-    const native = await download('Download native evidence')
+    const native = await download('Download evidence file')
     check('browser_native_download_matches_the_authenticated_artifact', sha256(native) === artifact.sha256
       && native.length === artifact.byte_size, `sha ${sha256(native).slice(0, 16)} vs ${artifact.sha256.slice(0, 16)}; ${native.length} vs ${artifact.byte_size} bytes`)
-    const anchor = JSON.parse(await download('Download independent replay anchors'))
+    const anchor = JSON.parse(await download('Download replay anchors'))
     check('browser_anchor_binds_the_run', anchor.run_id === child.id, `anchor run ${anchor.run_id}, child ${child.id}`)
     await panel.getByRole('button', { name: 'Download research report snapshot', exact: true }).first().waitFor({ timeout: 60000 })
     const report = (await download('Download research report snapshot')).toString('utf8')

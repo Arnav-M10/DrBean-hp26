@@ -10,17 +10,17 @@ From the repository root, `scripts/dev/setup.sh` once and then `scripts/dev/star
 node apps/web/serve.mjs
 ```
 
-Open `http://127.0.0.1:4173`. The proxy targets `127.0.0.1:8000` by default. A trusted local launch can set `BEAN_WEB_API_PORT` to a different loopback API port; browser requests cannot select another destination. The proxy rejects foreign hosts/origins and forwards neither cookies nor browser origin headers. This remains a local serving lane, not hosted authentication.
+Open the web address printed by the launcher. It automatically selects a private browser workspace using an HttpOnly cookie. Reloads and additional tabs reuse a valid session. Researchers do not enter access tokens or provider keys. Cookie expiry, clearing site data or changing the shared hostname cannot recover earlier private work; the UI offers explicit recovery or a new workspace without moving old records.
 
-Open **Server connection**, enter an authorized researcher access token, and choose or create a workspace. Credentials stay in memory and are cleared from the password field after connecting. They never enter URLs, downloads, cookies or browser storage. Reloading requires reconnecting. For teammates using the owner's one server and Gemini key, open its shared HTTPS link instead; see [Shared server](../../docs/shared-server.md). No per-person Gemini key is required.
+The launcher configures a separate private loopback proxy boundary. An operator running the web server alone must supply the matching local gateway file and exact origin to the API; otherwise private connection fails visibly. Direct API maintenance remains separate. For the optional shared HTTPS path, see [Shared server](../../docs/shared-server.md). Connection and navigation make no provider or scientific calls.
 
 ## Baseline workflow
 
 1. Enter measurements or import CSV columns `time,concentration,epsilon`. Review elapsed hours, concentrations in mg/L, positive hard allowances and included rows. CSV original spellings and source metadata are retained; original CSV file bytes remain with you.
 2. Enter experiment identity, the meaning of t=0, dataset origin, parameter domain and closed `ke` claim. Explain the hard allowances. Counterdex requires 3–128 rows, three distinct included times, strict positive parameter intervals and `upper(ke) < lower(ka)`.
-3. Review the draft and choose **Save inputs and prepare plan**. The immutable `counterdex.v1` plan freezes the question, success criterion, exact inputs and bounded provider-free baseline scope. An optional research goal becomes the question; otherwise the question is derived from the reviewed exact claim.
-4. Review the displayed objective and exact frozen records, check the approval box, then choose **Approve reviewed plan**. Saving inputs never runs science. Editing a draft requires a new plan and approval.
-5. Choose **Queue approved manual run**. The browser requires actual baseline availability; it does not use a global qualification badge. The worker searches and checks the submitted input. Pending runs update through read-only polling.
+3. Review the draft and choose **Save inputs and prepare check**. The immutable `counterdex.v1` plan freezes the question, success criterion, exact inputs and bounded provider-free baseline scope. An optional research goal becomes the question; otherwise the question is derived from the reviewed exact claim.
+4. Review the displayed objective and exact frozen records, check the approval box, then choose **Approve check**. Saving inputs never runs science. Editing a draft requires a new plan and approval.
+5. Choose **Run approved check**. The browser requires actual baseline availability; it does not use a global qualification badge. The worker searches and checks the submitted input. Pending runs update through read-only polling.
 6. Inspect execution state, scientific outcome, verification, expected binding and replay separately. Exact candidate vectors remain visible. A bounded search without a counterexample does not prove the claim.
 7. Download **native scientific evidence** and **replay anchors**. Native bytes are checked against both their response digest and the selected evidence reference. The application evidence-record and report downloads are separately labeled.
 
@@ -40,8 +40,8 @@ Keep a run identifier to reopen authenticated history after reconnecting. A repo
 
 1. Open a completed baseline with two freshly checked compatible candidates. The two candidate selectors use its actual retained vectors. A single counterexample does not unlock pair design.
 2. Enter the feasible elapsed times, a positive future hard allowance, its origin/explanation and the maximum approved horizon. The grid keeps its reviewed order. Explicitly choose whether fixed-candidate certificates may be constructed and extended through that horizon.
-3. Choose **Prepare measurement design** and inspect the exact frozen pair, assumptions and limits. The requested tier is checked pair separation; numerical guidance, no separation or unavailable results remain possible. This preview does not execute science.
-4. Check the separate design-approval box, choose **Approve reviewed design**, then **Queue approved design**. Editing the design invalidates the current browser approval. Pending jobs poll read-only, and the same accepted plan cannot spend its approval twice.
+3. Choose **Prepare comparison** and inspect the exact frozen pair, assumptions and limits. The requested tier is checked pair separation; numerical guidance, no separation or unavailable results remain possible. This preview does not execute science.
+4. Check the separate design-approval box, choose **Approve comparison**, then **Run approved comparison**. Editing the design invalidates the current browser approval. Pending jobs poll read-only, and the same accepted plan cannot spend its approval twice.
 5. Inspect the selected time and every grid row, including unavailable/skipped rows. Exact margins and checked prediction bands remain available. Checked separation applies only to this pair, grid and allowance; no separating time does not prove the candidates identical or exclude useful times elsewhere.
 6. Download the native design evidence and its separate replay anchors. The native packet includes baseline history and is replayable with the same CLI command shown above. Keep the design job identifier to reopen its result; the browser displays that job’s historical run, scenario and pair. Opening a different baseline clears the previous design display.
 

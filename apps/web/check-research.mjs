@@ -9,6 +9,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { captureDesign } from './design-capture.mjs'
 
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -28,9 +29,9 @@ const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', DRBEAN_VAR_DIR: scratch,
   BEAN_DEV_API_PORT: String(apiPort), BEAN_DEV_WEB_PORT: String(webPort), BEAN_RESEARCH_MODE: 'controlled',
   BEAN_AI_MODE: 'placeholder', PYTHONPATH: join(root, 'apps/api') + ':' + join(root, 'evaluation/drbean_eval/guard'),
   DRBEAN_EGRESS_GUARD_LOG: join(scratch, 'egress.jsonl'), LANGSMITH_TRACING: 'false' }
-let browser, token = '', launched = false, page
+let browser, browserContext, launched = false, page
 const checks = [], external = [], errors = []
-const redact = value => token ? String(value).split(token).join('[synthetic private credential]') : String(value)
+const redact = value => String(value)
 async function command(executable, args, timeout = 45000) {
   const child = spawn(executable, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
   let text = '', timer
@@ -43,8 +44,11 @@ async function command(executable, args, timeout = 45000) {
   return text
 }
 async function api(path) {
-  const response = await fetch(`http://127.0.0.1:${apiPort}/api/bean/v1${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) })
-  assert.equal(response.status, 200, await response.clone().text())
+  assert.ok(browserContext || path === '/capabilities', 'Private API evidence requires the actual browser context')
+  const response = browserContext ? await browserContext.request.get(`${base}/api/bean/v1${path}`)
+    : await fetch(`${base}/api/bean/v1${path}`, { signal: AbortSignal.timeout(15000) })
+  const status = browserContext ? response.status() : response.status
+  assert.equal(status, 200, status === 200 ? '' : await response.text())
   return response.json()
 }
 const check = name => checks.push(name)
@@ -53,8 +57,6 @@ try {
   await command(python, ['-m', 'bean_api.bootstrap'], 10000)
   await command(python, ['scripts/dev/launcher.py', 'start'])
   launched = true
-  const credentials = JSON.parse(await readFile(join(scratch, 'auth.json'), 'utf8'))
-  token = Object.values(credentials)[0]
   const capabilities = await api('/capabilities')
   assert.equal(capabilities.deepagents.execution_mode, 'controlled', JSON.stringify(capabilities.deepagents))
   assert.equal(capabilities.deepagents.dispatch_enabled, true, JSON.stringify(capabilities.deepagents))
@@ -62,6 +64,7 @@ try {
   check('actual-launcher-api-worker-and-controlled-policy-ready')
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] })
   const context = await browser.newContext({ acceptDownloads: true })
+  browserContext = context
   page = await context.newPage()
   page.on('pageerror', error => errors.push(error.message))
   await page.route('**/*', route => {
@@ -70,14 +73,13 @@ try {
     return route.continue()
   })
   await page.goto(base + '#inputs')
-  await page.locator('#connection-panel summary').click()
-  await page.fill('#bearer', token)
-  await page.getByRole('button', { name: 'Connect', exact: true }).click()
-  await page.waitForFunction(() => document.querySelector('#connection-status').textContent.includes('Connected'))
-  await page.fill('#workspace-name', 'Narrow agent browser: explicit synthetic readings, computed evidence')
-  await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('#workspace-select').value !== '')
   const workspace = await page.locator('#workspace-select').inputValue()
+  assert.equal(await page.locator('#bearer').isVisible(), false)
+  const connected = await api('/shared-session/current')
+  assert.equal(connected.workspace_id, workspace)
+  assert.equal(connected.credentials, 'server_managed')
+  check('automatic-private-browser-session-without-token-entry')
   // Exercise the ordinary file input, not the optional example button.
   const file = join(scratch, 'reviewed-synthetic-readings.csv')
   await writeFile(file, 'time,concentration,epsilon\n0.25,4.80,0.50\n0.5,7.20,0.50\n1,8.00,0.50\n2,6.80,0.50\n4,5.70,0.50\n')
@@ -111,6 +113,7 @@ try {
   const approve = panel.getByRole('button', { name: 'Approve exact operation and continue', exact: true })
   assert.equal(await approve.isDisabled(), true)
   check('real-maintained-plan-and-canonical-interrupt-do-not-authorize-a-child')
+  await captureDesign(page, 'agent-investigation-review')
   await panel.getByLabel('I approve only this frozen scientific scope and its limits.', { exact: true }).check()
   await approve.click()
   await panel.getByRole('button', { name: 'Plan next step for separate review', exact: true }).waitFor({ timeout: 140000 })
@@ -118,6 +121,7 @@ try {
   assert.equal(session.state, 'completed')
   assert.equal(session.children.length, 1)
   assert.equal(session.reports.length, 1)
+  await captureDesign(page, 'agent-baseline-report')
   await panel.getByRole('button', { name: 'Plan next step for separate review', exact: true }).click()
   await panel.getByRole('heading', { name: 'Review the separate pair-design operation', exact: true }).waitFor({ timeout: 140000 })
   session = await api(`/research-sessions/${session.id}`)
@@ -131,6 +135,7 @@ try {
   assert.deepEqual(session.pending_review.body.request.candidate_ids, baseline.body.result.candidates.map(candidate => candidate.id))
   assert.equal(await approve.isDisabled(), true)
   check('approved-real-baseline-read-by-agent-leads-to-separate-bound-pair-design-review')
+  await captureDesign(page, 'agent-separate-design-review')
   await panel.getByLabel('I approve only this frozen scientific scope and its limits.', { exact: true }).check()
   await approve.click()
   await page.waitForFunction(() => document.querySelector('#durable-research').textContent.includes('State: completed'), null, { timeout: 140000 })
@@ -139,23 +144,33 @@ try {
   assert.ok(session.children.every(child => child.state === 'completed'))
   assert.equal(session.reports.length, 2)
   check('separate-design-approval-computes-design-and-accepts-evidence-bound-report')
-  const navigate = async name => page.locator('.steps').getByRole('link', { name }).click()
+  const navigate = async name => {
+    const link = page.locator('.steps').getByRole('link', { name })
+    const hash = await link.getAttribute('href'), previous = await page.evaluate(() => location.hash)
+    await link.click()
+    await page.waitForFunction(({ hash, changed }) => location.hash === hash
+      && !document.getElementById(hash.slice(1)).hidden
+      && (!changed || document.activeElement?.id === `${hash.slice(1)}-title`), { hash, changed: previous !== hash })
+  }
   await navigate(/^Next measurement/)
+  await captureDesign(page, 'agent-design-report')
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#research-report').getByRole('button', { name: 'Download research report snapshot', exact: true }).last().click()])
   await download.saveAs(join(output, 'report.json'))
   const report = JSON.parse(await readFile(join(output, 'report.json'), 'utf8')).body
   assert.equal(report.report_profile, 'research-report.v2')
   assert.equal(report.evidence.length, 2)
   assert.equal(report.native_evidence.length, 2)
-  const evidence = page.locator('#research-results, #research-next')
-  const nativeButtons = evidence.getByRole('button', { name: 'Download native evidence', exact: true })
-  const anchorButtons = evidence.getByRole('button', { name: 'Download independent replay anchors', exact: true })
   for (let index = 0; index < report.native_evidence.length; index++) {
     const entry = report.native_evidence[index]
     const record = report.evidence.find(item => item.id === entry.evidence_id)
     await navigate(record.kind === 'suggestion' ? /^Next measurement/ : /^Result/)
-    const [native] = await Promise.all([page.waitForEvent('download'), nativeButtons.nth(index).click()])
-    const [anchor] = await Promise.all([page.waitForEvent('download'), anchorButtons.nth(index).click()])
+    // Baseline and design evidence live on separate pages. Bind the visible
+    // card to its artifact instead of indexing a list whose hidden entries vary.
+    const evidence = page.locator(record.kind === 'suggestion' ? '#research-next' : '#research-results')
+    const card = evidence.locator('section.callout').filter({ hasText: entry.artifact.id })
+    assert.equal(await card.count(), 1, `One displayed card must bind artifact ${entry.artifact.id}`)
+    const [native] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Download evidence file', exact: true }).click()])
+    const [anchor] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Download replay anchors', exact: true }).click()])
     const nativePath = join(output, entry.native_filename), anchorPath = join(output, entry.anchor_filename)
     await native.saveAs(nativePath); await anchor.saveAs(anchorPath)
     assert.equal(createHash('sha256').update(await readFile(nativePath)).digest('hex'), entry.artifact.sha256)

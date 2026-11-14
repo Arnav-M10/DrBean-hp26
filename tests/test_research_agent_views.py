@@ -253,10 +253,42 @@ def test_canonical_plan_marks_only_evidence_backed_completion_as_completed():
     asyncio.run(ports.record_plan(items, plan_digest(items), {"Investigate": ["evidence_1"], "Claimed elsewhere": []}))
     steps = {step["title"]: step for step in backend.plans[0]["steps"]}
     assert (steps["Investigate"]["status"], steps["Investigate"]["reference_ids"]) == ("completed", ["evidence_1"])
-    assert "after it read the cited checked evidence" in steps["Investigate"]["reason"]
+    assert "after it read the cited evidence" in steps["Investigate"]["reason"]
     assert (steps["Claimed elsewhere"]["status"], steps["Claimed elsewhere"]["reference_ids"]) == ("pending", [])
     assert "Agent-proposed completion" in steps["Claimed elsewhere"]["reason"]
     assert steps["Design"]["status"] == "pending" and steps["Design"]["reason"] == "Agent-proposed research step."
+
+
+@pytest.mark.parametrize("outcome,verification,replay", [
+    ("inconclusive", "inconclusive", "passed"),
+    ("numerical_candidate", "not_checked", "not_run"),
+])
+def test_completing_evidence_read_never_labels_unresolved_or_numerical_results_checked(outcome, verification, replay):
+    fact = investigation_fact()
+    fact.update(scientific_outcome=outcome, verification=verification, replay=replay)
+    fact["verification_record"]["verification"] = verification
+    fact["native_replay"].update(verification=verification, replay=replay)
+    fact["native_replay"]["outcome"]["scientific_outcome"] = outcome
+    original = copy.deepcopy(fact)
+    view = _model_fact(fact)
+    items = todos(("Read the scientific result", "completed"))["todos"]
+    citations = _plan_evidence(thread(
+        ("read_research_evidence", {"evidence_id": fact["id"]}, view, "success"),
+        ("write_todos", {"todos": items}, None, "success"),
+    ))
+    ports, backend = canonical_ports()
+    asyncio.run(ports.record_plan(items, plan_digest(items), citations))
+    step = backend.plans[0]["steps"][0]
+    assert (step["status"], step["reference_ids"]) == ("completed", [fact["id"]])
+    assert step["reason"] == ("Completed by the assistant after it read the cited evidence; "
+                              "that evidence keeps its own verification status.")
+    # Reading the result can finish a planning step. It cannot make unresolved
+    # science checked, including when a separate replay has passed.
+    assert view["scientific_outcome"] == view["native_replay"]["outcome"]["scientific_outcome"] == outcome
+    assert view["verification"] == view["native_replay"]["verification"] == verification
+    assert view["replay"] == view["native_replay"]["replay"] == replay
+    assert view["expected_binding"] == view["native_replay"]["expected_binding"] == fact["expected_binding"]
+    assert fact == original
 
 
 @pytest.mark.parametrize("evidence,code", [

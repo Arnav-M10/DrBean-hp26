@@ -2,6 +2,7 @@
 from contextlib import ExitStack
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import threading
@@ -120,6 +121,29 @@ class Sharing(unittest.TestCase):
         self.assertIn("http://127.0.0.1:4174", command)
         self.assertNotIn("--token", command)
         self.assertNotIn(json.loads(credential)["secret"], self.output.getvalue())
+
+    def test_real_launcher_environment_does_not_pass_local_proof_configuration_to_public_children(self):
+        # Use the actual launcher environment so additions to it cannot bypass
+        # this boundary through the small controlled() fixture above.
+        with mock.patch.dict(os.environ, {}, clear=True):
+            environment = share.launcher.child_env()
+        self.assertEqual(environment["BEAN_LOCAL_GATEWAY_FILE"], str(self.path / "local-gateway.json"))
+        self.assertIn("BEAN_LOCAL_BROWSER_ORIGIN", environment)
+        captured = {}
+
+        def capture(name, command, env):
+            captured[name] = env.copy()
+            return self.spawn(name, command, env)
+
+        with self.controlled(), mock.patch.object(share.launcher, "child_env", return_value=environment), \
+                mock.patch.object(share.launcher, "spawn", side_effect=capture):
+            self.assertEqual(share.start(), 0)
+        self.assertEqual(set(captured), {"share-gateway", "share-tunnel"})
+        for name, env in captured.items():
+            self.assertFalse(any(key.startswith("BEAN_LOCAL_") for key in env), name)
+            shared = {key: value for key, value in env.items() if key.startswith("BEAN_SHARE_")}
+            self.assertEqual(shared, {"BEAN_SHARE_ORIGIN_FILE": str(self.origin),
+                                      "BEAN_SHARE_GATEWAY_FILE": str(self.gateway)} if name == "share-gateway" else {})
 
     def test_partial_failure_recovers_without_api_restart_or_credential_rotation(self):
         def fail_tunnel(name, command, env):

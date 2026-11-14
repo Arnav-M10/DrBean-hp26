@@ -35,14 +35,14 @@ export function fileMediaHint(file) {
 }
 
 export function validateFileSelection(existing, files, limits) {
-  if (!limits.available) throw new Error('General file admission is unavailable on this server. Existing evidence is unchanged.')
+  if (!limits.available) throw new Error('This server cannot accept files right now. Files you already added are unchanged.')
   if (!files.length || existing.length + files.length > limits.maxFiles) throw new Error(`Choose between 1 and ${limits.maxFiles} files in total.`)
   for (const file of files) {
     if (typeof file.name !== 'string' || !file.name || file.name.length > 240) throw new Error('Choose a file with a name of 240 characters or fewer.')
     if (!Number.isSafeInteger(file.size) || file.size < 1 || file.size > limits.maxFileBytes) throw new Error(`${file.name}: files must be nonempty and at most ${Math.floor(limits.maxFileBytes / 1024 / 1024)} MiB.`)
     if (!limits.mediaTypes.includes(fileMediaHint(file))) throw new Error(`${file.name}: this format is not supported by the server. Choose an advertised CSV, TSV, JSON, text, image or PDF format.`)
   }
-  if (existing.reduce((n, file) => n + file.byte_size, 0) + files.reduce((n, file) => n + file.size, 0) > limits.maxTotalBytes) throw new Error('Selected files exceed the 10 MiB combined limit. Remove a file or choose a smaller scope.')
+  if (existing.reduce((n, file) => n + file.byte_size, 0) + files.reduce((n, file) => n + file.size, 0) > limits.maxTotalBytes) throw new Error('These files are over the 10 MiB combined limit. Remove a file or choose smaller ones.')
 }
 
 export function validateResearchAsset(asset, expected = {}) {
@@ -53,7 +53,7 @@ export function validateResearchAsset(asset, expected = {}) {
       || expected.id && asset.id !== expected.id
       || expected.workspaceId && asset.workspace_id && asset.workspace_id !== expected.workspaceId) throw new Error('The retained file does not match the selected bytes or workspace.')
   const pages = list(asset.pages, GENERAL_LIMITS.pdfPages, 'page list')
-  if (!pages.length) throw new Error('The server admitted no inspectable pages. Use a supported file or a smaller excerpt.')
+  if (!pages.length) throw new Error('The server could not read any pages from this file. Try a supported file type or a shorter excerpt.')
   pages.forEach((page, index) => {
     if (page.page_index !== index || page.page_number !== index + 1) throw new Error('The server returned inconsistent source page identities.')
     for (const key of ['image_sha256', 'text_sha256']) if (page[key] !== null && !SHA.test(page[key])) throw new Error('The source page digest is invalid.')
@@ -62,7 +62,7 @@ export function validateResearchAsset(asset, expected = {}) {
 }
 
 export function validateResearchAnalysis(record, assets, workspaceId) {
-  if (JSON.stringify(record).length > 4 * 1024 * 1024) throw new Error('The analysis exceeds the bounded browser preview. Request a smaller scope.')
+  if (JSON.stringify(record).length > 4 * 1024 * 1024) throw new Error('This answer is too large to show here. Ask about fewer files or a narrower question.')
   if (!record || !ID.test(record.id) || record.workspace_id && record.workspace_id !== workspaceId) throw new Error('The saved analysis belongs to another workspace or has an invalid identity.')
   const body = record.body
   if (!body || body.verification?.status !== 'not_mathematically_verified') throw new Error('General AI analysis cannot be presented as a mathematically verified result.')
@@ -124,7 +124,7 @@ export class GeneralResearchWorkspace {
   key() { return `drbean-general-v1:${this.identityId}:${this.connection.workspaceId}` }
   persist() {
     if (!this.connection.workspaceId) return
-    try { this.storage?.setItem('drbean-general-active-identity', this.identityId); this.storage?.setItem(this.key(), JSON.stringify({ version: 1, assets: this.state.assets.map(({ id, sha256 }) => ({ id, sha256 })), question: this.state.question, pending: this.state.pending, pendingUploads: this.state.pendingUploads, history: this.state.history })) } catch { this.state.notice = 'Browser storage is unavailable. Keep this tab open to retain pending request identities.' }
+    try { this.storage?.setItem('drbean-general-active-identity', this.identityId); this.storage?.setItem(this.key(), JSON.stringify({ version: 1, assets: this.state.assets.map(({ id, sha256 }) => ({ id, sha256 })), question: this.state.question, pending: this.state.pending, pendingUploads: this.state.pendingUploads, history: this.state.history })) } catch { this.state.notice = 'This browser cannot store data for this page. Keep the tab open until any unanswered request is resolved.' }
   }
   async connect(connection) {
     const same = connection.api === this.connection.api && connection.workspaceId === this.connection.workspaceId && connection.mode === this.connection.mode
@@ -173,7 +173,7 @@ export class GeneralResearchWorkspace {
         }))
         if (generation !== this.generation) return
         this.state.assets = assets
-        this.state.notice = this.state.pending.length ? 'A request may have completed before this page closed. Inspect its frozen disclosure and deliberately retry the same request; no analysis runs automatically.' : 'Retained sources restored. Reopen a saved analysis without another model call.'
+        this.state.notice = this.state.pending.length ? 'A request may have finished before this page closed. Read what was sent, then retry the same request if you want its answer. Nothing runs by itself.' : 'Retained sources restored. Reopen a saved analysis without another model call.'
       } catch (error) { if (generation === this.generation) this.state.error = `Saved workspace could not be reopened: ${error.message}` }
     }
     if (generation === this.generation) { this.state.busy = false; this.emit() }
@@ -204,7 +204,7 @@ export class GeneralResearchWorkspace {
   }
   async upload(files) {
     if (this.state.busy) return
-    try { validateFileSelection(this.state.assets, files, this.limits); if (!this.service) throw new Error('Connect to a private workspace first.') } catch (error) { this.state.error = error.message; this.emit(); return }
+    try { validateFileSelection(this.state.assets, files, this.limits); if (!this.service) throw new Error('Connect to your workspace first.') } catch (error) { this.state.error = error.message; this.emit(); return }
     this.state.busy = true; this.state.error = ''; this.state.review = null; this.state.accepted = false; this.emit()
     const generation = this.generation
     const service = this.service, workspaceId = this.connection.workspaceId
@@ -240,14 +240,14 @@ export class GeneralResearchWorkspace {
         this.uploadFiles.delete(operation.id)
         this.persist()
       }
-      this.state.notice = 'Files retained for your inspection. Nothing has been sent to Gemini.'
+      this.state.notice = 'Files added. Nothing has been sent to Gemini.'
     } catch (error) { if (generation === this.generation) this.state.error = `${error.message} Previously admitted files and evidence are preserved.` }
     finally { if (generation === this.generation) { this.state.busy = false; this.emit() } }
   }
   async retryUpload(operationId) {
     const file = this.uploadFiles.get(operationId)
     if (file) return this.upload([file])
-    this.state.notice = 'Reselect the original file to retry this upload. Its exact filename, bytes and media hint must match; the saved operation ID will be reused.'; this.emit()
+    this.state.notice = 'To retry this upload, choose the same file again. Its name and contents must match exactly.'; this.emit()
   }
   async prepareReview() {
     if (this.state.busy) return
@@ -260,7 +260,7 @@ export class GeneralResearchWorkspace {
         if (generation !== this.generation) return
         this.connection.capabilities = capabilities; this.limits = generalCapabilities(capabilities)
       }
-      if (!this.service || !this.state.assets.length) throw new Error('Add at least one admitted file to a private workspace first.')
+      if (!this.service || !this.state.assets.length) throw new Error('Add at least one file first.')
       const question = this.state.question.trim()
       if (!question || question.length > 8000) throw new Error('Enter a question of 1–8,000 characters about your files.')
       if (!this.limits.analysisAvailable || !this.limits.model) throw new Error(this.limits.reason || 'Gemini analysis is unavailable. Your files and question remain available for manual review.')

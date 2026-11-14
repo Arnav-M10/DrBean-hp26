@@ -128,8 +128,9 @@ def start():
     clear_origin()
     env = launcher.child_env()  # No provider credentials in the gateway or tunnel.
     # Paths are only needed by the gateway; cloudflared gets no credential or
-    # credential-file configuration. Ignore inherited sharing overrides.
-    env = {key: value for key, value in env.items() if not key.startswith("BEAN_SHARE_")}
+    # credential-file configuration. Neither public child needs local browser
+    # proof configuration; only the gateway gets its explicit sharing paths.
+    env = {key: value for key, value in env.items() if not key.startswith(("BEAN_SHARE_", "BEAN_LOCAL_"))}
     gateway_env = {**env, "BEAN_SHARE_ORIGIN_FILE": str(ORIGIN_FILE),
                    "BEAN_SHARE_GATEWAY_FILE": str(GATEWAY_FILE)}
     log = Path(launcher.RUN) / "share-tunnel.log"

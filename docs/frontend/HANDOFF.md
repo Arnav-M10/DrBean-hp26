@@ -67,7 +67,7 @@ Manual browser rehearsal (isolated API/worker/web on 8811/4811): first visit, ex
 1. Start the stack (`scripts/dev/start.sh`), open the web app and expand **Connect to a Dr. Bean server** if it is not automatic; create or pick a workspace.
 2. On **Start**, choose **Start with the example study**. The claim and search limits are prefilled from the synthetic example and marked as such.
 3. In **Check inputs → Measurements**, choose **Use these rows**. Note the plot: each reading with its ±0.50 mg/L allowance bar. Choose **Next: describe the claim**, review the values, then **Next: review inputs**.
-4. On **Review and approve**, read "What the check will assume", choose **Save inputs and prepare plan**, read what the approval covers (no AI model, limits, design not included), tick the box, **Approve reviewed plan**, then **Queue approved manual run**.
+4. On **Review and approve**, read "What the check will assume", choose **Save inputs and prepare check**, read what the approval covers (no AI model, limits, design not included), tick the box, **Approve check**, then **Run approved check**.
 5. **Investigate** shows the real state; when it finishes choose **View results**.
 6. **Result**: the claim is not forced — one checked candidate lies outside the shaded claim. Both curves pass every allowance bar. Read "Still uncertain". Download evidence if needed.
 7. **Compare measurement times**: enter `8, 6`, allowance `0.2`, latest time `8`, a reason, tick both permissions, prepare, approve, queue. The chart shows where the two curves part and marks the suggested time.

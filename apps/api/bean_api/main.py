@@ -31,7 +31,7 @@ from .source_materialization import SourceMaterializationService
 from .resource_policy import describe_policy
 from .runtime_status import read_status
 from .store import Store
-from .sessions import BrowserSessions, SessionError, clear_session_cookie
+from .sessions import COOKIE, BrowserSessions, SessionError, clear_session_cookie
 from .workflow import DomainError, Workflow
 
 PREFIX = "/api/bean/v1"
@@ -97,6 +97,8 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None,
     app.state.provider, app.state.adapter = provider, adapter
     app.state.controlled_source_proposer = controlled_source_proposer
     app.state.sessions = BrowserSessions(store, gateway_file=settings.shared_gateway_file,
+                                        local_gateway_file=settings.local_gateway_file,
+                                        local_browser_origin=settings.local_browser_origin,
                                         ttl_seconds=settings.browser_session_ttl_seconds,
                                         max_sessions=settings.browser_session_capacity)
     app.add_middleware(RequestBoundary, max_json_bytes=settings.max_json_bytes, max_upload_bytes=settings.max_upload_bytes)
@@ -116,12 +118,16 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None,
         response = JSONResponse(error_body(request.state.request_id, exc.code, exc.message), status_code=exc.status,
                                 headers={"Cache-Control": "no-store"})
         if exc.clear_cookie:
-            clear_session_cookie(response)
+            clear_session_cookie(response, cookie=getattr(request.state, "browser_session_cookie", COOKIE))
         return response
 
     @app.get(PREFIX + "/shared-session")
     def shared_session(request: Request, response: Response):
         return app.state.sessions.bootstrap(request, response)
+
+    @app.get(PREFIX + "/shared-session/current")
+    def current_shared_session(request: Request, response: Response):
+        return app.state.sessions.current(request, response)
 
     @app.post(PREFIX + "/shared-session/rotate")
     def rotate_shared_session(request: Request, response: Response):

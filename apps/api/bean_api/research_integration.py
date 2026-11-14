@@ -221,7 +221,7 @@ class _CanonicalPorts:
             status = todo["status"] if todo["status"] != "completed" or cited else "pending"
             steps.append({"id": step_id, "title": title, "status": status,
                 "dependencies": [], "reference_ids": cited,
-                "reason": "Completed by the assistant after it read the cited checked evidence; that evidence "
+                "reason": "Completed by the assistant after it read the cited evidence; that evidence "
                           "keeps its own verification status." if cited else
                 "Agent-proposed completion; canonical execution remains authoritative."
                 if todo["status"] == "completed" else "Agent-proposed research step."})

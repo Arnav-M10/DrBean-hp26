@@ -13,7 +13,8 @@ const rawCsv = await readFile(new URL('./fixtures/general/penguins-excerpt.csv',
 const manifest = JSON.parse(await readFile(new URL('./fixtures/general/provenance.json', import.meta.url)))
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 assert.equal(hash(rawCsv), manifest.excerpt_sha256)
-const server = spawn(process.execPath, ['serve.mjs', '0'], { cwd: root + 'apps/web', stdio: ['ignore', 'pipe', 'inherit'] })
+const server = spawn(process.execPath, ['serve.mjs', '0'], { cwd: root + 'apps/web',
+  env: { PATH: process.env.PATH, BEAN_WEB_API_PORT: '9' }, stdio: ['ignore', 'pipe', 'inherit'] })
 const checks = []
 const check = (name, condition) => { assert.ok(condition, name); checks.push(name) }
 let browser
@@ -36,7 +37,7 @@ try {
   const json = (route, object, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(object) })
   await page.route('**/api/bean/v1/**', async route => {
     const request = route.request(), path = new URL(request.url()).pathname.replace('/api/bean/v1', '')
-    if (path === '/shared-session') return json(route, { mode: 'browser_session', authenticated: true, credentials: 'server_managed', workspace_id: workspace })
+    if (path === '/shared-session/current') return json(route, { mode: 'browser_session', authenticated: true, credentials: 'server_managed', workspace_id: workspace })
     if (path === '/capabilities') return json(route, caps)
     if (path === '/workspaces') return json(route, [{ id: workspace, name: 'Controlled UI fixture workspace' }])
     if (path === `/workspaces/${workspace}/research-assets`) {

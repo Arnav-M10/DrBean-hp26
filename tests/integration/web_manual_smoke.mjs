@@ -20,7 +20,8 @@ const checks = []
 const check = (id, ok, detail = '') => { checks.push({ id, passed: Boolean(ok), detail }); return ok }
 
 const web = fileURLToPath(new URL('../../apps/web/', import.meta.url))
-const server = spawn(process.execPath, ['serve.mjs', '0'], { cwd: web, stdio: ['ignore', 'pipe', 'inherit'] })
+const server = spawn(process.execPath, ['serve.mjs', '0'], { cwd: web,
+  env: { PATH: process.env.PATH, BEAN_WEB_API_PORT: '9' }, stdio: ['ignore', 'pipe', 'inherit'] })
 let browser
 try {
 const url = await new Promise((resolve, reject) => {
@@ -36,17 +37,21 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   const page = await context.newPage()
   const external = []
   const errors = []
-  let localSessionProbe = false
+  let localSessionProbes = 0
+  const sessionRequests = []
   page.on('response', response => {
-    if (response.url() === `${url}/api/bean/v1/shared-session` && response.status() === 404) localSessionProbe = true
+    if (response.url() === `${url}/api/bean/v1/shared-session/current` && response.status() === 503) localSessionProbes++
   })
-  page.on('request', request => { if (!request.url().startsWith(url) && !/^(blob|data):/.test(request.url())) external.push(request.url()) })
+  page.on('request', request => {
+    if (!request.url().startsWith(url) && !/^(blob|data):/.test(request.url())) external.push(request.url())
+    if (request.url().startsWith(`${url}/api/bean/v1/`)) sessionRequests.push({ url: request.url(), method: request.method() })
+  })
   page.on('pageerror', error => errors.push(String(error)))
   page.on('console', message => {
-    // The frozen session contract deliberately uses 404 at the local owner
-    // boundary. Chromium reports that expected network probe as console noise;
+    // This offline-editor lane intentionally has no configured API/session
+    // boundary. Chromium reports that exact unavailable read as console noise;
     // actual JS exceptions and all other console errors still fail this lane.
-    const expectedLocalProbe = message.location().url === `${url}/api/bean/v1/shared-session` && message.text().includes('404')
+    const expectedLocalProbe = message.location().url === `${url}/api/bean/v1/shared-session/current` && message.text().includes('503')
     if (message.type() === 'error' && !expectedLocalProbe) errors.push(`${message.text()} ${message.location().url}`)
   })
   // General research is now the primary entry; science remains an explicit path.
@@ -76,6 +81,9 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   await page.waitForSelector('#question:not([hidden])')
   const bounds = { aMin: '1', aMax: '12', keMin: '1/10', keMax: '0.3', kaMin: '1/2', kaMax: '2', targetMin: '0.10', targetMax: '17/100' }
   for (const [id, value] of Object.entries(bounds)) await page.fill(`#${id}`, value)
+  await page.fill('#experiment-id', 'offline_editor_synthetic')
+  await page.fill('#time-origin', 'Elapsed hours from the declared synthetic t=0')
+  await page.selectOption('#dataset-origin', 'synthetic')
 
   // A complete structured draft must not be blocked by a blank free-text goal.
   await page.fill('#allowanceOrigin', 'Team-chosen hard allowance of 0.50 mg/L for the synthetic example.')
@@ -86,6 +94,8 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   const review = await page.locator('#review-summary').textContent() // includes the collapsed exact-values disclosure
   check('review-shows-exact-values', review.includes('[1/10, 3/10]') && review.includes('[1/10, 17/100]'),
     'exact normalized bounds are shown in review')
+  await page.locator('#manual-path > summary').click()
+  await page.locator('#backend-review').getByText('Investigation planning is unavailable', { exact: false }).waitFor({ state: 'visible' })
   check('planning-honestly-unavailable', (await page.locator('#review').innerText()).includes('Investigation planning is unavailable'),
     'the page does not pretend a backend exists')
 
@@ -103,7 +113,10 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   check('exact-canonical', exact.every(value => rational.test(value)), exact.slice(0, 4).join(' '))
 
   check('no-external-requests', external.length === 0, external.join(' ') || 'no request left 127.0.0.1 (no provider call, offline assets)')
-  check('local-session-boundary-is-unavailable', localSessionProbe, 'local owner mode returns the required 404 instead of provisioning a public/shared identity')
+  for (let wait = 0; localSessionProbes < 3 && wait < 20; wait++) await page.waitForTimeout(100)
+  check('offline-connection-retries-only-safe-reads', localSessionProbes === 3 && sessionRequests.length === 3
+    && sessionRequests.every(request => request.method === 'GET' && request.url === `${url}/api/bean/v1/shared-session/current`),
+    'the unavailable server produces three bounded current-session reads, with no issuance, science or provider operation')
   check('no-page-errors', errors.length === 0, errors.join(' | '))
   check('no-credentials-in-browser-storage', await page.evaluate(() => localStorage.length + sessionStorage.length === 0) && (await context.cookies()).length === 0, 'no cookies or storage')
 } finally {

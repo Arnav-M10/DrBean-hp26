@@ -246,7 +246,7 @@ function renderReview() {
   for (const [symbol, label, units, lower, upper] of bounds) {
     exactList.append(element('dt', `${label} (${symbol}, ${units})`), element('dd', `[${exact[lower]}, ${exact[upper]}]`))
   }
-  details.append(element('summary', 'Exact model bounds and target interval'), exactList)
+  details.append(element('summary', 'Exact search limits and claimed range'), exactList)
   summary.append(details)
 }
 
@@ -306,7 +306,7 @@ function updateChrome() {
     if (state) item.dataset.status = state; else delete item.dataset.status
     item.querySelector('.step-state').textContent = text
   }
-  setStep('start', status.connected ? 'done' : 'attention', status.connected ? (status.workspace ? 'Connected' : 'Choose a workspace') : 'Not connected')
+  setStep('start', status.connected ? 'done' : 'attention', status.connected ? 'Ready' : status.mode === 'session_error' ? 'Connection needs attention' : 'Connecting')
   setStep('inputs', status.approved ? 'done' : status.planned && status.planCurrent ? 'attention' : '',
     status.approved ? 'Approved' : status.planned && status.planCurrent ? 'Waiting for your approval' : status.inputsCurrent ? 'Inputs saved' : inputsReady ? 'Ready to review' : rows.some(row => row.time || row.concentration) ? 'In progress' : 'Not started')
   const run = status.run
@@ -320,15 +320,19 @@ function updateChrome() {
 
   const pill = byId('connection-pill')
   pill.dataset.state = status.connected ? 'on' : status.mode === 'session_error' ? 'error' : 'off'
-  pill.textContent = status.connected ? (status.mode === 'browser_session' ? 'Private workspace' : status.workspace ? 'Connected' : 'Connected, no workspace') : status.mode === 'session_error' ? 'Connection failed' : 'Not connected'
+  pill.textContent = status.connected ? 'Ready · Private workspace' : status.mode === 'session_error' ? 'Connection needs attention' : 'Connecting…'
   byId('connection-panel').dataset.state = status.connected && status.workspace ? 'on' : 'off'
   const summary = byId('connection-panel').querySelector('summary'), note = byId('connection-summary-note')
   if (status.connected && status.workspace) {
-    const name = byId('workspace-select').selectedOptions[0]?.textContent
-    summary.textContent = status.mode === 'browser_session' ? 'Connected to your private workspace' : `Connected to workspace “${name || status.workspace}”`
+    summary.textContent = 'Ready · Private workspace and connection details'
     note.textContent = 'Saved checks and research plans are stored in this workspace on the server.'
-  } else if (status.connected) { summary.textContent = 'Connected: choose a workspace'; note.textContent = 'Pick an existing workspace or create one to keep your work on the server.' }
-  else if (status.mode === 'session_error') note.textContent = 'The private session could not be established. Reload once the server is available.'
+  } else if (status.mode === 'session_error') {
+    summary.textContent = 'Connection needs attention'
+    note.textContent = 'Open the connection details to retry or review recovery options. Retrying never resubmits an investigation.'
+  } else {
+    summary.textContent = 'Connecting to your private workspace…'
+    note.textContent = 'You can prepare a draft while the private workspace opens. Connecting does not run an investigation.'
+  }
 
   const context = byId('study-context')
   const experiment = byId('experiment-id').value.trim()
@@ -340,7 +344,7 @@ function updateChrome() {
   const path = byId('investigation-path')
   const action = assistantReady && inputsReady
   path.replaceChildren(element('h2', 'Research with the assistant'),
-    element('p', !status.connected ? 'Connect to your study workspace to continue. You can still edit or download this draft.' : !status.workspace ? 'Choose a study workspace to continue.' : !assistantReady ? 'The assistant is unavailable in this workspace. Open the manual check below to use Counterdex directly.' : !inputsReady ? 'Finish the measurements and assumptions above before you continue.' : 'Save the reviewed inputs on Investigate, then explicitly ask the assistant to plan a check. You’ll approve the proposed operation separately.'))
+    element('p', !status.connected ? 'Your private workspace must be ready before you save research. Check the connection status above; you can still edit or download this draft.' : !status.workspace ? 'Choose a study workspace to continue.' : !assistantReady ? 'The assistant is unavailable in this workspace. Open the manual check below to use Counterdex directly.' : !inputsReady ? 'Finish the measurements and assumptions above before you continue.' : 'Save the reviewed inputs on Investigate, then explicitly ask the assistant to plan a check. You’ll approve the proposed operation separately.'))
   if (action) path.append(element('a', session ? 'Open research plan' : 'Research with the assistant', { href: '#investigations', class: 'button' }))
   byId('backend-results').hidden = agentFinding && !run
   byId('backend-next').hidden = Boolean(agentFinding && !run)
@@ -360,7 +364,12 @@ function renderResume(status) {
     item.append(text, element('a', status.run.evidence ? 'View result' : 'Follow progress', { href: status.run.evidence ? '#result' : '#investigations', class: 'button secondary' }))
     items.push(item)
   }
-  for (const previous of research?.controller?.state?.history ?? []) {
+  const currentResearch = research?.controller?.state?.snapshot
+  const researchHistory = research?.controller?.state?.history ?? []
+  const savedResearch = currentResearch
+    ? [currentResearch, ...researchHistory.filter(previous => previous.id !== currentResearch.id)]
+    : researchHistory
+  for (const previous of savedResearch) {
     const item = element('div', '', { class: 'resume-item' })
     const text = element('div')
     text.append(element('strong', previous.objective.slice(0, 160)), element('p', `Research plan, ${previous.state.replaceAll('_', ' ')}`))
@@ -372,7 +381,7 @@ function renderResume(status) {
     items.push(item)
   }
   if (!items.length) {
-    const empty = element('p', status.connected ? 'No saved investigations in this workspace yet. To reopen an earlier check by its run identifier, go to ' : 'Connect to see investigations saved in your workspace. To reopen a check by its run identifier, go to ', { class: 'fine' })
+    const empty = element('p', status.connected ? 'No saved checks in this workspace yet. To reopen an earlier check by its ID, go to ' : 'Your saved checks appear when the private workspace is ready. To reopen a check by its ID, go to ', { class: 'fine' })
     empty.append(element('a', 'run history', { href: '#run-history' }), '.')
     items.push(empty)
   }
@@ -459,7 +468,7 @@ byId('csv-file').addEventListener('change', async event => {
     const hash = globalThis.crypto?.subtle ? await crypto.subtle.digest('SHA-256', bytes) : null
     const digest = hash && Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
     if (token !== previewToken) return
-    showImportPreview(imported, { name: file.name, digest, description: 'CSV field text is kept in this draft. The original file bytes stay with you.' })
+    showImportPreview(imported, { name: file.name, digest, description: 'The CSV values are copied into this draft. The file itself is not uploaded.' })
   } catch (error) {
     if (token !== previewToken) return
     const message = element('p', `${file.name}: ${error.message}`, { role: 'alert' })
@@ -472,7 +481,7 @@ byId('example').addEventListener('click', () => {
   previewToken++
   showImportPreview(parseMeasurementsCsv(exampleCsv), {
     name: 'Synthetic two-rate example',
-    description: 'Synthetic five-row research example. Historical hard allowances are team-selected at 0.50 mg/L. Review the model domain and closed claim separately; investigation results are computed from the submitted inputs.',
+    description: 'Synthetic example with five readings. The team chose the 0.50 mg/L allowances. Review the search limits and the claim on the next page; results come only from the inputs you save.',
   })
 })
 
@@ -525,11 +534,11 @@ renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
     accepted.set(index, row)
   }
   if (!accepted.size) throw new Error('This review has no supported measurement rows. Enter measurements manually.')
-  rows = []; sources = [{ id: source.id, name: 'Reviewed source image', description: 'Explicitly accepted controlled-source values; inspect the retained source review for original strings and corrections.' }]
+  rows = []; sources = [{ id: source.id, name: 'Reviewed source image', description: 'Values you accepted from the reviewed source image. The source review keeps the original text and every correction.' }]
   for (const [, values] of [...accepted].sort((a, b) => a[0] - b[0])) addRow(values, source.id)
   rowsReviewed = false; questionReviewed = false
   byId('dataset-origin').value = source.body.origin === 'synthetic' ? 'synthetic' : ''
-  renderRows(); location.hash = 'inputs'; announce('Reviewed source values copied to the measurement draft. Review missing fields and the question before preparing science.')
+  renderRows(); location.hash = 'inputs'; announce('Reviewed values copied into the measurement table. Fill in any missing fields and the claim before saving inputs.')
 }, { onConnectionChange: async connection => { await Promise.all([general.connectionChanged(connection), research.connectionChanged(connection)]) }, onRender: () => updateChrome() })
 
 byId('start-example').addEventListener('click', () => {

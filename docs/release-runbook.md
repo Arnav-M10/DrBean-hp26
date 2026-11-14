@@ -44,9 +44,10 @@ scripts/dev/stop.sh
 | Web workspace | `http://127.0.0.1:4173` |
 | API and docs | `http://127.0.0.1:8000`, `/docs`, `/api/bean/v1/capabilities` |
 | Store (one, authoritative) | `var/bean.sqlite3`, sources in `var/sources/`, native artifacts in `var/artifacts/` |
-| Bearer token | private file `var/auth.json`; paste it into the web connection panel or the docs page's Authorize control |
+| Researcher access | automatic private browser session; no token entry |
+| Operator API identity | existing private `var/auth.json`, used only for direct API maintenance; not passed through the web proxy |
 | Logs and pid records | `var/run/*.log`, `var/run/*.json` |
-| Binding | loopback only; no hosted boundary exists |
+| Binding | API and web remain loopback; optional exact-origin HTTPS sharing uses its separate gateway |
 
 The launcher starts each process in its own session and records its pid and start time. Stop signals only those process groups and only if the recorded start time still matches, so a reused pid or another project is never touched. It does not use `pkill`.
 
@@ -58,7 +59,8 @@ The launcher starts each process in its own session and records its pid and star
 | Start fails | The launcher prints the last log lines and stops what it started. Read `var/run/api.log` or `worker.log`. |
 | Worker reports another worker holds the lock | An older worker is still running on this store. Stop it, then recover. |
 | Machine or process died during a run | `scripts/dev/stop.sh`, then `python3 scripts/dev/launcher.py recover`, then start. Interrupted work is marked interrupted. Nothing is rerun, no approval is reused, completed evidence is unchanged. |
-| Lost the token | It is in `var/auth.json`. Deleting that file and rerunning setup creates a new identity and orphans access to nothing but your own session; do not delete the database. |
+| Private browser session expired, revoked or cleared | Retry checks the cookie without dispatching work. Starting a new private workspace does not recover or transfer earlier research. Account and cross-device recovery are not implemented. |
+| Private access cannot start | Allow this site’s cookies and storage, then retry. Ask the operator to check availability or session capacity if the failure persists. Never delete auth, session or provider-ledger records as a workaround. |
 | Want a clean trial without touching real data | `DRBEAN_VAR_DIR=/some/empty/dir scripts/dev/setup.sh`, then the same variable for start and stop. |
 
 Backup: stop the stack and preserve `var/bean.sqlite3`, `var/sources/`, `var/artifacts/` and the private local identity together. Never point the stack at an empty store while presenting earlier approvals.
