@@ -21,9 +21,9 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 | F-MAC-NPROC | P0 | 2 | retested | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | retested | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | retested | Coordinator attempt metadata names provider gemini for controlled-model turns |
-| F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
+| F-TEST-VAR-LEAK | P2 | B (backend tests; was Owner 2) | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
 | F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | retested | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
-| F-SIBLING-FORKS | P2 | 2 | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
+| F-SIBLING-FORKS | P2 | B (worker/process supervision; was Owner 2) | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
 | H-ORACLE-BOUNDARIES | P1 | 5 | retested | Harness contract oracle accepted inputs the API rejects (trailing newline, -0, depth 64, digit caps) |
 | H-BUDGET-USAGE | P1 | 5 | retested | Harness JSONL budget accepted negative usage and counted one request per reservation |
 | H-COMPLETED-QUALIFIES | P0 | 5 | retested | Merged harness passed a case-less full-stack entry on state == completed alone |
@@ -44,15 +44,17 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 | F-LEDGER-MALFORMED | P2 | 2 | retested | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
 | F-EXPLANATION-CHECKED-GATES | P2 | 3 | retested | 'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates |
 | H-GATE-CONTROLS-DIRTY | P1 | 5 | retested | native_engine_controls gate admitted dirty (and otherwise unqualified) control records |
-| F-NARRATION-OVERSUPPRESSION | P2 | 3 | open | The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record |
+| F-NARRATION-OVERSUPPRESSION | P2 | A (narration guard in conversation/coordinator; was Owner 3) | open | The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record |
 | H-SOURCE-RETRY-KEY | P2 | 5 | retested | Harness source-review test treated a new idempotency key as a retry |
-| F-PAPER-CITATION-SUBSTRING | P1 | 3 | open | A paper citation that is only a fragment of a longer printed number is accepted as the exact cited value (4.6 for 4.62; 538 ng/mL for 5380 ng/mL) |
-| F-PAPER-QUOTE-NORMALIZATION | P2 | 3 (with 4: parser text normalization) | open | An authentic quote that crosses a text-layer line break, or uses an NFKC-equivalent character (µ U+00B5 vs μ U+03BC), discards the whole paper proposal |
-| F-PAPER-HARD-BOUND-CONTEXT | P2 | 3 | open | A stated hard bound is refused, and the whole proposal discarded, when an unrelated SD or CI appears anywhere on the same page |
-| F-PAPER-EXPONENT-FLATTENING | P2 | 3 (with 4: parser) | open | A superscript exponent flattened by the PDF text layer ('1.1 × 10' + superscript '1' read as '1.1 × 101') is accepted as the exact value 101 with no visual-review flag |
+| F-PAPER-CITATION-SUBSTRING | P1 | A (PR #35 paper proposal validator; was Owner 3) | open | A paper citation that is only a fragment of a longer printed number is accepted as the exact cited value (4.6 for 4.62; 538 ng/mL for 5380 ng/mL) |
+| F-PAPER-QUOTE-NORMALIZATION | P2 | A (PR #35 validator) with B (file services; was Owners 3 and 4) | open | An authentic quote that crosses a text-layer line break, or uses an NFKC-equivalent character (µ U+00B5 vs μ U+03BC), discards the whole paper proposal |
+| F-PAPER-HARD-BOUND-CONTEXT | P2 | A (PR #35 validator; was Owner 3) | open | A stated hard bound is refused, and the whole proposal discarded, when an unrelated SD or CI appears anywhere on the same page |
+| F-PAPER-EXPONENT-FLATTENING | P2 | A (PR #35 validator) with B (parser; was Owners 3 and 4) | open | A superscript exponent flattened by the PDF text layer ('1.1 × 10' + superscript '1' read as '1.1 × 101') is accepted as the exact value 101 with no visual-review flag |
 | H-LANE-ENGINE-PRECONDITION | P2 | 5 (harness) | retested | Lane reports judged the engine precondition by the engine interpreter's installed copy, so checkouts without one (preview worktrees) were reported failed although the application ran the repository source |
-| F-PAPER-RENDER-MEMORY | P1 | 4 (papers worker; resource_policy with 2) | open | On macOS a page preview of a small PDF whose content inflates to gigabytes drives the PDF worker to multiple GiB: memory is bounded only by time |
-| F-PAPER-IDENTITY-CONTRACTS | P2 | 2 (contracts), with 3 and 4 | open | Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written |
+| F-PAPER-RENDER-MEMORY | P1 | B (PR #36 papers worker and resource policy; was Owners 4 and 2) | open | On macOS a page preview of a small PDF whose content inflates to gigabytes drives the PDF worker to multiple GiB: memory is bounded only by time |
+| F-PAPER-IDENTITY-CONTRACTS | P2 | B (canonical contracts; was Owner 2) with A | open | Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written |
+| F-SESSION-CAPACITY-EXHAUSTION | P2 | B (private browser sessions, shared gateway) | open | Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors |
+| H-LAUNCHER-OPTIN-FORMAT | P3 | C (harness) | retested | The launcher opt-in doctor test assumed PR #36's opt-in file format and wording, so it failed against main's stricter launcher |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -254,7 +256,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Strict-xfail test XPASSes on this branch too; remove the marker when it merges. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
 - **Retest at merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50:** Closed by retest: controlled turns are no longer labelled as bare provider gemini attempts; the strict-xfail test XPASSed and is now an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"})
 
-## F-TEST-VAR-LEAK (P2, owner 2, open)
+## F-TEST-VAR-LEAK (P2, owner B (backend tests; was Owner 2), open)
 
 - **Input:** tests/test_api.py client fixture (Settings(database_path=..., blob_dir=..., auth_tokens=...))
 - **Command:** `.venv/bin/python -m pytest -q tests/test_api.py; ls var/artifacts`
@@ -276,7 +278,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Retest at merged main 80f95a4 (PR #9 + PR #11) via harness b827c61; diagnostic relax_nproc only (F-MAC-NPROC blocks every non-diagnostic run on this Mac):** Closed by retest: the documented design request WITH source_artifact_ids now returns checked_pair_separation at 8/1 with a strictly positive exact margin, valid verification and fresh replay of both packets; no isolation probe was needed. neighbouring entries in the same run: RS-HERO-FULL, RS-CHANGED-INPUT, RS-RETRY-CONCURRENT, RS-DESIGN-AUTHORITY, RS-FOLLOWUP, RS-ZERO-DISPATCH all pass. (evidence: {"attempts": ["att_1ace0e6c87124367"], "results": "evaluation/results/previews/main-b827c61/relax_nproc"})
 - **Retest at d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0):** Current Counterdex 0.3 qualification uses a newly reviewed design request with empty prospective source_artifact_ids, while the selected immutable baseline packet is supplied independently as mandatory history. This request completes at checked_pair_separation, selects 8/1 with a strictly positive exact margin, and freshly replays with valid matching evidence; there is no isolation probe or rewrite of an already approved request. The earlier successful nonempty-reuse observation describes the older consumer and is preserved above, not claimed as the current 0.3 reuse contract. (evidence: {"attempts": ["att_ec9cf987565e48ec"], "lane_run_id": "lane_872f1c39287144d1", "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])"})
 
-## F-SIBLING-FORKS (P2, owner 2, open)
+## F-SIBLING-FORKS (P2, owner B (worker/process supervision; was Owner 2), open)
 
 - **Input:** two hypothetical observation proposals against the same parent dataset in one workspace
 - **Command:** `review the second proposal after accepting the first`
@@ -419,7 +421,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** The candidate's control record is clean, executed acceptance, CPython 3.11.17, engine 0.3.0 imported from the repository with a matching source digest; the fixed gate admits it (22/22). (evidence: {"controls": "evaluation/results/controls.jsonl (tested_commit e791e91)"})
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls. (evidence: {"attempts": ["att_b6fc5431663f4693", "att_f66513d7ec274c82", "att_917faf93b8a14f96", "att_17ae63064bb84863"]})
 
-## F-NARRATION-OVERSUPPRESSION (P2, owner 3, open)
+## F-NARRATION-OVERSUPPRESSION (P2, owner A (narration guard in conversation/coordinator; was Owner 3), open)
 
 - **Input:** commentary_rejection('The returned design remains numerical guidance.', [{'id': 'design-evidence', 'problem_id': 'problem', 'design_tier': 'numerical_guidance'}]) and three similar limiting statements
 - **Command:** `local merge of PR #20 f3d424f + PR #28 623ae19: .venv/bin/python -m pytest tests/test_coordinator.py::test_separately_approved_design_has_one_completed_callback_observation`
@@ -429,7 +431,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Main 22c9a24 has PR #27's source review but neither PR #20's coordinator change nor PR #28; the conflict between those two open PRs is unchanged. (evidence: {})
 - **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Still present on main b8c5952: the evidence-bound guard withholds all four correct limiting statements (4 strict xfails hold). The cross-PR coordinator failure is resolved: PR #32 changed the coordinator fixture to neutral narration (eaa9d809), and the backend suite passes (704). The finding is narrowed to useful narration being suppressed; nothing is overclaimed. (evidence: {"backend": "704 passed", "pytest": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept: 4 xfailed (strict)"})
 
-## F-PAPER-CITATION-SUBSTRING (P1, owner 3, open)
+## F-PAPER-CITATION-SUBSTRING (P1, owner A (PR #35 paper proposal validator; was Owner 3), open)
 
 - **Input:** validate_paper_proposal: page text 'Table 2. Individual plasma concentrations.\n0.5 4.62 µg/mL\n4.0 5380 ng/mL'; finding measurement/table_transcription raw_value '538', candidate_exact '538/1', unit 'ng/mL' (reported), citations quote '538' and quote 'ng/mL' (also raw '4.6' with quote '4.6')
 - **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_a_fragment_of_a_longer_printed_number_is_not_a_citation`
@@ -437,7 +439,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Observed:** accepted; '538 ng/mL' passes with no diagnostic at all, '4.6' only with missing_unit. The quote check is a raw substring test against the page and the numeric-token boundary check runs on the quote, not on the page context
 - **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "repro": "10 controls pass, 6 known-defect xfails on the preview", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail; NOT_AVAILABLE on main)"}
 
-## F-PAPER-QUOTE-NORMALIZATION (P2, owner 3 (with 4: parser text normalization), open)
+## F-PAPER-QUOTE-NORMALIZATION (P2, owner A (PR #35 validator) with B (file services; was Owners 3 and 4), open)
 
 - **Input:** page text 'a hard bound on the error of each individual reading in\nTable 2.' quoted as '... reading in Table 2'; page '0.5 4.62 \u00b5g/mL' quoted as '4.62 \u03bcg/mL'
 - **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_layout_whitespace_and_equivalent_characters_do_not_discard_an_authentic_quote`
@@ -445,7 +447,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Observed:** PaperProposalError paper_citation_quote_mismatch for the whole proposal; through the gateway the request is charged and the extraction lost (retry policy none)
 - **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
 
-## F-PAPER-HARD-BOUND-CONTEXT (P2, owner 3, open)
+## F-PAPER-HARD-BOUND-CONTEXT (P2, owner A (PR #35 validator; was Owner 3), open)
 
 - **Input:** page: "The assay's maximum absolute error is 0.25 mg/L; we use 0.25 mg/L as a hard bound on each reading.\nIn the parent trial the mean at 2 h was 3.9 ± 0.8 mg/L (mean ± SD)."; hard_allowance finding quoting the first sentence
 - **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_unrelated_statistics_elsewhere_on_the_page_do_not_discard_a_stated_hard_bound`
@@ -453,7 +455,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Observed:** PaperProposalError paper_hard_allowance_unjustified: the statistical and negation patterns are searched in the whole retained text of the cited page
 - **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
 
-## F-PAPER-EXPONENT-FLATTENING (P2, owner 3 (with 4: parser), open)
+## F-PAPER-EXPONENT-FLATTENING (P2, owner A (PR #35 validator) with B (parser; was Owners 3 and 4), open)
 
 - **Input:** page text 'The mean plasma concentration at the first sample (5 min) was 1.1 × 101 mg/L.'; finding raw_value '101', candidate_exact '101/1', unit mg/L, quote '1.1 × 101 mg/L'
 - **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_a_flattened_exponent_is_flagged_for_visual_review`
@@ -471,7 +473,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Retest at harness e12c512 against previews 3a7816e (PR #35) and d0148aa (PR #33):** The same preview runs now pass their preconditions (application import resolves the repository source; no installed copy in the worktree interpreter). Closed by retest. (evidence: {"reports": ["lane_1c86a89352b248ec", "lane_65fd953469e04b65", "lane_14457236e1b143be", "lane_e403723180574529"]})
 - **Retest at harness after 10c302c (combined preview e67c3cf of PRs #33, #35, #36):** The first fix over-relaxed the check: it made a stale installed copy informational. The combined preview showed that native replay (python -I -m counterdex) imports the installed copy, and 20 backend tests failed with source_version_mismatch while the copy was stale. Corrected: an installed copy, when present, must equal the source; absence still passes on the child import path. Regression updated. (evidence: {"combined_backend_with_stale_copy": "20 failed / 878 passed, all source_version_mismatch"})
 
-## F-PAPER-RENDER-MEMORY (P1, owner 4 (papers worker; resource_policy with 2), open)
+## F-PAPER-RENDER-MEMORY (P1, owner B (PR #36 papers worker and resource policy; was Owners 4 and 2), open)
 
 - **Input:** a 4.2 MB PDF (under the 20 MiB cap) whose page-1 content stream FlateDecode-inflates to 4 GiB (hostile_pdfs._compressed_zeros(4 GiB) as the page's content stream)
 - **Command:** `PR #36 preview + its proposed route patch: DRBEAN_HEAVY_RESOURCE_ATTACKS=1 .venv/bin/python -m pytest -q tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (watchdog samples the application's process tree every 50 ms and kills children above 1.5 GiB)`
@@ -479,13 +481,30 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Observed:** without the watchdog kill: the request returned 200 after the process tree peaked at 2440 MiB; with it: killed at 1549 MiB, then a 422 resource_limit. resource_policy reports address_space 'unavailable' on darwin, so only RLIMIT_CPU (12 s) and the 15 s wall clock bound the renderer; inspection stays bounded (pypdf caps decompression; 236 MiB peak)
 - **Evidence:** {"library_probe": "inspect: 236 MiB peak; render: watchdog killed at 2228 MiB in 0.93 s", "preview": "7139c90 = 500ba3c + PR #36 081bbdc, plus f02e2a6 applying docs/proposals/owner2-paper-routes.patch (unreviewed by Owner 2) and an unlocked uv resolution of pypdf 7.1.0 / pypdfium2 5.15.2; labelled preview", "regression": "tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (opt-in; strict xfail on darwin)"}
 
-## F-PAPER-IDENTITY-CONTRACTS (P2, owner 2 (contracts), with 3 and 4, open)
+## F-PAPER-IDENTITY-CONTRACTS (P2, owner B (canonical contracts; was Owner 2) with A, open)
 
 - **Input:** compare: PR #34 shared/contracts/RESEARCH_AGENT_HANDOFF.json identity.page_identity; PR #35 ai_prompts.PaperPageContext/PaperCitation; PR #36 papers/_pdf_worker.inspect() page records and papers/citations.validate_citation()
 - **Command:** `read-only comparison of the three branches (no execution needed)`
 - **Expected:** one agreed page identity (id, physical page, digest of what), one citation coordinate space (units, origin, rotation, render scale) and one disclosure digest that the parser emits, the proposal validator checks and the ledger binds
 - **Observed:** PR #34: page_id, physical_page_number, source_sha256, text_reference, image_reference, parser_version; disclosure binds selected_page_manifest_digest. PR #35: page_id + page_sha256 per page; citation bbox = four integers within an admitted pixel width/height with top < bottom (top-left pixel space at an unstated render scale); page_manifest_digest and selected_page_subset_digest. PR #36: no page_id or page_sha256 (text_sha256 = hash of extracted text); boxes in PDF points with a bottom-left origin before /Rotate, plus render_box() to map to preview pixels at a given scale; digests manifest_sha256, selection_sha256, subset_sha256
 - **Evidence:** {"branches": {"pr34": "33dc7f4", "pr35": "c952c35", "pr36": "081bbdc"}}
+
+## F-SESSION-CAPACITY-EXHAUSTION (P2, owner B (private browser sessions, shared gateway), open)
+
+- **Input:** trusted-gateway request to GET /api/bean/v1/shared-session without a cookie, repeated capacity times (default 4096), each followed by logout
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors (capacity 3 for speed; strict xfail)`
+- **Expected:** a new visitor can still start a private workspace once earlier sessions are logged out or expired, or anonymous issuance is rate-limited so it cannot exhaust capacity
+- **Observed:** after 3 bootstrap+logout cycles with browser_session_capacity=3 the next GET /shared-session returns 429 shared_session_capacity; BrowserSessions._capacity counts every row in browser_sessions including revoked ones, and apps/web/share-gateway.mjs has no request rate limit. The default capacity is 4096 and is not configurable from the environment
+- **Evidence:** {"candidate": "main 299a356 (application tree identical on the C branch)", "regression": "tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors"}
+
+## H-LAUNCHER-OPTIN-FORMAT (P3, owner C (harness), retested)
+
+- **Input:** tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key on the C branch merged with main 299a356
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_zero_dispatch.py -k doctor`
+- **Expected:** the test exercises the launcher actually on the candidate: a well-formed dummy opt-in in its documented format, and the safety predicate that the key is never printed
+- **Observed:** AssertionError 'doctor did not report the opt-in state': main's launcher validates documented keys (free-tier flag, token bounds, image bound) and reports gemini_live.opt_in_state in doctor --json; the key was never printed
+- **Evidence:** {"regression": "tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key"}
+- **Retest at C branch merged with main 299a356 (before commit):** passes; the dummy key is never printed and the state is reported as configured (evidence: {})
 
 ## Check-level finding ids (raised only when the check fails)
 

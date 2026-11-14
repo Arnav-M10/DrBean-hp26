@@ -1,7 +1,7 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T09:26:21+00:00",
+  "updated_at": "2026-11-14T13:15:04Z",
   "application_code_commit": "b8c5952",
   "observed_at_harness_commit": "c51bbae",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
@@ -928,7 +928,7 @@
     {
       "id": "F-TEST-VAR-LEAK",
       "severity": "P2",
-      "owner": "2",
+      "owner": "B (backend tests; was Owner 2)",
       "status": "open",
       "title": "Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts",
       "minimal_input": "tests/test_api.py client fixture (Settings(database_path=..., blob_dir=..., auth_tokens=...))",
@@ -1006,7 +1006,7 @@
     {
       "id": "F-SIBLING-FORKS",
       "severity": "P2",
-      "owner": "2",
+      "owner": "B (worker/process supervision; was Owner 2)",
       "status": "open",
       "title": "Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer)",
       "minimal_input": "two hypothetical observation proposals against the same parent dataset in one workspace",
@@ -1674,7 +1674,7 @@
     {
       "id": "F-NARRATION-OVERSUPPRESSION",
       "severity": "P2",
-      "owner": "3",
+      "owner": "A (narration guard in conversation/coordinator; was Owner 3)",
       "status": "open",
       "title": "The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record",
       "minimal_input": "commentary_rejection('The returned design remains numerical guidance.', [{'id': 'design-evidence', 'problem_id': 'problem', 'design_tier': 'numerical_guidance'}]) and three similar limiting statements",
@@ -1717,7 +1717,7 @@
     {
       "id": "F-PAPER-CITATION-SUBSTRING",
       "severity": "P1",
-      "owner": "3",
+      "owner": "A (PR #35 paper proposal validator; was Owner 3)",
       "status": "open",
       "title": "A paper citation that is only a fragment of a longer printed number is accepted as the exact cited value (4.6 for 4.62; 538 ng/mL for 5380 ng/mL)",
       "minimal_input": "validate_paper_proposal: page text 'Table 2. Individual plasma concentrations.\\n0.5 4.62 µg/mL\\n4.0 5380 ng/mL'; finding measurement/table_transcription raw_value '538', candidate_exact '538/1', unit 'ng/mL' (reported), citations quote '538' and quote 'ng/mL' (also raw '4.6' with quote '4.6')",
@@ -1735,7 +1735,7 @@
     {
       "id": "F-PAPER-QUOTE-NORMALIZATION",
       "severity": "P2",
-      "owner": "3 (with 4: parser text normalization)",
+      "owner": "A (PR #35 validator) with B (file services; was Owners 3 and 4)",
       "status": "open",
       "title": "An authentic quote that crosses a text-layer line break, or uses an NFKC-equivalent character (µ U+00B5 vs μ U+03BC), discards the whole paper proposal",
       "minimal_input": "page text 'a hard bound on the error of each individual reading in\\nTable 2.' quoted as '... reading in Table 2'; page '0.5 4.62 \\u00b5g/mL' quoted as '4.62 \\u03bcg/mL'",
@@ -1752,7 +1752,7 @@
     {
       "id": "F-PAPER-HARD-BOUND-CONTEXT",
       "severity": "P2",
-      "owner": "3",
+      "owner": "A (PR #35 validator; was Owner 3)",
       "status": "open",
       "title": "A stated hard bound is refused, and the whole proposal discarded, when an unrelated SD or CI appears anywhere on the same page",
       "minimal_input": "page: \"The assay's maximum absolute error is 0.25 mg/L; we use 0.25 mg/L as a hard bound on each reading.\\nIn the parent trial the mean at 2 h was 3.9 ± 0.8 mg/L (mean ± SD).\"; hard_allowance finding quoting the first sentence",
@@ -1769,7 +1769,7 @@
     {
       "id": "F-PAPER-EXPONENT-FLATTENING",
       "severity": "P2",
-      "owner": "3 (with 4: parser)",
+      "owner": "A (PR #35 validator) with B (parser; was Owners 3 and 4)",
       "status": "open",
       "title": "A superscript exponent flattened by the PDF text layer ('1.1 × 10' + superscript '1' read as '1.1 × 101') is accepted as the exact value 101 with no visual-review flag",
       "minimal_input": "page text 'The mean plasma concentration at the first sample (5 min) was 1.1 × 101 mg/L.'; finding raw_value '101', candidate_exact '101/1', unit mg/L, quote '1.1 × 101 mg/L'",
@@ -1827,7 +1827,7 @@
     {
       "id": "F-PAPER-RENDER-MEMORY",
       "severity": "P1",
-      "owner": "4 (papers worker; resource_policy with 2)",
+      "owner": "B (PR #36 papers worker and resource policy; was Owners 4 and 2)",
       "status": "open",
       "title": "On macOS a page preview of a small PDF whose content inflates to gigabytes drives the PDF worker to multiple GiB: memory is bounded only by time",
       "minimal_input": "a 4.2 MB PDF (under the 20 MiB cap) whose page-1 content stream FlateDecode-inflates to 4 GiB (hostile_pdfs._compressed_zeros(4 GiB) as the page's content stream)",
@@ -1845,7 +1845,7 @@
     {
       "id": "F-PAPER-IDENTITY-CONTRACTS",
       "severity": "P2",
-      "owner": "2 (contracts), with 3 and 4",
+      "owner": "B (canonical contracts; was Owner 2) with A",
       "status": "open",
       "title": "Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written",
       "minimal_input": "compare: PR #34 shared/contracts/RESEARCH_AGENT_HANDOFF.json identity.page_identity; PR #35 ai_prompts.PaperPageContext/PaperCitation; PR #36 papers/_pdf_worker.inspect() page records and papers/citations.validate_citation()",
@@ -1861,9 +1861,49 @@
           "pr36": "081bbdc"
         }
       }
+    },
+    {
+      "id": "F-SESSION-CAPACITY-EXHAUSTION",
+      "severity": "P2",
+      "owner": "B (private browser sessions, shared gateway)",
+      "status": "open",
+      "title": "Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors",
+      "minimal_input": "trusted-gateway request to GET /api/bean/v1/shared-session without a cookie, repeated capacity times (default 4096), each followed by logout",
+      "command": ".venv/bin/python -m pytest -q tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors (capacity 3 for speed; strict xfail)",
+      "expected": "a new visitor can still start a private workspace once earlier sessions are logged out or expired, or anonymous issuance is rate-limited so it cannot exhaust capacity",
+      "observed": "after 3 bootstrap+logout cycles with browser_session_capacity=3 the next GET /shared-session returns 429 shared_session_capacity; BrowserSessions._capacity counts every row in browser_sessions including revoked ones, and apps/web/share-gateway.mjs has no request rate limit. The default capacity is 4096 and is not configurable from the environment",
+      "impact": "availability of the public shared link: about 4096 scripted anonymous requests stop all new private sessions until the owner edits the database; no data exposure",
+      "suggested_fix": "count only active, unexpired sessions toward capacity (retain revoked/expired rows as history but outside the cap), and/or rate-limit anonymous issuance at the gateway",
+      "evidence": {
+        "candidate": "main 299a356 (application tree identical on the C branch)",
+        "regression": "tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors"
+      },
+      "retests": []
+    },
+    {
+      "id": "H-LAUNCHER-OPTIN-FORMAT",
+      "severity": "P3",
+      "owner": "C (harness)",
+      "status": "retested",
+      "title": "The launcher opt-in doctor test assumed PR #36's opt-in file format and wording, so it failed against main's stricter launcher",
+      "minimal_input": "tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key on the C branch merged with main 299a356",
+      "command": ".venv/bin/python -m pytest -q tests/integration/test_zero_dispatch.py -k doctor",
+      "expected": "the test exercises the launcher actually on the candidate: a well-formed dummy opt-in in its documented format, and the safety predicate that the key is never printed",
+      "observed": "AssertionError 'doctor did not report the opt-in state': main's launcher validates documented keys (free-tier flag, token bounds, image bound) and reports gemini_live.opt_in_state in doctor --json; the key was never printed",
+      "impact": "harness only: one false failure in the independent integration suite (98 passed, 53 xfailed, 1 failed); no product defect",
+      "suggested_fix": "write the dummy opt-in in the launcher's documented format and read opt_in_state from doctor --json (older 'key present' text still accepted)",
+      "evidence": {
+        "regression": "tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key"
+      },
+      "retests": [
+        {
+          "at_commit": "C branch merged with main 299a356 (before commit)",
+          "result": "passes; the dummy key is never printed and the state is reported as configured"
+        }
+      ]
     }
   ],
-  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main).",
+  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed).",
   "check_catalog": {
     "note": "Finding ids that a check names when it fails. They are not observed findings: an id appears in `findings` only after a check actually failed or was blocked. Every id cited by evaluation/drbean_eval or tests/integration must be a finding or listed here (enforced by evaluation/tests).",
     "ids": {

@@ -188,8 +188,12 @@ def test_repository_ships_no_real_looking_credentials():
     assert offenders == []
 
 
-DUMMY_OPT_IN = {"mode": "live", "GEMINI_API_KEY": "DRBEAN-DUMMY-KEY-0042", "GEMINI_MODEL": DUMMY_MODEL,
-                "BEAN_GEMINI_ACCOUNT_GATE": "approved", "BEAN_GEMINI_ACCOUNT_DECISION_ID": "DRBEAN-DUMMY-DECISION-0042"}
+# The launcher's documented opt-in keys (main 299a356), with a DRBEAN-DUMMY key that can never pass the
+# provider's key-format check: the server stays dispatch-disabled even though the file is well formed.
+DUMMY_OPT_IN = {"mode": "live", "GEMINI_API_KEY": "DRBEAN-DUMMY-KEY-0042", "GEMINI_MODEL": "gemini-2.5-flash-lite",
+                "BEAN_GEMINI_ACCOUNT_GATE": "approved", "BEAN_GEMINI_ACCOUNT_DECISION_ID": "DRBEAN-DUMMY-DECISION-0042",
+                "BEAN_GEMINI_FREE_TIER_ONLY": "1", "BEAN_GEMINI_IMAGE_TOKEN_BOUND": "8192",
+                "BEAN_GEMINI_MAX_INPUT_TOKENS": "24000", "BEAN_GEMINI_MAX_OUTPUT_TOKENS": "4096"}
 
 
 def _process_environment(pid: int) -> str:
@@ -199,7 +203,10 @@ def _process_environment(pid: int) -> str:
 
 
 def test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key(tmp_path):
-    """Owner 4's doctor reads the opt-in file as data and never prints the key (isolated var directory, dummy key)."""
+    """The launcher doctor reads the opt-in file as data and never prints the key (isolated var directory, dummy key).
+
+    The state is read from `doctor --json` (`gemini_live.opt_in_state`, main 299a356) or the older text form
+    ("key present", PR #36); the safety predicate is the same for both: the key value never appears."""
     import json as _json
     import subprocess
     import sys as _sys
@@ -218,7 +225,14 @@ def test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key(tmp_path)
         outputs.append(done.stdout + done.stderr)
     joined = "\n".join(outputs)
     assert DUMMY_OPT_IN["GEMINI_API_KEY"] not in joined, "doctor printed the opt-in key"
-    assert "key present" in joined, "doctor did not report the opt-in state"
+    state = None
+    start = outputs[1].find("{")
+    if start >= 0:
+        try:
+            state = _json.loads(outputs[1][start:]).get("gemini_live", {}).get("opt_in_state")
+        except ValueError:
+            state = None
+    assert state == "configured" or "key present" in joined, f"doctor did not report the opt-in state ({state!r})"
 
 
 @pytest.mark.real_stack
