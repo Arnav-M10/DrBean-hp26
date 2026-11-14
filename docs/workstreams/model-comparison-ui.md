@@ -13,14 +13,18 @@ no physics, computation, auth or API implementation was independently rebuilt.
 Initial missing-service dependency was resolved by its subsequent publication.
 Only five fixed static allowlist entries/tests change outside the frontend.
 
-Verified so far: 13 actual launcher/browser gates; 15 frontend tests; 108 existing
-web tests. Backend source at the service integration passed 1,372 tests with one
-optional numerical-package skip (to be covered against latest main's package).
+Verified: 14 actual launcher/browser gates at clean source `9d28103`; 123 combined
+web/frontend tests. Backend source passed 1,372 tests with one optional registry
+skip; that registry check subsequently passed against the numerical package on
+current main. Ruff, schema export and secret scan pass.
 No provider calls, new public service, ledger reset or process-limit changes.
 
-Current task: merge current main, rerun the final assembled browser candidate,
-retain screenshots/receipts, push the focused PR for integration. Exact SHA and
-final CI status belong in PR55; separate branch results are not release acceptance.
+Current task: delivered for integration in PR55. Current main `7d40d1c` is
+incorporated; service and numerical owner history is preserved. Screenshots,
+receipt, exact source SHAs and walkthrough are in docs/frontend/model-comparison/.
+Final PR head adds qualification documentation/screenshots only after tested code
+9d28103. CI and any merge decision remain visible on PR55; this is not a whole
+product or live-provider release verdict.
 
 Limits: synthetic observations only; no calibrated experimental plasma, independent
 instrument detection floor, hard allowance, queue/cancel endpoint, or exact
