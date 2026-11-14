@@ -54,8 +54,8 @@ def revised_inputs(history, value, *, origin="hypothetical", time=None, allowanc
     body = {"dataset_id": history["dataset"]["id"], "experiment_id": history["dataset"]["body"]["experiment_id"],
         "origin": origin, "row": {"id": "hypothetical_followup", "time": time or result["selected_time"],
             "concentration": value, "hard_allowance": allowance or result["future_hard_allowance"], "included": True,
-            "notes": "Explicit hypothetical control, not an acquired measurement"},
-        "source_description": "Generated from the selected computed design for an explicit hypothetical control",
+            "notes": f"Synthetic contract control with declared {origin} observation provenance"},
+        "source_description": f"Synthetic contract control of a reviewed {origin} observation declaration",
         "change_reason": "Review what this proposed new reading would imply for the original selected pair"}
     if origin == "hypothetical":
         body["generating_choices"] = {"design_job_id": history["design_job"]["id"],
@@ -128,9 +128,11 @@ def test_hypothetical_followup_rechecks_original_pair_with_new_approval_and_port
     assert hashlib.sha256(download.content).hexdigest() == reference["sha256"] == download.headers["X-Artifact-SHA256"]
     anchors = client.get(PREFIX + f"/artifacts/{reference['id']}/anchor?download=true").json()
     packet = download.json()
-    assert packet["operation"] == "review"
-    assert packet["binding"]["dataset"]["body"] == dataset["body"]
-    assert packet["binding"]["problem"]["body"] == problem["body"]
+    assert packet["operation"] == "recheck"
+    assert packet["binding"]["schema_version"] == "counterdex.followup-binding.v1"
+    assert packet["binding"]["application"]["dataset"]["body"] == dataset["body"]
+    assert packet["binding"]["application"]["problem"]["body"] == problem["body"]
+    assert packet["binding"]["observation_proposal"] == {key: proposal[key] for key in ("id", "digest", "body")}
     assert base64.b64decode(packet["history"]["bytes_base64"], validate=True) == history["design_content"]
     assert packet["history"]["anchors"] == history["design_anchors"]
     native = json.loads(base64.b64decode(packet["scientific"]["bytes_base64"], validate=True))
@@ -141,7 +143,7 @@ def test_hypothetical_followup_rechecks_original_pair_with_new_approval_and_port
     process, fresh = baseline.replay_cli(replay_python, tmp_path, download.content, anchors)
     assert process.returncode == 0, fresh
     assert fresh["integrity"] == fresh["replay"] == "passed" and fresh["expected_binding"] == "matches"
-    assert fresh["operation"] == "review" and fresh["dataset_origin"] == "hypothetical"
+    assert fresh["operation"] == "recheck" and fresh["dataset_origin"] == "hypothetical"
     assert fresh["verification"] == result["verification"]
     assert {c["candidate_id"] for c in fresh["candidate_results"] if c["verification"] == "valid"} == survivors
     process, failure = baseline.replay_cli(replay_python, tmp_path, download.content,
@@ -164,21 +166,91 @@ def test_hypothetical_followup_rechecks_original_pair_with_new_approval_and_port
     assert client.get(PREFIX + f"/artifacts/{reference['id']}", headers={"Authorization": "Bearer " + "b" * 40}).status_code == 404
 
 
-@pytest.mark.parametrize("origin,time,allowance,code", [
-    ("actual", None, None, "followup_origin_unsupported"),
-    ("hypothetical", "79/10", None, "followup_lineage_mismatch"),
-    ("hypothetical", None, "1/10", "followup_lineage_mismatch"),
-])
-def test_followup_admission_rejects_unimplemented_observation_scope(computed_design, origin, time, allowance, code):
+@pytest.mark.parametrize("origin", ["actual", "transcription", "hypothetical"])
+def test_reviewed_followup_uses_its_own_time_allowance_and_complete_provenance(computed_design, replay_python, tmp_path, origin):
     history, client = computed_design, computed_design["client"]
-    value, _ = reading_for(history, 0)
-    _, _, problem, body = revised_inputs(history, value, origin=origin, time=time, allowance=allowance)
-    response = client.post(PREFIX + f"/workspaces/{history['workspace']}/plans", json={
-        "expected_current_revision_id": problem["id"], "plan": body}, headers={"Idempotency-Key": "unsupported-followup"})
-    assert response.status_code == 422, response.text
-    assert response.json()["code"] == code
+    proposal, dataset, problem, body = revised_inputs(history, "100/1", origin=origin, time="79/10", allowance="7/20")
+    assert dataset["body"]["origin"] == ("hypothetical" if origin == "hypothetical" else "synthetic")
+    plan = post(client, f"/workspaces/{history['workspace']}/plans", {
+        "expected_current_revision_id": problem["id"], "plan": body}, "own-time-plan")
+    rejected = client.post(PREFIX + f"/plans/{plan['id']}/runs", json={
+        "approval_id": history["design_approval"]["id"], "expected_plan_digest": plan["digest"]},
+        headers={"Idempotency-Key": "own-time-wrong-approval"})
+    assert rejected.status_code == 403
     assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
+    approval = post(client, f"/plans/{plan['id']}/approvals", {
+        "expected_current_revision_id": problem["id"], "expected_plan_digest": plan["digest"], "accepted": True}, "own-time-approval")
+    run = post(client, f"/plans/{plan['id']}/runs", {
+        "approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "own-time-start")
+    assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 1
+    finished = client.get(PREFIX + f"/runs/{run['id']}").json()
+    assert finished["state"] == "completed", finished
+    evidence = client.get(PREFIX + f"/records/{finished['scenarios'][0]['result_id']}").json()
+    result = evidence["body"]["result"]
+    assert result["scientific_outcome"] == "inconclusive" and result["verification"] == "valid"
+    assert all(row["verification"] == "invalid" for row in result["candidate_results"])
+    assert result.get("baseline_search") is None
+    reference = result["artifacts"][0]
+    download = client.get(PREFIX + f"/artifacts/{reference['id']}")
+    anchors = client.get(PREFIX + f"/artifacts/{reference['id']}/anchor?download=true").json()
+    packet = download.json()
+    assert packet["operation"] == "recheck"
+    assert packet["binding"]["observation_proposal"] == {key: proposal[key] for key in ("id", "digest", "body")}
+    assert packet["binding"]["observation_proposal"]["body"]["origin"] == origin
+    native = json.loads(base64.b64decode(packet["scientific"]["bytes_base64"]))
+    assert (native["problem"]["observations"][-1]["time"], native["problem"]["observations"][-1]["allowance"]) == ("79/10", "7/20")
+    assert base64.b64decode(packet["history"]["bytes_base64"]) == history["design_content"]
+    assert packet["history"]["anchors"] == history["design_anchors"]
+    expected_vectors = dict(zip(history["design_plan"]["body"]["request"]["candidate_ids"],
+                                history["design_plan"]["body"]["request"]["candidate_vectors"], strict=True))
+    assert {row["id"]: row["parameters"] for row in native["candidates"]} == expected_vectors
+    process, replay = baseline.replay_cli(replay_python, tmp_path, download.content, anchors)
+    assert process.returncode == 0, replay
+    assert replay["replay"] == "passed" and replay["verification"] == "valid"
+    assert replay["operation"] == "recheck" and replay["dataset_origin"] == dataset["body"]["origin"]
     design.assert_preserved_history(history)
+
+
+@pytest.mark.parametrize("parent_tier", ["no_separation_established", "numerical_guidance"])
+def test_followup_accepts_checked_no_separation_parent_and_rejects_numerical_parent(computed_history, replay_python, tmp_path, parent_tier):
+    history, client = computed_history, computed_history["client"]
+    request = design.design_request(history, allowance="100/1")
+    if parent_tier == "numerical_guidance":
+        request["requested_tier"] = "numerical_guidance"
+    plan = design.propose(history, request, "parent-design")
+    job, approval, result, content, anchors = design.approve_start_and_download(history, plan, "parent-design")
+    assert result["design_tier"] == parent_tier
+    if parent_tier == "no_separation_established":
+        assert result["selected_time"] is None
+    finished = client.get(PREFIX + f"/design-jobs/{job['id']}").json()
+    record = client.get(PREFIX + f"/records/{finished['result_id']}").json()
+    history = {**history, "design_plan": plan, "design_job": finished, "design_approval": approval,
+               "design_result": result, "design_record": record, "design_content": content, "design_anchors": anchors}
+    _, _, problem, body = revised_inputs(history, "100/1", origin="actual", time="79/10", allowance="7/20")
+    response = client.post(PREFIX + f"/workspaces/{history['workspace']}/plans", json={
+        "expected_current_revision_id": problem["id"], "plan": body}, headers={"Idempotency-Key": "no-selection-followup"})
+    if parent_tier == "numerical_guidance":
+        assert response.status_code == 422 and response.json()["code"] == "followup_design_required", response.text
+        assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
+        return
+    assert response.status_code == 201, response.text
+    followup = response.json()
+    approval = post(client, f"/plans/{followup['id']}/approvals", {
+        "expected_current_revision_id": problem["id"], "expected_plan_digest": followup["digest"], "accepted": True}, "no-selection-approval")
+    run = post(client, f"/plans/{followup['id']}/runs", {
+        "approval_id": approval["id"], "expected_plan_digest": followup["digest"]}, "no-selection-start")
+    assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 1
+    run = client.get(PREFIX + f"/runs/{run['id']}").json()
+    assert run["state"] == "completed", run
+    evidence = client.get(PREFIX + f"/records/{run['scenarios'][0]['result_id']}").json()["body"]["result"]
+    assert evidence["scientific_outcome"] == "inconclusive" and evidence["verification"] == "valid"
+    reference = evidence["artifacts"][0]
+    download = client.get(PREFIX + f"/artifacts/{reference['id']}")
+    expected = client.get(PREFIX + f"/artifacts/{reference['id']}/anchor?download=true").json()
+    process, replay = baseline.replay_cli(replay_python, tmp_path, download.content, expected)
+    assert process.returncode == 0 and replay["replay"] == "passed", replay
+    assert replay["operation"] == "recheck" and replay["verification"] == "valid"
+    assert base64.b64decode(download.json()["history"]["bytes_base64"]) == content
 
 
 def test_followup_plan_rejects_changed_design_identity(computed_design):
@@ -211,7 +283,7 @@ def test_completed_followup_cannot_publish_after_authority_ends(computed_design,
 
     def complete_then_end_scope(*args, **kwargs):
         result = real_run(*args, **kwargs)
-        assert result.get("native_replay", {}).get("operation") == "review", result
+        assert result.get("native_replay", {}).get("operation") == "recheck", result
         assert result["verification"] == "valid" and result["replay"] == "passed"
         if stop == "cancel":
             post(client, f"/runs/{run['id']}/cancel", {}, "late-followup-cancel")

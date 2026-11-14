@@ -5,10 +5,11 @@ is content-bound evidence, not an authorization record or a digital signature.
 """
 import base64
 
-from .application import (DESIGN_BINDING, MAPPING_POLICY,
+from .application import (DESIGN_BINDING, DESIGN_MAPPING_POLICY, MAPPING_POLICY,
                           verify_application_binding, verify_design_binding)
 from .errors import AdapterError
 from .exact import artifact_digest, canonical_bytes, strict_json_loads
+from .followup import FOLLOWUP_BINDING, FOLLOWUP_FIELDS, verify_followup_binding
 from .models import counter, digest_value, fields, text_value
 from .replay import replay_bundle
 from .replay_baseline import decode_artifact, replay_baseline
@@ -41,7 +42,7 @@ def _anchors(value: dict) -> dict:
 
 def _packet(value: dict) -> dict:
     packet = fields(value, PACKET_FIELDS, "packet")
-    if packet["schema_version"] != PACKET_PROFILE or packet["operation"] not in ("investigate", "design", "review"):
+    if packet["schema_version"] != PACKET_PROFILE or packet["operation"] not in ("investigate", "design", "review", "recheck"):
         raise AdapterError("unsupported_model", "Unsupported native application packet profile.")
     for key in ("run_id", "scenario_id"):
         text_value(packet[key], "packet/" + key, identifier=True)
@@ -52,13 +53,18 @@ def _packet(value: dict) -> dict:
     if packet["operation"] == "design":
         binding = fields(packet["binding"], {"schema_version", "mapping_policy", "application", "request",
             "request_digest", "historical_evidence", "design_digest", "approved_grid_order"}, "packet/binding")
-        if binding["schema_version"] != DESIGN_BINDING or binding["mapping_policy"] != MAPPING_POLICY:
+        if binding["schema_version"] != DESIGN_BINDING or binding["mapping_policy"] not in (MAPPING_POLICY, DESIGN_MAPPING_POLICY):
             raise AdapterError("unsupported_model", "Unsupported application design mapping policy.")
         digest_value(binding["request_digest"], "packet/binding/request_digest")
         digest_value(binding["design_digest"], "packet/binding/design_digest")
         _object_with(binding["request"], {"scenario_id", "historical_run_id"}, "packet/binding/request")
         _object_with(binding["historical_evidence"], {"run_id", "scenario_id", "result"}, "packet/binding/historical_evidence")
         _object_with(binding["historical_evidence"]["result"], {"artifacts"}, "packet/binding/historical_evidence/result")
+        application = binding["application"]
+    elif packet["operation"] == "recheck":
+        binding = fields(packet["binding"], FOLLOWUP_FIELDS, "packet/binding")
+        if binding["schema_version"] != FOLLOWUP_BINDING:
+            raise AdapterError("unsupported_model", "Unsupported follow-up binding profile.")
         application = binding["application"]
     else:
         application = packet["binding"]
@@ -94,7 +100,7 @@ def packet_bytes(operation: str, binding: dict, scientific: bytes, *, run_id: st
 def packet_anchors(content: bytes) -> dict:
     """Return export identities for the caller to persist independently of bytes."""
     p = _packet(strict_json_loads(content))
-    b = p["binding"]["application"] if p["operation"] == "design" else p["binding"]
+    b = p["binding"]["application"] if p["operation"] in ("design", "recheck") else p["binding"]
     return {"artifact_sha256": artifact_digest(content), "dataset_digest": b["dataset"]["digest"],
         "problem_digest": b["problem"]["digest"], "projection_digest": b["projection_digest"],
         "app_request_digest": p["binding"]["request_digest"] if p["operation"] == "design" else None,
@@ -202,8 +208,8 @@ def replay_packet(content: bytes, *, expected: dict, context=None, _depth: int =
     _object_with(scientific, {"problem", "operation"} if p["operation"] != "design" else {"problem", "design", "suggestion_digest"}, "scientific")
     if p["operation"] == "design":
         _, parent, fresh_parent = _history(p, context, _depth)
-        if parent["operation"] != "investigate":
-            raise AdapterError("wrong_specification_binding", "Design requires an actual baseline discovery packet.")
+        if parent["operation"] != "investigate" or fresh_parent["replay"] != "passed":
+            raise AdapterError("wrong_specification_binding", "Design requires a freshly replayed actual baseline discovery packet.")
         binding = p["binding"]
         evidence = binding["historical_evidence"]
         if (parent["run_id"] != evidence["run_id"] or parent["scenario_id"] != p["scenario_id"]
@@ -220,7 +226,8 @@ def replay_packet(content: bytes, *, expected: dict, context=None, _depth: int =
         if "fresh_checked" in fresh:
             fresh["candidate_results"] = fresh["fresh_checked"]["candidate_results"]
     else:
-        mapping = verify_application_binding(p["binding"])
+        application = p["binding"]["application"] if p["operation"] == "recheck" else p["binding"]
+        mapping = verify_application_binding(application)
         if scientific["problem"] != mapping["problem"]:
             raise AdapterError("wrong_specification_binding", "Native historical inputs differ from the application mapping.")
         if p["operation"] == "investigate":
@@ -229,8 +236,15 @@ def replay_packet(content: bytes, *, expected: dict, context=None, _depth: int =
         else:
             _, parent, fresh_parent = _history(p, context, _depth)
             if fresh_parent["replay"] != "passed":
-                raise AdapterError("incomplete_export", "Original design must freshly replay before follow-up.")
-            validate_followup(p["binding"], parent, scientific)
+                raise AdapterError("incomplete_export", "Original evidence must freshly replay before follow-up.")
+            if p["operation"] == "recheck":
+                parent_scientific = strict_json_loads(decode_artifact(parent["scientific"]["bytes_base64"], parent["scientific"]["sha256"]))
+                followup = verify_followup_binding(p["binding"], parent_packet=parent,
+                    parent_scientific=parent_scientific, parent_replay=fresh_parent)
+                if scientific["operation"] != "fixed_candidate_review" or scientific.get("candidates") != followup["candidates"]:
+                    raise AdapterError("candidate_mismatch", "Recheck must retain exactly the original fixed candidates.")
+            else:
+                validate_followup(p["binding"], parent, scientific)
         _object_with(scientific, {"baseline_digest"}, "scientific")
         fresh = replay_baseline(native, expected_problem_digest=expected["projection_digest"],
             expected_baseline_digest=scientific["baseline_digest"], expected_scenario_id=expected["scenario_id"], context=context)
@@ -238,4 +252,4 @@ def replay_packet(content: bytes, *, expected: dict, context=None, _depth: int =
     if stop:
         raise AdapterError(stop, "Native replay stopped at its shared execution budget.")
     return {**fresh, "packet_profile": PACKET_PROFILE, "operation": p["operation"], "anchors": expected,
-            "dataset_origin": (p["binding"]["application"] if p["operation"] == "design" else p["binding"])["dataset_origin"]}
+            "dataset_origin": (p["binding"]["application"] if p["operation"] in ("design", "recheck") else p["binding"])["dataset_origin"]}

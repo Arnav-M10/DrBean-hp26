@@ -18,6 +18,7 @@ from .models import (CHECKED_POLICY, DESIGN_PROFILE, MODEL, NUMERICAL_POLICY,
                      normalize_problem)
 
 MAPPING_POLICY = "DB-SC-1-to-groundwork-v1"
+DESIGN_MAPPING_POLICY = "DB-SC-1-design-to-groundwork-v2"
 APPLICATION_BINDING = "counterdex.application-binding.v1"
 DESIGN_BINDING = "counterdex.application-design-binding.v1"
 APPLICATION_BODY_CAP = 1024 * 1024
@@ -169,6 +170,48 @@ def _candidate_vector(value: object, path: str) -> dict:
     return {name: _exact(vector[name], path + "/" + name, positive=True) for name in ("A", "ke", "ka")}
 
 
+def _design_policy(request: dict, scientific_problem, times: list[str], budget: dict, expected: str) -> tuple:
+    """Keep legacy replay stable while binding every explicit reviewed choice."""
+    sources = request.get("source_artifact_ids", [])
+    if type(sources) is not list or len(sources) > 2:
+        raise _error("invalid_input", "Supply at most two source artifact identifiers.", "request/source_artifact_ids")
+    for index, source in enumerate(sources):
+        _identifier(source, f"request/source_artifact_ids/{index}")
+    if len(set(sources)) != len(sources):
+        raise _error("invalid_input", "Source artifact identifiers must be unique.", "request/source_artifact_ids")
+    profile = request.get("scientific_profile")
+    explicit_fields = ("requested_tier", "allowance_origin", "maximum_horizon")
+    if profile is None:
+        if sources or any(request.get(field) is not None for field in explicit_fields):
+            raise _error("invalid_input", "Explicit scientific choices require the counterdex.v1 profile.", "request/scientific_profile")
+        horizon = max(scientific_problem.horizon, *(parse_rational(time) for time in times))
+        return (MAPPING_POLICY, "checked_pair_separation",
+                {"kind": "reviewed_hard_bound", "description": f"Approved DB-SC-1 design request {expected}; future_hard_allowance"},
+                rational_text(horizon))
+    if profile != "counterdex.v1":
+        raise _error("unsupported_model", "Unsupported application scientific profile.", "request/scientific_profile")
+    for field in explicit_fields:
+        if request.get(field) is None:
+            raise _error("invalid_input", "Review this scientific design choice explicitly.", "request/" + field)
+    tier = request["requested_tier"]
+    if tier not in ("numerical_guidance", "checked_pair_separation"):
+        raise _error("invalid_input", "Select an admitted scientific design tier.", "request/requested_tier")
+    origin = _object(request["allowance_origin"], "request/allowance_origin")
+    if set(origin) != {"kind", "description"} or origin.get("kind") not in ("hypothetical", "reviewed_hard_bound"):
+        raise _error("invalid_input", "Declare the reviewed allowance kind and description.", "request/allowance_origin")
+    description = origin["description"]
+    if type(description) is not str or not 1 <= len(description) <= 2000:
+        raise _error("invalid_input", "Supply the reviewed allowance description.", "request/allowance_origin/description")
+    horizon = _exact(request["maximum_horizon"], "request/maximum_horizon", positive=True)
+    if parse_rational(horizon) < scientific_problem.horizon or any(parse_rational(time) > parse_rational(horizon) for time in times):
+        raise _error("unavailable_horizon", "The reviewed horizon must cover included history and every approved time.", "request/maximum_horizon")
+    if tier == "checked_pair_separation" and budget["pair_verifications"] < 2:
+        raise _error("invalid_input", "Checked design requires initial checking and fresh pair replay.", "request/budget/pair_verifications")
+    if sources:
+        raise _error("unsupported_artifact_reuse", "Prospective certificate reuse is not supported by this application bridge.", "request/source_artifact_ids")
+    return DESIGN_MAPPING_POLICY, tier, origin, horizon
+
+
 def project_design(request: dict, *, expected_request_digest: str, projection: dict,
                    historical_evidence: dict, native_candidate_results: list[dict]) -> dict:
     """Project the approved design after the bridge freshly replays its history.
@@ -250,21 +293,21 @@ def project_design(request: dict, *, expected_request_digest: str, projection: d
         if type(value) is not int or not lo <= value <= hi:
             raise _error("invalid_input", "Design resource budget exceeds the scientific profile.", "request/budget/" + key)
     scientific_problem = normalize_problem(current["problem"])
-    horizon = max(scientific_problem.horizon, *(parse_rational(time) for time in times))
+    mapping_policy, tier, allowance_origin, horizon = _design_policy(request, scientific_problem, times, budget, expected)
     design = normalize_design({
         "schema_version": DESIGN_PROFILE, "problem_digest": current["projection_digest"],
         "scenario_id": request["scenario_id"], "candidates": selected,
         "grid": [{"time": time, "feasible": True, "reason": "Reviewed application feasible time"} for time in times],
         "time_origin": scientific_problem.time_origin, "observable": "c", "future_allowance": allowance,
-        "allowance_origin": {"kind": "reviewed_hard_bound", "description": f"Approved DB-SC-1 design request {expected}; future_hard_allowance"},
-        "requested_tier": "checked_pair_separation",
-        "horizon_policy": {"allow_construction": construction, "allow_extension": extension, "maximum_horizon": rational_text(horizon)},
+        "allowance_origin": allowance_origin,
+        "requested_tier": tier,
+        "horizon_policy": {"allow_construction": construction, "allow_extension": extension, "maximum_horizon": horizon},
         "numerical_policy": NUMERICAL_POLICY, "checked_policy": CHECKED_POLICY,
         "limits": {"wall_seconds": budget["wall_seconds"], "max_times": len(times),
                    "max_constructions": budget["fixed_vector_constructions"], "max_pair_verifications": budget["pair_verifications"],
                    "max_bundle_bytes": budget["bundle_bytes"], "max_certificate_bytes": min(2 * 1024 * 1024, budget["bundle_bytes"])},
     }, scientific_problem)
-    design_binding = {"schema_version": DESIGN_BINDING, "mapping_policy": MAPPING_POLICY,
+    design_binding = {"schema_version": DESIGN_BINDING, "mapping_policy": mapping_policy,
                       "application": binding, "request": request, "request_digest": expected,
                       "historical_evidence": evidence, "design_digest": design.digest,
                       "approved_grid_order": times}
@@ -274,7 +317,7 @@ def project_design(request: dict, *, expected_request_digest: str, projection: d
 
 def verify_design_binding(binding: dict, *, native_candidate_results: list[dict]) -> dict:
     b = _object(binding, "binding")
-    if b.get("schema_version") != DESIGN_BINDING or b.get("mapping_policy") != MAPPING_POLICY:
+    if b.get("schema_version") != DESIGN_BINDING or b.get("mapping_policy") not in (MAPPING_POLICY, DESIGN_MAPPING_POLICY):
         raise _error("unsupported_model", "Unsupported application design mapping policy.", "binding/mapping_policy")
     projection = verify_application_binding(_get(b, "application", "binding"))
     result = project_design(_get(b, "request", "binding"), expected_request_digest=_get(b, "request_digest", "binding"),

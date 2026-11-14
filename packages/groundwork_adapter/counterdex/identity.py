@@ -6,7 +6,7 @@ import sys
 from .errors import AdapterError
 from .exact import artifact_digest, canonical_bytes
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 
 def implementation_identity() -> dict:

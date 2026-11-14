@@ -1,8 +1,8 @@
-"""The design request follows the contract the application publishes, never a guess.
+"""The design request follows the current (v2) contract, and the published capability gates the reuse probe.
 
-``capabilities.science.native_design`` (v2): the server resolves mandatory baseline history and
-prospective reuse is unsupported, so ``source_artifact_ids`` is empty. Without it, the earlier
-contract names the baseline artifacts. Nothing is launched here.
+v2 (``capabilities.science.native_design``): the server resolves mandatory baseline history and
+prospective reuse is unsupported, so ``source_artifact_ids`` is always empty; the design-authority
+scenario separately checks a nonempty reuse request never yields a checked design. Nothing is launched.
 """
 import os
 import sys
@@ -36,9 +36,9 @@ class DesignContract(unittest.TestCase):
     def test_v2_native_design_sends_no_reuse(self):
         self.assertEqual(self.request({"science": {"native_design": True}})["source_artifact_ids"], [])
 
-    def test_earlier_contract_names_the_baseline_artifacts_once(self):
+    def test_reuse_stays_empty_whatever_the_capabilities_say(self):
         for caps in ({"science": {}}, {"science": {"native_design": False}}, {}):
-            self.assertEqual(self.request(caps)["source_artifact_ids"], ["art_base"], caps)
+            self.assertEqual(self.request(caps)["source_artifact_ids"], [], caps)
 
     def test_everything_else_is_identical_across_contracts(self):
         v2, v1 = self.request({"science": {"native_design": True}}), self.request({})

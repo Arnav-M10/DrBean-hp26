@@ -15,7 +15,7 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 | live_intake | 1 | NOT_RUN (disabled) | live | any | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | live_agent_controlled_tools | 1 | NOT_RUN (disabled) | live | controlled | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | actual_full_stack | 1 | NOT_RUN (disabled) | live | real | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
-| offline_real_science | 1 | yes | none/controlled | real | 7 | 78 | 24 | 25 | 29 | 0 | 0 | 0 | 0 | 0 |
+| offline_real_science | 1 | yes | none/controlled | real | 7 | 78 | 34 | 21 | 23 | 0 | 0 | 0 | 0 | 0 |
 
 Records with manifest_version 1 / harness 0.1.0 are the pre-merge inventory: 34 entries recorded before the backend and science package were merged, all `unrun` with a stale reason. They are kept byte-for-byte and interpreted as written, never relabelled as current results.
 
@@ -61,17 +61,17 @@ Evidence class counts (harness >= 0.2.0): executed_acceptance: 78.
 | live_intake | C01-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live1 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
-| offline_real_science | RS-CANCEL-RESTART | unrun | d6503da24c | False | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for example; no_orphan_after_worker_kill (prerequisite): the ru |
-| offline_real_science | RS-CHANGED-INPUT | failed | d6503da24c | False | failed: baseline_completed_with_evidence |
-| offline_real_science | RS-DESIGN-AUTHORITY | unrun | d6503da24c | False | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
-| offline_real_science | RS-FOLLOWUP | unrun | d6503da24c | False | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
-| offline_real_science | RS-HERO-FULL | failed | d6503da24c | False | failed: baseline_completed_with_evidence |
-| offline_real_science | RS-RETRY-CONCURRENT | passed | d6503da24c | False |  |
-| offline_real_science | RS-ZERO-DISPATCH | passed | d6503da24c | False |  |
+| offline_real_science | RS-CANCEL-RESTART | passed | 159fd65303 | False |  |
+| offline_real_science | RS-CHANGED-INPUT | passed | 159fd65303 | False |  |
+| offline_real_science | RS-DESIGN-AUTHORITY | passed | 159fd65303 | False |  |
+| offline_real_science | RS-FOLLOWUP | passed | 159fd65303 | False |  |
+| offline_real_science | RS-HERO-FULL | passed | 159fd65303 | False |  |
+| offline_real_science | RS-RETRY-CONCURRENT | passed | 159fd65303 | False |  |
+| offline_real_science | RS-ZERO-DISPATCH | passed | 159fd65303 | False |  |
 
 ## Scientific jobs and external model requests (separate counts)
 
-- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 69. These are actual local computations attempted by the real worker; at this commit they fail before scientific computation (see findings).
+- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 91. This accumulated count spans historical attempts; see each attempt for its scientific outcome and the latest-entry table for current results.
 - External model requests: verified zero by the egress guard in 78 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
 - Synthetic budget-ledger reservations in unit tests use temporary stores and are not provider charges.
 - Durations are harness wall time on loopback; they are not provider latency.
@@ -79,7 +79,7 @@ Evidence class counts (harness >= 0.2.0): executed_acceptance: 78.
 
 ## Engine-level native controls (latest run; engine public operations, not HTTP)
 
-Commit d6503da24c, interpreter CPython 3.11.17.
+Commit 159fd65303, interpreter CPython 3.11.17.
 
 | Control | Result | Observed |
 |---|---|---|
@@ -106,16 +106,16 @@ Commit d6503da24c, interpreter CPython 3.11.17.
 | followup:4.57 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "compatible", "reference": "excluded"}, "per_candidate": {"outside": "compatible", "refe |
 | followup:4.0 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "excluded"}, "per_candidate": {"outside": "excluded", "referenc |
 
-## Release gates at d6503da24c (overall: failed)
+## Release gates at 526f15a6f4 (overall: failed)
 
 | Gate | Status |
 |---|---|
 | harness_integrity | passed |
-| real_science_http | failed |
-| essential_negative_controls_http | failed |
-| zero_external_model_dispatch | passed |
-| native_engine_controls | passed |
-| supported_machine_subprocesses | failed |
+| real_science_http | blocked |
+| essential_negative_controls_http | blocked |
+| zero_external_model_dispatch | blocked |
+| native_engine_controls | blocked |
+| supported_machine_subprocesses | blocked |
 | no_unresolved_p0 | failed |
 | live_gemini_qualification | not_run |
 
@@ -123,7 +123,7 @@ Commit d6503da24c, interpreter CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
-| F-ORPHAN-WORKER-KILL | P0 | 2 | open | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
+| F-ORPHAN-WORKER-KILL | P0 | 2 | retested | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
 | F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | retested | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
 | F-PLATFORM-RLIMIT | P0 | 2 | retested | Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected) |
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
@@ -137,7 +137,7 @@ Commit d6503da24c, interpreter CPython 3.11.17.
 | F-REVIEW-MATERIALIZATION | P1 | 2 | fixed_pending_retest | An accepted intake review creates no dataset association (source values never reach execution) |
 | F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
 | F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
-| F-MAC-NPROC | P0 | 2 | fixed_pending_retest | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
+| F-MAC-NPROC | P0 | 2 | retested | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | retested | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | retested | Coordinator attempt metadata names provider gemini for controlled-model turns |
 | F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
@@ -159,6 +159,8 @@ Commit d6503da24c, interpreter CPython 3.11.17.
 | F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
 | F-RESTART-EPERM | P0 | 2 | open | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
 | H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
+| F-LEDGER-TOTALS | P2 | 2 | fixed_pending_retest | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
+| F-LEDGER-MALFORMED | P2 | 2 | fixed_pending_retest | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
 
 ## Every attempt
 
@@ -262,17 +264,17 @@ Commit d6503da24c, interpreter CPython 3.11.17.
 | 96 | RS-FOLLOWUP | offline_real_science | 9 | unrun | executed_acceptance | 0085414dd2 | False | 0.251 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
 | 97 | RS-CANCEL-RESTART | offline_real_science | 9 | unrun | executed_acceptance | 0085414dd2 | False | 3022.985 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
 | 98 | RS-ZERO-DISPATCH | offline_real_science | 9 | passed | executed_acceptance | 0085414dd2 | False | 79.219 |  |
-| 99 | RS-HERO-FULL | offline_real_science | 10 | failed | executed_acceptance | 1ae19ffa84 | False | 604.383 | failed: baseline_completed_with_evidence |
-| 100 | RS-CHANGED-INPUT | offline_real_science | 10 | failed | executed_acceptance | 1ae19ffa84 | False | 1756.086 | failed: baseline_completed_with_evidence |
-| 101 | RS-RETRY-CONCURRENT | offline_real_science | 11 | passed | executed_acceptance | 1ae19ffa84 | False | 572.888 |  |
-| 102 | RS-DESIGN-AUTHORITY | offline_real_science | 10 | unrun | executed_acceptance | 1ae19ffa84 | False | 3.53 | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
-| 103 | RS-FOLLOWUP | offline_real_science | 10 | unrun | executed_acceptance | 1ae19ffa84 | False | 0.333 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
-| 104 | RS-CANCEL-RESTART | offline_real_science | 10 | unrun | executed_acceptance | 1ae19ffa84 | False | 3312.87 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
-| 105 | RS-ZERO-DISPATCH | offline_real_science | 10 | passed | executed_acceptance | 1ae19ffa84 | False | 85.799 |  |
-| 106 | RS-HERO-FULL | offline_real_science | 11 | failed | executed_acceptance | d6503da24c | False | 574.129 | failed: baseline_completed_with_evidence |
-| 107 | RS-CHANGED-INPUT | offline_real_science | 11 | failed | executed_acceptance | d6503da24c | False | 1335.574 | failed: baseline_completed_with_evidence |
-| 108 | RS-RETRY-CONCURRENT | offline_real_science | 12 | passed | executed_acceptance | d6503da24c | False | 986.646 |  |
-| 109 | RS-DESIGN-AUTHORITY | offline_real_science | 11 | unrun | executed_acceptance | d6503da24c | False | 81.225 | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
-| 110 | RS-FOLLOWUP | offline_real_science | 11 | unrun | executed_acceptance | d6503da24c | False | 0.311 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
-| 111 | RS-CANCEL-RESTART | offline_real_science | 11 | unrun | executed_acceptance | d6503da24c | False | 3044.831 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
-| 112 | RS-ZERO-DISPATCH | offline_real_science | 11 | passed | executed_acceptance | d6503da24c | False | 127.586 |  |
+| 99 | RS-HERO-FULL | offline_real_science | 10 | passed | executed_acceptance | d821202b33 | False | 2503.807 |  |
+| 100 | RS-CHANGED-INPUT | offline_real_science | 10 | passed | executed_acceptance | d821202b33 | False | 2586.803 |  |
+| 101 | RS-RETRY-CONCURRENT | offline_real_science | 11 | passed | executed_acceptance | d821202b33 | False | 967.715 |  |
+| 102 | RS-DESIGN-AUTHORITY | offline_real_science | 10 | passed | executed_acceptance | d821202b33 | False | 31.467 |  |
+| 103 | RS-FOLLOWUP | offline_real_science | 10 | passed | executed_acceptance | d821202b33 | False | 12337.699 |  |
+| 104 | RS-CANCEL-RESTART | offline_real_science | 10 | passed | executed_acceptance | d821202b33 | False | 7355.238 |  |
+| 105 | RS-ZERO-DISPATCH | offline_real_science | 10 | passed | executed_acceptance | d821202b33 | False | 104.189 |  |
+| 106 | RS-HERO-FULL | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 3374.17 |  |
+| 107 | RS-CHANGED-INPUT | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 2630.926 |  |
+| 108 | RS-RETRY-CONCURRENT | offline_real_science | 12 | passed | executed_acceptance | 159fd65303 | False | 1517.336 |  |
+| 109 | RS-DESIGN-AUTHORITY | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 59.357 |  |
+| 110 | RS-FOLLOWUP | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 13066.414 |  |
+| 111 | RS-CANCEL-RESTART | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 7244.179 |  |
+| 112 | RS-ZERO-DISPATCH | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 132.418 |  |

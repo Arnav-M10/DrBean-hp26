@@ -84,3 +84,7 @@ Live Gemini of any kind; hosted deployment; Photon; visual redesign; additional 
 - `cb8aef8`..`849f516`: merged PR #3; fixed launcher and web plan request for the new contract.
 - CI review: found I-018; added the ordinary-user check to the gates and CI; test suites in the checklist no longer inherit paths to the real `var/` store.
 - Earlier update: merged PR #4; transport checks; storage and AI-mode doctor facts; role log; master-document alignment.
+
+## Codex launcher recovery contribution
+
+Base `9cc90e0`, branch `codex/product-launch-recovery`, macOS, launcher Python 3.14. Partial service spawn exceptions now trigger cleanup. Missing process start timestamps no longer establish ownership. Six focused environment, doctor and regression checks pass, and `git diff --check` passes. Full launcher suite could not qualify this environment: sandbox denies `ps`, and the repeated socket connection assertion failed. No full-stack or release qualification is claimed. Next actions: run launcher checks in an environment allowing process inspection, qualify ordinary Mac startup, then resume the existing browser integration backlog. Gemini remains disabled.

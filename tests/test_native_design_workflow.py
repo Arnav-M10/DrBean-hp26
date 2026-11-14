@@ -47,7 +47,7 @@ def design_request(history, *, times=None, allowance="1/5"):
         "requested_tier": "checked_pair_separation", "maximum_horizon": "8/1",
         "allowance_origin": {"kind": "hypothetical", "description": "Explicitly reviewed prospective synthetic hard bound"},
         "allow_construction": True, "allow_continuation": True,
-        "source_artifact_ids": [history["result"]["artifacts"][0]["id"]]}
+        "source_artifact_ids": []}
 
 
 def propose(history, request, key):
@@ -87,6 +87,8 @@ def approve_start_and_download(history, plan, key):
     packet = downloaded.json()
     assert packet["schema_version"] == "counterdex.application-bundle.v1" and packet["operation"] == "design"
     assert packet["binding"]["request"] == plan["body"]["request"]
+    assert packet["binding"]["mapping_policy"] == "DB-SC-1-design-to-groundwork-v2"
+    assert plan["body"]["request"].get("source_artifact_ids", []) == []
     assert packet["binding"]["historical_evidence"] == history["evidence"]["body"]
     assert base64.b64decode(packet["history"]["bytes_base64"], validate=True) == history["content"]
     assert packet["history"]["anchors"] == history["anchors"]
@@ -94,6 +96,8 @@ def approve_start_and_download(history, plan, key):
     assert scientific["workflow"] == {"plan_id": plan["id"], "approval_id": approval["id"],
         "operation_id": job["id"], "execution_id": job["id"]}
     assert [candidate["parameters"] for candidate in scientific["design"]["candidates"]] == plan["body"]["request"]["candidate_vectors"]
+    assert scientific["design"]["allowance_origin"] == plan["body"]["request"]["allowance_origin"]
+    assert scientific["design"]["horizon_policy"]["maximum_horizon"] == plan["body"]["request"]["maximum_horizon"]
     assert post(client, f"/design-plans/{plan['id']}/jobs", start, key + "-retry")["id"] == job["id"]
     assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
     return job, approval, result, downloaded.content, anchors
@@ -108,7 +112,8 @@ def assert_preserved_history(history):
 
 def test_actual_pair_design_requires_separate_approval_and_replays_downloaded_lineage(computed_history, replay_python, tmp_path):
     history, client = computed_history, computed_history["client"]
-    plan = propose(history, design_request(history), "design")
+    request = {**design_request(history), "maximum_horizon": "10/1"}
+    plan = propose(history, request, "design")
     # The investigation approval grants no authority to run this new design.
     response = client.post(PREFIX + f"/design-plans/{plan['id']}/jobs", json={
         "approval_id": history["approval"]["id"], "expected_plan_digest": plan["digest"]},
@@ -173,8 +178,8 @@ def test_revised_design_needs_new_approval_and_preserves_honest_no_separation(co
     assert fresh["fresh_checked"]["tier"] == "no_separation_established"
     assert client.get(PREFIX + f"/artifacts/{original['artifacts'][0]['id']}").content == original_bytes
 
-    # A caller cannot replace a discovered vector or request a tier this native
-    # mapping does not implement by editing a new proposal.
+    # A caller cannot replace a discovered vector. A separately reviewed
+    # numerical request remains numerical rather than acquiring exact scope.
     invalid = deepcopy(original_request)
     invalid["candidate_vectors"][0]["A"] = "1/1"
     response = client.post(PREFIX + f"/runs/{history['run']['id']}/design-proposals", json=invalid,
@@ -182,8 +187,40 @@ def test_revised_design_needs_new_approval_and_preserves_honest_no_separation(co
     assert response.status_code == 422
     numerical = {**original_request, "requested_tier": "numerical_guidance"}
     response = client.post(PREFIX + f"/runs/{history['run']['id']}/design-proposals", json=numerical,
-                           headers={"Idempotency-Key": "unsupported-native-tier"})
-    assert response.status_code == 422
+                           headers={"Idempotency-Key": "reviewed-numerical-tier"})
+    assert response.status_code == 201
+    assert response.json()["body"]["request"]["requested_tier"] == "numerical_guidance"
+    assert_preserved_history(history)
+
+
+def test_explicit_numerical_design_uses_zero_pair_budget_and_retains_replayable_scope(computed_history, replay_python, tmp_path):
+    history = computed_history
+    request = {**design_request(history), "requested_tier": "numerical_guidance", "maximum_horizon": "10/1",
+               "allow_construction": False, "allow_continuation": False,
+               "budget": {"wall_seconds": 60, "fixed_vector_constructions": 0,
+                          "pair_verifications": 0, "bundle_bytes": 4 * 1024 * 1024}}
+    plan = propose(history, request, "explicit-numerical")
+    _, _, result, content, anchors = approve_start_and_download(history, plan, "explicit-numerical")
+    assert result["design_tier"] == "numerical_guidance"
+    assert result["verification"] == "not_checked" and result["replay"] == "unsupported"
+    science = json.loads(base64.b64decode(json.loads(content)["scientific"]["bytes_base64"]))
+    assert science["report"]["checked"]["construction_attempts"] == 0
+    assert science["report"]["checked"]["pair_verification_passes"] == 0
+    process, replay = baseline.replay_cli(replay_python, tmp_path, content, anchors)
+    assert process.returncode == 0, replay
+    assert replay["integrity"] == "passed" and replay["expected_binding"] == "matches"
+    assert replay["verification"] == "not_checked" and replay["replay"] == "unsupported"
+    assert_preserved_history(history)
+
+
+def test_native_design_refuses_prospective_reuse_during_plan_admission(computed_history):
+    history = computed_history
+    request = design_request(history)
+    request["source_artifact_ids"] = [history["result"]["artifacts"][0]["id"]]
+    response = history["client"].post(PREFIX + f"/runs/{history['run']['id']}/design-proposals", json=request,
+                                     headers={"Idempotency-Key": "unsupported-prospective-reuse"})
+    assert response.status_code == 422 and response.json()["code"] == "unsupported_artifact_reuse"
+    assert Worker(history["client"].app.state.workflow, settings=history["client"].app.state.settings).tick() == 0
     assert_preserved_history(history)
 
 

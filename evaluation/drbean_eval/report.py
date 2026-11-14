@@ -87,8 +87,8 @@ def render(root: str, results_dir: str) -> str:
     legacy_requests = [a["provider_requests"] for a in attempts if a.get("harness_version") == "0.1.0"
                        and a.get("provider_requests") is not None]
     out += [f"- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): "
-            f"{len(jobs)}. These are actual local computations attempted by the real worker; at this commit they "
-            "fail before scientific computation (see findings).",
+            f"{len(jobs)}. This accumulated count spans historical attempts; see each attempt for its "
+            "scientific outcome and the latest-entry table for current results.",
             f"- External model requests: verified zero by the egress guard in {len(verified)} attempt(s); "
             f"unknown in {len(unknown)} attempt(s); legacy records reporting requests: {len(legacy_requests)}. "
             "Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.",

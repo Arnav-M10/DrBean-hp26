@@ -128,7 +128,7 @@ def _relax_nproc(module) -> None:
 def _science_barrier(module) -> None:
     """DIAGNOSTIC ONLY (opt-in): deterministic barrier inside the scientific child, after setsid and limits.
 
-    Wraps CounterdexAdapter.investigate/design/review so a spawned child waits while the harness-owned barrier file
+    Wraps CounterdexAdapter.investigate/design/review/recheck so a spawned child waits while the harness-owned barrier file
     exists (at most 120 s). The path is captured at import because the child clears its environment before it
     calls the adapter. Cancellation and kill handling under test remain the product's own code.
     """
@@ -149,7 +149,7 @@ def _science_barrier(module) -> None:
         wrapped.__name__ = method.__name__
         return wrapped
 
-    for name in ("investigate", "design", "review"):  # every scientific operation run_bounded accepts
+    for name in ("investigate", "design", "review", "recheck"):  # every scientific operation run_bounded accepts
         if hasattr(adapter, name):
             setattr(adapter, name, hold(getattr(adapter, name)))
     adapter._drbean_barrier = True
@@ -210,7 +210,8 @@ def install(log_path: str | None) -> bool:
         return False
     _LOG = log_path
     sys._drbean_guard_installed = True  # type: ignore[attr-defined]
-    present = sorted(name for name in _CREDENTIAL_NAMES if os.environ.get(name) is not None)
+    names = set(os.environ)
+    present = sorted(name for name in _CREDENTIAL_NAMES if name in names)
     _record("guard_installed", python=sys.version.split()[0], credential_names_present=present)
     sys.addaudithook(_audit)
     _watch_credential_reads()

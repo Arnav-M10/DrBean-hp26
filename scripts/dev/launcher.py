@@ -57,8 +57,13 @@ SERVICES = ("api", "worker", "web")
 
 def child_env() -> dict:
     """Environment for product processes: explicit placeholder AI, one store, absolute paths."""
-    env = {k: v for k, v in os.environ.items()
-           if k not in PROVIDER_ENV_EXACT and not k.startswith(PROVIDER_ENV_PREFIXES)}
+    env = {key: os.environ[key] for key in os.environ
+           if key not in PROVIDER_ENV_EXACT and not key.startswith(PROVIDER_ENV_PREFIXES)}
+    # The server source is explicit even when a filesystem hides .venv's
+    # editable-install .pth file. Preserve an operator's guard/search path.
+    application_path = os.path.join(REPO, "apps", "api")
+    paths = [path for path in env.get("PYTHONPATH", "").split(os.pathsep) if path]
+    env["PYTHONPATH"] = os.pathsep.join([application_path, *(path for path in paths if path != application_path)])
     env.update(
         BEAN_AI_MODE=AI_MODE,
         BEAN_DATABASE_PATH=os.path.join(VAR, "bean.sqlite3"),
@@ -78,7 +83,8 @@ def child_env() -> dict:
 
 def out(cmd, env=None, cwd=REPO, timeout=120):
     try:
-        done = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=cwd, timeout=timeout)
+        done = subprocess.run(cmd, capture_output=True, text=True, env=child_env() if env is None else env,
+                              cwd=cwd, timeout=timeout)
         return done.returncode, (done.stdout + done.stderr).strip()
     except (FileNotFoundError, PermissionError) as error:
         return 127, str(error)
@@ -122,7 +128,7 @@ def owned(name: str) -> dict | None:
             record = json.load(handle)
     except (OSError, ValueError):
         return None
-    return record if started_at(record["pid"]) == record["started_at"] else None
+    return record if record.get("started_at") and started_at(record["pid"]) == record["started_at"] else None
 
 
 def spawn(name: str, command: list[str], env: dict) -> dict:
@@ -188,9 +194,9 @@ def static_facts() -> dict:
     facts["uv"] = text if code == 0 else None
     code, text = out(["node", "--version"])
     facts["node"] = text if code == 0 else None
-    probe = ("import json,sys,importlib.metadata as m;"
+    probe = ("import json,sys,bean_api,importlib.metadata as m;"
              "v=lambda n:(m.version(n) if any(d.metadata['Name'].lower()==n for d in m.distributions()) else None);"
-             "print(json.dumps({'python':sys.version.split()[0],"
+             "print(json.dumps({'python':sys.version.split()[0],'application_importable':True,"
              "'packages':{n:v(n) for n in %r}}))")
     code, text = out([BACKEND_PY, "-c", probe % (["dr-bean-backend", "fastapi", "uvicorn", "pydantic", "deepagents",
                                                    "langchain", "langchain-google-genai", "google-genai"],)])
@@ -252,7 +258,7 @@ def summarize(static: dict, service: dict | None) -> tuple[list[tuple[str, str, 
         static["node"] or "not found. Install Node 20 or newer for the web workspace.")
     backend = static["backend"]
     backend_ok = bool(backend) and backend["python"].startswith(("3.12.", "3.13.")) \
-        and bool(backend["packages"].get("dr-bean-backend"))
+        and backend.get("application_importable") is True and bool(backend["packages"].get("dr-bean-backend"))
     row(backend_ok, "backend runtime (.venv)",
         (f"Python {backend['python']}; " + ", ".join(f"{k} {v}" for k, v in backend["packages"].items() if v))
         if backend else "not installed. Run scripts/dev/setup.sh")
@@ -375,10 +381,16 @@ def cmd_start(_args) -> int:
               "Nothing was started and nothing was killed. Free the port and retry.")
         return 1
     env = child_env()
-    spawn("api", [BACKEND_PY, "-m", "uvicorn", "bean_api.main:create_app", "--factory", "--host", HOST,
-                  "--port", str(API_PORT), "--no-access-log"], env)
-    spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], env)
-    spawn("web", ["node", os.path.join("apps", "web", "serve.mjs"), str(WEB_PORT)], env)
+    try:
+        spawn("api", [BACKEND_PY, "-m", "uvicorn", "bean_api.main:create_app", "--factory", "--host", HOST,
+                      "--port", str(API_PORT), "--no-access-log"], env)
+        spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], env)
+        spawn("web", ["node", os.path.join("apps", "web", "serve.mjs"), str(WEB_PORT)], env)
+    except (OSError, KeyboardInterrupt) as error:
+        for name in reversed(SERVICES):
+            stop_one(name)
+        print(f"Start interrupted ({type(error).__name__}); started services were stopped. See logs in {RUN}.")
+        return 1
     deadline = time.monotonic() + 30
     service = service_facts()
     while time.monotonic() < deadline:

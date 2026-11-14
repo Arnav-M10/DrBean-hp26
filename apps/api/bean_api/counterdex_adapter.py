@@ -12,7 +12,8 @@ import shutil
 import subprocess
 
 from .canonical import semantic_digest
-from .scientific_projection import PROJECTION_VERSION, project_design, project_problem
+from .scientific_projection import (PROJECTION_VERSION, native_design_mapping_policy,
+                                    project_design, project_native_design, project_problem)
 from .workflow import DomainError
 
 APPLICATION_MAPPING = "DB-SC-1-to-groundwork-v1"
@@ -59,16 +60,22 @@ class CounterdexAdapter:
     def capabilities(self) -> dict:
         probe = self._run({"operation": "probe"}, 5)
         available = "worker_error" not in probe
+        recheck = available and probe.get("capabilities", {}).get("capabilities", {}).get(
+            "observation_revision_recheck", {}).get("supported") is True
+        native_design = available and probe.get("capabilities", {}).get("scientific_profiles", {}).get(
+            "explicit_design_mapping") == "DB-SC-1-design-to-groundwork-v2"
         return {"implemented": True, "configured": bool(self.python_executable), "available": available,
-                "verified_in_environment": False, "adapter": "Counterdex", "adapter_version": "0.2.0",
+                "verified_in_environment": False, "adapter": "Counterdex",
+                "adapter_version": (probe.get("identity") or {}).get("adapter_version"),
                 "projection_version": APPLICATION_MAPPING, "runtime": probe.get("identity"),
                 "reason": probe.get("worker_error"),
                 "baseline_discovery": available and probe.get("baseline_discovery") is True,
-                "native_design": available and probe.get("baseline_discovery") is True,
-                "native_followup": {"available": available and probe.get("baseline_discovery") is True,
-                    "hypothetical_only": True, "selected_time_and_allowance_only": True,
-                    "requires_checked_separation": True},
-                "native_design_requested_tiers": ["checked_pair_separation"] if available and probe.get("baseline_discovery") is True else [],
+                "native_design": native_design,
+                "native_followup": {"available": recheck, "operation": "recheck",
+                    "hypothetical_only": False, "selected_time_and_allowance_only": False,
+                    "requires_checked_separation": False, "requires_fresh_checked_design": True},
+                "native_recheck": recheck,
+                "native_design_requested_tiers": ["numerical_guidance", "checked_pair_separation"] if native_design else [],
                 "claim_families": ["closed_ke_interval_counterexample"] if available else [],
                 "design_tiers": ["numerical_guidance", "checked_pair_separation", "no_separation_established"] if available else [],
                 "native_replay": available, "browser_replay": False,
@@ -186,9 +193,16 @@ class CounterdexAdapter:
 
     def review(self, problem: dict, dataset: dict, limits: dict, context: dict) -> dict:
         """Review the immutable selected pair against one approved hypothetical row."""
+        return self._review_candidates(problem, dataset, limits, context, operation="review")
+
+    def recheck(self, problem: dict, dataset: dict, limits: dict, context: dict) -> dict:
+        """Check the original vectors against one independently reviewed reading."""
+        return self._review_candidates(problem, dataset, limits, context, operation="recheck")
+
+    def _review_candidates(self, problem: dict, dataset: dict, limits: dict, context: dict, *, operation: str) -> dict:
         from .followup_evidence import validate_followup_packet
         required = ("run_id", "scenario_id", "workflow", "historical_artifact", "design_request")
-        if any(key not in context for key in required):
+        if any(key not in context for key in required) or (operation == "recheck" and "observation_proposal" not in context):
             return {"worker_error": "incomplete_historical_projection"}
         wall = limits["scientific_wall_seconds"]
         admitted = self._run({"protocol": NATIVE_PROTOCOL, "operation": "admission",
@@ -196,10 +210,13 @@ class CounterdexAdapter:
         if "worker_error" in admitted:
             return admitted
         projection = self._projection(admitted, problem, dataset)
-        response = self._run({"protocol": NATIVE_PROTOCOL, "operation": "review", "problem": problem,
+        payload = {"protocol": NATIVE_PROTOCOL, "operation": operation, "problem": problem,
             "dataset": dataset, "run_id": context["run_id"], "scenario_id": context["scenario_id"],
             "workflow": context["workflow"], "limits": {"wall_seconds": wall, "max_bundle_bytes": 4 * 1024 * 1024},
-            "historical_artifact": context["historical_artifact"]}, wall)
+            "historical_artifact": context["historical_artifact"]}
+        if operation == "recheck":
+            payload["observation_proposal"] = context["observation_proposal"]
+        response = self._run(payload, wall)
         if "worker_error" in response:
             return response
         try:
@@ -231,7 +248,8 @@ class CounterdexAdapter:
                    "approval_id": context["workflow"]["approval_id"]}
             validate_followup_packet(content, response["anchors"], projection=projection, job=job,
                 scenario_id=context["scenario_id"], result=result, historical_artifact=context["historical_artifact"],
-                design_request=context["design_request"])
+                design_request=context["design_request"],
+                **({"observation_proposal": context["observation_proposal"]} if operation == "recheck" else {}))
             result["_native_artifacts"] = [{**reference, "content_base64": artifact["bytes_base64"],
                 "artifact_kind": "bundle", "anchor": response["anchors"]}]
             result["_application_projection"] = projection
@@ -332,37 +350,22 @@ class CounterdexAdapter:
 
     @staticmethod
     def _native_design_projection(request: dict, projection: dict, request_digest: str) -> dict:
-        """Check the explicit application mapping without trusting returned bytes.
-
-        Reuse design admission and apply only the versioned native mapping's
-        documented differences from the retained legacy projection.
-        """
-        design = project_design(request, projection["problem"], [None, None])
-        design["grid"] = sorted([{"time": time, "feasible": True, "reason": "Reviewed application feasible time"}
-                                 for time in request["feasible_times"]], key=lambda row: Fraction(row["time"]))
-        design["allowance_origin"] = {"kind": "reviewed_hard_bound",
-            "description": f"Approved DB-SC-1 design request {request_digest}; future_hard_allowance"}
-        horizon = max(*(Fraction(time) for time in request["feasible_times"]),
-                      *(Fraction(row["time"]) for row in projection["problem"]["observations"] if row["included"]))
-        design["horizon_policy"]["maximum_horizon"] = f"{horizon.numerator}/{horizon.denominator}"
-        design["limits"]["max_certificate_bytes"] = min(2 * 1024 * 1024, request["budget"]["bundle_bytes"])
-        return design
+        """Reconstruct reviewed scope without trusting a child's projection."""
+        return project_native_design(request, projection["problem"], request_digest)
 
     def _native_design(self, request: dict, history: dict) -> dict:
         required = ("problem", "dataset", "workflow", "run_id", "expected_request_digest",
                     "historical_artifact", "remaining_wall_seconds")
         if any(name not in history for name in required):
             return {"worker_error": "incomplete_historical_projection"}
-        if request.get("scientific_profile") != "counterdex.v1" or request.get("requested_tier") != "checked_pair_separation":
-            return {"worker_error": "unsupported_design_tier"}
+        if request.get("source_artifact_ids", []):
+            return {"worker_error": "unsupported_artifact_reuse"}
         problem, dataset = history["problem"], history["dataset"]
         if (request["problem_id"] != problem["id"] or request["problem_digest"] != problem["digest"]
                 or semantic_digest("design-request", request) != history["expected_request_digest"]
                 or history["workflow"].get("operation_id") != history["run_id"]
                 or history["workflow"].get("execution_id") != history["run_id"]):
             return {"worker_error": "binding_mismatch"}
-        if request.get("source_artifact_ids") != [history["historical_artifact"].get("id")]:
-            return {"worker_error": "incomplete_export"}
         wall = min(request["budget"]["wall_seconds"], history["remaining_wall_seconds"])
         if wall < 1:
             return {"worker_error": "budget_exhausted"}
@@ -371,7 +374,10 @@ class CounterdexAdapter:
         if "worker_error" in admitted:
             return admitted
         projection = self._projection(admitted, problem, dataset)
-        design = self._native_design_projection(request, projection, history["expected_request_digest"])
+        try:
+            design = self._native_design_projection(request, projection, history["expected_request_digest"])
+        except DomainError as error:
+            return {"worker_error": error.code}
         response = self._run({"protocol": NATIVE_PROTOCOL, "operation": "design", "problem": problem,
             "dataset": dataset, "run_id": history["run_id"], "workflow": history["workflow"], "request": request,
             "expected_request_digest": history["expected_request_digest"],
@@ -402,7 +408,7 @@ class CounterdexAdapter:
             "problem_digest": history["problem"]["digest"], "projection_digest": projection["projection_digest"],
             "app_request_digest": history["expected_request_digest"], "design_digest": design_digest,
             "scenario_id": request["scenario_id"], "run_id": history["run_id"]}
-        binding = {"schema_version": "counterdex.application-design-binding.v1", "mapping_policy": APPLICATION_MAPPING,
+        binding = {"schema_version": "counterdex.application-design-binding.v1", "mapping_policy": native_design_mapping_policy(request),
             "application": projection["binding"], "request": request, "request_digest": history["expected_request_digest"],
             "historical_evidence": history["evidence"]["body"], "design_digest": design_digest,
             "approved_grid_order": request["feasible_times"]}
@@ -424,6 +430,14 @@ class CounterdexAdapter:
         result, report = response["result"], scientific["report"]
         checked = fresh.get("fresh_checked", {})
         valid = checked.get("verification") == "valid" and fresh["replay"] == "passed"
+        if design["requested_tier"] == "numerical_guidance" and (
+                valid or report.get("tier") not in {"numerical_guidance", "unavailable"}
+                or fresh.get("verification") != "not_checked" or fresh.get("replay") != "unsupported"
+                or report["checked"].get("verification") != "not_checked"
+                or report["checked"].get("construction_attempts") != 0
+                or report["checked"].get("pair_verification_passes") != 0
+                or scientific.get("artifacts") != []):
+            return {"worker_error": "binding_mismatch"}
         rows = checked["rows"] if valid else report["numerical"]["rows"]
         options = {row["time"]: {"time": row["time"], "state": row["status"],
             "reason_code": row["reason_code"] or ("exact_margin_checked" if valid else "numerical_only"),
