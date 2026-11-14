@@ -3,8 +3,9 @@ from bean_api.main import PREFIX
 from bean_api.worker import Worker
 from test_research_native_authority import reviewed_inputs
 from test_scientific_http import post
+import test_scientific_http as scientific_http
 
-scientific_client = __import__("test_scientific_http").scientific_client
+scientific_client = scientific_http.scientific_client
 
 
 def test_ordinary_worker_reaches_canonical_investigation_review(scientific_client):

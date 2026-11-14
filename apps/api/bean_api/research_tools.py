@@ -251,7 +251,7 @@ class ApplicationResearchPorts:
             current_jobs = [self.workflow._job(conn, self.runtime.actor_id, job["id"]) for job in jobs]
             if _hash(current_jobs) != evidence_revision:
                 raise DomainError("research_evidence_changed", "Retained work changed while assembling this report; request a new snapshot.", 409)
-            existing = conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind='report' AND json_extract(body,'$.evidence_revision')=?", (session["id"], evidence_revision)).fetchone()
+            existing = conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind='report' AND json_extract(body,'$.evidence_revision')=? AND json_extract(body,'$.report_profile')='research-report.v2'", (session["id"], evidence_revision)).fetchone()
             if existing:
                 report = self.workflow._get(conn, self.runtime.actor_id, existing["id"], "report")
             else:
@@ -261,19 +261,32 @@ class ApplicationResearchPorts:
                     if job["kind"] == "design_job" and job["result_id"]:
                         evidence_ids.append(job["result_id"])
                 evidence = [self.workflow._get(conn, self.runtime.actor_id, ref) for ref in dict.fromkeys(evidence_ids)]
+                native_evidence = []
+                for item in evidence:
+                    result = item["body"].get("result", item["body"])
+                    for artifact in result.get("artifacts", []):
+                        native_evidence.append({"evidence_id": item["id"], "evidence_digest": item["digest"],
+                            "artifact": artifact,
+                            "download_path": "/api/bean/v1/artifacts/" + artifact["id"],
+                            "anchor_path": "/api/bean/v1/artifacts/" + artifact["id"] + "/anchor?download=true",
+                            "native_filename": "dr-bean-" + artifact["id"] + ".native.json",
+                            "anchor_filename": "dr-bean-" + artifact["id"] + ".anchors.json",
+                            "replay_command": "python3.11 -m counterdex replay-native dr-bean-" + artifact["id"] + ".native.json --anchors dr-bean-" + artifact["id"] + ".anchors.json"})
                 decisions = [self.workflow._get(conn, self.runtime.actor_id, row["id"]) for row in conn.execute(
                     "SELECT id FROM entities WHERE workspace_id=? AND kind='research_decision' AND json_extract(body,'$.research_session_id')=? ORDER BY created_at,rowid", (self.runtime.workspace_id, session["id"]))]
                 report = self.workflow._insert(conn, self.runtime.actor_id, self.runtime.workspace_id, "report", {
-                    "schema_version": "DB-RESEARCH-1", "research_session_id": session["id"],
+                    "schema_version": "DB-RESEARCH-1", "report_profile": "research-report.v2", "research_session_id": session["id"],
                     "evidence_revision": evidence_revision,
                     "objective": self.workflow._get(conn, self.runtime.actor_id, session["id"])["body"]["objective"],
                     "root_inputs": self.service.root_context(conn, session), "research_plan_revision_id": current["plan_revision_id"],
                     "decisions": decisions, "children": jobs, "evidence": evidence, "run_reports": snapshots,
+                    "included_operations": [{"job_id": job["id"], "kind": job["kind"], "state": job["state"]} for job in jobs],
+                    "native_evidence": native_evidence,
                     "limitations": ["Verification is adapter-specific and conditional on reviewed meanings and assumptions.",
                         "A bounded search that finds no counterexample does not prove the claim.",
                         "Fresh replay reruns the same checker; it is not an independently implemented proof system.",
                         "An actual observation is a human declaration, not authenticated acquisition."],
-                    "native_downloads": "Use retained artifact IDs and external anchors from the run reports; raw native bytes remain separately authenticated."
+                    "native_downloads": "The native_evidence manifest covers every included baseline, design and follow-up packet. Download each native file and its external anchors using the authenticated paths; replay does not strengthen its scientific conclusion."
                 }, session["id"])
             self.service._event(conn, current, "tool_finished", "A canonical report snapshot was assembled from retained evidence.", [report["id"]], self.runtime.action_id)
         return {"id": report["id"], "report_id": report["id"], "report_digest": report["digest"],
