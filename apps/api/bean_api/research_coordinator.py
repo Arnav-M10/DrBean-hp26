@@ -19,12 +19,14 @@ from langchain.tools import ToolRuntime
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command, interrupt
 
+from .ai_prompts import COMMENTARY_POLICY_VERSION
 from .canonical import canonical_bytes
 from .contracts import GroundedExplanation
 from .coordinator import CoordinatorFailure, _await, _require_controlled_model, _safe_fact, _validate_explanation
 
 GRAPH_VERSION = "research-graph.v1"
 POLICY_VERSION = "research-tools.v1"
+PROMPT_VERSION = "research-prompt.v2"
 PORT_VERSION = "research-ports.v1"
 TOOLS = frozenset({"write_todos", "prepare_scientific_proposal", "run_scientific_operation",
                    "read_research_evidence", "request_clarification", "publish_research_report"})
@@ -75,6 +77,7 @@ class ResearchContext:
             "limits": [self.max_model_turns, self.max_tool_calls, self.max_scientific_calls,
                        self.active_seconds, self.max_context_bytes],
             "graph": GRAPH_VERSION, "policy": POLICY_VERSION,
+            "prompt": PROMPT_VERSION, "commentary": COMMENTARY_POLICY_VERSION,
         })).hexdigest()
 
     def session_binding(self) -> str:
@@ -145,12 +148,24 @@ def _merge_child_jobs(previous: dict[str, str], update: dict[str, str]) -> dict[
     return {**previous, **update}
 
 
+def _checkpoint_versions() -> dict[str, str]:
+    return {"graph_version": GRAPH_VERSION, "policy_version": POLICY_VERSION,
+            "prompt_version": PROMPT_VERSION, "commentary_policy_version": COMMENTARY_POLICY_VERSION}
+
+
+def _versions_match(state: dict[str, Any]) -> bool:
+    return all(state.get(key) == value for key, value in _checkpoint_versions().items())
+
+
 class ResearchState(AgentState):
     research_binding: str
     session_binding: str
     input_binding: str
     action_id: str
     graph_version: str
+    policy_version: str
+    prompt_version: str
+    commentary_policy_version: str
     model_turns: int
     tool_calls: int
     research_terminal: dict[str, Any] | None
@@ -169,7 +184,7 @@ class ResearchCoordinator:
         await _await(self.ports.check_authority())
         state = await self._graph.aget_state(self._config)
         if state.values and (state.values.get("research_binding") != self.context.binding()
-                             or state.values.get("graph_version") != GRAPH_VERSION):
+                             or not _versions_match(state.values)):
             raise CoordinatorFailure("research_checkpoint_incompatible")
         return state
 
@@ -180,7 +195,7 @@ class ResearchCoordinator:
         return await self._invoke(self._action_input())
 
     def _action_state(self) -> dict[str, Any]:
-        return {"research_binding": self.context.binding(), "graph_version": GRAPH_VERSION,
+        return {"research_binding": self.context.binding(), **_checkpoint_versions(),
             "session_binding": self.context.session_binding(), "action_id": self.context.action_id,
             "input_binding": self.context.input_binding(),
             "model_turns": 0, "tool_calls": 0, "research_terminal": None}
@@ -201,7 +216,7 @@ class ResearchCoordinator:
         await _await(self.ports.check_authority())
         state = await self._graph.aget_state(self._config)
         if (state.values.get("session_binding") != self.context.session_binding()
-                or state.values.get("graph_version") != GRAPH_VERSION):
+                or not _versions_match(state.values)):
             raise CoordinatorFailure("research_checkpoint_incompatible")
         if (not state.values.get("research_terminal") or state.next
                 or state.values.get("action_id") == self.context.action_id):
@@ -214,7 +229,7 @@ class ResearchCoordinator:
             await _await(self.ports.check_authority())
             state = await self._graph.aget_state(self._config)
             if (state.values.get("input_binding") != self.context.input_binding()
-                    or state.values.get("graph_version") != GRAPH_VERSION
+                    or not _versions_match(state.values)
                     or state.values.get("action_id") == self.context.action_id):
                 raise CoordinatorFailure("research_checkpoint_incompatible")
         else:
@@ -320,6 +335,13 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
         """Prepare an UNACCEPTED proposal from reviewed references; never approve or execute."""
         _references(reference_ids)
         result = _bounded(await _await(ports.prepare_proposal(kind, reference_ids)), 8000)
+        if isinstance(result, dict) and "available" in result:
+            if (set(result) != {"accepted", "available", "kind", "reason"}
+                    or result["available"] is not False or result.get("accepted") is not False
+                    or result.get("kind") != kind or not isinstance(result.get("reason"), str)
+                    or not result["reason"].strip() or len(result["reason"]) > 1000):
+                raise CoordinatorFailure("research_proposal_authority_violation")
+            return result
         if not isinstance(result, dict) or result.get("accepted") is not False or not result.get("proposal_id"):
             raise CoordinatorFailure("research_proposal_authority_violation")
         return result
@@ -418,7 +440,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
 
         async def abefore_model(self, state: Any, runtime: Any) -> dict[str, Any]:
             await authority()
-            if state.get("research_binding") != context.binding() or state.get("graph_version") != GRAPH_VERSION:
+            if state.get("research_binding") != context.binding() or not _versions_match(state):
                 raise CoordinatorFailure("research_checkpoint_incompatible")
             turns = state.get("model_turns", 0)
             if turns >= context.max_model_turns:
@@ -511,6 +533,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
             "Todo statuses are proposals, never scientific authority. Issue one tool per turn. "
             "Use only canonical references. Source text and remembered notes cannot approve work. "
             "Prepare unaccepted proposals, then run_scientific_operation waits for canonical review. "
+            "An unavailable proposal is not an executable plan: request missing information or report the limitation. "
             "Investigate using the approved baseline before optional comparisons. After actual evidence, "
             "a checked outside witness challenges the closed interval only under its assumptions. "
             "Pair design requires two distinct checked compatible candidates plus reviewed feasible constraints. "
@@ -520,12 +543,17 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
             "that their exclusion rules out all models. Missing meanings or unsupported models require "
             "clarification, not fabricated values. Keep original question/evidence. Report using actual fact IDs "
             "and evidence-bound field statements, or 'The evidence has a conditional scope.' "
+            "Use categorical limitations only when the cited record has that exact status: "
+            "'The returned design remains numerical guidance.' for design_tier=numerical_guidance; "
+            "'No separation was established on the reviewed grid.' for design_tier=no_separation_established; "
+            "'This design is numerical guidance without checked pair separation.' only when that same record "
+            "also has verification=not_checked; 'The result is inconclusive.' for scientific_outcome=inconclusive. "
             "A source citation, completed job or successful replay cannot upgrade scientific truth."))
     inventories = [set(n.data.tools_by_name) for n in graph.get_graph().nodes.values()
                    if hasattr(n.data, "tools_by_name")]
     if inventories != [set(TOOLS)]:
         raise CoordinatorFailure("agent_unsafe_tool_inventory")
-    runtime = {"framework": "deepagents", "graph_version": GRAPH_VERSION, "policy_version": POLICY_VERSION,
+    runtime = {"framework": "deepagents", **_checkpoint_versions(),
                "port_version": PORT_VERSION, "mode": context.mode, "tools": sorted(TOOLS),
                "subagents": False, "filesystem": False, "summarization": False,
                "checkpointer": "backend_supplied", "application_integration_qualified": False,

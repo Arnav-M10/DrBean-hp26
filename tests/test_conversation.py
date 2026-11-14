@@ -189,7 +189,7 @@ def test_new_model_numbers_are_withheld(setup):
     assert response["body"]["commentary_suppression_reason"] == "unsupported_numeric_claim"
 
 
-def test_baseline_explanation_prompt_teaches_complete_v2_templates_and_real_fact_ids(setup):
+def test_baseline_explanation_prompt_teaches_complete_policy_templates_and_real_fact_ids(setup):
     from test_workflow import create_problem, dataset_body
     workflow, workspace = setup
     dataset = workflow.create_dataset("alice", workspace, dataset_body(), "baseline-data")
@@ -206,11 +206,18 @@ def test_baseline_explanation_prompt_teaches_complete_v2_templates_and_real_fact
     assert result["model_commentary"] == text
     assert result["commentary_status"] == "unverified_model_commentary"
     prompt, = provider.prompts
-    assert "evidence-bound-statements.v2" in prompt
+    from bean_api.ai_prompts import COMMENTARY_POLICY_VERSION
+    assert COMMENTARY_POLICY_VERSION in prompt
+    assert "The returned design remains numerical guidance." in prompt
+    assert "No separation was established on the reviewed grid." in prompt
+    assert "This design is numerical guidance without checked pair separation." in prompt
+    assert "The result is inconclusive." in prompt
+    assert "same record has design_tier=numerical_guidance AND verification=not_checked" in prompt
+    assert "never combine different records or uncited context" in prompt
     assert "The reviewed interval is [<lower> 1/h, <upper> 1/h]." in prompt
     assert "The claim lower bound is <lower> 1/h." in prompt
     assert "The claim upper bound is <upper> 1/h." in prompt
-    assert "Never paraphrase scientific verdicts" in prompt
+    assert "Otherwise never paraphrase scientific verdicts" in prompt
     assert "Never substitute domain bounds or candidate rates for claim bounds" in prompt
     assert "actual id strings in explanation.fact_ids" in prompt and target_id in prompt
     assert "For explain, return no drafts. For interpret_design, extract only explicitly supplied" in prompt

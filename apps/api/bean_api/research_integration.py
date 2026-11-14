@@ -1,8 +1,7 @@
 """Consumer adapter from DB-RESEARCH-1 services to A's restricted graph.
 
 No backend modules, routes, approval service or storage are implemented here.
-The d224846 protocol needs the following producer additions before this adapter
-is available: read-only ``check_authority``; atomic
+The 0c69912 producer exposes read-only ``check_authority``; atomic
 ``execute_child(review_id, *, expected_review_digest)``; and a context snapshot
 with objective/question (identical), reviewed_context, input_digest, budget, reference_ids, reviews,
 and design_constraints (a reviewed dict or explicit None).
@@ -10,8 +9,9 @@ and design_constraints (a reviewed dict or explicit None).
 Each canonical review has review_id/review_digest/kind/approval_id and a scope
 containing immutable plan_id/plan_digest/input_digest. ``require_review`` returns
 that binding plus decision pending/approve/reject. Child results retain the same
-review/scope plus job_id/state. These expectations fail closed until B publishes
-and implements them. They are consumer requirements, not new public DTOs.
+review/scope plus job_id/state. Unknown or malformed producer envelopes fail
+closed. These are consumer requirements, not new public DTOs or production route
+integration claims.
 
 ``policy`` is the admitted ResearchBudget mapping/model, identical to the
 snapshot budget. ``model_factory`` is B's trusted zero-argument bound factory.
@@ -24,11 +24,15 @@ import hashlib
 import inspect
 from typing import Any
 
+from .agent_evidence import project_evidence_fact
 from .canonical import canonical_bytes
+from .contracts import DesignResult, ScientificResult
+from .conversation import ConversationService
 from .coordinator import CoordinatorFailure, _await
 from .research_coordinator import (
     GRAPH_VERSION, PORT_VERSION, ResearchContext, _bounded, create_research_coordinator,
 )
+from .workflow import DomainError, _digest as entity_digest
 
 CONTRACT_VERSION = "DB-RESEARCH-1"
 CHECKPOINT_VERSION = "research-checkpoint.v1"
@@ -36,6 +40,7 @@ ACTION_POLICY = "research-action.v1"
 INTEGRATION_VERSION = "research-integration.v1"
 _BUDGET_CAPS = {"model_turns": 4, "tool_calls": 6, "scientific_reservations": 2, "active_seconds": 300}
 _KINDS = {"investigation", "design", "followup"}
+_ENTITY_FIELDS = {"id", "workspace_id", "kind", "body", "digest", "parent_id", "created_by", "created_at"}
 _METHODS = ("context", "check_authority", "update_plan", "prepare_investigation", "prepare_design",
             "prepare_followup", "require_review", "execute_child", "read_evidence",
             "request_clarification", "publish_report", "admit_model", "admit_tool")
@@ -90,6 +95,67 @@ def _canonical_review(value: Any, input_digest: str) -> dict[str, Any]:
 def _binding(review: dict[str, Any]) -> tuple[str, ...]:
     return (review["review_id"], review["review_digest"], review["kind"],
             review["scope"]["plan_id"], review["scope"]["plan_digest"], review["scope"]["input_digest"])
+
+
+def _unavailable(value: Any, kind: str) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or "available" not in value:
+        return None
+    if (set(value) != {"available", "reason"} or value["available"] is not False
+            or not isinstance(value["reason"], str) or not value["reason"].strip()
+            or len(value["reason"]) > 1000):
+        raise CoordinatorFailure("research_backend_binding_invalid")
+    return {"accepted": False, "available": False, "kind": kind, "reason": value["reason"]}
+
+
+def _evidence_fact(value: Any, evidence_id: str, workspace_id: str) -> dict[str, Any]:
+    """Project B's immutable entity without turning replay into scientific success."""
+    if (not isinstance(value, dict) or set(value) != _ENTITY_FIELDS
+            or value.get("id") != evidence_id or value.get("workspace_id") != workspace_id
+            or value.get("kind") not in {"evidence", "suggestion"}
+            or not isinstance(value.get("body"), dict)):
+        raise CoordinatorFailure("research_evidence_binding_invalid")
+    _digest(value.get("digest"))
+    if value["parent_id"] is not None:
+        _identity(value["parent_id"])
+    try:
+        if entity_digest(value["kind"], value["body"]) != value["digest"]:
+            raise CoordinatorFailure("research_evidence_binding_invalid")
+        if value["kind"] == "evidence":
+            body = value["body"]
+            _identity(body.get("run_id"))
+            _identity(body.get("scenario_id"))
+            ScientificResult.model_validate(body.get("result"))
+            fact = project_evidence_fact(value)
+            normalized = ConversationService._scientific_body(value)
+            for key in ("candidate_ids", "dataset_origin", "native_replay"):
+                if key in normalized:
+                    fact[key] = normalized[key]
+        else:
+            DesignResult.model_validate(value["body"])
+            # Preserve all options, candidates and verification records. The
+            # established projection bounds only duplicated native transcripts;
+            # binding is derived solely from a present verification record.
+            fact = {"id": value["id"], "evidence_digest": value["digest"],
+                    "fact_projection": "agent-design-evidence.v1",
+                    **ConversationService._scientific_body(value)}
+        source = value["body"]["result"] if value["kind"] == "evidence" else value["body"]
+        if isinstance(source.get("native_replay"), dict):
+            # Match coordinator._safe_fact's independent replay axes. In
+            # particular an unresolved outcome or failed historical check must
+            # not disappear merely because replay's byte check passed.
+            fact["native_replay"] = {key: source["native_replay"][key] for key in (
+                "replay", "scope", "integrity", "verification", "expected_binding",
+                "recorded_result_matches", "reason_code", "dataset_origin", "operation",
+                "packet_profile", "anchors", "baseline_digest", "problem_digest",
+                "design_digest", "suggestion_digest", "outcome", "historical_compatibility",
+                "search_replayed",
+            ) if key in source["native_replay"]}
+        fact.update(kind=value["kind"], workspace_id=workspace_id, parent_id=value["parent_id"])
+        return _mapping(fact, 12_000)
+    except (KeyError, TypeError, ValueError) as error:
+        raise CoordinatorFailure("research_evidence_binding_invalid") from error
+    except DomainError as error:
+        raise CoordinatorFailure(error.code) from error
 
 
 class _CanonicalPorts:
@@ -157,10 +223,14 @@ class _CanonicalPorts:
         elif kind == "design":
             constraints = self.snapshot["design_constraints"]
             if constraints is None:
-                raise CoordinatorFailure("research_design_constraints_unavailable")
+                return _unavailable({"available": False,
+                    "reason": "Reviewed feasible times, future hard allowance and horizon are required before preparing a design."}, kind)
             value = await _await(self.backend.prepare_design(_mapping(constraints, 8000)))
         else:
             raise CoordinatorFailure("research_operation_unavailable")
+        unavailable = _unavailable(value, kind)
+        if unavailable is not None:
+            return unavailable
         review = self._remember(value)
         if review["kind"] != kind:
             raise CoordinatorFailure("research_backend_binding_invalid")
@@ -213,7 +283,8 @@ class _CanonicalPorts:
         await self.check_authority()
         # B revalidates membership and exact admitted lineage, including explicit
         # historical evidence. A's cache is an additional bound, never authority.
-        return await _await(self.backend.read_evidence(evidence_id))
+        return _evidence_fact(await _await(self.backend.read_evidence(evidence_id)),
+                              evidence_id, self.context.workspace_id)
 
     async def clarify(self, fields: list[str], question: str) -> Any:
         await self.check_authority()
