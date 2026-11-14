@@ -271,8 +271,8 @@ def test_disabled_default_does_not_read_manifest_or_enable_from_credentials(tmp_
 
 
 def test_invalid_controlled_configuration_cannot_fall_back(tmp_path):
-    with pytest.raises(ValueError, match="disabled or controlled"):
-        Settings(source_intake_mode="live")
+    with pytest.raises(ValueError, match="disabled, controlled or live"):
+        Settings(source_intake_mode="automatic")
     with pytest.raises(ValueError, match="explicit trusted"):
         Settings(source_intake_mode="controlled")
     manifest = tmp_path / "invalid.json"
@@ -295,8 +295,11 @@ def test_source_mode_is_selected_only_from_explicit_deployment_configuration(tmp
     settings = Settings.from_env()
     assert settings.source_intake_mode == "controlled" and settings.controlled_source_manifest_path == str(MANIFEST)
     monkeypatch.setenv("BEAN_SOURCE_INTAKE_MODE", "live")
-    with pytest.raises(ValueError, match="disabled or controlled"):
-        Settings.from_env()
+    assert Settings.from_env().source_intake_mode == "live"
+    # Naming a source mode alone never supplies consent or enables credentials.
+    monkeypatch.delenv("BEAN_AI_MODE", raising=False)
+    from bean_api.main import provider_config_from_env
+    assert provider_config_from_env().api_key is None
 
 
 def test_legacy_schema_and_record_types_keep_their_meanings():

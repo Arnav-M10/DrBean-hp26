@@ -1,5 +1,6 @@
 """Tests for the local launcher. Standard library only: python3 -m unittest scripts/dev/test_launcher.py"""
 import json
+import io
 import os
 import socket
 import subprocess
@@ -82,8 +83,11 @@ class OwnedProcesses(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.patch = mock.patch.object(launcher, "RUN", self.dir.name)
         self.patch.start()
+        self.config_patch = mock.patch.object(launcher, "LIVE_CONFIG", os.path.join(self.dir.name, "absent.json"))
+        self.config_patch.start()
 
     def tearDown(self):
+        self.config_patch.stop()
         self.patch.stop()
         self.dir.cleanup()
 
@@ -147,6 +151,13 @@ class OwnedProcesses(unittest.TestCase):
 
 
 class Doctor(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        patch = mock.patch.object(launcher, "LIVE_CONFIG", os.path.join(directory.name, "absent.json"))
+        patch.start()
+        self.addCleanup(patch.stop)
+
     def test_live_gemini_configuration_is_an_alert_not_a_pass(self):
         static = {"uv": "uv", "node": "v22.0.0", "backend": {"python": "3.13.0", "application_importable": True,
                                                                    "packages": {"dr-bean-backend": "0"}},
@@ -180,6 +191,168 @@ class Doctor(unittest.TestCase):
         rows, ok = launcher.summarize(static, None)
         self.assertFalse(ok)
         self.assertTrue(any(state == "MISSING" and fact == "backend runtime (.venv)" for state, fact, _ in rows))
+
+
+class LiveOptIn(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = os.path.join(self.directory.name, "gemini.local.json")
+        patch = mock.patch.object(launcher, "LIVE_CONFIG", self.path)
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.config = {
+            "mode": "live", "GEMINI_API_KEY": "launcher-test-canary-not-a-real-key",
+            "GEMINI_MODEL": "gemini-3.5-flash-lite", "BEAN_GEMINI_FREE_TIER_ONLY": "1",
+            "BEAN_GEMINI_ACCOUNT_GATE": "approved", "BEAN_GEMINI_ACCOUNT_DECISION_ID": "local-test-approval",
+            "BEAN_GEMINI_IMAGE_TOKEN_BOUND": "8192", "BEAN_GEMINI_MAX_INPUT_TOKENS": "16000",
+            "BEAN_GEMINI_MAX_OUTPUT_TOKENS": "2048",
+        }
+        self.static = {
+            "uv": "uv", "node": "v22.0.0", "backend": {"python": "3.13.0", "application_importable": True,
+                                                        "packages": {"dr-bean-backend": "0"}},
+            "engine": {"python": "3.11.0", "runtime_qualified": True, "counterdex": "0",
+                       "native_replay_supported": True}, "auth_file_present": True,
+            "os": "x", "os_release": "x", "arch": "x",
+        }
+        self.service = {"api_ready": True, "web_ready": True, "worker_ready": True,
+                        "capabilities": {"science": {}, "gemini": {"dispatch_enabled": True}}}
+
+    def write(self, data=None, mode=0o600):
+        with open(self.path, "w", encoding="utf-8") as handle:
+            json.dump(self.config if data is None else data, handle)
+        os.chmod(self.path, mode)
+
+    def assert_closed(self, expected="invalid"):
+        live = launcher.live_config()
+        self.assertEqual(live["state"], expected)
+        self.assertEqual(live["env"], {})
+        self.assertNotIn(self.config["GEMINI_API_KEY"], json.dumps(live))
+
+    def test_absent_and_disabled_do_not_admit_credentials(self):
+        self.assert_closed("absent")
+        self.write({**self.config, "mode": "disabled"})
+        self.assert_closed("disabled")
+        self.write({**self.config, "GEMINI_API_KEY": ""})
+        self.assert_closed("missing_key")
+
+    def test_only_explicit_supported_models_and_valid_limits_are_admitted(self):
+        for model in ("gemini-3.5-flash-lite", "gemini-2.5-flash-lite"):
+            with self.subTest(model=model):
+                self.write({**self.config, "GEMINI_MODEL": model})
+                live = launcher.live_config()
+                self.assertEqual(live["state"], "configured")
+                self.assertEqual(live["env"]["GEMINI_MODEL"], model)
+                self.assertEqual(live["env"]["BEAN_AI_MODE"], "live_opt_in")
+        for key, value in (
+            ("GEMINI_MODEL", ""), ("GEMINI_MODEL", "gemini-pro"), ("BEAN_GEMINI_FREE_TIER_ONLY", "0"),
+            ("BEAN_GEMINI_ACCOUNT_GATE", "pending"), ("BEAN_GEMINI_ACCOUNT_DECISION_ID", ""),
+            ("BEAN_GEMINI_ACCOUNT_DECISION_ID", "cannot contain spaces"),
+            ("BEAN_GEMINI_MAX_INPUT_TOKENS", "0"), ("BEAN_GEMINI_MAX_INPUT_TOKENS", "24001"),
+            ("BEAN_GEMINI_MAX_OUTPUT_TOKENS", "4097"), ("BEAN_GEMINI_IMAGE_TOKEN_BOUND", "-1"),
+            ("BEAN_GEMINI_IMAGE_TOKEN_BOUND", "8191"), ("BEAN_GEMINI_IMAGE_TOKEN_BOUND", "8193"),
+            ("BEAN_GEMINI_MAX_INPUT_TOKENS", 16000),
+        ):
+            with self.subTest(key=key, value=value):
+                self.write({**self.config, key: value})
+                self.assert_closed()
+        for key in launcher.LIVE_KEYS - {"GEMINI_API_KEY"}:
+            with self.subTest(missing=key):
+                self.write({name: value for name, value in self.config.items() if name != key})
+                self.assert_closed()
+        self.write({**self.config, "BEAN_GEMINI_MAX_INPUT_TOKENS": "24000",
+                    "BEAN_GEMINI_MAX_OUTPUT_TOKENS": "4096"})
+        self.assertEqual(launcher.live_config()["state"], "configured")
+
+    def test_permission_and_file_type_failures_never_read_a_key(self):
+        self.write(mode=0o644)
+        with mock.patch.object(launcher.json, "loads", side_effect=AssertionError("must not read JSON")):
+            self.assert_closed()
+        os.unlink(self.path)
+        target = os.path.join(self.directory.name, "target.json")
+        with open(target, "w", encoding="utf-8") as handle:
+            json.dump(self.config, handle)
+        os.chmod(target, 0o600)
+        os.symlink(target, self.path)
+        self.assert_closed()
+        os.unlink(self.path)
+        os.mkdir(self.path)
+        self.assert_closed()
+
+    def test_malformed_or_oversized_configuration_never_leaks_values(self):
+        for raw in (
+            '{"mode":"live","mode":"disabled"}', "[1, 2]", "{not JSON}",
+            json.dumps({**self.config, "undocumented": "secret"}),
+            json.dumps({**self.config, "GEMINI_API_KEY": "line\nbreak"}),
+            " " * 16385,
+        ):
+            with self.subTest(kind=raw[:20]):
+                with open(self.path, "w", encoding="utf-8") as handle:
+                    handle.write(raw)
+                os.chmod(self.path, 0o600)
+                self.assert_closed()
+
+    def test_live_values_go_only_to_server_children(self):
+        self.write()
+        shell = {"GEMINI_API_KEY": "wrong-shell-key", "GEMINI_MODEL": "wrong-shell-model",
+                 "BEAN_AI_MODE": "live_opt_in", "BEAN_GEMINI_MAX_INPUT_TOKENS": "999999",
+                 "GOOGLE_GEMINI_BASE_URL": "https://wrong-provider.example", "BEAN_GEMINI_EXTRA": "shell-only"}
+        with mock.patch.dict(os.environ, shell, clear=True):
+            base = launcher.child_env()
+        server = launcher.provider_child_env(base, launcher.live_config())
+        self.assertEqual(server["GEMINI_API_KEY"], self.config["GEMINI_API_KEY"])
+        self.assertEqual(server["BEAN_GEMINI_MAX_INPUT_TOKENS"], "16000")
+        self.assertEqual(server["BEAN_GEMINI_FREE_TIER_ONLY"], "1")
+        self.assertNotIn("GOOGLE_GEMINI_BASE_URL", server)
+        self.assertNotIn("BEAN_GEMINI_EXTRA", server)
+        self.assertNotIn("wrong-shell", json.dumps(server))
+        self.assertNotIn("GEMINI_API_KEY", base)
+        self.assertEqual(base["BEAN_AI_MODE"], "placeholder")
+        self.assertEqual(base["GOOGLE_GEMINI_BASE_URL"], "http://127.0.0.1:9")
+        self.assertNotIn(self.config["GEMINI_API_KEY"], json.dumps(base))
+
+    def test_start_routes_the_configuration_to_api_and_worker_only(self):
+        self.write()
+        with mock.patch.object(launcher, "static_facts", return_value=self.static), \
+                mock.patch.object(launcher, "owned", side_effect=[None] * 3 + [{"pid": 1}] * 6), \
+                mock.patch.object(launcher, "port_in_use", return_value=False), \
+                mock.patch.object(launcher, "service_facts", return_value=self.service), \
+                mock.patch.object(launcher, "spawn") as spawn, mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(launcher.cmd_start(None), 0)
+        environments = {call.args[0]: call.args[2] for call in spawn.call_args_list}
+        self.assertEqual(set(environments), {"api", "worker", "web"})
+        for name in ("api", "worker"):
+            self.assertEqual(environments[name]["GEMINI_API_KEY"], self.config["GEMINI_API_KEY"])
+            self.assertNotIn("GOOGLE_GEMINI_BASE_URL", environments[name])
+        self.assertNotIn("GEMINI_API_KEY", environments["web"])
+        self.assertEqual(environments["web"]["BEAN_AI_MODE"], "placeholder")
+        self.assertNotIn(self.config["GEMINI_API_KEY"], output.getvalue())
+
+    def test_invalid_config_blocks_start_without_spawning(self):
+        self.write(mode=0o644)
+        with mock.patch.object(launcher, "static_facts", return_value=self.static), \
+                mock.patch.object(launcher, "spawn") as spawn, mock.patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(launcher.cmd_start(None), 1)
+            spawn.assert_not_called()
+
+    def test_doctor_reports_configuration_and_server_state_without_claiming_qualification(self):
+        self.write()
+        for observed in (True, False):
+            self.service["capabilities"]["gemini"]["dispatch_enabled"] = observed
+            with self.subTest(observed=observed), \
+                    mock.patch.object(launcher, "static_facts", return_value=self.static), \
+                    mock.patch.object(launcher, "owned", return_value={"pid": 1}), \
+                    mock.patch.object(launcher, "service_facts", return_value=self.service), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(launcher.cmd_doctor(type("Args", (), {"json": True})()), 0)
+                report = json.loads(output.getvalue())
+            self.assertEqual(report["ai_mode"], "live_opt_in")
+            self.assertEqual(report["gemini_live"]["server_dispatch_enabled"], observed)
+            self.assertEqual(report["gemini_live"]["live_qualification"], "not_established_by_launcher")
+            self.assertNotIn(self.config["GEMINI_API_KEY"], output.getvalue())
+        live = launcher.live_status(launcher.live_config(), None)
+        self.assertFalse(live["server_observed"])
+        self.assertIsNone(live["server_dispatch_enabled"])
 
 
 if __name__ == "__main__":

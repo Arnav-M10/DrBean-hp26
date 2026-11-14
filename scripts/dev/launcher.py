@@ -6,10 +6,11 @@ picks "whatever python3 is on PATH" for product code: the backend runs in the
 uv-managed `.venv` (Python 3.12/3.13 per pyproject.toml) and the Counterdex
 engine in `.venv-engine` (CPython 3.11, its only qualified runtime).
 
-AI is in placeholder mode. Every child process is started with provider and
-tracing credentials removed from its environment, so a key that happens to be
-set in your shell cannot enable a live model call. This script never reads,
-prints or validates a key, and never contacts a model provider.
+AI defaults to placeholder mode. Shell provider credentials are discarded.
+An owner-only var/gemini.local.json file can explicitly opt the API and worker
+into the supported free-tier-only Gemini mode. The web process stays sanitized.
+This launcher never prints key values or contacts a model provider. Configuration
+and server readiness are not evidence that a live test has passed.
 
   scripts/dev/setup.sh      install both runtimes, create local auth (keeps existing data)
   scripts/dev/doctor.py     report prerequisites and, if running, service facts
@@ -23,9 +24,11 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -51,8 +54,102 @@ PROVIDER_ENV_EXACT = {
     "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LANGCHAIN_API_KEY", "LANGCHAIN_TRACING_V2", "LANGCHAIN_ENDPOINT",
     "DATABASE_URL",
 }
-PROVIDER_ENV_PREFIXES = ("GOOGLE_GENAI_", "GOOGLE_CLOUD_", "VERTEX", "LANGSMITH_", "ANTHROPIC_", "OPENAI_")
+PROVIDER_ENV_PREFIXES = ("BEAN_GEMINI_", "GOOGLE_GEMINI_", "GOOGLE_GENAI_", "GOOGLE_CLOUD_", "VERTEX",
+                         "LANGSMITH_", "ANTHROPIC_", "OPENAI_")
 SERVICES = ("api", "worker", "web")
+LIVE_CONFIG = os.path.join(VAR, "gemini.local.json")
+LIVE_MODELS = frozenset({"gemini-2.5-flash-lite", "gemini-3.5-flash-lite"})
+LIVE_KEYS = frozenset({"GEMINI_API_KEY", "GEMINI_MODEL", "BEAN_GEMINI_ACCOUNT_GATE",
+                       "BEAN_GEMINI_ACCOUNT_DECISION_ID", "BEAN_GEMINI_FREE_TIER_ONLY",
+                       "BEAN_GEMINI_IMAGE_TOKEN_BOUND", "BEAN_GEMINI_MAX_INPUT_TOKENS",
+                       "BEAN_GEMINI_MAX_OUTPUT_TOKENS"})
+
+
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON keys are not allowed")
+        result[key] = value
+    return result
+
+
+def live_config() -> dict:
+    """Read an explicit owner-only opt-in. Callers must never serialize `env`."""
+    def result(state, detail, env=None):
+        return {"state": state, "detail": detail, "env": env or {}}
+
+    try:
+        # Refuse symlinks and nonregular files before reading; fstat also prevents
+        # checking permissions on one file and then reading a substituted file.
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        with os.fdopen(os.open(LIVE_CONFIG, flags), "r", encoding="utf-8") as handle:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
+                return result("invalid", "opt-in must be a regular file owned by this user")
+            if stat.S_IMODE(info.st_mode) != 0o600:
+                return result("invalid", "opt-in permissions must be 0600; run chmod 600 var/gemini.local.json")
+            if info.st_size > 16384:
+                return result("invalid", "opt-in exceeds the 16 KiB limit")
+            raw = handle.read(16385)
+            if len(raw.encode("utf-8")) > 16384:
+                return result("invalid", "opt-in exceeds the 16 KiB limit")
+            data = json.loads(raw, object_pairs_hook=_unique_json_object)
+    except FileNotFoundError:
+        return result("absent", "no local opt-in file; live Gemini is off")
+    except (OSError, ValueError, UnicodeError):
+        return result("invalid", "opt-in is unreadable or invalid JSON; no configuration was loaded")
+    if not isinstance(data, dict) or set(data) - LIVE_KEYS - {"mode"}:
+        return result("invalid", "opt-in must be an object containing only documented keys")
+    if any(not isinstance(value, str) or len(value) > 4096 or any(ord(c) < 32 for c in value)
+           for value in data.values()):
+        return result("invalid", "opt-in values must be bounded single-line strings")
+    mode = data.get("mode", "disabled")
+    if mode not in {"disabled", "live"}:
+        return result("invalid", "opt-in mode must be disabled or live")
+    if mode == "disabled":
+        return result("disabled", "local opt-in is disabled; no provider credentials will be passed")
+    if not data.get("GEMINI_API_KEY", "").strip():
+        return result("missing_key", "live opt-in has no key; no provider credentials will be passed")
+    if data.get("GEMINI_MODEL") not in LIVE_MODELS:
+        return result("invalid", "select an explicitly supported Flash-Lite model; no automatic fallback")
+    if data.get("BEAN_GEMINI_FREE_TIER_ONLY") != "1":
+        return result("invalid", "live opt-in requires BEAN_GEMINI_FREE_TIER_ONLY=1")
+    decision = data.get("BEAN_GEMINI_ACCOUNT_DECISION_ID", "")
+    if data.get("BEAN_GEMINI_ACCOUNT_GATE") != "approved" or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", decision):
+        return result("invalid", "live opt-in requires a recorded approved account decision")
+    limits = {"BEAN_GEMINI_MAX_INPUT_TOKENS": 24000, "BEAN_GEMINI_MAX_OUTPUT_TOKENS": 4096}
+    for key, maximum in limits.items():
+        value = data.get(key, "")
+        if not re.fullmatch(r"[0-9]{1,5}", value) or not 1 <= int(value) <= maximum:
+            return result("invalid", "live opt-in requires input tokens in 1..24000 and output tokens in 1..4096")
+    if data.get("BEAN_GEMINI_IMAGE_TOKEN_BOUND") != "8192":
+        return result("invalid", "live image opt-in requires the supported 8192-token image bound")
+    env = {key: data[key] for key in LIVE_KEYS}
+    env["BEAN_AI_MODE"] = "live_opt_in"
+    return result("configured", "explicit free-tier-only opt-in configured; live test not established", env)
+
+
+def provider_child_env(base: dict, live: dict) -> dict:
+    """Only API and worker receive an admitted opt-in; ordinary children do not."""
+    env = dict(base)
+    if live["state"] == "configured":
+        env.pop("GOOGLE_GEMINI_BASE_URL", None)
+        env.update(live["env"])
+    return env
+
+
+def live_status(live: dict, service: dict | None) -> dict:
+    """Public facts, never credentials or an inferred live-qualification claim."""
+    opted = live["state"] == "configured"
+    caps = (service or {}).get("capabilities") or {}
+    gemini = caps.get("gemini") or {}
+    return {"opt_in_state": live["state"], "detail": live["detail"],
+            "requested_mode": "live_opt_in" if opted else AI_MODE,
+            "model": live["env"].get("GEMINI_MODEL") if opted else None,
+            "free_tier_only": opted, "server_observed": bool(caps),
+            "server_dispatch_enabled": bool(gemini.get("dispatch_enabled")) if caps else None,
+            "live_qualification": "not_established_by_launcher"}
 
 
 def child_env() -> dict:
@@ -243,7 +340,7 @@ def service_facts() -> dict:
     return report
 
 
-def summarize(static: dict, service: dict | None) -> tuple[list[tuple[str, str, str]], bool]:
+def summarize(static: dict, service: dict | None, live: dict | None = None) -> tuple[list[tuple[str, str, str]], bool]:
     """Rows of (state, fact, detail) and whether the prerequisites for `start` hold."""
     rows, ok = [], True
 
@@ -276,8 +373,13 @@ def summarize(static: dict, service: dict | None) -> tuple[list[tuple[str, str, 
         f"{static.get('store_dir', 'var')} writable, {free} MiB free; database "
         f"{'present' if static.get('database_present') else 'not created yet'}"
         if static.get("store_writable", True) else f"{static.get('store_dir')} is not writable")
-    row(True, "AI mode", "controlled placeholder only. Provider credentials are removed from every launched "
-        "process; no model provider is contacted.")
+    live = live_config() if live is None else live
+    opted = live["state"] == "configured"
+    row(live["state"] not in {"invalid", "missing_key"}, "Gemini opt-in file", live["detail"])
+    row(True, "AI mode", "live opt-in: only API and worker receive the configured Gemini credentials; "
+        "each operation still needs its own consent and bounded budget" if opted else
+        "controlled placeholder only. Provider credentials are removed from every launched process.")
+    row(True, "Live qualification", "not established by this launcher; configuration is not a passed test")
     if service is None:
         return rows, ok
     caps = service["capabilities"] or {}
@@ -299,14 +401,19 @@ def summarize(static: dict, service: dict | None) -> tuple[list[tuple[str, str, 
             "yes" if science.get("native_replay") else "no (engine CLI replay is separate, see above)")
         run(bool(science.get("baseline_discovery")), "baseline discovery through the API",
             "yes" if science.get("baseline_discovery") else f"no ({science.get('reason')})")
-        live = bool(gemini.get("configured")) or bool(gemini.get("account_gate_passed")) \
+        configured = bool(gemini.get("configured")) or bool(gemini.get("account_gate_passed")) \
             or bool(gemini.get("dispatch_enabled"))
-        rows.append(("ALERT" if live else "ok", "Gemini live",
-                     "CONFIGURED. This sprint requires placeholder mode: stop, and start with scripts/dev/start.sh"
-                     if live else "disabled, not tested"
-                     + (f" (API reports ai_mode {caps['ai_mode']})" if caps.get("ai_mode") else "")))
-        if live:
+        if configured and not opted:
+            rows.append(("ALERT", "Gemini live", "API reports provider configuration without a valid local opt-in"))
             ok = False
+        elif opted:
+            enabled = bool(gemini.get("dispatch_enabled"))
+            rows.append(("ok" if enabled else "note", "Gemini live",
+                         "opted in; server dispatch " + ("enabled" if enabled else "still disabled")
+                         + "; configuration does not establish a successful live test"))
+        else:
+            rows.append(("ok", "Gemini live", "disabled, not tested"
+                         + (f" (API reports ai_mode {caps['ai_mode']})" if caps.get("ai_mode") else "")))
     return rows, ok
 
 
@@ -350,9 +457,11 @@ def cmd_doctor(args) -> int:
     static = static_facts()
     running = any(owned(name) for name in SERVICES) or port_in_use(API_PORT)
     service = service_facts() if running else None
-    rows, ok = summarize(static, service)
+    live = live_config()
+    rows, ok = summarize(static, service, live)
     if args.json:
-        print(json.dumps({"ok": ok, "ai_mode": AI_MODE, "gemini_live": "disabled, not tested",
+        public_live = live_status(live, service)
+        print(json.dumps({"ok": ok, "ai_mode": public_live["requested_mode"], "gemini_live": public_live,
                           "static": static, "service": service}, indent=2))
     else:
         print("Dr. Bean doctor")
@@ -365,10 +474,12 @@ def cmd_doctor(args) -> int:
 
 def cmd_start(_args) -> int:
     static = static_facts()
-    rows, ok = summarize(static, None)
+    live = live_config()
+    rows, ok = summarize(static, None, live)
     if not ok:
         print_rows(rows)
-        print("\nCannot start: run scripts/dev/setup.sh first.")
+        print("\nCannot start: correct the local Gemini opt-in shown above." if live["state"] in {"invalid", "missing_key"}
+              else "\nCannot start: run scripts/dev/setup.sh first.")
         return 1
     already = [name for name in SERVICES if owned(name)]
     if already:
@@ -381,10 +492,11 @@ def cmd_start(_args) -> int:
               "Nothing was started and nothing was killed. Free the port and retry.")
         return 1
     env = child_env()
+    provider_env = provider_child_env(env, live)
     try:
         spawn("api", [BACKEND_PY, "-m", "uvicorn", "bean_api.main:create_app", "--factory", "--host", HOST,
-                      "--port", str(API_PORT), "--no-access-log"], env)
-        spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], env)
+                      "--port", str(API_PORT), "--no-access-log"], provider_env)
+        spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], provider_env)
         spawn("web", ["node", os.path.join("apps", "web", "serve.mjs"), str(WEB_PORT)], env)
     except (OSError, KeyboardInterrupt) as error:
         for name in reversed(SERVICES):
@@ -410,14 +522,14 @@ def cmd_start(_args) -> int:
             print("If the worker says another worker holds the lock, an older worker is still running on this "
                   "database. Stop it; then `python3 scripts/dev/launcher.py recover`.")
         return 1
-    rows, _ = summarize(static, service)
+    rows, _ = summarize(static, service, live)
     print("Dr. Bean is running (loopback only)")
     print_rows(rows)
     print(f"\n  open      http://{HOST}:{WEB_PORT}\n  API docs  http://{HOST}:{API_PORT}/docs"
           f"\n  token     private file var/auth.json (read it locally; never paste it into a URL or chat)"
           f"\n  logs      var/run/*.log\n  stop      scripts/dev/stop.sh")
-    live = any(state == "ALERT" for state, _, _ in rows)
-    return 1 if live else 0
+    alert = any(state == "ALERT" for state, _, _ in rows)
+    return 1 if alert else 0
 
 
 def cmd_stop(_args) -> int:
@@ -454,7 +566,7 @@ def main(argv=None) -> int:
         command = sub.add_parser(name)
         if name == "start":
             command.add_argument("--controlled-source-examples", action="store_true",
-                                 help="Enable only the packaged controlled source examples; Gemini remains disabled.")
+                                 help="Enable packaged controlled source examples; this option does not enable Gemini.")
     sub.add_parser("doctor").add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if getattr(args, "controlled_source_examples", False):

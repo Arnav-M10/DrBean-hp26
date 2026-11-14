@@ -24,8 +24,8 @@ class Settings:
     controlled_source_manifest_path: str | None = None
 
     def __post_init__(self):
-        if self.source_intake_mode not in {"disabled", "controlled"}:
-            raise ValueError("Source intake mode must be disabled or controlled")
+        if self.source_intake_mode not in {"disabled", "controlled", "live"}:
+            raise ValueError("Source intake mode must be disabled, controlled or live")
         if self.source_intake_mode == "controlled" and not self.controlled_source_manifest_path:
             raise ValueError("Controlled intake requires an explicit trusted local fixture manifest")
 

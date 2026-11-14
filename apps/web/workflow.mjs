@@ -1,5 +1,6 @@
 import { setupSourceWorkflow } from './source-workflow.mjs'
-import { BeanApi, baselineAvailable, baselineExplanation } from './api.mjs'
+import { setupAssistantWorkflow } from './assistant-workflow.mjs'
+import { BeanApi, baselineAvailable, baselineExplanation, liveGeminiAvailable } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 import { setupDesignWorkflow } from './design-workflow.mjs'
 import { designAvailable } from './design.mjs'
@@ -19,11 +20,12 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
   const currentPlan = () => plan && frozen === fingerprint()
   const available = () => baselineAvailable(capabilities)
   const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save, openRun: async id => { await refreshRun(id); location.hash = 'investigations' } })
+  const assistant = setupAssistantWorkflow({ context: () => ({ api, workspace, run, busy, capabilities }), button, node, exactRecord })
   const sources = setupSourceWorkflow({ context: () => ({ api, workspace, busy, capabilities }), applyReviewedFields, getDraft, button, node, exactRecord, useInputs: async materialized => {
     const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(materialized.problem))
     inputs = materialized; plan = prepared; frozen = fingerprint(); approval = undefined
   } })
-  function reset() { sources.reset(); clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
+  function reset() { sources.reset(); assistant.reset(); clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
   function button(parent, label, action, disabled = false) {
     const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy
     b.addEventListener('click', () => perform(action)); parent.append(b); return b
@@ -154,6 +156,7 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
       }
     }
     designs.render(investigations)
+    assistant.render(investigations)
     investigations.append(node('p', 'Adding and checking a follow-up observation is a separate workflow. A design approval does not authorize a new observation or investigation.'))
     const sourcePanel = byId('backend-source-review'); sourcePanel.replaceChildren(); sources.render(sourcePanel)
     const reports = byId('backend-report'); reports.replaceChildren(node('h3', 'Reviewer snapshot'))
@@ -183,7 +186,7 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
       if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('Unsupported API contract or policy version.')
       await candidate.json('/workspaces') // Authenticate before retaining the client.
       api = candidate; capabilities = caps; workspace = ''; reset(); await workspaces()
-      byId('connection-status').textContent = `Connected · DB-SC-1 / GF-2. Baseline discovery: ${available() ? 'available; each result is checked separately' : 'unavailable'}. Gemini remains disabled. No model-provider calls are made by this manual workflow.`
+      byId('connection-status').textContent = `Connected · DB-SC-1 / GF-2. Baseline discovery: ${available() ? 'available; each result is checked separately' : 'unavailable'}. ${liveGeminiAvailable(capabilities) ? `Gemini (${capabilities.gemini.model}) is enabled for separately approved image intake and explanations. Manual scientific runs make no model-provider calls.` : 'Gemini remains disabled. No model-provider calls are made by this manual workflow.'}`
     })
   })
   byId('disconnect').addEventListener('click', () => {

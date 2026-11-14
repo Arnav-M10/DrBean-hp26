@@ -1,4 +1,5 @@
 import { datasetBody, problemBody } from './manual.mjs'
+import { liveGeminiAvailable } from './api.mjs'
 
 function assumptionValues(dataset, problem) {
   const values = { experiment_id: dataset.experiment_id, time_origin: dataset.time_origin }
@@ -13,12 +14,12 @@ function assumptionValues(dataset, problem) {
 }
 
 export function setupSourceWorkflow({ context, getDraft, button, node, exactRecord, useInputs, applyReviewedFields }) {
-  let source, imageUrl, proposal, review, fields = [], resolved = new Set(), explanation = '', prepared, materialized, selectedFile, selectedOrigin = '', previewDraft
+  let source, imageUrl, proposal, review, fields = [], resolved = new Set(), explanation = '', prepared, materialized, selectedFile, selectedOrigin = '', previewDraft, liveConsent = false, liveProposal = false
   function reset() {
     if (imageUrl) URL.revokeObjectURL(imageUrl)
     source = imageUrl = proposal = review = prepared = materialized = undefined
     selectedFile = previewDraft = undefined; selectedOrigin = ''
-    fields = []; resolved = new Set(); explanation = ''
+    fields = []; resolved = new Set(); explanation = ''; liveConsent = liveProposal = false
   }
   async function showSource(record) {
     const { api, workspace } = context()
@@ -30,8 +31,12 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
   }
   function render(parent) {
     const { api, workspace, busy, capabilities } = context()
+    const live = liveGeminiAvailable(capabilities) && capabilities.source_intake?.execution_mode === 'live'
+      && capabilities.source_intake.application_review_integration === 'available'
     const section = node('section', ''); section.id = 'source-review'; parent.append(section)
-    section.append(node('h3', 'Source and value review'), node('p', 'Gemini is a disabled placeholder. Upload retains a source locally without extraction or scientific approval. Enter measurements manually when no reviewed proposal is available.'))
+    section.append(node('h3', 'Source and value review'), node('p', live
+      ? `Gemini (${capabilities.gemini.model}) can propose values from one public or synthetic image after your permission. Upload alone retains the source locally. You must review each proposal before it changes scientific inputs. CSV files belong in Measurements; this upload accepts PNG or JPEG images.`
+      : 'Gemini is a disabled placeholder. Upload retains a source locally without extraction or scientific approval. Enter measurements manually when no reviewed proposal is available.'))
     const fileLabel = node('label', 'Public or synthetic source image'); fileLabel.className = 'stack'
     const file = node('input', ''); file.type = 'file'; file.accept = 'image/png,image/jpeg'; file.id = 'source-image-file'; file.disabled = busy
     file.addEventListener('change', () => { selectedFile = file.files[0] })
@@ -55,27 +60,48 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
     }
     const controlled = capabilities?.source_intake?.execution_mode === 'controlled' && capabilities.source_intake.application_review_integration === 'available'
     section.append(node('p', controlled ? 'Controlled examples are enabled for exact supported synthetic images only. These authored values are not image understanding or Gemini transcription. Unknown or changed images require manual entry.' : 'Controlled proposals are unavailable in this server configuration. Manual entry remains available.'))
-    button(section, 'Use controlled example image', async () => {
+    button(section, live ? 'Use sample source image' : 'Use controlled example image', async () => {
       const response = await fetch('/examples/controlled-source.png')
       if (!response.ok) throw new Error('The controlled example image is unavailable. Upload a source or enter measurements manually.')
       const bytes = await response.blob()
       const record = await api.uploadSource(workspace, new File([bytes], 'controlled-source.png', { type: 'image/png' }), 'synthetic')
       reset(); await showSource(record)
-    }, !api || !workspace || !controlled)
-    button(section, 'Prepare controlled source proposal', async () => {
-      const loaded = await api.json(`/workspaces/${workspace}/intake-proposals`, { execution_mode: 'controlled', source_id: source.id, expected_source_digest: source.body.sha256 })
+    }, !api || !workspace || (!controlled && !live))
+    function acceptProposal(loaded, isLive) {
       if (loaded.kind !== 'intake_proposal' || loaded.workspace_id !== workspace || loaded.body.source_asset_id !== source.id || loaded.body.source_digest !== source.body.sha256) throw new Error('Proposal and selected source identities differ.')
       proposal = loaded; review = prepared = materialized = undefined; resolved = new Set()
+      liveProposal = isLive
       fields = loaded.body.fields.map(field => ({ field_path: field.field_path, value: field.original_value ?? field.candidate_exact ?? '', origin: 'confirmed_transcription', correction_reason: '' }))
+    }
+    button(section, 'Prepare controlled source proposal', async () => {
+      const loaded = await api.json(`/workspaces/${workspace}/intake-proposals`, { execution_mode: 'controlled', source_id: source.id, expected_source_digest: source.body.sha256 })
+      acceptProposal(loaded, false)
     }, !controlled || !source || source.body.origin !== 'synthetic')
+    if (live && source) {
+      section.append(node('p', 'This sends the displayed image and its source identity to Google Gemini. It makes one bounded request with no automatic retry or paid-model fallback. The free-tier account and server limits apply. No draft measurements or notes are included.'))
+      const consentLabel = node('label', ` Send this selected ${source.body.origin} image to ${capabilities.gemini.model} for an unaccepted proposal.`)
+      const consent = node('input', ''); consent.type = 'checkbox'; consent.id = 'gemini-source-consent'; consent.checked = liveConsent; consent.disabled = busy
+      consentLabel.prepend(consent); section.append(consentLabel)
+      const prepare = button(section, 'Ask Gemini to read this image', async () => {
+        if (!liveConsent) throw new Error('Review and accept the selected image disclosure first.')
+        const loaded = await api.json(`/workspaces/${workspace}/intake-proposals`, {
+          source_id: source.id, notes: '', existing_values: {},
+          consent: { provider: 'gemini', model: capabilities.gemini.model, source_asset_ids: [source.id], include_notes: false, include_existing_values: false, accepted: true },
+        })
+        acceptProposal(loaded, true); liveConsent = false
+      }, !api || !workspace || !liveConsent)
+      consent.addEventListener('change', () => { liveConsent = consent.checked; prepare.disabled = busy || !liveConsent })
+    }
     const manual = node('a', 'Continue with manual measurements'); manual.href = '#inputs'; section.append(manual)
     if (!proposal) return
-    section.append(node('p', proposal.body.label || 'Controlled example; not Gemini transcription.'))
+    section.append(node('p', proposal.body.label || (liveProposal ? 'Gemini image proposal. No values are accepted yet.' : 'Controlled example; not Gemini transcription.')))
     if (proposal.body.status === 'unavailable' || fields.length === 0) {
       section.append(node('p', 'Extraction unavailable for these image bytes. No values were accepted or added. Use manual measurements.'))
       return
     }
-    section.append(node('p', 'Review every proposed value against the retained image. Controlled proposals are test output; no live Gemini qualification is claimed.'), exactRecord('Proposal and source locators', proposal))
+    section.append(node('p', liveProposal
+      ? 'Review every proposed value and source locator against the retained image. Gemini can misread values. A source quotation or model proposal does not establish a scientific result.'
+      : 'Review every proposed value against the retained image. Controlled proposals are test output; no live Gemini qualification is claimed.'), exactRecord('Proposal and source locators', proposal))
     fields.forEach((field, index) => {
       const original = proposal.body.fields[index]
       if (!field.value || original.ambiguity) section.append(node('p', `Needs review: ${field.field_path} — ${original.ambiguity || 'No proposed value; enter a reviewed value or assumption.'}`))

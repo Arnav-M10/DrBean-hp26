@@ -1,10 +1,10 @@
 # Dr. Bean researcher workspace
 
-The dependency-free browser supports reviewed CSV/manual measurements, exact rational inputs, an immutable baseline plan, explicit approval, real Counterdex investigation, separately approved next-measurement design, result reopening, and authenticated native evidence/replay-anchor downloads. The backend owns identities, approvals, scope and scientific execution. Gemini remains disabled; this manual path makes no model-provider calls.
+The dependency-free browser supports reviewed CSV/manual measurements, exact rational inputs, an immutable baseline plan, explicit approval, real Counterdex investigation, separately approved next-measurement design, result reopening, and authenticated native evidence/replay-anchor downloads. The backend owns identities, approvals, scope and scientific execution. Gemini is disabled by default; optional live image proposals and selected-run commentary require private deployment opt-in and separate operation consent. The manual scientific path makes no model-provider calls.
 
 ## Local startup
 
-From the repository root, `scripts/dev/setup.sh` once and then `scripts/dev/start.sh` prepare both runtimes and start the API, durable worker and this workspace together on one store, with `BEAN_COUNTERDEX_PYTHON` pointing at the prepared CPython 3.11 engine and AI in placeholder mode. To run only this web server against an API you started yourself:
+From the repository root, `scripts/dev/setup.sh` once and then `scripts/dev/start.sh` prepare both runtimes and start the API, durable worker and this workspace together on one store, with `BEAN_COUNTERDEX_PYTHON` pointing at the prepared CPython 3.11 engine. AI stays in placeholder mode unless the private live configuration is explicitly enabled; see [Optional live Gemini](../../README.md#optional-live-gemini). To run only this web server against an API you started yourself:
 
 ```sh
 node apps/web/serve.mjs
@@ -66,7 +66,7 @@ Open a completed checked-separation design, enter a hypothetical concentration a
 
 ## Retained source review
 
-Start with `scripts/dev/start.sh --controlled-source-examples` to enable the packaged controlled source manifest. Ordinary startup without this option leaves controlled intake disabled. Gemini stays disabled in both modes.
+Start with `scripts/dev/start.sh --controlled-source-examples` to enable the packaged controlled source manifest. Ordinary startup without this option leaves controlled intake disabled. Neither startup option enables live Gemini; that requires the separate private configuration described in the root README.
 
 Upload a public or synthetic PNG/JPEG and choose its origin explicitly, or choose **Use controlled example image** for the supported synthetic lab sheet. The retained image is displayed for inspection; upload neither extracts values nor approves science.
 
@@ -75,3 +75,11 @@ Choose **Prepare controlled source proposal**. This uses the ordinary authentica
 Compare every original/proposed value and locator against the image, record corrections and reasons, and resolve blocking diagnostics. Accept the source review, then choose **Use reviewed values in measurement draft** to replace the draft rows with those explicit accepted values. Complete missing measurements and the question separately. Explain the remaining assumptions and inspect the exact source-bound preview before accepting it. Changing the draft requires a new preview. The resulting plan still requires separate scientific approval.
 
 The browser regression uses these same visible controls, including changed-byte refusal and manual fallback. Source review, input materialization, discovery, design, follow-up and native replay use the real application and engine; controlled source values do not supply scientific results. No database helper or copied proposal identifier is needed.
+
+## Optional live image and explanation controls
+
+Live controls appear only when the connected server reports live Gemini dispatch and a selected model. Upload one public or synthetic PNG/JPEG (at most 1600 × 1600 pixels and 5 MiB for live extraction), inspect it, check its separate consent box, then choose **Ask Gemini to read this image**. Upload itself stays local. Review every extracted value and source locator, resolve missing assumptions and use the ordinary source-review/materialization flow before approving scientific work. CSV import belongs in Measurements; PDF upload is unsupported.
+
+Open a run with retained evidence to use **Ask Gemini about this investigation**. Enter a question and accept the disclosure of that run's inputs/evidence and bounded prior question context. No source images are sent in this operation. **Ask Gemini for an explanation** makes one bounded request without automatic retry; an uncertain response retains the same operation identity for explicit retrieval. Scientific statements remain server-owned. Model commentary is labeled unverified or withheld when it fails grounding checks. A message cannot authorize an investigation or a new reading.
+
+**Show Gemini call budget** reads remaining conservative reservations without a model call. These are application limits across the local store, not Google's quota or a billing verification. Live configuration and local smoke testing do not establish formal release qualification. Autonomous live Deep Agents coordination remains unavailable.

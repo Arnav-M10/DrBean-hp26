@@ -6,7 +6,7 @@ This README states what the repository does at the tested commit. Status by gate
 
 ## Current state in one paragraph
 
-The API, worker and web workspace start with one command and survive a restart. An approved baseline runs the real engine and returns scoped results with native evidence that replays in a separate process. The browser supports reviewed exact inputs, frozen plans, separate approvals, actual baseline and next-measurement design, history and native downloads. Backend follow-up checks retain the original pair and a separately reviewed reading. The browser also supports retained-source inspection, controlled proposal correction/materialization and hypothetical follow-up revisions. Strict clean-checkout release qualification is tracked separately. The independent HTTP suite is delivered; qualification depends on its retained results for the current commit. Counterdex also works offline on CPython 3.11. **Gemini remains a disabled placeholder. The launcher removes provider configuration, and offline acceptance checks verify zero model-provider dispatch.**
+The API, worker and web workspace start with one command and survive a restart. An approved baseline runs the real engine and returns scoped results with native evidence that replays in a separate process. The browser supports reviewed exact inputs, frozen plans, separate approvals, actual baseline and next-measurement design, history and native downloads. Backend follow-up checks retain the original pair and a separately reviewed reading. The browser also supports retained-source inspection, proposal correction/materialization and hypothetical follow-up revisions. Strict clean-checkout release qualification is tracked separately. The independent HTTP suite is delivered; qualification depends on its retained results for the current commit. Counterdex also works offline on CPython 3.11. **Gemini is disabled by default. An explicit private local opt-in enables bounded image proposals and selected-run commentary, each with separate consent. Live autonomous Deep Agents coordination is not integrated.**
 
 ## Run it
 
@@ -22,7 +22,7 @@ Installs both runtimes, creates the private local auth file if absent, and print
 scripts/dev/start.sh --controlled-source-examples
 ```
 
-Starts the API (`127.0.0.1:8000`), the durable worker and the web workspace (`127.0.0.1:4173`) on one SQLite store under `var/`, waits until they answer, and prints service facts. Loopback only. This explicit option enables the packaged synthetic source examples; Gemini remains disabled. Omit the option for manual-only source intake.
+Starts the API (`127.0.0.1:8000`), the durable worker and the web workspace (`127.0.0.1:4173`) on one SQLite store under `var/`, waits until they answer, and prints service facts. Loopback only. This option enables the packaged synthetic source examples. Without the separate live opt-in below, Gemini remains disabled; omit the option for manual-only source intake.
 
 ```sh
 scripts/dev/stop.sh
@@ -34,11 +34,28 @@ Stops only the processes the launcher started. Data is kept.
 scripts/dev/doctor.py
 ```
 
-Reports, as separate facts: API ready, worker ready, scientific adapter available and qualified, native replay supported, and Gemini live (disabled, not tested).
+Reports, as separate facts: API ready, worker ready, scientific adapter available and qualified, native replay supported, and Gemini opt-in/server dispatch state. Configuration and readiness do not establish live qualification.
 
 Open `http://127.0.0.1:4173`, expand **Local backend connection**, and paste the bearer token from the private file `var/auth.json`. The token stays in memory only. Never put it in a URL, a screenshot or chat. API documentation is at `http://127.0.0.1:8000/docs`.
 
 If a start fails, the launcher prints the log tail and stops what it started. Port already in use: it refuses and kills nothing. After an unclean stop, run `python3 scripts/dev/launcher.py recover` before the next start. Details: [docs/release-runbook.md](docs/release-runbook.md).
+
+## Optional live Gemini
+
+One backend uses one server-side Gemini key for all authorized users and workspaces. Teammates connecting to that backend do not provide their own Gemini keys. The server owner configures it once; cloning the repository does not copy the private key. The launcher discards shell provider credentials. After setup on the server, create an owner-only configuration from the disabled example:
+
+```sh
+cp scripts/dev/gemini.local.example.json var/gemini.local.json
+chmod 600 var/gemini.local.json
+```
+
+Edit that private file on the server: enter the owner's `GEMINI_API_KEY`, set `mode` to `live`, set `BEAN_GEMINI_ACCOUNT_GATE` to `approved`, and record the owner's decision in `BEAN_GEMINI_ACCOUNT_DECISION_ID` using 1–128 letters, digits, dots, underscores, colons or hyphens, starting with a letter or digit. Keep `BEAN_GEMINI_FREE_TIER_ONLY` at `1`. The model is explicitly selected as `gemini-3.5-flash-lite`; `gemini-2.5-flash-lite` is also supported. No model fallback is performed. Restart the launcher after changing the file. Setting `mode` to `disabled` and restarting disables dispatch again.
+
+This free-tier flag records your assertion about the Google project. The application does not verify its billing state or establish a dollar-denominated spending guarantee. Use a project without billing enabled when zero spend is required. API keys, bearer tokens, local stores and live-test records under `var/` are excluded from Git.
+
+After connecting and selecting a workspace, upload one public or synthetic PNG/JPEG, review the image disclosure, and choose **Ask Gemini to read this image**. Live images are limited to 1600 × 1600 pixels and 5 MiB. Review each proposed value and complete missing assumptions before scientific approval. With a completed run open, **Ask Gemini about this investigation** sends the question and selected research context after separate consent. The app shows server-owned scientific statements separately from model commentary and withholds commentary that fails grounding checks.
+
+**Show Gemini call budget** reads the local ledger without calling a model. The live ledger permits at most eight requests with total conservative reservations of 64,000 input and 16,000 output tokens. These limits apply across the local store, not separately to each workspace or to Google's quota. Failed/uncertain requests retain reservations, and the app makes no automatic retry. Manual discovery, measurement design, follow-up checking and native replay make no model calls. PDF intake and live autonomous coordination remain unavailable. A local smoke test does not satisfy the formal live release gate.
 
 ## What works, and how it is checked
 
@@ -49,11 +66,12 @@ If a start fails, the launcher prints the log tail and stops what it started. Po
 | Browser to API: plan, approval, run retrieval, downloads | works | `node apps/web/check-backend.mjs` |
 | Web editor: exact entry, validation, export | works | `node --test` in `apps/web`; `tests/integration/web_manual_smoke.mjs` |
 | Counterdex engine standalone: candidate discovery, exact check, fixed-pair design, native replay | works on CPython 3.11 | 257 engine tests; replay of the prepared synthetic bundle |
-| Source intake and review, deepagents graph | backend-tested with **controlled placeholder** models only | backend tests |
+| Source intake and review | controlled examples plus explicitly opted-in live image proposals | backend tests; `tests/test_live_provider_opt_in.py`; web source tests |
+| deepagents graph | backend-tested with **controlled placeholder** models only; live coordinator unavailable | backend tests |
 | Baseline discovery through the API and browser | works with the prepared engine interpreter | `stack_smoke.py --require-science`; `node apps/web/check-backend.mjs` |
 | Design, native export and replay through the API (gate G2) | real discovered pair, separate approval, native replay | backend tests |
 | Browser controls for source review, design and follow-up | implemented; controlled source proposal, real science and hypothetical follow-up | `node apps/web/check-backend.mjs` |
-| Live Gemini | **not run; disabled** | |
+| Live Gemini | explicit opt-in for image proposals and selected-run commentary; disabled by default; formal live qualification not run | substituted SDK transport tests and browser control tests; live qualification is separate |
 
 ```sh
 python3 scripts/release/checklist.py

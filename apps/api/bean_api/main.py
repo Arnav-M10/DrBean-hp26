@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, Query, Request
@@ -23,7 +24,7 @@ from .conversation import ConversationService
 from .http import RequestBoundary, error_body
 from .intake import IntakeService, SourceService
 from .ledger import LedgerBudgetExceeded, ProviderLedger
-from .providers import GeminiProvider, ProviderConfig, ProviderFailure
+from .providers import GeminiProvider, LIVE_MODEL, ProviderConfig, ProviderFailure
 from .counterdex_adapter import CounterdexAdapter, create_science_adapter
 from .artifacts import ArtifactService
 from .source_materialization import SourceMaterializationService
@@ -38,9 +39,27 @@ OperationKey = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_
 
 
 def provider_config_from_env() -> ProviderConfig:
-    # Current work order forbids live dispatch. Do not even read existing secrets.
-    # Future activation needs an explicit user instruction AND a reviewed code/config change.
-    return ProviderConfig()
+    # Credentials alone never activate inference. Disabled startup does not even
+    # inspect secrets. The free-tier flag is a user assertion, not a billing query.
+    if os.getenv("BEAN_AI_MODE") != "live_opt_in":
+        return ProviderConfig()
+    if os.getenv("BEAN_GEMINI_FREE_TIER_ONLY") != "1":
+        return ProviderConfig(mode="live")
+    def integer(name: str, default: int) -> int:
+        try:
+            return int(os.getenv(name, str(default)))
+        except ValueError:
+            raise ValueError(f"{name} must be a bounded integer") from None
+    return ProviderConfig(
+        api_key=os.getenv("GEMINI_API_KEY"), model=os.getenv("GEMINI_MODEL", LIVE_MODEL),
+        account_gate_passed=os.getenv("BEAN_GEMINI_ACCOUNT_GATE") == "approved",
+        account_decision_id=os.getenv("BEAN_GEMINI_ACCOUNT_DECISION_ID"),
+        mode="live", free_tier_user_asserted=True,
+        max_input_tokens=integer("BEAN_GEMINI_MAX_INPUT_TOKENS", 24_000),
+        max_output_tokens=integer("BEAN_GEMINI_MAX_OUTPUT_TOKENS", 4_096),
+        image_token_upper_bound=8_192,
+        request_timeout_seconds=integer("BEAN_GEMINI_TIMEOUT_SECONDS", 30),
+    )
 
 
 def create_app(settings: Settings | None = None, *, provider=None, adapter=None) -> FastAPI:
@@ -61,8 +80,10 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
             raise ValueError("Controlled source intake requires a valid bounded local fixture manifest") from None
     store = Store(settings.database_path)
     workflow = Workflow(store)
-    ledger = ProviderLedger(store)
-    provider = provider or GeminiProvider(provider_config_from_env(), ledger)
+    provider_config = provider_config_from_env() if provider is None else getattr(provider, "config", ProviderConfig())
+    live_mode = getattr(provider_config, "mode", "disabled") == "live"
+    ledger = ProviderLedger(store, request_cap=8 if live_mode else 32)
+    provider = provider or GeminiProvider(provider_config, ledger)
     adapter = adapter or create_science_adapter(settings.counterdex_python, settings.science_adapter)
     sources = SourceService(workflow, settings.blob_dir)
     intake = IntakeService(workflow, sources, provider, controlled_source_proposer=controlled_source_proposer)
@@ -110,22 +131,26 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
 
     @app.get(PREFIX + "/capabilities")
     def capabilities():
+        provider_capabilities = provider.capabilities()
+        live_dispatch = bool(provider_capabilities.get("dispatch_enabled")) and provider_capabilities.get("execution_mode") == "live"
         return {"contract_version": "DB-SC-1", "policy_version": "GF-2", "storage": "local_sqlite",
                 "auth": "server_bearer", "manual_review": True,
                 "source_intake": {"media_types": ["image/png", "image/jpeg"], "max_assets": 1,
                                   "max_bytes": 5242880, "max_pixels": 12000000, "max_fields": 50,
                                   "retention": "retain", "pdf": False,
-                                  "execution_mode": settings.source_intake_mode,
-                                  "application_review_integration": "available" if controlled_source_proposer else "disabled",
+                                  "execution_mode": "live" if live_dispatch else "controlled" if controlled_source_proposer else "disabled",
+                                  "live_max_width": 1600, "live_max_height": 1600,
+                                  "application_review_integration": "available" if controlled_source_proposer or live_dispatch else "disabled",
                                   "controlled_authorship": "controlled_fixture" if controlled_source_proposer else None},
                 "model_templates": [{"id": "two_rate_concentration", "schema_implemented": True,
                                      "scientific_adapter_qualified": bool(adapter.capabilities().get("verified_in_environment")),
                                      "units": {"time": "h", "concentration": "mg/L", "rates": "1/h"},
                                      "initial_concentration": "0/1", "rate_order": "ke_lt_ka", "target_interval": "closed"}],
                 "science": adapter.capabilities(),
-                "ai_mode": "controlled_placeholder" if controlled_source_proposer else "disabled_placeholder",
-                "gemini": {**provider.capabilities(), "dispatch_enabled": False, "live_qualification": "not_run"},
-                "deepagents": {"implemented": True, "configured": bool(provider.capabilities().get("configured")),
+                "ai_mode": "live_opt_in" if live_dispatch else "controlled_placeholder" if controlled_source_proposer else "disabled_placeholder",
+                "gemini": provider_capabilities,
+                "deepagents": {"implemented": True, "configured": False, "dispatch_enabled": False,
+                               "execution_mode": "controlled_only", "unavailable_reason": "live_coordinator_not_integrated",
                                "reachable": None, "verified_in_environment": False},
                 "transport": {"web": True, "photon": False}}
 
@@ -286,7 +311,13 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
     @app.get(PREFIX + "/workspaces/{workspace_id}/provider-budget")
     def provider_budget(workspace_id: str, actor: Actor):
         workflow.authorize(actor, workspace_id)
-        return ledger.diagnostics()
+        info = provider.capabilities()
+        enabled = info.get("execution_mode") == "live" and info.get("dispatch_enabled") is True
+        return {**ledger.diagnostics(), "dispatch_enabled": enabled,
+                "current_mode": "live_opt_in" if enabled else "disabled_placeholder",
+                "caps": {"requests": ledger.request_cap, "input_tokens": ledger.input_token_cap,
+                         "output_tokens": ledger.output_token_cap},
+                "free_tier_user_asserted": bool(info.get("free_tier_user_asserted")), "billing_verified": False}
 
     @app.get(PREFIX + "/workspaces/{workspace_id}/activity")
     def activity(workspace_id: str, actor: Actor):

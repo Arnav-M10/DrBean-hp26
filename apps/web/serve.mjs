@@ -14,6 +14,7 @@ const routes = new Map([
   ['/api.mjs', ['api.mjs', 'text/javascript']],
   ['/manual.mjs', ['manual.mjs', 'text/javascript']],
   ['/source-workflow.mjs', ['source-workflow.mjs', 'text/javascript']],
+  ['/assistant-workflow.mjs', ['assistant-workflow.mjs', 'text/javascript']],
   ['/workflow.mjs', ['workflow.mjs', 'text/javascript']],
   ['/design.mjs', ['design.mjs', 'text/javascript']],
   ['/followup-workflow.mjs', ['followup-workflow.mjs', 'text/javascript']],
@@ -53,7 +54,8 @@ const server = createServer(async (request, response) => {
       response.writeHead(result.statusCode, safeHeaders);
       result.pipe(response);
     });
-    upstream.setTimeout(15000, () => upstream.destroy());
+    const providerOperation = /^\/api\/bean\/v1\/workspaces\/[^/]+\/(intake-proposals|assistant-turns)$/.test(request.url);
+    upstream.setTimeout(providerOperation ? 70000 : 15000, () => upstream.destroy());
     upstream.on('error', () => {
       if (!response.headersSent) response.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       response.end(JSON.stringify({ code: 'backend_unavailable', message: `Start the local API on 127.0.0.1:${apiPort}.` }));

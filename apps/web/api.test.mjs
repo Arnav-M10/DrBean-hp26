@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ApiError, BeanApi, MAX_JSON_BYTES, baselineAvailable, baselineExplanation } from './api.mjs'
+import { ApiError, BeanApi, MAX_JSON_BYTES, baselineAvailable, baselineExplanation, liveGeminiAvailable } from './api.mjs'
 import { datasetBody, problemBody, planRequest, investigationObjective } from './manual.mjs'
 
 test('uncertain mutation retry retains its operation key and token never enters body or URL', async () => {
@@ -111,4 +111,30 @@ test('source upload preserves bytes and retains the operation identity after a l
   assert.equal(seen[0].headers['Content-Type'], 'image/png')
   assert.deepEqual(new Uint8Array(seen[0].body), bytes)
   await assert.rejects(api.uploadSource('workspace', { ...file, type: 'application/pdf' }, 'synthetic'), /PNG or JPEG/)
+})
+
+test('live controls require explicit dispatch, live provenance and a disclosed model', () => {
+  const available = { gemini: { dispatch_enabled: true, execution_mode: 'live', model: 'gemini-test' } }
+  assert.equal(liveGeminiAvailable(available), true)
+  for (const patch of [{ dispatch_enabled: false }, { dispatch_enabled: undefined }, { execution_mode: 'controlled' }, { execution_mode: 'disabled' }, { model: null }, { model: '' }]) {
+    assert.equal(liveGeminiAvailable({ gemini: { ...available.gemini, ...patch } }), false)
+  }
+  assert.equal(liveGeminiAvailable({}), false)
+})
+
+test('assistant operation identity matches its request body and survives a lost response without automatic retries', async () => {
+  const seen = [], api = new BeanApi('token', async (url, options) => {
+    seen.push({ url, ...options })
+    if (seen.length === 1) throw new Error('lost answer')
+    return new Response('{}')
+  })
+  const body = { client_operation_id: 'assistant_one', expected_conversation_revision: 0, text: 'Explain the selected evidence.' }
+  await assert.rejects(api.assistantTurn('workspace', body), error => error.kind === 'uncertain')
+  assert.equal(seen.length, 1)
+  await api.assistantTurn('workspace', body)
+  for (const call of seen) assert.equal(call.headers['Idempotency-Key'], JSON.parse(call.body).client_operation_id)
+  assert.equal(seen[0].body, seen[1].body)
+  assert.equal(seen[0].url, '/api/bean/v1/workspaces/workspace/assistant-turns')
+  await assert.rejects(api.assistantTurn('workspace', { ...body, client_operation_id: '' }), /operation identity/)
+  assert.equal(seen.length, 2)
 })

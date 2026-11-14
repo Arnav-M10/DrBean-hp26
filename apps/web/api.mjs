@@ -4,6 +4,12 @@
 export const MAX_JSON_BYTES = 8 * 1024 * 1024       // largest JSON body this client will parse
 export const MAX_DOWNLOAD_BYTES = 16 * 1024 * 1024  // largest artifact this client will hold in memory
 
+export function liveGeminiAvailable(capabilities) {
+  return capabilities?.gemini?.dispatch_enabled === true
+    && capabilities.gemini.execution_mode === 'live'
+    && typeof capabilities.gemini.model === 'string' && capabilities.gemini.model.length > 0
+}
+
 // kind 'rejected': the server answered and refused; nothing was accepted.
 // kind 'uncertain': a mutation was sent and no answer arrived; it may have been accepted.
 // kind 'unreachable': a read got no answer; nothing changed.
@@ -45,7 +51,7 @@ export class BeanApi {
   #token
   #keys = new Map()
   constructor(token, fetcher = globalThis.fetch.bind(globalThis)) { this.#token = token; this.fetcher = fetcher }
-  async request(path, body, mediaType = 'application/json') {
+  async request(path, body, mediaType = 'application/json', operationKey) {
     const serialized = body === undefined ? undefined : mediaType === 'application/json' ? JSON.stringify(body) : body
     const headers = { Authorization: `Bearer ${this.#token}` }
     if (serialized !== undefined) {
@@ -55,13 +61,14 @@ export class BeanApi {
       const identity = mediaType === 'application/json' ? serialized : Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', serialized)), b => b.toString(16).padStart(2, '0')).join('')
       const operation = path + '\n' + mediaType + '\n' + identity
       if (!this.#keys.has(operation)) this.#keys.set(operation, crypto.randomUUID())
-      headers['Idempotency-Key'] = this.#keys.get(operation)
+      headers['Idempotency-Key'] = operationKey ?? this.#keys.get(operation)
     }
     let response
     try {
       response = await this.fetcher(`/api/bean/v1${path}`, {
         method: serialized === undefined ? 'GET' : 'POST', headers, body: serialized,
-        credentials: 'omit', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15000),
+        credentials: 'omit', cache: 'no-store', redirect: 'error',
+        signal: AbortSignal.timeout(/^\/workspaces\/[^/]+\/(intake-proposals|assistant-turns)$/.test(path) ? 75000 : 15000),
       })
     } catch {
       // Never resent automatically. The person decides; the same key is reused if they retry.
@@ -79,6 +86,10 @@ export class BeanApi {
     return response
   }
   async json(path, body) { return parseJson(await readBounded(await this.request(path, body), MAX_JSON_BYTES)) }
+  async assistantTurn(workspace, body) {
+    if (typeof body.client_operation_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.client_operation_id)) throw new Error('A bounded assistant operation identity is required.')
+    return parseJson(await readBounded(await this.request(`/workspaces/${encodeURIComponent(workspace)}/assistant-turns`, body, 'application/json', body.client_operation_id), MAX_JSON_BYTES))
+  }
   async uploadSource(workspace, file, origin) {
     if (!['image/png', 'image/jpeg'].includes(file.type) || file.size < 1 || file.size > 5242880) throw new Error('Choose a PNG or JPEG up to 5 MiB.')
     if (!['synthetic', 'public'].includes(origin)) throw new Error('Declare synthetic or public source origin.')

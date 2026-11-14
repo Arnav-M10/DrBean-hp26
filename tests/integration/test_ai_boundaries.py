@@ -449,9 +449,10 @@ class FakeLedger:
 
 
 def controlled_config():
-    """The explicit controlled lane: Owner 3's mode="controlled" when ProviderConfig has a mode, else dummy values."""
+    """Use a declared controlled mode only when that mode is actually supported."""
+    from typing import get_args, get_type_hints
     from bean_api.providers import ProviderConfig
-    if "mode" in getattr(ProviderConfig, "__dataclass_fields__", {}):
+    if "controlled" in get_args(get_type_hints(ProviderConfig).get("mode")):
         return ProviderConfig(mode="controlled", model=PLACEHOLDER_MODEL)
     return ProviderConfig(api_key="DRBEAN-DUMMY-KEY-0001", model=PLACEHOLDER_MODEL, account_gate_passed=True,
                           account_decision_id="DRBEAN-DUMMY-DECISION-0001")
