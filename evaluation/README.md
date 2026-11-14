@@ -4,6 +4,12 @@ Standard-library Python, run with CPython 3.11. Owner: Workstream 5 (independent
 
 **No command here dispatches a model request.** Live lanes are disabled (`NOT_RUN`); there is no flag that activates them and `budget open` refuses. Real local computation (API, worker, Counterdex, native replay) does run. Any AI in the current lanes is absent or a labelled *controlled placeholder*, never Gemini evidence.
 
+## Coordinator sprint (DB-COORDINATOR-3OWNER-1, role C)
+
+Frozen predicates: [coordinator/](coordinator/README.md). Baseline on main `299a356`:
+[results/integration/baseline-299a356.md](results/integration/baseline-299a356.md) (12 passed, 7 not_run, 35
+not_available, 0 failed; the durable coordinator and general-file producer do not exist yet).
+
 ## Integrated acceptance checkpoint
 
 The final source commit `159fd65303c5ff87a14dfa616f88dbd5a76777b5` was

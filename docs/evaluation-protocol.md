@@ -78,6 +78,17 @@ This gate is required. Each required lane is decided by its newest report whose 
 
 `NOT_AVAILABLE` means a capability is not advertised by this candidate. `HARNESS_PENDING` means the capability is advertised but its attack has not been written yet. Both are counted separately from passes and product failures.
 
+## Coordinator sprint predicates (DB-COORDINATOR-3OWNER-1)
+
+C froze `evaluation/coordinator/predicates.v1.json` (54 predicates, 43 release-blocking) against main `299a356`
+before any candidate run; `FROZEN.json` holds the canonical SHA-256 and a self-test fails on any edit (a
+correction is a new version). Each candidate gets an observation file under `evaluation/results/coordinator/`
+with one status per predicate: `passed` (the whole predicate exercised on that candidate), `failed` (a finding is
+filed), `not_available` (the observed feature is absent; exercisable parts are listed separately), `not_run` (with
+the exact reason), `historical_only` or `author_check` (a Claude-authored component awaiting A/B cross-review).
+A missing producer is never a pass. Adaptivity is graded as acceptable sets of permitted next actions per
+tool-return condition. The four lanes and their permitted conclusions are unchanged.
+
 ## Paper corpus, scoring and attack matrix
 
 - **Corpus (`evaluation/corpus/`).**

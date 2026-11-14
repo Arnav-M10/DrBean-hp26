@@ -2,6 +2,21 @@
 
 Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw evidence and machine-readable findings live in `evaluation/`; this log links them and is not a second status source.
 
+## C status: DB-COORDINATOR-3OWNER-1 (current; the sections below are the earlier sprint's record)
+
+| Item | Value |
+|---|---|
+| Owner | C (Claude): independent evaluation, held-out challenges, exact-candidate qualification, findings and release evidence. A (user's Codex): science and Deep Agents graph. B (teammate's Codex): backend authority, sessions, ledger, UI, general files, sole integrator |
+| Branch, SHA, runtime | `claude/adversarial-validation` (PR #22) at `bb503a7` + evidence commits; application tree identical to main `299a356`; macOS 26.7 arm64, backend CPython 3.13.18, engine CPython 3.11.17 with Counterdex 0.3.0 (repository source) |
+| Contract version | predicates `coordinator-predicates.v1` (54, 43 blocking), commitment `46a8ae08...` frozen 2026-11-14T13:12:22Z against main `299a356`; observed contract DB-RESEARCH-1 (PR #41 `d224846`, proposal only) |
+| Implemented vs tested | Tested on baseline: acceptance 7/7, engine controls 22/22, `controlled_callbacks` 88 passed / 5 xfail / 43 NOT_AVAILABLE, `controlled_science` 18 / 11 / 2 not_run, `historical_replay` 168 replayed, gate exit 0; backend 760, engine 292, web 71, B's browser checks 4/4, harness 180. Predicate status: 12 passed, 7 not_run, 35 not_available, 0 failed. Not available: research sessions, checkpointer, planning-enabled coordinator, research decisions, action journal, general-file producer |
+| Commands | `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch`; `cli.py controls`; `cli.py lanes run --lane controlled_callbacks|controlled_science|historical_replay`; `cli.py gate --require release`; `.venv/bin/python -m pytest -q tests/integration` |
+| Blocker, recipient, reproducer | B: F-SESSION-CAPACITY-EXHAUSTION (P2), `tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors`. A/B: Gates 1-3 not yet delivered (probes in `tests/integration/test_research_session_probes.py` run unchanged once routes exist) |
+| Next independent step | author SCI-02/05/06/07/08 cases; extend probes to the crash matrix with owned fault injection; evaluate B's registered producer; qualify B's frozen integrated commit (Gate 6) |
+| Lanes | controlled callbacks and controlled science passed on baseline; live Gemini `not_run` (no allocation, no key read, $0); fresh native replay passed |
+| Records | `evaluation/coordinator/` (predicates, commitment, README), `evaluation/results/coordinator/baseline-299a356.json`, `evaluation/results/integration/baseline-299a356.md`, `evaluation/results/coordinator/demo-and-consultation.md` |
+| Authorship disclosure | Claude authored PR #40 (general-file producer); its tests are author checks until A/B cross-review. Production maintenance moved to B |
+
 ## Current position
 
 | Item | Value |

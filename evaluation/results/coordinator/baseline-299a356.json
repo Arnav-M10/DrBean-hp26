@@ -1,0 +1,644 @@
+{
+  "schema_version": "coordinator-baseline.v1",
+  "assignment": "DB-COORDINATOR-3OWNER-1",
+  "predicates_version": "coordinator-predicates.v1",
+  "predicates_canonical_sha256": "46a8ae089996e7936cd5d0bba9a4224b6e81bc5a0b4e6184afbf975bad418e68",
+  "candidate": {
+    "main": "299a356f677a96fda44c5b280a20317ac7816c4f",
+    "observed_on": "bb503a7 (C branch; application, packages, shared, scripts, fixtures and locks byte-identical to main 299a356)",
+    "clean": true
+  },
+  "environment": {
+    "os": "macOS 26.7 (Darwin 25.6.0) arm64",
+    "backend": "CPython 3.13.18",
+    "engine": "CPython 3.11.17, Counterdex 0.3.0, repository source",
+    "deepagents": "0.7.38",
+    "langgraph": "1.2.21",
+    "langchain": "1.5.0"
+  },
+  "lanes": {
+    "controlled_callbacks": "lane_9ade7a285b6e407f",
+    "controlled_science": "lane_8619f1fe84114739",
+    "historical_replay": "lane_583ed42dc383477e",
+    "live_gemini": "not_run"
+  },
+  "observed_at": "2026-11-14T13:25:18Z",
+  "observations": [
+    {
+      "id": "SCI-01",
+      "status": "passed",
+      "basis": "A freshly computed outside witness compatible with every reviewed hard allowance challenges the claim through HTTP with actual Counterdex (RS-HERO-FULL predicate fresh_outside_candidate_compatible); the engine control confirms a value at a closed endpoint is inside.",
+      "evidence": [
+        "tests/integration/test_http_lifecycle_and_science.py::test_hero_full_loop_real_science_design_download_and_native_replay",
+        "evaluation/results/lanes/reports.jsonl::lane_8619f1fe84114739",
+        "evaluation/results/attempts.jsonl::RS-HERO-FULL",
+        "evaluation/results/controls.jsonl::semantics:closed_endpoint_is_inside"
+      ]
+    },
+    {
+      "id": "SCI-02",
+      "status": "not_run",
+      "basis": "No current case separately exercises 'no candidate found', 'comparison skipped' and 'infrastructure failure' and asserts their distinct recorded meanings; a dedicated C case is pending.",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CHANGED-INPUT"
+      ],
+      "exercised_parts_passed": [
+        "changed-input-v1 asserts honest scope without a forced positive (RS-CHANGED-INPUT passed)",
+        "allowed optional-scenario skips are exercised in controlled callbacks"
+      ],
+      "missing_parts": [
+        "one case per condition with the three distinct records"
+      ]
+    },
+    {
+      "id": "SCI-03",
+      "status": "passed",
+      "basis": "Changed reviewed inputs get fresh identities and computation while the original result stays unchanged (RS-CHANGED-INPUT); a changed reading creates a new lineage needing new approval; metamorphic controls show tightened allowances change verdicts and excluded rows are not constraints.",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CHANGED-INPUT",
+        "tests/integration/test_http_lifecycle_and_science.py::test_changed_input_gets_fresh_identities_and_computation",
+        "tests/integration/test_http_lifecycle_and_science.py::test_hypothetical_reading_creates_new_lineage_and_needs_new_approval",
+        "evaluation/results/controls.jsonl::metamorphic:tightened_row_allowance",
+        "evaluation/results/controls.jsonl::metamorphic:excluded_row_is_not_a_constraint"
+      ]
+    },
+    {
+      "id": "SCI-04",
+      "status": "passed",
+      "basis": "The checked design binds the same candidates and every approved grid time with a strictly positive checked margin (RS-HERO-FULL, RS-DESIGN-AUTHORITY); touching bands do not separate; at allowance 0.6 the fixed pair is not separated (no positive margin); swapping the pair order does not change the margin.",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-DESIGN-AUTHORITY",
+        "tests/integration/test_http_lifecycle_and_science.py::test_design_authority_is_separate_and_bound",
+        "evaluation/results/controls.jsonl::semantics:touching_bands_do_not_separate",
+        "evaluation/results/controls.jsonl::fixed_pair:grid-6-8-allowance-0.6",
+        "evaluation/results/controls.jsonl::metamorphic:swapped_pair_order"
+      ]
+    },
+    {
+      "id": "SCI-05",
+      "status": "not_run",
+      "basis": "Parts exercised: no separation at allowance 0.6 and cancellation never produce a checked-positive result. Not yet exercised: numerical-guidance designs and partial or unavailable grid rows through records, reports and labels.",
+      "evidence": [
+        "evaluation/results/controls.jsonl::fixed_pair:grid-6-8-allowance-0.6",
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART"
+      ],
+      "exercised_parts_passed": [
+        "no-separation control",
+        "cancellation with restart recovery"
+      ],
+      "missing_parts": [
+        "numerical guidance",
+        "partial/unavailable grid rows",
+        "report and UI labels for those conditions"
+      ]
+    },
+    {
+      "id": "SCI-06",
+      "status": "not_run",
+      "basis": "Reference-only, outside-only and both-excluded dispositions pass at 8 h and allowance 0.2 (engine controls and RS-FOLLOWUP through HTTP). Not yet exercised: a legitimately both-compatible follow-up (nonseparating design or declared changed time/allowance), the contradiction flag for both-compatible at a positive separating time, and an inconclusive check.",
+      "evidence": [
+        "evaluation/results/controls.jsonl::followup:3.4",
+        "evaluation/results/controls.jsonl::followup:4.57",
+        "evaluation/results/controls.jsonl::followup:4.0",
+        "evaluation/results/attempts.jsonl::RS-FOLLOWUP",
+        "tests/integration/test_http_lifecycle_and_science.py::test_hypothetical_followups_give_candidate_specific_feedback"
+      ],
+      "exercised_parts_passed": [
+        "reference-only",
+        "outside-only",
+        "both-excluded"
+      ],
+      "missing_parts": [
+        "legitimate both-compatible",
+        "contradiction flag",
+        "inconclusive follow-up"
+      ]
+    },
+    {
+      "id": "SCI-07",
+      "status": "not_run",
+      "basis": "Narration overclaims (including 'proves the interval' paraphrases) are refused by the explanation guard, but no C check yet asserts the structured follow-up fields that keep candidate dispositions apart from pair-level propositions.",
+      "evidence": [
+        "tests/integration/test_explanation_guard.py::test_paraphrased_overclaims_are_refused",
+        "tests/integration/test_explanation_guard.py::test_overclaim_cannot_hide_behind_an_unrelated_hedge_word"
+      ],
+      "exercised_parts_passed": [
+        "narration overclaim refusals"
+      ],
+      "missing_parts": [
+        "structured follow-up field assertions"
+      ]
+    },
+    {
+      "id": "SCI-08",
+      "status": "not_run",
+      "basis": "A rejected final explanation leaves the completed evidence unchanged, and provider failures preserve accepted inputs; native downloads after a post-science provider failure are not yet exercised.",
+      "evidence": [
+        "tests/integration/test_ai_boundaries.py::test_exaggerated_final_explanation_is_rejected_but_evidence_is_preserved",
+        "tests/integration/test_ai_boundaries.py::test_provider_failures_preserve_accepted_inputs"
+      ],
+      "exercised_parts_passed": [
+        "evidence preserved after a rejected explanation"
+      ],
+      "missing_parts": [
+        "downloads after a post-science model failure"
+      ]
+    },
+    {
+      "id": "SCI-09",
+      "status": "passed",
+      "basis": "Genuine native packets replay against separately recorded anchors with the repository Counterdex source (lane precondition engine_runtime_matches_repository_source); wrong identity, changed byte, original-anchor and fresh-mathematics mutation, truncation, oversize, another run's packet, dropped and duplicated artifacts and an unknown profile all fail with specific classes; another actor gets 404 (unauthenticated 401) for the run, evidence, report, native bytes and anchors.",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_583ed42dc383477e",
+        "evaluation/results/controls.jsonl::defense:wrong_expected_identity",
+        "evaluation/results/controls.jsonl::defense:changed_byte",
+        "evaluation/results/controls.jsonl::defense:mutation_rejected_by_original_anchor",
+        "evaluation/results/controls.jsonl::defense:mutation_rejected_by_fresh_mathematics",
+        "evaluation/results/controls.jsonl::defense:truncated_packet",
+        "evaluation/results/controls.jsonl::defense:another_runs_valid_packet",
+        "tests/integration/test_native_download_scope.py::test_another_workspace_cannot_reach_native_bytes_anchors_evidence_or_reports"
+      ]
+    },
+    {
+      "id": "SCI-10",
+      "status": "not_available",
+      "basis": "main 299a356 registers no general analysis producer (capabilities have no general_research block; the merged general UI reports the producer unavailable). Author-check evidence only: PR #40 offers the two-rate checker solely for tables stating h and mg/L.",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f"
+      ],
+      "missing_parts": [
+        "a registered general-analysis producer"
+      ]
+    },
+    {
+      "id": "LOOP-01",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-02",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-03",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-04",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-05",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-06",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-07",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-08",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-11",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "LOOP-09",
+      "status": "not_available",
+      "basis": "The current coordinator is the actual create_deep_agent graph, but not the durable planning coordinator: compiled parent inventory is execute_approved_scenario, read_scoped_evidence, record_allowed_skip and return_grounded_explanation (no write_todos, no planning middleware node), checkpointer=None, store=None, subagents=[], summarization excluded, ephemeral StateBackend, controlled model only; capabilities report live_coordinator_not_integrated.",
+      "evidence": [
+        "evaluation/results/lanes/lane_9ade7a285b6e407f/deepagents-inventory.json",
+        "apps/api/bean_api/coordinator.py"
+      ],
+      "exercised_parts_passed": [
+        "no shell, filesystem, network or delegation tools in the compiled inventory"
+      ],
+      "missing_parts": [
+        "planning enabled",
+        "disk-backed checkpointer",
+        "product research-session integration"
+      ]
+    },
+    {
+      "id": "LOOP-10",
+      "status": "not_available",
+      "basis": "No specialists exist: subagents=[] and the general-purpose subagent is disabled by the harness profile, so there is nothing yet to qualify.",
+      "evidence": [
+        "evaluation/results/lanes/lane_9ade7a285b6e407f/deepagents-inventory.json"
+      ]
+    },
+    {
+      "id": "AUTH-01",
+      "status": "not_available",
+      "basis": "Every exercisable cross-context read and write is refused as not found; the research objects in the predicate do not exist yet.",
+      "evidence": [
+        "tests/integration/test_private_sessions_independent.py::test_two_private_contexts_cannot_read_or_write_each_others_work",
+        "tests/integration/test_http_lifecycle_and_science.py::test_cross_workspace_records_are_invisible_and_unusable",
+        "tests/integration/test_native_download_scope.py::test_another_workspace_cannot_reach_native_bytes_anchors_evidence_or_reports"
+      ],
+      "exercised_parts_passed": [
+        "private browser contexts: workspaces, records, sources (metadata and bytes), provider attempts and budget, activity, dataset/problem/source writes",
+        "bearer actors: records, plans, run start",
+        "completed run: native bytes, anchors, evidence, report"
+      ],
+      "missing_parts": [
+        "research sessions, actions, events, reviews, graph threads/checkpoints",
+        "general assets and analyses (no producer on main)"
+      ]
+    },
+    {
+      "id": "AUTH-02",
+      "status": "passed",
+      "basis": "Missing, forged and malformed session cookies are refused (401); an owner bearer on the gateway lane is refused (403); the owner's local lane cannot see a private workspace; each new visitor gets a new private workspace.",
+      "evidence": [
+        "tests/integration/test_private_sessions_independent.py::test_no_owner_fallback_and_forged_or_missing_sessions_are_refused"
+      ]
+    },
+    {
+      "id": "AUTH-03",
+      "status": "not_available",
+      "basis": "Rotation keeps the actor and workspace, the old token stops working, expiry refuses access, records are retained and a new anonymous identity cannot reach them; there is no server-side pending research operation to carry across rotation yet. B's DB-RESEARCH-1 README states no cross-device or expired-cookie recovery is claimed.",
+      "evidence": [
+        "tests/integration/test_private_sessions_independent.py::test_rotation_keeps_identity_and_expiry_refuses_without_erasing_work"
+      ],
+      "exercised_parts_passed": [
+        "rotation identity",
+        "stale token refused",
+        "expiry refused",
+        "retention",
+        "no inheritance by ID"
+      ],
+      "missing_parts": [
+        "pending research review across rotation"
+      ]
+    },
+    {
+      "id": "AUTH-04",
+      "status": "not_available",
+      "basis": "The existing canonical plan approvals hold: another actor's approval cannot start a plan, concurrent and retried starts create one run, design approval is separate and bound. Research-session decisions do not exist yet.",
+      "evidence": [
+        "tests/integration/test_http_lifecycle_and_science.py::test_cross_workspace_records_are_invisible_and_unusable",
+        "tests/integration/test_http_lifecycle_and_science.py::test_concurrent_and_retried_starts_create_exactly_one_run",
+        "evaluation/results/attempts.jsonl::RS-DESIGN-AUTHORITY"
+      ],
+      "exercised_parts_passed": [
+        "existing plan/design approvals"
+      ],
+      "missing_parts": [
+        "DB-RESEARCH-1 decisions, forged review, raw graph command, duplicate resume"
+      ]
+    },
+    {
+      "id": "AUTH-05",
+      "status": "not_available",
+      "basis": "Source content and controlled model output cannot grant authority or change scope; specialist findings and stored notes do not exist yet.",
+      "evidence": [
+        "tests/integration/test_ai_boundaries.py::test_source_content_cannot_grant_authority_or_change_scope",
+        "tests/integration/test_ai_boundaries.py::test_invalid_controlled_output_falls_back_without_authority"
+      ],
+      "exercised_parts_passed": [
+        "source files",
+        "model output"
+      ],
+      "missing_parts": [
+        "stored research notes",
+        "specialist findings"
+      ]
+    },
+    {
+      "id": "AUTH-06",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "AUTH-07",
+      "status": "not_run",
+      "basis": "Repository secret scan: 0 findings; dummy keys are never printed by the launcher doctor and never read in placeholder mode. The launched web child's environment check did not run: ports 8000/4173 are held by a separately running Dr. Bean instance (working directory /Users/arnav/Documents/HackPrinceton/DrBean-test), which C does not stop.",
+      "evidence": [
+        "tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key",
+        "tests/integration/test_zero_dispatch.py::test_present_dummy_credentials_are_never_read_in_placeholder_mode",
+        "evaluation/results/lanes/reports.jsonl::lane_8619f1fe84114739"
+      ],
+      "exercised_parts_passed": [
+        "secret scan",
+        "doctor output",
+        "placeholder mode"
+      ],
+      "missing_parts": [
+        "web child environment of a launched stack"
+      ]
+    },
+    {
+      "id": "CRASH-01",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-02",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-03",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-04",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-05",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-06",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-07",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-09",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-10",
+      "status": "not_available",
+      "basis": "no research-session routes, research records, actions, reviews, checkpoints or events exist on main 299a356 (DB-RESEARCH-1 is a proposal on PR #41 d224846); probes in tests/integration/test_research_session_probes.py report NOT_AVAILABLE. Job-level analogues pass today: queued cancel/restart recovery with no orphans (RS-CANCEL-RESTART) and one run for concurrent/retried starts (RS-RETRY-CONCURRENT).",
+      "evidence": [
+        "evaluation/results/attempts.jsonl::RS-CANCEL-RESTART",
+        "evaluation/results/attempts.jsonl::RS-RETRY-CONCURRENT",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "CRASH-08",
+      "status": "passed",
+      "basis": "On main's only dispatching boundary (GeminiProvider with a substituted transport and the shared ProviderLedger) a request outliving its timeout is recorded unknown_outcome, keeps its reservation and is not reissued (one call); malformed or missing usage never releases a reservation. Must be re-qualified on A's future coordinator dispatch adapter.",
+      "evidence": [
+        "tests/integration/test_provider_accounting_independent.py::test_unknown_outcome_stays_charged_and_is_never_reissued",
+        "tests/integration/test_ledger_attacks.py::test_negative_boolean_or_missing_usage_never_releases_the_reservation"
+      ]
+    },
+    {
+      "id": "METER-01",
+      "status": "not_available",
+      "basis": "On main only the direct Gemini features dispatch physical requests, and each reserves in the shared ledger before a client exists; the coordinator uses controlled models only. Parent, specialist, retry, repair and middleware requests of the coordinator do not exist yet.",
+      "evidence": [
+        "tests/integration/test_provider_accounting_independent.py::test_an_exhausted_ledger_refuses_before_any_client_exists"
+      ],
+      "exercised_parts_passed": [
+        "direct provider requests reserve before dispatch, one row per call"
+      ],
+      "missing_parts": [
+        "coordinator parent/specialist/middleware requests"
+      ]
+    },
+    {
+      "id": "METER-02",
+      "status": "passed",
+      "basis": "An exhausted ledger refuses before any client is constructed; concurrent reservations never exceed the request cap.",
+      "evidence": [
+        "tests/integration/test_provider_accounting_independent.py::test_an_exhausted_ledger_refuses_before_any_client_exists",
+        "tests/integration/test_ledger_attacks.py::test_concurrent_reservations_never_exceed_the_request_cap"
+      ]
+    },
+    {
+      "id": "METER-03",
+      "status": "not_available",
+      "basis": "Another actor, another workspace and a restarted ledger instance over the same store see the same global remaining capacity and cannot exceed the cap; research sessions and graph threads do not exist yet.",
+      "evidence": [
+        "tests/integration/test_provider_accounting_independent.py::test_new_actors_workspaces_and_a_restarted_process_get_no_extra_capacity"
+      ],
+      "exercised_parts_passed": [
+        "new actor",
+        "new workspace",
+        "restart"
+      ],
+      "missing_parts": [
+        "new research session",
+        "new graph thread"
+      ]
+    },
+    {
+      "id": "METER-04",
+      "status": "passed",
+      "basis": "Unknown and malformed usage never releases a reservation or rewrites history; malformed history fails closed; double reconciliation is refused.",
+      "evidence": [
+        "tests/integration/test_ledger_attacks.py::test_negative_boolean_or_missing_usage_never_releases_the_reservation",
+        "tests/integration/test_ledger_attacks.py::test_malformed_history_still_fails_closed",
+        "tests/integration/test_ledger_attacks.py::test_reconciling_twice_or_an_unknown_id_never_rewrites_or_releases"
+      ]
+    },
+    {
+      "id": "METER-05",
+      "status": "not_available",
+      "basis": "research-action.v1 and the research-session policy are defined only in B's DB-RESEARCH-1 proposal; the current coordinator's BudgetMiddleware applies to controlled models only.",
+      "evidence": [
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "METER-06",
+      "status": "passed",
+      "basis": "Every lane verified zero external model requests from the guard installed in every launched process, and RS-ZERO-DISPATCH passed.",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f",
+        "evaluation/results/lanes/reports.jsonl::lane_8619f1fe84114739",
+        "evaluation/results/lanes/reports.jsonl::lane_583ed42dc383477e",
+        "evaluation/results/attempts.jsonl::RS-ZERO-DISPATCH"
+      ]
+    },
+    {
+      "id": "METER-07",
+      "status": "not_run",
+      "basis": "No live sample: live coordination is not implemented, and the user has enabled no disclosure, live mode or admitted allocation for it. No key was read and no provider was called.",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f"
+      ]
+    },
+    {
+      "id": "FILE-01",
+      "status": "not_available",
+      "basis": "No general-file producer is registered on main 299a356, so the merged general UI cannot admit files. PR #40 advertises and enforces 5 MiB/file, 10 MiB/analysis, 10 PDF pages, 1-5 assets (author check).",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f"
+      ],
+      "missing_parts": [
+        "a producer registered by B"
+      ]
+    },
+    {
+      "id": "FILE-02",
+      "status": "not_available",
+      "basis": "No general-file producer is registered on main 299a356, so the merged general UI cannot admit files. Measured locally (not committed): zolleral_26-converted.pdf 9,848,487 bytes (9.39 MiB), 12 pages; sokolowskial_25.pdf 19,073,679 bytes (18.19 MiB), 11 pages; each exceeds the 5 MiB and 10-page profile on both counts and would fit a 25 MiB/20-page profile (27.58 MiB together).",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f"
+      ],
+      "missing_parts": [
+        "a producer registered by B"
+      ]
+    },
+    {
+      "id": "FILE-03",
+      "status": "not_available",
+      "basis": "No general-file producer is registered on main 299a356, so the merged general UI cannot admit files. PR #40's citation checks pass these attacks (author check, 22 citation tests).",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f"
+      ],
+      "missing_parts": [
+        "a producer registered by B"
+      ]
+    },
+    {
+      "id": "FILE-04",
+      "status": "not_available",
+      "basis": "No general-file producer is registered on main 299a356, so the merged general UI cannot admit files. PR #40 uses one asset SHA-256, zero-based page_index, page_number and normalized_top_left boxes (author check).",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f"
+      ],
+      "missing_parts": [
+        "a producer registered by B"
+      ]
+    },
+    {
+      "id": "FILE-05",
+      "status": "not_available",
+      "basis": "No general-file producer is registered on main 299a356, so the merged general UI cannot admit files. PR #40's macOS footprint watchdog killed a 4 GiB allocation at 256 MiB and its pre-scan refuses bombs before PDFium (author check). On main only PNG/JPEG intake exists, bounded by pixel limits before decoding.",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f"
+      ],
+      "missing_parts": [
+        "a producer registered by B"
+      ]
+    },
+    {
+      "id": "FILE-06",
+      "status": "not_available",
+      "basis": "No general-file producer is registered on main 299a356, so the merged general UI cannot admit files. PR #40 creates no consent, approval, dataset or problem from uploads or analyses (author check).",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f"
+      ],
+      "missing_parts": [
+        "a producer registered by B"
+      ]
+    },
+    {
+      "id": "FILE-07",
+      "status": "passed",
+      "basis": "The four sealed holdouts (H1-H4 PDFs and gold) and both authoring scripts match their recorded digests, and the commitment (SHA-256 of canonical {items, tools}) recomputes to ad8a6913...; they have never been revealed or used.",
+      "evidence": [
+        "evaluation/corpus/holdouts.sealed.json"
+      ]
+    },
+    {
+      "id": "REL-01",
+      "status": "passed",
+      "basis": "The release gate passed at bb503a7 with all eight required gates; harness self-tests cover refusal of dirty, preview, failed, foreign-identity and stale evidence; failed records are retained (append-only history).",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f",
+        "evaluation/tests/test_lanes.py"
+      ]
+    },
+    {
+      "id": "REL-02",
+      "status": "passed",
+      "basis": "Each lane report records its lane, source identity, preconditions and dispatch accounting; PR #40 is labelled author check; no execution is counted in two lanes.",
+      "evidence": [
+        "evaluation/results/lanes/reports.jsonl::lane_9ade7a285b6e407f",
+        "evaluation/results/lanes/reports.jsonl::lane_8619f1fe84114739",
+        "evaluation/results/lanes/reports.jsonl::lane_583ed42dc383477e"
+      ]
+    }
+  ]
+}
