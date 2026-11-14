@@ -1,5 +1,25 @@
 # Owner 2: adopt the application bridge in the existing worker
 
+## Controlled fact consumer update
+
+Proposed `backend/controlled-acceptance` `4f09623` passed its three existing
+`tests/test_agent_evidence.py` controls against installed 0.3.0: **3 passed in
+0.40 s**, sanitized pinned backend Python 3.13.18. Actual seven-row discovery's
+compact facts preserve exact candidates/results, independent status/binding axes
+and native references; excluded/unresolved facts and explicit oversize rejection
+also pass. This qualifies the new fact projection boundary only. Main remains
+`80f95a4`; no scientific mapping, recheck or process-policy correction landed in
+that proposed change. No new package implementation is needed for this boundary.
+
+On `4f09623`, reproduce with the prepared backend and installed 0.3 engine:
+
+```sh
+env -i PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 \
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=apps/api \
+  BEAN_COUNTERDEX_PYTHON="$ENGINE_PYTHON" "$BACKEND_PYTHON" -m pytest \
+  -q -p no:cacheprovider tests/test_agent_evidence.py
+```
+
 ## Current continuation: merged follow-up consumes a valid 0.3 parent
 
 At science merge `304070d`, integrated main `80f95a4` contains design PR #9 and

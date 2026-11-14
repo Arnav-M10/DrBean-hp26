@@ -2,6 +2,39 @@
 
 Owner: Person 1 / Counterdex.
 
+## Current continuation — controlled fact consumer qualification
+
+Resumed clean `f6a647d`; integrated main remains `80f95a4`. Proposed backend
+`4f09623` adds `agent-evidence.v1`, not a change to the outstanding scientific
+mapping, recheck or process-policy seams. Its actual existing
+`tests/test_agent_evidence.py` passed **3 tests in 0.40 s** against installed
+Counterdex **0.3.0** / CPython **3.11.17**, using sanitized pinned backend Python
+**3.13.18** / Pydantic **2.13.4**. Fresh seven-row discovery retains exact
+vectors, candidate results, all scientific/binding axes and native references
+in bounded coordinator facts. Excluded/unresolved facts stay distinct;
+oversized core facts fail explicitly without truncation. This is direct consumer
+compatibility, not controlled HTTP/worker or live-model qualification.
+
+Proposed evaluator `e7c7a6c` now binds the existing `FollowupScope`, downloads
+its own review bytes and checks full revised history; the earlier missing-scope
+request is retired on that branch. A read-only reviewer replayed the three
+unchanged current 0.3 review packets with all eight external anchors, then used
+constructed application record wrappers to probe the new qualifier. Its five
+link checks accept valid cases but also accept changing the both-excluded
+`inconclusive` label to `no_counterexample_found`. Owner 5 needs an exact
+fixed-review outcome assertion, not only an outside-witness boolean comparison.
+This isolated qualifier gap does not establish an HTTP or whole-gate bypass.
+
+Proposed release commit `448d702` also supplies `DRBEAN_SCIENCE_PYTHON` to
+the evaluator CI step. That wiring correction is not yet in main and does not
+resolve the separate process-policy or design-mapping blockers.
+
+No new owned defect was found. Only this log and concise consumer handoffs
+changed; no new tests, scientific code, version, fixtures or broad reruns.
+Existing v2/history, proposal-bound recheck, Mac process policy and independent
+acceptance dependencies remain. Stop expansion until those consumers change.
+No provider call, credential inspection or resource guard bypass occurred.
+
 ## Current continuation — merged follow-up with a fresh v2 parent
 
 Resumed from clean `457fb6e`; current main `80f95a4` merged as `304070d`.

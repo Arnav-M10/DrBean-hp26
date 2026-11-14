@@ -1,10 +1,10 @@
 # Owner 5: native acceptance handoff
 
-Current science base: `304070d` on `codex/science-next`, incorporating `main`
+Current science base: `f6a647d` on `codex/science-next`, incorporating `main`
 `80f95a4` and its merged backend design/follow-up. Counterdex remains **0.3.0**,
 CPython **3.11.17**, source
 `90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
-The newer evaluator at **`80c2bcf`** on
+The newer evaluator at **`e7c7a6c`** on
 `origin/claude/adversarial-validation` is **not yet merged into that main**.
 Keep these consumer states distinct. No ordinary HTTP acceptance gate was
 executed or passed by this handoff.
@@ -42,8 +42,8 @@ issue documented in [the current Owner 2 handoff](OWNER2_BRIDGE_ADOPTION.md).
 
 Remaining trigger: integrate the implemented consumer and rerun ordinary
 HTTP/download/replay acceptance after Owner 2 fixes the Mac process-limit
-boundary and native v2 design/history mapping. The proposed follow-up flow still
-launches ordinary discovery on the revised dataset; dedicated adoption of
+boundary and native v2 design/history mapping. Proposed `e7c7a6c` now adopts
+the implemented design-bound `FollowupScope`; dedicated adoption of
 proposal-bound **`recheck`** remains an Owner 2 seam. The existing operation
 supports actual/transcription/hypothetical declarations and a reading's own
 time/allowance without replacing the original fixed vectors. No new science
@@ -51,10 +51,11 @@ producer or evaluator rewrite is needed.
 
 ## Newly merged follow-up route: use its explicit scope
 
-Main now implements a separately approved hypothetical fixed-pair review;
-the evaluator `80c2bcf` follow-up still omits `plan.followup`, which selects
-ordinary discovery. For the implemented narrow route, retain the accepted
-observation proposal/review and set the current `FollowupScope` fields:
+Main implements a separately approved hypothetical fixed-pair review.
+The earlier `80c2bcf` evaluator omitted `plan.followup`; proposed `e7c7a6c`
+now binds it, retains the relevant records, downloads/replays review bytes and
+checks per-candidate verdicts over the whole revised history. The missing-scope
+request is retired on that branch. Its current `FollowupScope` fields are:
 
 ```text
 design_job_id, design_result_id, design_result_digest,
@@ -80,6 +81,21 @@ adapter compatibility, not an HTTP gate. The [Owner 2 reproduction](OWNER2_BRIDG
 retains a freshly computed review packet for independent CLI replay. Native
 classification/full-anchor handling is already implemented in the proposed
 evaluator and does not need another implementation.
+
+One new narrow qualifier request for Owner 5: `_followup_links` at `e7c7a6c`
+compares only whether the result is certified against whether a compatible
+outside survivor exists. A read-only probe used constructed record wrappers
+from current 0.3 fixture inputs/results; all three original review packets
+separately replay with eight external anchors and all five link checks pass.
+Changing only the both-excluded result from `inconclusive` to
+`no_counterexample_found` still passes those five checks. Require the exact
+fixed-review outcome: `certified_counterexample` when a compatible outside
+candidate survives, otherwise `inconclusive`. Extend
+`test_outcome_must_follow_from_which_candidates_survive` in
+`evaluation/tests/test_followup_qualify.py` with the mutated-label control.
+This is isolated saved-record semantic coverage,
+not an observed HTTP or full-gate bypass; no package implementation change is
+needed. Retain native replay, identity and candidate-specific checks.
 
 ## Earlier findings, retained with their original scope
 
