@@ -70,6 +70,42 @@ All subagent and root checks here are **A author checks**, not C's independent
 acceptance. In-memory checkpoint reconstruction does not claim fresh-process
 storage/lease/browser qualification. Live model adaptivity is `not_run`.
 
+### Committed component qualification
+
+Code commit: **`63357c0b9bb653be3edc6bcbe29e904cbb07d27b`**, clean at test start.
+[PR #42](https://github.com/Arnav-M10/DrBean-hp26/pull/42) is draft for B's
+application integration; A did not merge it or alter main.
+The final combined component regression passed **340 tests in 28.78s**:
+
+```sh
+env -i PATH="$ENGINE_BIN:/opt/homebrew/bin:/usr/bin:/bin" LANG=C.UTF-8 \
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$PWD/evaluation/drbean_eval/guard" \
+  DRBEAN_EGRESS_GUARD_LOG=/tmp/drbean-63357c0-guard.jsonl BEAN_AI_MODE=placeholder \
+  BEAN_COUNTERDEX_PYTHON="$ENGINE_PYTHON" BEAN_COUNTERDEX_REPLAY_PYTHON="$ENGINE_PYTHON" \
+  "$BACKEND_PYTHON" -m pytest -q -p no:cacheprovider \
+  tests/test_research_coordinator.py tests/test_research_coordinator_adversarial.py \
+  tests/test_research_integration.py tests/test_research_coordinator_native.py \
+  tests/test_gemini_chat_model.py tests/test_gemini_chat_gateway.py \
+  tests/test_coordinator.py tests/test_controlled_native_workflow.py \
+  tests/test_provider.py tests/test_conversation.py tests/test_ledger.py \
+  tests/test_ledger_accounting.py tests/test_restart_workflow.py
+```
+
+Here `BACKEND_PYTHON` was the sibling
+`DrBean-hp26-shared-integration/.venv/bin/python`; `ENGINE_PYTHON` was its
+`.venv-engine/bin/python`, and `ENGINE_BIN` its `.venv-engine/bin` directory.
+No source or package install was modified by this check. Guard telemetry was
+39 `guard_installed` events and no other events: zero provider constructions,
+network attempts or credential lookups in this run. Ruff on `apps tests scripts`,
+secret scan (zero findings), and `git diff --check` passed at the same source.
+
+CI for that code commit:
+[run 43599016318](https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43599016318).
+At receipt creation, engine/native replay, evaluation self-checks and web units
+were green; backend, browser and actual-stack checks were still running. CI
+success for the existing browser path is not acceptance of new unregistered
+coordinator routes. Any final combined B commit requires its own qualification.
+
 ## B/C handoff and next condition
 
 B published `DB-RESEARCH-1` at `d224846` in
@@ -84,6 +120,12 @@ recovery journal, routes/worker registration, canonical decisions, precise
 session/action accounting and ordinary browser loop. Default live allocation is
 unchanged; a version marker is not permission or new capacity. Current main's
 ledger cannot admit this live coordinator lane.
+
+B's proposed eight logical model turns per session also needs an explicit
+whole-loop policy decision: the minimal one-tool-per-turn baseline/design/
+observation/report sequence needs roughly nine selections before optional reads
+or plan revision. A raised this concrete bound on PR #41; it grants no live
+capacity and does not change the four-turn action limit or the real global ledger.
 
 C should challenge the resulting combined commit with independent holdouts,
 same-input binding, review races, child/checkpoint crash recovery, valid and
