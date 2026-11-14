@@ -42,8 +42,9 @@ succeed, and `provenance.media_type_detection` records how the type was chosen. 
 the server names the file `research-file-<sha256[:12]>.<ext>` (`source_name_supplied: false`). `origin` is the uploader's declaration and is stored as such (`origin_verified: false`):
 `real_observation`, `public_source`, `synthetic_example`, `hypothetical`, or `unspecified` (default).
 
-Limits (also in `GET /research-capabilities` → `limits`): 5 MiB per file; 1–5 files and 10 MiB per
-analysis; PDFs at most 10 pages. Refusals are explicit, never silent truncation:
+Limits (also in `GET /research-capabilities` → `limits`, profile `paper-25mib-20p.v2`): PDFs up to
+25 MiB (`max_pdf_bytes`) and 20 pages; every other file up to 5 MiB (`max_asset_bytes`); 1–5 files and
+50 MiB per analysis. Each analysis must still fit the model request's token budget. Refusals are explicit, never silent truncation:
 
 | code | status | meaning |
 |---|---|---|

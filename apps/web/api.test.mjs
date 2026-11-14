@@ -226,7 +226,7 @@ test('general upload keeps original bytes and a bounded filename with a stable r
   }
   await api.uploadResearchAsset('workspace_one', { ...file, type: '' })
   assert.equal(seen.at(-1).headers['Content-Type'], 'application/octet-stream')
-  await assert.rejects(api.uploadResearchAsset('workspace_one', { ...file, size: 5242881 }), /5 MiB/)
+  await assert.rejects(api.uploadResearchAsset('workspace_one', { ...file, size: 26214401 }), /25 MiB/)  // largest kind (PDF); the server enforces each kind
   await assert.rejects(api.uploadResearchAsset('workspace_one', { ...file, size: 0 }), /5 MiB/)
   await assert.rejects(api.uploadResearchAsset('workspace_one', { ...file, size: file.size + 1 }), /changed/)
   await assert.rejects(api.request('/x', bytes.buffer, 'text/csv', undefined, { Authorization: 'owner' }), /metadata/)

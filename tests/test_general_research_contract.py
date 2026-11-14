@@ -130,4 +130,4 @@ def test_the_merged_browser_validators_accept_actual_responses(recorded, tmp_pat
     assert result.returncode == 0, result.stderr[-2000:]
     limits = json.loads(result.stdout)["limits"]
     assert limits["available"] is True and limits["analysisAvailable"] is True
-    assert (limits["maxFiles"], limits["maxPdfPages"]) == (5, 10) and limits["model"] == "controlled-general-analysis"
+    assert (limits["maxFiles"], limits["maxPdfPages"]) == (5, 20) and limits["model"] == "controlled-general-analysis"

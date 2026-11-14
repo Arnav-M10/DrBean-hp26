@@ -11,7 +11,7 @@ numerical model comparison service and the signed downloads. Nothing on the page
 ## One flow for any files
 
 1. **Data.** The person writes a question and adds up to 5 files of any field: CSV, TSV, JSON,
-   text, Markdown, PDF (up to 10 pages) or PNG/JPEG, or pastes a table. Each file is saved as a
+   text, Markdown, PDF (up to 20 pages and 25 MB) or PNG/JPEG, or pastes a table. Each file is saved as a
    research asset. `intake.mjs` reads the tables in its text, and `general.mjs` decides from the
    column names which checks fit. The overview then shows what Dr. Bean can do with the files:
 

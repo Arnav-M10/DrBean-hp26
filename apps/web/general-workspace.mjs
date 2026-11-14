@@ -1,6 +1,8 @@
 // General research is interpretation of retained sources, never checker authority.
 // This controller has no provider transport or production fallback answers.
-export const GENERAL_LIMITS = Object.freeze({ files: 5, fileBytes: 5 * 1024 * 1024, totalBytes: 10 * 1024 * 1024, pdfPages: 10 })
+// Paper profile v2: PDFs may be larger and longer; other files keep 5 MiB. The server's advertised limits can only lower these.
+export const GENERAL_LIMITS = Object.freeze({ files: 5, fileBytes: 5 * 1024 * 1024, pdfBytes: 25 * 1024 * 1024, totalBytes: 50 * 1024 * 1024, pdfPages: 20 })
+const MiB = bytes => Math.floor(bytes / 1024 / 1024)
 const TYPES = Object.freeze({ csv: 'text/csv', tsv: 'text/tab-separated-values', json: 'application/json', txt: 'text/plain', md: 'text/markdown', markdown: 'text/markdown', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', pdf: 'application/pdf' })
 const ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/
 const SHA = /^[a-f0-9]{64}$/
@@ -17,6 +19,8 @@ export function generalCapabilities(capabilities) {
     mediaTypes: Array.isArray(general?.media_types) ? general.media_types.filter(type => Object.values(TYPES).includes(type)) : [],
     maxFiles: lower(general?.max_assets, GENERAL_LIMITS.files),
     maxFileBytes: lower(general?.max_file_bytes, GENERAL_LIMITS.fileBytes),
+    // A server that does not advertise a PDF bound gets the ordinary file bound, never the larger client ceiling.
+    maxPdfBytes: Number.isInteger(general?.max_pdf_bytes) && general.max_pdf_bytes > 0 ? Math.min(general.max_pdf_bytes, GENERAL_LIMITS.pdfBytes) : lower(general?.max_file_bytes, GENERAL_LIMITS.fileBytes),
     maxTotalBytes: lower(general?.max_total_bytes, GENERAL_LIMITS.totalBytes),
     maxPdfPages: lower(general?.max_pdf_pages, GENERAL_LIMITS.pdfPages),
     analysisAvailable: general?.analysis?.available === true,
@@ -39,15 +43,17 @@ export function validateFileSelection(existing, files, limits) {
   if (!files.length || existing.length + files.length > limits.maxFiles) throw new Error(`Choose between 1 and ${limits.maxFiles} files in total.`)
   for (const file of files) {
     if (typeof file.name !== 'string' || !file.name || file.name.length > 240) throw new Error('Choose a file with a name of 240 characters or fewer.')
-    if (!Number.isSafeInteger(file.size) || file.size < 1 || file.size > limits.maxFileBytes) throw new Error(`${file.name}: files must be nonempty and at most ${Math.floor(limits.maxFileBytes / 1024 / 1024)} MiB.`)
+    const pdf = fileMediaHint(file) === 'application/pdf', ceiling = pdf ? limits.maxPdfBytes ?? limits.maxFileBytes : limits.maxFileBytes
+    if (!Number.isSafeInteger(file.size) || file.size < 1 || file.size > ceiling) throw new Error(`${file.name}: ${pdf ? 'PDFs' : 'files of this type'} must be nonempty and at most ${MiB(ceiling)} MiB.`)
     if (!limits.mediaTypes.includes(fileMediaHint(file))) throw new Error(`${file.name}: this format is not supported by the server. Choose an advertised CSV, TSV, JSON, text, image or PDF format.`)
   }
-  if (existing.reduce((n, file) => n + file.byte_size, 0) + files.reduce((n, file) => n + file.size, 0) > limits.maxTotalBytes) throw new Error('These files are over the 10 MiB combined limit. Remove a file or choose smaller ones.')
+  if (existing.reduce((n, file) => n + file.byte_size, 0) + files.reduce((n, file) => n + file.size, 0) > limits.maxTotalBytes) throw new Error(`These files are over the ${MiB(limits.maxTotalBytes)} MiB combined limit. Remove a file or choose smaller ones.`)
 }
 
 export function validateResearchAsset(asset, expected = {}) {
   if (!asset || !ID.test(asset.id) || !SHA.test(asset.sha256) || !Object.values(TYPES).includes(asset.media_type)
-      || !Number.isSafeInteger(asset.byte_size) || asset.byte_size < 1 || asset.byte_size > GENERAL_LIMITS.fileBytes) throw new Error('The server did not return a valid retained file identity.')
+      || !Number.isSafeInteger(asset.byte_size) || asset.byte_size < 1
+      || asset.byte_size > (asset.media_type === 'application/pdf' ? GENERAL_LIMITS.pdfBytes : GENERAL_LIMITS.fileBytes)) throw new Error('The server did not return a valid retained file identity.')
   bounded(asset.filename, 240, 'filename')
   if (expected.sha256 && asset.sha256 !== expected.sha256 || expected.byte_size !== undefined && asset.byte_size !== expected.byte_size
       || expected.id && asset.id !== expected.id
@@ -161,7 +167,8 @@ export class GeneralResearchWorkspace {
         })
         this.state.pendingUploads = list(saved.pendingUploads ?? [], 5, 'pending uploads').map(operation => {
           if (!ID.test(operation.id) || !SHA.test(operation.sha256) || !Object.values(TYPES).includes(operation.media_type)
-              || !Number.isSafeInteger(operation.byte_size) || operation.byte_size < 1 || operation.byte_size > GENERAL_LIMITS.fileBytes) throw new Error('Invalid saved upload identity.')
+              || !Number.isSafeInteger(operation.byte_size) || operation.byte_size < 1
+              || operation.byte_size > (operation.media_type === 'application/pdf' ? GENERAL_LIMITS.pdfBytes : GENERAL_LIMITS.fileBytes)) throw new Error('Invalid saved upload identity.')
           bounded(operation.filename, 240, 'saved upload filename')
           return { ...operation, status: 'uncertain' }
         })

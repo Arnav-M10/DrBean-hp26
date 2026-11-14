@@ -13,16 +13,22 @@ CITATION_NORMALIZATION_VERSION = "citation-normalization.v1"
 BBOX_SPACE = "normalized_top_left"
 
 # Upload and analysis selection (shared API contract).
-MAX_ASSET_BYTES = 5 * MiB
+# Paper profile v2: PDFs (papers) may be larger and longer than other files.
+# Every other kind keeps the original 5 MiB bound; images sent to the model,
+# lab-sheet intake and Counterdex inputs are unchanged.
+FILE_PROFILE = "paper-25mib-20p.v2"
+MAX_ASSET_BYTES = 5 * MiB                # text, tables, JSON and raster images
+MAX_PDF_BYTES = 25 * MiB                 # one paper
+MAX_UPLOAD_BYTES = max(MAX_ASSET_BYTES, MAX_PDF_BYTES)
 MIN_ANALYSIS_ASSETS = 1
 MAX_ANALYSIS_ASSETS = 5
-MAX_ANALYSIS_BYTES = 10 * MiB
+MAX_ANALYSIS_BYTES = 50 * MiB
 MAX_SOURCE_NAME_CHARS = 240
 MAX_SOURCE_NAME_HEADER_BYTES = 1024
 MAX_QUESTION_CHARS = 4000
 
 # PDF structure and decoding. The pre-scan refuses a file before PDFium sees it.
-MAX_PDF_PAGES = 10
+MAX_PDF_PAGES = 20
 MAX_PDF_PAGE_SIDE_POINTS = 5000          # about 1.76 m; A0 is 2384 x 3370 points
 MIN_PDF_PAGE_SIDE_POINTS = 1
 MAX_PDF_OBJECTS = 100_000
@@ -33,7 +39,7 @@ MAX_PDF_TOTAL_DECODED_BYTES = 512 * MiB   # all streams together (time bound; im
 MAX_PDF_IMAGE_PIXELS = 40_000_000        # one image XObject (a 600 dpi A4 scan is about 35 million)
 MAX_PDF_PAGE_IMAGE_PIXELS = 80_000_000   # declared image pixels referenced by all streams together
 MAX_PDF_TEXT_CHARS_PER_PAGE = 200_000
-MAX_PDF_TEXT_CHARS_TOTAL = 1_000_000
+MAX_PDF_TEXT_CHARS_TOTAL = 2_000_000       # scales with MAX_PDF_PAGES
 MIN_TEXT_LAYER_ALNUM = 20                # fewer alphanumerics: the page has no useful text layer
 
 # Page images sent to the model and shown in the browser (also the live image bound).
@@ -70,7 +76,8 @@ ANALYSIS_FIXED_INPUT_OVERHEAD = 1024
 def public_limits() -> dict:
     """Limits the browser needs to explain refusals before uploading."""
     return {
-        "max_asset_bytes": MAX_ASSET_BYTES, "min_assets_per_analysis": MIN_ANALYSIS_ASSETS,
+        "file_profile": FILE_PROFILE, "max_asset_bytes": MAX_ASSET_BYTES, "max_pdf_bytes": MAX_PDF_BYTES,
+        "min_assets_per_analysis": MIN_ANALYSIS_ASSETS,
         "max_assets_per_analysis": MAX_ANALYSIS_ASSETS, "max_analysis_bytes": MAX_ANALYSIS_BYTES,
         "max_pdf_pages": MAX_PDF_PAGES, "max_question_chars": MAX_QUESTION_CHARS,
         "max_source_name_chars": MAX_SOURCE_NAME_CHARS, "max_table_rows": MAX_TABLE_ROWS,

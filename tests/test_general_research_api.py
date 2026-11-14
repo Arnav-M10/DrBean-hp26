@@ -90,8 +90,13 @@ def test_user_json_files_bypass_the_strict_api_json_parser(controlled):
 def test_boundary_and_admission_refusals(controlled):
     _, _, client = controlled()
     w = workspace(client)
-    too_large = client.post(PREFIX + f"/workspaces/{w}/research-assets", content=b"x" * (5 * 1024 * 1024 + 1),
-                            headers={"Content-Type": "text/plain"})
+    # Paper profile v2: the HTTP boundary admits up to the largest kind (a 25 MiB PDF) and refuses anything larger;
+    # each kind keeps its own bound, so a text file just over 5 MiB is still refused, by admission.
+    text_too_large = client.post(PREFIX + f"/workspaces/{w}/research-assets", content=b"x" * (5 * 1024 * 1024 + 1),
+                                 headers={"Content-Type": "text/plain"})
+    assert text_too_large.status_code == 413 and text_too_large.json()["code"] == "file_too_large"
+    too_large = client.post(PREFIX + f"/workspaces/{w}/research-assets", content=b"x" * (25 * 1024 * 1024 + 1),
+                            headers={"Content-Type": "application/pdf"})
     assert too_large.status_code == 413 and too_large.json()["code"] == "request_too_large"
     assert upload(client, w, b"a,b\n1,2\n", "text/csv", origin="trust_me", expect=422)["code"] == "invalid_data_origin"
     assert upload(client, w, b"a,b\n1,2\n", "application/x-sh", expect=415)["code"] == "unsupported_media_type"

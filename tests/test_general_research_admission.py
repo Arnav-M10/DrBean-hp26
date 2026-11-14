@@ -168,12 +168,12 @@ def test_rotated_page_boxes_use_the_displayed_orientation():
 
 
 HOSTILE_EXPECTED = {
-    "truncated": "malformed_pdf", "password-protected": "encrypted_pdf", "pages-11": "pdf_page_limit",
+    "truncated": "malformed_pdf", "password-protected": "encrypted_pdf", "pages-over-cap": "pdf_page_limit",
     "pages-2000": "pdf_page_limit", "inflate-bomb": "pdf_decompression_limit",
     "image-dimension-bomb": "pdf_image_pixel_limit", "image-inflate-bomb": "pdf_image_pixel_limit",
     "nested-arrays": "pdf_nesting_limit", "page-tree-cycle": "malformed_pdf", "huge-xref-size": "pdf_object_limit",
     "html-polyglot": "media_type_mismatch", "png-bytes-named-pdf": "media_type_mismatch", "header-only": "malformed_pdf",
-    "empty": "empty_file", "oversize-6mib": "file_too_large",
+    "empty": "empty_file", "oversize-pdf": "file_too_large",
 }
 
 
@@ -273,3 +273,21 @@ def test_worker_never_puts_the_application_package_on_its_path():
     worker = Path(__file__).resolve().parents[1] / "apps/api/bean_api/general_research/_pdf_worker.py"
     source = worker.read_text()
     assert "sys.path.insert" not in source and "spec_from_file_location" in source
+
+
+def test_paper_profile_admits_a_pdf_between_the_old_and_new_bounds_but_not_other_kinds():
+    """Paper profile v2: a 12 MiB, 20-page PDF is admitted; a 6 MiB text file and a 21-page PDF are not."""
+    assert (L.MAX_PDF_BYTES, L.MAX_PDF_PAGES, L.MAX_ASSET_BYTES, L.MAX_ANALYSIS_BYTES) == (25 * L.MiB, 20, 5 * L.MiB, 50 * L.MiB)
+    doc = hostile._simple("Twenty-page paper probe", pages=L.MAX_PDF_PAGES)
+    padding = 12 * L.MiB
+    doc.add_object(b"<< /Length %d >>\nstream\n%s\nendstream" % (padding, b"0" * padding))
+    raw = doc.to_bytes()
+    assert L.MAX_ASSET_BYTES < len(raw) <= L.MAX_PDF_BYTES
+    parsed = parse(raw, "application/pdf")
+    assert len(parsed.pages) == L.MAX_PDF_PAGES
+    with pytest.raises(Refusal) as refused:
+        parse(b"x" * (L.MAX_ASSET_BYTES + 1), "text/plain")
+    assert refused.value.code == "file_too_large"
+    with pytest.raises(Refusal) as refused:
+        parse(hostile._simple("One page over", pages=L.MAX_PDF_PAGES + 1).to_bytes(), "application/pdf")
+    assert refused.value.code == "pdf_page_limit"

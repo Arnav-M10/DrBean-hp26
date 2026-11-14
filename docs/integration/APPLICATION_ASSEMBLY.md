@@ -27,7 +27,12 @@ graph is unavailable until A's controlled policy factory is present. Do not
 substitute test models in product startup or treat saved metadata as a resumed
 parent. Scientific children remain provider-free.
 
-The default paper profile remains5MiB/file,10MiB combined,10pages. Larger papers
-receive an explicit limit/manual-excerpt refusal. The separately versioned
-25MiB/50MiB/20page profile follows the reliable core loop and measured platform
-bounds; no image/provider/native limit has been widened.
+The paper profile is `paper-25mib-20p.v2`: PDFs up to 25 MiB and 20 pages, other
+files 5 MiB, 50 MiB per analysis. Measured on the two supplied public papers
+(9.39 MiB/12 pages and 18.19 MiB/11 pages: admitted in about 2 s, isolated worker
+peak about 220 MiB) and a 20-page real-page composite (2.5 s, 256 MiB peak) against
+the unchanged 768 MiB / 45 s worker caps. No image, lab-sheet intake, provider or
+native limit has been widened: only `/research-assets` admits 25 MiB at the HTTP
+boundary, and each Gemini request keeps its token budget, so one analysis covers
+roughly one dense paper page; larger selections are refused with
+`analysis_context_exceeded` and must be narrowed.
