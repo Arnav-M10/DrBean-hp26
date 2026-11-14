@@ -148,14 +148,17 @@ def _require_controlled_model(model: Any) -> None:
     Python objects. Inspect the MRO so a locally declared subclass of a known
     hosted adapter cannot accidentally bypass the offline application policy.
     """
+    from langchain_core.language_models import BaseChatModel
+
     hosted_modules = (
         "langchain_google_genai", "langchain_google_vertexai", "langchain_openai",
         "langchain_anthropic", "langchain_aws", "langchain_cohere",
         "langchain_mistralai", "langchain_together", "langchain_groq",
         "langchain_nvidia_ai_endpoints", "langchain_fireworks", "langchain_deepseek",
         "langchain_xai", "langchain_community.chat_models", "langchain.chat_models",
+        "bean_api.gemini_chat_model",
     )
-    if model is None or any(
+    if not isinstance(model, BaseChatModel) or any(
         cls.__module__ == prefix or cls.__module__.startswith(prefix + ".")
         for cls in type(model).__mro__ for prefix in hosted_modules
     ):

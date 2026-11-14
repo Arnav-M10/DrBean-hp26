@@ -35,7 +35,7 @@ def source_proposal_prompt(context: dict) -> str:
 
 CommentaryRejection = Literal["unsupported_claim", "unsupported_numeric_claim"]
 
-COMMENTARY_POLICY_VERSION = "evidence-bound-statements.v2"
+COMMENTARY_POLICY_VERSION = "evidence-bound-statements.v3"
 _NUMERIC_SPELLING = r"[+\-]?(?:\d+/\d+|(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+\-]?\d+)?)"
 _RATIO = re.compile(r"([+\-]?\d+)/(\d+)\Z")
 # Opaque identifiers cannot authorize quantities. They are removed only from
@@ -59,6 +59,15 @@ _NEUTRAL = frozenset({
     "the true model remains unknown", "this result does not establish global optimality",
     "no claim that all alternatives are eliminated is supported",
 })
+# These are descriptions of cited categorical results, never unconditional
+# caveats. Keep complete sentences and exact field requirements together.
+_LIMITING_STATEMENTS = {
+    "the returned design remains numerical guidance": {"design_tier": "numerical_guidance"},
+    "no separation was established on the reviewed grid": {"design_tier": "no_separation_established"},
+    "this design is numerical guidance without checked pair separation": {
+        "design_tier": "numerical_guidance", "verification": "not_checked"},
+    "the result is inconclusive": {"scientific_outcome": "inconclusive"},
+}
 _VULGAR = "¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞"
 _FRACTIONS = str.maketrans({char: unicodedata.normalize("NFKC", char).replace("⁄", "/") for char in _VULGAR})
 # Labels encode roles, not a bag of interchangeable numbers. Units are fixed by
@@ -202,6 +211,54 @@ def _negative_check_state(record: dict) -> bool:
     return False
 
 
+def _status_records(facts: list[dict]) -> dict[tuple, dict[str, set[str | None]]]:
+    """Retain all cited categorical values; conflicting duplicates cannot win by order."""
+    grouped: dict[tuple, dict[str, set[str | None]]] = {}
+    for index, fact in enumerate(facts):
+        if isinstance(fact.get("field"), str) and "value" in fact:
+            identity = fact.get("record_id")
+            fields = {fact["field"]: fact["value"]}
+        else:
+            identity = fact.get("id")
+            fields = fact
+        key = ("record", identity) if isinstance(identity, str) and identity else ("unbound", index)
+        record = grouped.setdefault(key, {})
+        for field in ("design_tier", "tier", "verification", "scientific_outcome"):
+            if field in fields:
+                value = fields[field]
+                role = "design_tier" if field == "tier" else field
+                record.setdefault(role, set()).add(value if isinstance(value, str) else None)
+    return grouped
+
+
+def _limiting_statements(facts: list[dict], context_facts: list[dict]) -> set[str]:
+    records, context = _status_records(facts), _status_records(context_facts)
+    permitted = set()
+    for statement, requirements in _LIMITING_STATEMENTS.items():
+        # Unqualified singular wording cannot choose among conflicting cited
+        # results. Verification is a same-record condition, not a global gate.
+        category = next(iter(requirements))
+        observed = set().union(*(record.get(category, set()) for record in records.values()))
+        if observed != {requirements[category]}:
+            continue
+        # Another matching citation must not conceal a known contradiction in
+        # a cited result of this category. Context still supplies no positives.
+        relevant = [(record, context.get(key, {}) if key[0] == "record" else {})
+                    for key, record in records.items() if record.get(category)]
+        if any((record.get(field, set()) | other.get(field, set())) - {expected}
+               for record, other in relevant for field, expected in requirements.items()):
+            continue
+        for key, record in records.items():
+            if not all(record.get(field) == {expected} for field, expected in requirements.items()):
+                continue
+            other = context.get(key, {}) if key[0] == "record" else {}
+            if any(other.get(field, set()) - {expected} for field, expected in requirements.items()):
+                continue
+            permitted.add(statement)
+            break
+    return permitted
+
+
 class _Vocabulary:
     """Cited roles and same-record associations, without scientific inference."""
     def __init__(self, facts: list[dict], context_facts: list[dict]):
@@ -211,6 +268,7 @@ class _Vocabulary:
         self.search: set[tuple[Fraction, Fraction]] = set()
         self.designs: set[tuple[Fraction, Fraction]] = set()
         self.controlled_tool_result = False
+        self.limiting_statements = _limiting_statements(facts, context_facts)
         self.candidate_count = 0
         # Uncited context can only veto a checked claim for the same record. It
         # can never authorize a quantity, unit, gate, range or option.
@@ -305,6 +363,8 @@ def _statement(text: str, vocabulary: _Vocabulary) -> CommentaryRejection | None
     lower = text.lower()
     if lower in _NEUTRAL:
         return None
+    if lower in vocabulary.limiting_statements:
+        return None
     if lower == "this is controlled commentary about a synthetic tool result" and vocabulary.controlled_tool_result:
         return None
     # A complete labeled quantity, including its entire suffix, must match.
@@ -339,7 +399,7 @@ def _statement(text: str, vocabulary: _Vocabulary) -> CommentaryRejection | None
 
 
 def commentary_rejection(text: str, facts: list[dict], *, context_facts: list[dict] | None = None) -> CommentaryRejection | None:
-    """Validate complete statements in the bounded v2 narration language.
+    """Validate complete statements in the bounded v3 narration language.
 
     Only cited typed facts authorize quantities, their roles, units and paired
     bounds/options. No hedge waives a check. Arbitrary prose is unsupported;
