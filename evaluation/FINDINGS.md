@@ -1,6 +1,6 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `d821202b339e`, observed with harness `d821202b339ed60720e3c919d6be47e450e3b894` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `37d8f6f`, observed with harness `30ab5f8` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
@@ -17,7 +17,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 | F-CONTROLLED-PROVENANCE | P1 | 3 | retested | Controlled-model turns are reserved as provider 'gemini' attempts with no placeholder marker |
 | F-REVIEW-MATERIALIZATION | P1 | 2 | fixed_pending_retest | An accepted intake review creates no dataset association (source values never reach execution) |
 | F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
-| F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
+| F-LINT-CHECKLIST | P2 | 4 | retested | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
 | F-MAC-NPROC | P0 | 2 | retested | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | retested | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | retested | Coordinator attempt metadata names provider gemini for controlled-model turns |
@@ -32,13 +32,13 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 | H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
 | H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
 | H-CI-ENGINE | P1 | 5 | retested | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
-| F-LAUNCHER-HIDDEN-PTH | P1 | 4 | open | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
-| F-LAUNCHER-ENV-READ | P2 | 4 | open | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
+| F-LAUNCHER-HIDDEN-PTH | P1 | 4 | retested | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
+| F-LAUNCHER-ENV-READ | P2 | 4 | retested | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 | H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
 | F-EXPLANATION-QUALIFIER | P2 | 3 | open | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
 | F-EXPLANATION-NUMBER-FORMS | P2 | 3 | open | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
 | F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
-| F-RESTART-EPERM | P0 | 2 | open | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
+| F-RESTART-EPERM | P0 | 2 | retested | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
 | H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
 | F-LEDGER-TOTALS | P2 | 2 | fixed_pending_retest | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
 | F-LEDGER-MALFORMED | P2 | 2 | fixed_pending_retest | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
@@ -57,6 +57,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Retest at preview of backend/restart-recovery c231be4 (PR #14; diagnostics relax_nproc + science_barrier):** Fixed by the PR's lifeline guard: the held child is stopped when the worker is SIGKILLed; nothing for the harness to terminate. Close after PR #14 merges with F-RESTART-EPERM resolved (otherwise normal completion fails on macOS). (evidence: {"attempts": ["att_2712c19d978049cb"], "results": "evaluation/results/previews/backend-restart-recovery-c231be4/relax_nproc+science_barrier"})
 - **Retest at preview of PR #15 9a6db61 (science_barrier only, no relaxed guard):** Still reproduces on PR #15 (it does not include PR #14's lifeline guard). Merge order matters: PR #14 fixes it but needs F-RESTART-EPERM fixed first, or PR #14 would break the science PR #15 just enabled on macOS. (evidence: {"attempts": ["att_5946ffbc58194fcd"], "results": "evaluation/results/previews/science-integration-fixes-9a6db61/science_barrier"})
 - **Retest at d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0):** Resolved on this supported Mac/runtime in the ordinary lane: one sustained live scientific child was observed before the worker SIGKILL and none remained afterwards; worker --recover marked the run interrupted with worker_restart and it stayed interrupted without redispatch. Running cancellation likewise observed one live child and none surviving. The separately declared cancellation workload contained 128 exact replicates of the synthetic input; no diagnostic barrier or relaxed guard was used. All seven required lifecycle checks passed. Earlier diagnostic failures remain historical; this is not a claim about every OS or every possible termination timing. (evidence: {"attempts": ["att_d77e70889700444b"], "interruption_workload": {"deterministic_barrier": false, "origin": "synthetic", "rows": 128}, "lane_run_id": "lane_872f1c39287144d1", "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])", "trace": "evaluation/results/traces/att_d77e70889700444b.json"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Independently confirmed: with the 128-row real workload (no diagnostic) 1 live scientific child at cancel and 1 at worker SIGKILL, none alive afterwards; recovery marks the run interrupted without redispatch. Same with the barrier diagnostic, where the harness had nothing to terminate. (evidence: {"attempts": ["att_a114e020f44547b2", "att_ee0e6b5f53c346ec"]})
 
 ## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, retested)
 
@@ -184,7 +185,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Retest at main 9cc90e0 with diagnostic science_barrier (harness d6a71c2):** Made observable with a deterministic diagnostic barrier inside the scientific child. Queued and running cancellation pass (held child killed, run cancelled); recovery marks the killed worker's run interrupted and never redispatches it. The worker-kill orphan this exposed is tracked as F-ORPHAN-WORKER-KILL. (evidence: {"results": "evaluation/results/previews/main-d6a71c2/science_barrier"})
 - **Retest at d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0):** The ordinary, non-barrier lane now observes sustained real scientific work for both cancellation and worker loss using a separately declared 128-row exact-replicate synthetic workload. One live child exists at each intervention, none survives, the cancelled run is terminal and the recovered worker-loss run stays interrupted without redispatch. This removes the earlier vacuity on this supported host; it does not weaken the sustained-observation criterion or promote earlier diagnostic evidence. (evidence: {"attempts": ["att_d77e70889700444b"], "lane_run_id": "lane_872f1c39287144d1", "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])"})
 
-## F-LINT-CHECKLIST (P2, owner 4, open)
+## F-LINT-CHECKLIST (P2, owner 4, retested)
 
 - **Input:** repository at 586fb9b
 - **Command:** `.venv/bin/ruff check apps tests scripts`
@@ -192,6 +193,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Observed:** F401 scripts/release/checklist.py:25 drbean_eval.contract imported but unused
 - **Evidence:** {}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** Still failing on main: ruff check apps tests scripts reports 1 error. (evidence: {"command": ".venv/bin/ruff check apps tests scripts"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by retest: `ruff check scripts/release/checklist.py` passes. (evidence: {})
 
 ## F-MAC-NPROC (P0, owner 2, retested)
 
@@ -209,6 +211,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Retest at main 61edad7, Linux CI:** Contrast: the same real-science HTTP tests (hero with checked design and fresh replay, changed input, design authority, design-bound follow-up) pass on the Linux runner, which owns about 64 processes. The failure on this Mac is the per-user process cap alone. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
 - **Retest at preview of codex/science-integration-fixes 9a6db61 (PR #15, stacked on PR #5; harness 2600456; NO diagnostics):** Fixed in PR #15: the process policy keeps the inherited per-user ceiling. On this Mac, with no diagnostic, 6/7 lane entries pass: hero (real discovery, checked design at 8 h, both packets replay fresh), changed input, retry/concurrency, design authority (v2 reuse probe included), design-bound follow-up (recheck; application, fresh replay and decimal oracle agree), zero dispatch. Close on main after PR #5/#15 merge. (evidence: {"attempts": ["att_c74f45e13b1c4522", "att_d6ae837f8bcc4541"], "results": "evaluation/results/previews/science-integration-fixes-9a6db61/plain"})
 - **Retest at d821202b339ed60720e3c919d6be47e450e3b894 (ordinary HTTP launch; macOS arm64; Counterdex 0.3.0):** Resolved by an ordinary run on this Mac: all seven scheduled HTTP entries pass, including real baseline discovery, changed input, separate design, proposal-bound follow-up and sustained cancellation/restart. The prepared CPython 3.11 runtime launches under the product process-guards-v3 policy with inherited account-wide RLIMIT_NPROC; readiness explicitly reports that a per-job process-count quota is unavailable because the platform limit is account-wide. Owned POSIX sessions, wall-clock supervision and the other reported guards remain enabled. No relax_nproc or other diagnostic override was used. This verifies the reported Mac launch failure on this host, not a newly available per-job process quota or a cross-platform proof. (evidence: {"attempts": ["att_ec9cf987565e48ec", "att_1f692eebc2c34baa", "att_371f1d8c816441b4", "att_955cd7b2cbe240ed", "att_fd97aeac25fa4cae", "att_d77e70889700444b", "att_1a506101c468467d"], "lane_run_id": "lane_872f1c39287144d1", "native_controls": {"at": "2026-11-14T05:24:07+00:00", "expected": 22, "file": "evaluation/results/controls.jsonl", "passed": 22, "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker"}, "resource_policy": {"policy_version": "process-guards-v3", "process_count": "inherited_rlimit_nproc_per_user", "process_count_job_quota": "unavailable", "process_count_reason": "account_wide_limit_not_job_quota", "process_tree": "owned_posix_session"}, "results": "evaluation/results (executed_acceptance; clean at execution; diagnostic_overrides=[])"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Independently confirmed on this Mac: the plain lane passes 7/7 through the harness launch path and 6/7 through Owner 4's launcher (cancel/restart is harness-path only), with real discovery, checked design, fresh replay and follow-up rechecks; no relaxed guard. (evidence: {"attempts": ["att_b9610a6030064d38", "att_a8d1f1b59cb845ef"]})
 
 ## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, retested)
 
@@ -269,21 +272,23 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Evidence:** {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43556610563", "reported_in": "origin/codex/science-next docs/workstreams/01-science.md (Post-push CI at 8af34e4)"}
 - **Retest at main 61edad7 (PR #16 merged 8bb1fbe), Linux CI:** Closed by retest: CI's integration suite now finds .venv-engine and runs real science: 43 passed, 3 failed (two strict-xfail XPASSes fixed by 1ae19ff, not yet in main; F-ORPHAN-WORKER-KILL). Hero, changed input, design authority and follow-up pass on Linux without diagnostics. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
 
-## F-LAUNCHER-HIDDEN-PTH (P1, owner 4, open)
+## F-LAUNCHER-HIDDEN-PTH (P1, owner 4, retested)
 
 - **Input:** checkout under ~/Documents on a Mac with iCloud Drive Desktop & Documents sync (an iCloud Drive File Provider domain); .venv created by `uv sync --locked`
 - **Command:** `DRBEAN_VAR_DIR=<isolated> python3 scripts/dev/launcher.py setup (then start); harness: python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher`
 - **Expected:** setup finishes (local auth created); start serves API, worker and web; the doctor's 'backend runtime ok' implies the service entry points can import bean_api
 - **Observed:** setup stops at the auth step (`.venv/bin/python -m bean_api.bootstrap`: No module named 'bean_api'); start: the API and worker exit with ModuleNotFoundError, and the launcher correctly stops everything it started and frees both ports; doctor still reports the backend runtime ok because it checks package metadata, not importability. Cause verified on this host: within about 6 s of creation the iCloud Drive File Provider sets UF_HIDDEN recursively on dot-named directories under ~/Documents (the same probe in /private/tmp stays visible), and CPython 3.11.17 and 3.13.18 `site` skip hidden .pth files (probe: visible .pth importable, hidden .pth not), so `_editable_impl_dr_bean_backend.pth` is ignored. With apps/api added to PYTHONPATH (what Owner 2's documented commands do via --app-dir/PYTHONPATH and what the harness launch path does) the same unmodified launcher starts in under a second; readiness then distinguishes API, worker and science, and the product processes receive no provider credentials.
 - **Evidence:** {"attempts": ["att_fe675c60b66a4801", "att_acd3a5749edf4d22"], "reproduction": "evaluation/results/owner4-launcher/HIDDEN-PTH-REPRO.md", "results": "evaluation/results/owner4-launcher (lane-runs.jsonl: startup_path.launcher_runs shows the unmodified start exit 1, then the labelled retry exit 0)"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by retest: from the iCloud-synced checkout, `launcher.py setup` now completes (auth created) and the unmodified `launcher.py start` exits 0 with no workaround recorded; the launcher puts apps/api first on PYTHONPATH for every child. 6/7 entries pass through it, no orphans after `launcher.py stop`. (evidence: {"attempts": ["att_a8d1f1b59cb845ef", "att_b80e99662ebb4196"], "results": "evaluation/results/owner4-launcher"})
 
-## F-LAUNCHER-ENV-READ (P2, owner 4, open)
+## F-LAUNCHER-ENV-READ (P2, owner 4, retested)
 
 - **Input:** dummy GEMINI_API_KEY / GOOGLE_API_KEY / LANGSMITH_API_KEY (DRBEAN-DUMMY-OWNER4-SCRUB) in the launcher's own environment, egress guard on PYTHONPATH
 - **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher`
 - **Expected:** names-only filtering (iterate keys, read only the values that are kept) and a scrubbed environment for every child, including probes
 - **Observed:** the guard records a credential_read of each dummy value in the launcher process during cmd_start -> child_env() (`os.environ.items()` reads every value; the code comment says values are never read), and the doctor's backend probe (`.venv/bin/python -c ...`, env=None) starts with all three names present. The API and worker receive none of them: the scrubbing that matters works.
 - **Evidence:** {"attempts": ["att_acd3a5749edf4d22"], "results": "evaluation/results/owner4-launcher (lane-runs.jsonl subject_end.launcher_side_guard_events: credential_read in launcher.py, probe guard_installed with names present; product processes credential_names_present [])"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by retest: with dummy GEMINI/GOOGLE/LANGSMITH keys in the launcher's environment the guard records no credential_read in the launcher, and every doctor/backend probe starts with no credential names (out() now defaults to the scrubbed child environment). API and worker receive none. (evidence: {"attempts": ["att_b80e99662ebb4196"], "results": "evaluation/results/owner4-launcher (lane-runs subject_end)"})
 
 ## H-ORPHAN-TEARDOWN (P1, owner 5, retested)
 
@@ -301,6 +306,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Expected:** unsupported_claim: the exemption should apply only when the qualifier hedges or negates the claim itself ('does not prove', 'may prove')
 - **Observed:** accepted (None); `_QUALIFIER` matches 'without'/'not'/'whether' anywhere in the clause prefix, so an intensifier exempts the claim
 - **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
 
 ## F-EXPLANATION-NUMBER-FORMS (P2, owner 3, open)
 
@@ -309,6 +315,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Expected:** unsupported_numeric_claim, as for 'ke 0.05' and '15%'
 - **Observed:** accepted (None): `_NUMBER`'s lookarounds skip digits glued to letters or hyphens, and words/unicode fractions are never parsed
 - **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
 
 ## F-EXPLANATION-PARAPHRASE (P2, owner 3, open)
 
@@ -317,14 +324,16 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Expected:** unsupported_claim (master brief 2.17: proof of the interval, elimination of outside models, physical truth, global optimality)
 - **Observed:** accepted (None)
 - **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
 
-## F-RESTART-EPERM (P0, owner 2, open)
+## F-RESTART-EPERM (P0, owner 2, retested)
 
 - **Input:** any baseline on backend/restart-recovery c231be4 on Darwin 25.6.0; or killpg-eperm-repro.py (standard library)
 - **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <PR #14 checkout> --diagnostic relax_nproc --results <dir>`
 - **Expected:** baselines complete; cancellation leaves no live scientific or guard process
 - **Observed:** hero and changed-input baselines fail with worker_failed / scientific_attempt_failed; run_bounded with a trivial adapter raises PermissionError at science.py:180 (`os.killpg(process.pid, SIGKILL)` in finally, which catches only ProcessLookupError); cancellation without the barrier leaves 1 live child. Darwin returns EPERM for killpg on a group whose only member is an exited, unreaped leader (standalone repro, CPython 3.11.17 and 3.13.18); Linux returns ESRCH, so Linux validation passed. The exception also skips the rest of the cleanup, including closing the parent lifeline, which is why the guard survives a cancellation. A one-line local diagnostic patch catching PermissionError makes the same lane pass 6/7 (as on main) and cancel/restart with the barrier pass.
 - **Evidence:** {"readme": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md", "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/killpg-eperm-repro.py", "results": "evaluation/results/previews/backend-restart-recovery-c231be4"}
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by independent retest. The original reproduction (trivial adapter through run_bounded) now returns its result instead of PermissionError; PR #19's _kill_owned_session reaps the leader and retries on Darwin EPERM. All 7 lane entries pass with real computation (10 follow-up jobs complete normally), cancellation and worker loss leave no live process with and without the barrier. integration 66 passed + 19 strict xfail (known P2 gaps only); backend 559 passed; engine 291 OK; harness 131 unit tests; 22/22 engine controls. (evidence: {"attempts": ["att_b9610a6030064d38", "att_33baea51713b4574", "att_a114e020f44547b2", "att_ee0e6b5f53c346ec"], "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md (probe rerun on 30ab5f8)"})
 
 ## F-LEDGER-TOTALS (P2, owner 2, fixed_pending_retest)
 
@@ -334,6 +343,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Observed:** main charges 120 tokens for a reported total of 5000
 - **Evidence:** {"tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"}
 - **Retest at preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in:** fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges. (evidence: {"command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py. (evidence: {"pytest": "66 passed, 19 xfailed"})
 
 ## F-LEDGER-MALFORMED (P2, owner 2, fixed_pending_retest)
 
@@ -343,6 +353,7 @@ Application code commit `d821202b339e`, observed with harness `d821202b339ed6072
 - **Observed:** main stores it; the next begin_attempt raises TypeError: '>' not supported between 'str' and 'int' (still fails closed: no new spending admitted, history untouched)
 - **Evidence:** {"tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"}
 - **Retest at preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in:** fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges. (evidence: {"command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"})
+- **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py. (evidence: {"pytest": "66 passed, 19 xfailed"})
 
 ## Check-level finding ids (raised only when the check fails)
 

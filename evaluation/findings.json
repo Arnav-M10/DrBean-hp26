@@ -2,8 +2,8 @@
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
   "updated_at": "2026-11-14",
-  "application_code_commit": "d821202b339ed60720e3c919d6be47e450e3b894",
-  "observed_at_harness_commit": "d821202b339ed60720e3c919d6be47e450e3b894",
+  "application_code_commit": "37d8f6f",
+  "observed_at_harness_commit": "30ab5f8",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -95,6 +95,16 @@
               "origin": "synthetic",
               "deterministic_barrier": false
             }
+          }
+        },
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Independently confirmed: with the 128-row real workload (no diagnostic) 1 live scientific child at cancel and 1 at worker SIGKILL, none alive afterwards; recovery marks the run interrupted without redispatch. Same with the barrier diagnostic, where the harness had nothing to terminate.",
+          "evidence": {
+            "attempts": [
+              "att_a114e020f44547b2",
+              "att_ee0e6b5f53c346ec"
+            ]
           }
         }
       ]
@@ -599,7 +609,7 @@
       "id": "F-LINT-CHECKLIST",
       "severity": "P2",
       "owner": "4",
-      "status": "open",
+      "status": "retested",
       "title": "Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract)",
       "minimal_input": "repository at 586fb9b",
       "command": ".venv/bin/ruff check apps tests scripts",
@@ -613,6 +623,11 @@
           "evidence": {
             "command": ".venv/bin/ruff check apps tests scripts"
           }
+        },
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Closed by retest: `ruff check scripts/release/checklist.py` passes.",
+          "evidence": {}
         }
       ]
     },
@@ -742,6 +757,16 @@
               "expected": 22,
               "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker"
             }
+          }
+        },
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Independently confirmed on this Mac: the plain lane passes 7/7 through the harness launch path and 6/7 through Owner 4's launcher (cancel/restart is harness-path only), with real discovery, checked design, fresh replay and follow-up rechecks; no relaxed guard.",
+          "evidence": {
+            "attempts": [
+              "att_b9610a6030064d38",
+              "att_a8d1f1b59cb845ef"
+            ]
           }
         }
       ]
@@ -1012,7 +1037,7 @@
       "id": "F-LAUNCHER-HIDDEN-PTH",
       "severity": "P1",
       "owner": "4",
-      "status": "open",
+      "status": "retested",
       "title": "One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready)",
       "minimal_input": "checkout under ~/Documents on a Mac with iCloud Drive Desktop & Documents sync (an iCloud Drive File Provider domain); .venv created by `uv sync --locked`",
       "command": "DRBEAN_VAR_DIR=<isolated> python3 scripts/dev/launcher.py setup (then start); harness: python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher",
@@ -1028,13 +1053,25 @@
           "att_acd3a5749edf4d22"
         ]
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Closed by retest: from the iCloud-synced checkout, `launcher.py setup` now completes (auth created) and the unmodified `launcher.py start` exits 0 with no workaround recorded; the launcher puts apps/api first on PYTHONPATH for every child. 6/7 entries pass through it, no orphans after `launcher.py stop`.",
+          "evidence": {
+            "attempts": [
+              "att_a8d1f1b59cb845ef",
+              "att_b80e99662ebb4196"
+            ],
+            "results": "evaluation/results/owner4-launcher"
+          }
+        }
+      ]
     },
     {
       "id": "F-LAUNCHER-ENV-READ",
       "severity": "P2",
       "owner": "4",
-      "status": "open",
+      "status": "retested",
       "title": "Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment",
       "minimal_input": "dummy GEMINI_API_KEY / GOOGLE_API_KEY / LANGSMITH_API_KEY (DRBEAN-DUMMY-OWNER4-SCRUB) in the launcher's own environment, egress guard on PYTHONPATH",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher",
@@ -1048,7 +1085,18 @@
           "att_acd3a5749edf4d22"
         ]
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Closed by retest: with dummy GEMINI/GOOGLE/LANGSMITH keys in the launcher's environment the guard records no credential_read in the launcher, and every doctor/backend probe starts with no credential names (out() now defaults to the scrubbed child environment). API and worker receive none.",
+          "evidence": {
+            "attempts": [
+              "att_b80e99662ebb4196"
+            ],
+            "results": "evaluation/results/owner4-launcher (lane-runs subject_end)"
+          }
+        }
+      ]
     },
     {
       "id": "H-ORPHAN-TEARDOWN",
@@ -1092,7 +1140,15 @@
         "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
         "end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py).",
+          "evidence": {
+            "pytest": "66 passed, 19 xfailed"
+          }
+        }
+      ]
     },
     {
       "id": "F-EXPLANATION-NUMBER-FORMS",
@@ -1109,7 +1165,15 @@
         "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
         "end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py).",
+          "evidence": {
+            "pytest": "66 passed, 19 xfailed"
+          }
+        }
+      ]
     },
     {
       "id": "F-EXPLANATION-PARAPHRASE",
@@ -1126,13 +1190,21 @@
         "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
         "end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py).",
+          "evidence": {
+            "pytest": "66 passed, 19 xfailed"
+          }
+        }
+      ]
     },
     {
       "id": "F-RESTART-EPERM",
       "severity": "P0",
       "owner": "2",
-      "status": "open",
+      "status": "retested",
       "title": "PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it",
       "minimal_input": "any baseline on backend/restart-recovery c231be4 on Darwin 25.6.0; or killpg-eperm-repro.py (standard library)",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <PR #14 checkout> --diagnostic relax_nproc --results <dir>",
@@ -1145,7 +1217,21 @@
         "readme": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md",
         "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/killpg-eperm-repro.py"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Closed by independent retest. The original reproduction (trivial adapter through run_bounded) now returns its result instead of PermissionError; PR #19's _kill_owned_session reaps the leader and retries on Darwin EPERM. All 7 lane entries pass with real computation (10 follow-up jobs complete normally), cancellation and worker loss leave no live process with and without the barrier. integration 66 passed + 19 strict xfail (known P2 gaps only); backend 559 passed; engine 291 OK; harness 131 unit tests; 22/22 engine controls.",
+          "evidence": {
+            "attempts": [
+              "att_b9610a6030064d38",
+              "att_33baea51713b4574",
+              "att_a114e020f44547b2",
+              "att_ee0e6b5f53c346ec"
+            ],
+            "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md (probe rerun on 30ab5f8)"
+          }
+        }
+      ]
     },
     {
       "id": "H-FOLLOWUP-OPERATION",
@@ -1190,6 +1276,13 @@
           "evidence": {
             "command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"
           }
+        },
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py.",
+          "evidence": {
+            "pytest": "66 passed, 19 xfailed"
+          }
         }
       ]
     },
@@ -1213,6 +1306,13 @@
           "result": "fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges.",
           "evidence": {
             "command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"
+          }
+        },
+        {
+          "at_commit": "combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named",
+          "result": "Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py.",
+          "evidence": {
+            "pytest": "66 passed, 19 xfailed"
           }
         }
       ]

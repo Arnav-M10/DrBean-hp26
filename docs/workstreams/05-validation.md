@@ -6,13 +6,13 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 
 | Item | Value |
 |---|---|
-| Branch | `claude/adversarial-validation` (pushed). PR #8 merged it into `main` up to `4ea7cb3`; `main` `55403ab` (PR #9 design, PR #10 offline AI, PR #11 follow-up) merged back as `98cef50`. Later harness commits (native consumer, `.venv-engine` discovery, Owner 4 launch path, design-bound follow-up, group-aware orphan cleanup, evidence-equivalent gates) reach `main` only through a new PR |
+| Branch | `claude/adversarial-validation` (pushed). `main` `37d8f6f` (PR #19: Counterdex 0.3, v2 design/recheck, restart recovery with the Darwin EPERM fix, launcher fixes, this branch up to `0931246`) merged in as `f3fb76c` without reverting anything; the remaining validation work (explanation-guard and ledger suites, design-contract/reuse probe, follow-up provenance check, engine previews, verified history forks, findings) goes to `main` as one PR |
 | Integration branch | `main` (GitHub default since the PR #3/#4 merges) |
-| Last recorded lane run | `3b55843` (app code = `main` `9cc90e0`), on **both launch paths**: the harness's own isolated launch (`evaluation/results/`) and Owner 4's `scripts/dev/launcher.py` (`evaluation/results/owner4-launcher/`). Same verdicts: hero and changed input fail with `scientific_runtime_unavailable` (F-MAC-NPROC); retry/concurrency and zero dispatch pass. Owner 4's path with `relax_nproc`: `evaluation/results/owner4-launcher/relax_nproc/` |
+| Last recorded lane run | Combined candidate `30ab5f8`, this Mac, no diagnostics: harness launch path **7/7 pass** (hero 37/37 + 33 qualifier, follow-up 130/130 + 194 qualifier incl. an actual reading at its own time, cancel/restart with a 128-row real workload: live children at cancel and worker kill, none left), Owner 4's unmodified launcher **6/7** (cancel/restart is harness-path only), 22/22 engine controls, integration 66 passed + 19 strict xfail (known P2 gaps only), backend 559 passed, engine 291 OK. Barrier diagnostic: cancel/restart passes, nothing for the harness to terminate. Divergent pre-merge records are kept in `evaluation/results/forks/` |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 from Owner 4's `.venv-engine` (created by `launcher.py setup`); checkout under iCloud-synced `~/Documents` (see F-LAUNCHER-HIDDEN-PTH) |
 | AI mode | zero external model dispatch, verified by the egress guard in API, worker and pytest; live Gemini `NOT_RUN` |
-| Findings | `evaluation/findings.json` → `evaluation/FINDINGS.md`. Open P0: **F-MAC-NPROC** (the only blocker between this Mac and release acceptance of hero/design/follow-up) and **F-ORPHAN-WORKER-KILL**. Closed by retest on merged `main` this session: F-FOLLOWUP-FEEDBACK, F-DESIGN-SOURCE-ARTIFACTS, F-NATIVE-BYTES, F-BASELINE-DISCOVERY. Check-level ids are catalogued there too |
-| Release gate | `python3.11 evaluation/cli.py gate --require release` → failed (exit 3) |
+| Findings | `evaluation/findings.json` -> `evaluation/FINDINGS.md`. **No open P0.** Closed by independent retest on `30ab5f8`: F-RESTART-EPERM, F-LAUNCHER-HIDDEN-PTH, F-LAUNCHER-ENV-READ, F-LINT-CHECKLIST; confirmed PR #19's closures of F-MAC-NPROC and F-ORPHAN-WORKER-KILL. Open: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE (P2, Owner 3), F-LEDGER-TOTALS/MALFORMED (P2, fixed only in unmerged PR #13), F-REVIEW-MATERIALIZATION (P1, not exercised by these lanes), F-TEST-VAR-LEAK, F-SIBLING-FORKS (P2) |
+| Release gate | `python3.11 evaluation/cli.py gate --require release` at the evidence commit after `30ab5f8`: see `evaluation/results/gates-latest.json` |
 
 ## Gate evidence (current)
 
@@ -87,12 +87,10 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 ## Next exact actions
 
-1. Merge order (for the user / owners): PR #5 + PR #15 make real science run on this Mac with no diagnostics. PR #14 fixes the worker-kill orphan but, as is, fails every normally finishing job on macOS (F-RESTART-EPERM): fix that first. Then rerun the plain lane on both launch paths and `gate --require release`.
-1b. (history) F-MAC-NPROC (P0, Owner 2) was the single blocker for release acceptance on this Mac: when Owner 2's platform-aware process guard lands, rerun the plain lane on both launch paths, then `gate --require release`.
-2. F-ORPHAN-WORKER-KILL (P0, Owner 2): reproduced on merged `main`. Ask for a product-side test barrier so the retest can be acceptance evidence, not only a diagnostic.
-3. Done: PR #10 merged, markers removed, AI findings closed. PR #12 (Owner 4 launcher cleanup; adds `DRBEAN_SCIENCE_PYTHON` to CI, which also resolves H-CI-ENGINE there) and PR #13 (Owner 2 controlled agents with real science) are open; PR #13 previewed locally: integration suite unchanged (no regressions).
-4. A new PR from this branch to `main` would ship the native consumer, `.venv-engine` discovery (fixes H-CI-ENGINE in CI), the Owner 4 launch subject and group-aware orphan cleanup. Opening it is the user's call.
-5. Owner 4: F-LAUNCHER-HIDDEN-PTH (P1) and F-LAUNCHER-ENV-READ (P2); rerun `--subject http-owner4-launcher` after a fix (it then records no workaround).
+1. When PR #13 merges: remove the two ledger strict-xfail markers (they XPASS there) and close F-LEDGER-TOTALS/MALFORMED by retest.
+2. Owner 3: the explanation-guard gaps (17 strict xfails) before any live model writes user-visible prose.
+3. Retest F-REVIEW-MATERIALIZATION with an independent source-materialization scenario.
+4. After any merge into `main`: refresh `.venv-engine` (`scripts/dev/launcher.py setup`; it installs a copy of the engine), rerun both launch paths, controls and the gate, and keep parallel history appends as verified forks.
 
 ## Conditional future work (not authorized now)
 
