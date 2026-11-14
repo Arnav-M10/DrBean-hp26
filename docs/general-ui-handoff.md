@@ -8,9 +8,11 @@ its isolated worktree; this assignment replaces that implementation scope here.
 
 ## Proposed adapter agreement (confirm changes before integration)
 
-GPT1: export `connectBrowserSession()` from `browser-session.mjs`, resolving
-`{api, workspaceId, capabilities}` only after `/shared-session` reports
+GPT1 agreement adopted: import `bootstrapSharedSession()` from `session.mjs`.
+It resolves `{api, session}` only after `/shared-session` reports
 `mode=browser_session`, `authenticated=true`, `credentials=server_managed`.
+Use `session.workspace_id` and fetch capabilities through that same API. A null
+return means only a local-boundary 404; expired/malformed sessions stay visible.
 `api` exposes authenticated `json(path, body?)`,
 `uploadResearchAsset(workspaceId, file, operationId)` and
 `researchAnalysis(workspaceId, frozenBody)`. The latter uses the body's
