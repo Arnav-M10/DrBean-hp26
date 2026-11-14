@@ -66,3 +66,40 @@ The "support line" row fixes a real overclaim: the old sentence said "The eviden
 3. **Text roles.** Settle on a few roles (page title, section title, body, help/fine print, technical) with fixed sizes, and drop per-component sizes such as `.steps-note` and `.fine` variants that differ only slightly.
 4. **Line length.** Body paragraphs, ledes and help text: about 65 characters (`max-width: 65ch`). The verdict statement already uses 40rem.
 5. **Semantic colour only for state.** Chips for checked, waiting, failed and unsupported states. Pair each with its text label, which the copy already provides.
+
+## Verification
+
+Run on commit `b8b99f6` (this branch, based on main `aa51f16`), Linux, Node 22.23.4, backend Python 3.13.18 (`.venv` from `scripts/dev/setup.sh`), engine CPython 3.11.15 / Counterdex 0.3.0, the session's preinstalled Playwright Chromium. Environment: `NODE_PATH=<playwright> BEAN_TEST_PYTHON=$PWD/.venv/bin/python BEAN_COUNTERDEX_PYTHON=$PWD/.venv-engine/bin/python`. Isolated ports and temporary stores; no provider calls.
+
+| Command | Result |
+|---|---|
+| `node --test` in `apps/web` | 81 passed, 0 failed |
+| `node apps/web/check-backend.mjs` | Passed (the same command also passed on unchanged main before the edits) |
+| same with `BEAN_TEST_FOLLOWUP_ORIGIN=actual` | Passed |
+| `node apps/web/check-research.mjs` | Passed |
+| `node tests/integration/web_manual_smoke.mjs` | 18/18 |
+| `node tests/integration/shared-session-browser.mjs` | Passed |
+| `node tests/integration/general_workspace_smoke.mjs` | Passed |
+| `.venv/bin/python -m pytest tests/test_general_research_contract.py` | 7 passed |
+| `node tests/integration/langchain_demo_browser.mjs` | **Fails, and fails identically on unchanged main `aa51f16`**: both stop waiting for "Advance research plan" after "Save reviewed inputs and research question". Not caused by this change; its two renamed download labels are updated but unexercised past that point |
+
+Screenshots of the real flow after the change (real API, worker and Counterdex; synthetic example): `docs/frontend/screenshots/copy-pass/`, covering the start page, readings, claim, review while not connected, approved review, Investigate, the result, the comparison, the report and the result at 390 px.
+
+## Walkthrough
+
+1. Start the stack (`scripts/dev/start.sh`), open the web app, connect and pick a workspace.
+2. Measurements: **Load synthetic example**, **Use these rows**, **Next: describe the claim**.
+3. Claim and assumptions: fill the dataset fields, then **Next: review inputs**.
+4. Review: **Save inputs and prepare check**, read what the approval covers, tick the box, **Approve check**, **Run approved check**.
+5. Result: "Your readings do not force the claim…", with the support, assumptions and uncertainty lines. Then **Download evidence file** and **Download replay anchors**.
+6. Next measurement: enter `8, 6`, allowance `0.2`, latest time `8` and a reason. Tick both permissions, then **Prepare comparison**, **Approve comparison**, **Run approved comparison**.
+7. Report: **Create report**, **Download report (JSON)**.
+
+## Integration needs and limits
+
+- Owner 3: the five structure requests above. My edits touch the same files (`workflow.mjs`, `index.html`, `app.mjs`, …) but only inside string literals, so conflicts should be line-local. If owner 3 rewrote a sentence, keep their structure and re-apply the wording from the before/after table and the terminology file.
+- Owner 2: the five typography and colour requests above. I did not edit `styles.css`.
+- Owner 5: please cross-check the result statements in `result-view.mjs` and the support line in `workflow.mjs` against your canonical result fixtures. The research-plan labels and the `api.mjs` explanation sentences are unchanged for you.
+- Owner 1: after merging, re-run `check-backend.mjs` (both origins) and `check-research.mjs`; their selectors depend on the new button names.
+- Still technical, left on purpose: the frozen plan question (`[1/10, 17/100] 1/h`) and success criterion ("No witness found does not prove the claim"). They are authored in `manual.mjs` but frozen into every plan, and a check-backend assertion matches them. Rewording them changes plan content, so it needs owner 3/5 agreement.
+- The Wikipedia "Signs of AI writing" page could not be fetched from this session (network policy blocks `en.wikipedia.org`). I used the patterns quoted in the Impeccable `clarify`/`distill` references and Vercel's writing guidelines (both read from their GitHub repos) instead.
