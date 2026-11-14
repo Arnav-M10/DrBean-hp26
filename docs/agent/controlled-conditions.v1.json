@@ -1,0 +1,67 @@
+{
+  "version": "drbean-agent-conditions.v1",
+  "purpose": "Expected predicates for the Deep Agents loop under the controlled planning fixture, committed before the recorded observation run. Counterdex computes every scientific outcome; these predicates only say which branch each reviewed input should reach.",
+  "lane": "controlled",
+  "lane_note": "The controlled planning model is a deterministic test fixture run through the real create_deep_agent graph, worker, ports and Counterdex. It is not live Gemini reasoning.",
+  "freeze_note": "C1-C3 reuse inputs whose outcomes were observed earlier (C narrow-demo qualification DEMO-04/05 on main cdb9d69 and this branch's provider-free measurement). C4 is new: its predicate was written before its first run. If an input does not reach its predicted branch, the observation reports the actual result rather than changing this file.",
+  "inputs": {
+    "rows_and_model": "packages/groundwork_adapter/fixtures/decision/hero-baseline.request.json (synthetic rows, origin hypothetical; two-rate concentration model; parameter domain)",
+    "objective": "Do the reviewed measurements challenge this range, and what should I do next?",
+    "reviewed_claim": {"parameter": "ke", "lower": "1/10", "upper": "17/100", "closed": true},
+    "widened_claim": {"parameter": "ke", "lower": "3/200", "upper": "7/20", "closed": true, "note": "the whole reviewed ke domain, so no compatible vector can lie strictly outside it"},
+    "design_constraints": {"feasible_times": ["6/1", "8/1"], "future_hard_allowance": "1/5", "maximum_horizon": "8/1", "allowance_origin": {"kind": "hypothetical", "description": "Explicit prospective control bound"}, "requested_tier": "checked_pair_separation", "allow_construction": true, "allow_continuation": true},
+    "wide_allowance_constraints": {"feasible_times": ["6/1", "8/1"], "future_hard_allowance": "5/1", "maximum_horizon": "8/1", "allowance_origin": {"kind": "hypothetical", "description": "Deliberately wide prospective bound"}, "requested_tier": "checked_pair_separation", "allow_construction": true, "allow_continuation": true}
+  },
+  "conditions": [
+    {
+      "id": "C1-supported-witness",
+      "input": "reviewed claim + design_constraints",
+      "expect": {
+        "before_approval": {"pending_review_kind": "plan", "children": 0},
+        "baseline": {"scientific_outcome": "certified_counterexample", "verification": "valid", "expected_binding": "matches", "replay": "passed", "distinct_checked_candidates": 2},
+        "report_next_action": "review_design",
+        "next_step_title": "Review feasible times and allowance for a separately approved pair design",
+        "completed_steps_cite_baseline_evidence": true,
+        "design_review": {"pending_review_kind": "design_plan", "children_before_approval": 1, "candidate_ids": "baseline candidates", "feasible_times": ["6/1", "8/1"], "future_hard_allowance": "1/5", "maximum_horizon": "8/1"},
+        "design": {"design_tier": "checked_pair_separation", "selected_margin_positive": true},
+        "after_design_next_step_title": "Review a new reading at its declared time and allowance",
+        "native_replay": "both packets replay with matching external anchors"
+      }
+    },
+    {
+      "id": "C2-changed-claim",
+      "input": "widened_claim + design_constraints",
+      "expect": {
+        "baseline": {"scientific_outcome": "no_counterexample_found"},
+        "report_next_action": "clarify",
+        "next_step_title": "Review assumptions and the bounded search scope before proposing further work",
+        "agent_report_text_contains": "does not prove",
+        "next_advance": {"pending_review_kind": "research_clarification", "fields": ["scientific_scope"], "new_children": 0}
+      }
+    },
+    {
+      "id": "C3-missing-inputs",
+      "input": "objective only; no reviewed model or measurements",
+      "expect": {"pending_review_kind": "research_clarification", "fields": ["reviewed_problem"], "children": 0, "jobs": 0}
+    },
+    {
+      "id": "C3b-missing-design-constraints",
+      "input": "reviewed claim; no design_constraints",
+      "expect": {
+        "baseline": {"scientific_outcome": "certified_counterexample"},
+        "next_advance": {"pending_review_kind": "research_clarification", "fields": ["design_constraints"], "new_children": 0}
+      }
+    },
+    {
+      "id": "C4-no-separating-time",
+      "input": "reviewed claim + wide_allowance_constraints",
+      "prediction_basis": "A 5 mg/L hard allowance on a future reading exceeds the concentration differences these fitted candidates can show at 6 h or 8 h, so no checked positive separation margin is expected.",
+      "expect": {
+        "baseline": {"scientific_outcome": "certified_counterexample"},
+        "design": {"design_tier": "no_separation_established"},
+        "after_design_next_step_title": "Review feasible times and allowance because this grid did not separate the pair",
+        "report_next_action": "clarify"
+      }
+    }
+  ]
+}
