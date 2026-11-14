@@ -310,12 +310,13 @@ class _CanonicalPorts:
     async def publish_report(self, evidence_ids: list[str], commentary: dict[str, Any]) -> dict[str, Any]:
         self._scoped(evidence_ids)
         await self.check_authority()
-        report = _mapping(await _await(self.backend.publish_report()), 8000)
+        commentary = _mapping(commentary, 6000)
+        report = _mapping(await _await(self.backend.publish_report(evidence_ids=evidence_ids, commentary=commentary)), 8000)
         if report.get("evidence_ids") != evidence_ids:
             raise CoordinatorFailure("research_report_binding_invalid")
-        # The published port accepts no commentary. Do not claim that this
-        # guarded annotation was persisted in B's immutable canonical report.
-        return {**report, "agent_commentary": _mapping(commentary, 6000), "commentary_persisted": False}
+        if report.get("agent_commentary") != commentary or report.get("commentary_persisted") is not True:
+            raise CoordinatorFailure("research_report_commentary_not_persisted")
+        return report
 
     async def record_event(self, event: dict[str, Any]) -> None:
         await self.check_authority()

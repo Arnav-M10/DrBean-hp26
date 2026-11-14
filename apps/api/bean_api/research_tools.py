@@ -234,9 +234,11 @@ class ApplicationResearchPorts:
             return self._prepared(conn, session, "followup", "followup", body,
                 lambda: self.workflow._create_plan_in_transaction(conn, self.runtime.actor_id, self.runtime.workspace_id, body))
 
-    async def publish_report(self):
+    async def publish_report(self, *, evidence_ids=None, commentary=None, _fallback_error=None):
+        from .research_reports import deterministic_summary, failure_reference, validated_commentary
+        fallback = failure_reference(_fallback_error) if _fallback_error is not None else None
         with self.service.store.read() as conn:
-            session, _ = self.service.assert_lease(conn, self.runtime)
+            session, _ = self.service.assert_lease(conn, self.runtime, check_deadline=fallback is None)
             jobs = [self.workflow._job(conn, self.runtime.actor_id, row["job_id"]) for row in conn.execute(
                 "SELECT job_id FROM research_effects WHERE session_id=? AND job_id IS NOT NULL ORDER BY created_at,id", (session["id"],))]
             if any(job["state"] in {"queued", "running", "cancel_requested"} for job in jobs):
@@ -245,22 +247,38 @@ class ApplicationResearchPorts:
         snapshots = [self.workflow.create_report(self.runtime.actor_id, job["id"], "research-report:" + _hash([session["id"], evidence_revision, job["id"]]))
             for job in jobs if job["kind"] == "run" and any(r["result_id"] for r in job["scenarios"])]
         with self.service.store.transaction() as conn:
-            current, _ = self.service.assert_lease(conn, self.runtime)
+            current, _ = self.service.assert_lease(conn, self.runtime, check_deadline=fallback is None)
             if not snapshots:
                 raise DomainError("research_report_evidence_required", "A report requires retained scientific evidence.", 409)
             current_jobs = [self.workflow._job(conn, self.runtime.actor_id, job["id"]) for job in jobs]
             if _hash(current_jobs) != evidence_revision:
                 raise DomainError("research_evidence_changed", "Retained work changed while assembling this report; request a new snapshot.", 409)
-            existing = conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind='report' AND json_extract(body,'$.evidence_revision')=? AND json_extract(body,'$.report_profile')='research-report.v2'", (session["id"], evidence_revision)).fetchone()
+            retained_ids = []
+            for job in jobs:
+                retained_ids.extend(r["result_id"] for r in job["scenarios"] if r["result_id"])
+                if job["kind"] == "design_job" and job["result_id"]:
+                    retained_ids.append(job["result_id"])
+            retained_ids = list(dict.fromkeys(retained_ids))
+            if evidence_ids is not None and evidence_ids != retained_ids:
+                raise DomainError("research_report_binding_invalid", "The report must retain every included evidence reference in canonical order.", 409)
+            evidence = [self.workflow._get(conn, self.runtime.actor_id, ref) for ref in retained_ids]
+            annotation = validated_commentary(commentary, evidence, current["mode"])
+            # A batched todo update can commit after this report and before a
+            # lost acknowledgement is retried. Keep the report's original plan
+            # snapshot, but do not let that incidental timing change its identity.
+            revision = _hash({"action_id": self.runtime.action_id, "evidence_revision": evidence_revision,
+                "agent_commentary": annotation, "model_failure": fallback})
+            existing = conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind='report' AND json_extract(body,'$.report_revision')=? AND json_extract(body,'$.report_profile')='research-report.v2'", (session["id"], revision)).fetchone()
+            if fallback is not None:
+                # A report commit may precede a lost graph acknowledgement.
+                # Keep its already validated commentary rather than adding a
+                # newer commentary-free snapshot for that same evidence/action.
+                retained = conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind='report' AND json_extract(body,'$.action_id')=? AND json_extract(body,'$.evidence_revision')=? AND json_extract(body,'$.commentary_status')='validated' ORDER BY rowid DESC LIMIT 1",
+                    (session["id"], self.runtime.action_id, evidence_revision)).fetchone()
+                existing = retained or existing
             if existing:
                 report = self.workflow._get(conn, self.runtime.actor_id, existing["id"], "report")
             else:
-                evidence_ids = []
-                for job in jobs:
-                    evidence_ids.extend(r["result_id"] for r in job["scenarios"] if r["result_id"])
-                    if job["kind"] == "design_job" and job["result_id"]:
-                        evidence_ids.append(job["result_id"])
-                evidence = [self.workflow._get(conn, self.runtime.actor_id, ref) for ref in dict.fromkeys(evidence_ids)]
                 native_evidence = []
                 for item in evidence:
                     result = item["body"].get("result", item["body"])
@@ -277,6 +295,10 @@ class ApplicationResearchPorts:
                 report = self.workflow._insert(conn, self.runtime.actor_id, self.runtime.workspace_id, "report", {
                     "schema_version": "DB-RESEARCH-1", "report_profile": "research-report.v2", "research_session_id": session["id"],
                     "evidence_revision": evidence_revision,
+                    "report_revision": revision, "action_id": self.runtime.action_id,
+                    "agent_commentary": annotation, "commentary_status": "validated" if annotation else "unavailable",
+                    "commentary_support": [{"evidence_id": item["id"], "evidence_digest": item["digest"], "kind": item["kind"]} for item in evidence] if annotation else [],
+                    "deterministic_summary": deterministic_summary(evidence), "model_failure": fallback,
                     "objective": self.workflow._get(conn, self.runtime.actor_id, session["id"])["body"]["objective"],
                     "root_inputs": self.service.root_context(conn, session), "research_plan_revision_id": current["plan_revision_id"],
                     "decisions": decisions, "children": jobs, "evidence": evidence, "run_reports": snapshots,
@@ -289,10 +311,26 @@ class ApplicationResearchPorts:
                         "An actual observation is a human declaration, not authenticated acquisition."],
                     "native_downloads": "The native_evidence manifest covers every included baseline, design and follow-up packet. Download each native file and its external anchors using the authenticated paths; replay does not strengthen its scientific conclusion."
                 }, session["id"])
-            self.service._event(conn, current, "tool_finished", "A canonical report snapshot was assembled from retained evidence.", [report["id"]], self.runtime.action_id)
+            self.service._event(conn, current, "tool_finished", "A canonical report snapshot was assembled from retained evidence.", [report["id"]], self.runtime.action_id,
+                "research-report:" + report["id"])
         return {"id": report["id"], "report_id": report["id"], "report_digest": report["digest"],
             "evidence_ids": [item["id"] for item in report["body"]["evidence"]],
+            "agent_commentary": report["body"]["agent_commentary"], "commentary_persisted": report["body"]["agent_commentary"] is not None,
+            "deterministic_summary_available": True,
             "scope": "Canonical evidence snapshot; verification does not apply to every narrative sentence."}
+
+    async def publish_fallback_report(self, error_code):
+        """Retain completed science while this worker still owns its fence.
+
+        This does not retry a model, complete the action or relax input/lease
+        authority. An elapsed action deadline does not prevent evidence retention.
+        """
+        try:
+            return await self.publish_report(_fallback_error=error_code)
+        except DomainError as error:
+            if error.code in {"research_report_evidence_required", "research_report_work_incomplete"}:
+                return None
+            raise
 
     async def admit_model(self):
         self.service.admit(self.runtime, "model")

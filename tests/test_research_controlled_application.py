@@ -180,10 +180,13 @@ def test_default_factory_ordinary_approved_baseline_reads_real_evidence_and_repo
     assert accepted["agent_commentary"]["next_action"] == next_action
     assert accepted["agent_commentary"]["scientific_authority"] is False
     assert accepted["agent_commentary"]["authorship"] == "controlled_commentary"
-    assert accepted["commentary_persisted"] is False  # checkpoint annotation is distinct from canonical report
+    assert accepted["commentary_persisted"] is True
     report = client.get(PREFIX + "/reports/" + final["reports"][0]).json()
     assert report["body"]["evidence"] == [evidence]
     assert report["body"]["root_inputs"]["dataset"] == dataset
+    assert report["body"]["agent_commentary"] == accepted["agent_commentary"]
+    assert report["body"]["commentary_support"] == [{"evidence_id": evidence["id"], "evidence_digest": evidence["digest"], "kind": "evidence"}]
+    assert report["body"]["deterministic_summary"]["results"][0]["scientific_outcome"] == outcome
     fresh = replay_current_source(client, result, tmp_path)
     if incompatible:
         assert result["candidates"] == [] and fresh["verification"] == "not_checked"
