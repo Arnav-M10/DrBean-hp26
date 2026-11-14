@@ -198,6 +198,37 @@ class AccountingTests(unittest.TestCase):
         self.assertEqual(lanes.live_not_run_statement()["status"], "not_run")
 
 
+class OriginalCheckerTests(unittest.TestCase):
+    def git(self, repo, *args):
+        return subprocess.run(["git", "-C", repo, *args], check=True, capture_output=True, text=True).stdout.strip()
+
+    def test_original_checker_is_extracted_at_the_recorded_commit_only(self):
+        with tempfile.TemporaryDirectory() as repo, tempfile.TemporaryDirectory() as work:
+            self.git(repo, "init", "-q")
+            self.git(repo, "config", "user.email", "eval@example.invalid")
+            self.git(repo, "config", "user.name", "eval")
+            engine = os.path.join(repo, "packages", "groundwork_adapter", "counterdex")
+            os.makedirs(engine)
+            with open(os.path.join(engine, "core.py"), "w", encoding="utf-8") as handle:
+                handle.write("VERSION = 'old'\n")
+            self.git(repo, "add", "-A")
+            self.git(repo, "commit", "-qm", "old engine")
+            old = self.git(repo, "rev-parse", "HEAD")
+            with open(os.path.join(engine, "core.py"), "w", encoding="utf-8") as handle:
+                handle.write("VERSION = 'new'\n")
+            self.git(repo, "commit", "-qam", "new engine")
+            package = lanes.original_checker(repo, old, work)
+            with open(os.path.join(package, "counterdex", "core.py"), encoding="utf-8") as handle:
+                self.assertEqual(handle.read(), "VERSION = 'old'\n")
+            self.assertIsNone(lanes.original_checker(repo, "0" * 40, work))
+            self.assertIsNone(lanes.original_checker(repo, "not-a-commit; rm -rf /", work))
+            self.assertIsNone(lanes.original_checker(repo, None, work))
+            self.assertEqual(lanes.packet_commit(repo, {"origin": {"tested_commit": old}}), (old, "attempt tested_commit"))
+            self.assertEqual(lanes.packet_commit(repo, {"origin": {"path": "packages/x/docs/review-evidence/4f6c580/u.json"}}),
+                             ("4f6c580", "review-evidence directory commit"))
+            self.assertEqual(lanes.packet_commit(repo, {"origin": {}}), (None, "unknown"))
+
+
 class EnginePreconditionTests(unittest.TestCase):
     def test_precondition_follows_the_applications_import_not_the_installed_copy(self):
         app = os.path.dirname(ROOT)
@@ -228,6 +259,8 @@ class JunitAndReplayTests(unittest.TestCase):
                '<testcase classname="m" name="skip"><skipped type="pytest.skip" message="why"/></testcase>'
                '<testcase classname="m" name="todo"><skipped type="pytest.xfail" '
                'message="HARNESS_PENDING: papers advertised"/></testcase>'
+               '<testcase classname="m" name="heavy"><skipped type="pytest.xfail" '
+               'message="NOT_RUN: heavy resource attack is opt-in"/></testcase>'
                '</testsuite></testsuites>')
         with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as handle:
             handle.write(xml)
@@ -236,7 +269,7 @@ class JunitAndReplayTests(unittest.TestCase):
         finally:
             os.unlink(handle.name)
         self.assertEqual(result["counts"], {"passed": 1, "failed": 2, "xfailed": 1, "skipped": 1, "not_available": 1,
-                                            "harness_pending": 1})
+                                            "harness_pending": 1, "not_run": 1})
         self.assertEqual({t["id"]: t["outcome"] for t in result["tests"]}["m::absent"], "not_available")
         self.assertIsNone(lanes.parse_junit("/nonexistent/junit.xml")["counts"])
 

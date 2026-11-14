@@ -186,3 +186,70 @@ def test_repository_ships_no_real_looking_credentials():
         if pattern.search(Path(path).read_text(encoding="utf-8", errors="ignore")):
             offenders.append(str(Path(path).relative_to(REPO)))
     assert offenders == []
+
+
+DUMMY_OPT_IN = {"mode": "live", "GEMINI_API_KEY": "DRBEAN-DUMMY-KEY-0042", "GEMINI_MODEL": DUMMY_MODEL,
+                "BEAN_GEMINI_ACCOUNT_GATE": "approved", "BEAN_GEMINI_ACCOUNT_DECISION_ID": "DRBEAN-DUMMY-DECISION-0042"}
+
+
+def _process_environment(pid: int) -> str:
+    """macOS/BSD ps shows a same-user process's environment after its command (used only for dummy values)."""
+    import subprocess
+    return subprocess.run(["ps", "eww", "-p", str(pid), "-o", "command="], capture_output=True, text=True).stdout
+
+
+def test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key(tmp_path):
+    """Owner 4's doctor reads the opt-in file as data and never prints the key (isolated var directory, dummy key)."""
+    import json as _json
+    import subprocess
+    import sys as _sys
+    launcher_path = REPO / "scripts" / "dev" / "launcher.py"
+    if "gemini.local.json" not in launcher_path.read_text(encoding="utf-8"):
+        pytest.xfail("NOT_AVAILABLE: Owner 4's launcher has no live opt-in file on this candidate")
+    var = tmp_path / "var"
+    var.mkdir(mode=0o700)
+    (var / "gemini.local.json").write_text(_json.dumps(DUMMY_OPT_IN), encoding="utf-8")
+    (var / "gemini.local.json").chmod(0o600)
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "LANG": "C.UTF-8", "DRBEAN_VAR_DIR": str(var)}
+    outputs = []
+    for args in (["doctor"], ["doctor", "--json"]):
+        done = subprocess.run([_sys.executable, str(launcher_path), *args], cwd=REPO, capture_output=True, text=True,
+                              timeout=120, env=env)
+        outputs.append(done.stdout + done.stderr)
+    joined = "\n".join(outputs)
+    assert DUMMY_OPT_IN["GEMINI_API_KEY"] not in joined, "doctor printed the opt-in key"
+    assert "key present" in joined, "doctor did not report the opt-in state"
+
+
+@pytest.mark.real_stack
+def test_owner4_live_opt_in_with_a_dummy_key_dispatches_nothing_and_stays_scoped():
+    """Owner 4's launcher opt-in ('mode': 'live' plus a key in an ignored file) with DUMMY values only.
+
+    Nothing may be dispatched from any process. The value must never appear in launcher or doctor output. It may
+    reach the API and worker, as the launcher documents, but never the web server. Ordinary routes keep working."""
+    launcher_source = (REPO / "scripts" / "dev" / "launcher.py").read_text(encoding="utf-8")
+    if "gemini.local.json" not in launcher_source:
+        pytest.xfail("NOT_AVAILABLE: Owner 4's launcher has no live opt-in file on this candidate")
+    from drbean_eval import launcher as harness_launcher
+    try:
+        stack = harness_launcher.Owner4LauncherStack(str(REPO), live_opt_in=dict(DUMMY_OPT_IN)).start()
+    except harness_launcher.StackError as error:
+        text = str(error).lower()
+        if "port" in text or "in use" in text or "setup.sh first" in text:
+            pytest.xfail(f"NOT_RUN: Owner 4's launcher cannot start here (fixed ports busy or setup not run): "
+                         f"{str(error)[-160:]}")
+        raise
+    try:
+        seen = exercise_model_paths(stack)
+        outputs = "\n".join(run.get("output_tail", "") for run in stack.launcher_runs)
+        assert DUMMY_OPT_IN["GEMINI_API_KEY"] not in outputs, "the opt-in key value was printed by the launcher"
+        assert "opt-in" in outputs.lower() or "Gemini" in outputs
+        assert seen["capabilities"]["gemini"].get("dispatch_enabled") is not True
+        environments = {name: _process_environment(process.pid) for name, process in stack.processes.items()}
+        assert "web" in environments and DUMMY_OPT_IN["GEMINI_API_KEY"] not in environments["web"], \
+            "the web server received the opt-in key"
+        attempts = stack.external_attempts()
+        assert attempts == [], f"external model attempts with a dummy live opt-in: {attempts[:3]}"
+    finally:
+        stack.stop()
+        stack.cleanup()

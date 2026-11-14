@@ -22,12 +22,14 @@ from __future__ import annotations
 import ast
 import glob
 import hashlib
+import io
 import json
 import os
 import platform
 import re
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import time
 import tomllib
@@ -326,8 +328,10 @@ def _split_probes(logs: dict[str, list[dict]]) -> tuple[list[dict], list[dict]]:
 def parse_junit(path: str) -> dict:
     """Outcome per test from pytest's JUnit XML (xunit2). xfail is reported by pytest as a skip of type pytest.xfail.
     A NOT_AVAILABLE reason marks a capability absent from this candidate (not run, never passed); HARNESS_PENDING
-    marks an advertised capability whose attack the harness has not written yet (a harness gap, not a pass)."""
-    counts = {"passed": 0, "failed": 0, "xfailed": 0, "skipped": 0, "not_available": 0, "harness_pending": 0}
+    marks an advertised capability whose attack the harness has not written yet (a harness gap, not a pass); NOT_RUN
+    marks an opt-in or environment-dependent test that was deliberately not executed (never a pass)."""
+    counts = {"passed": 0, "failed": 0, "xfailed": 0, "skipped": 0, "not_available": 0, "harness_pending": 0,
+              "not_run": 0}
     notable = []
     try:
         root = ET.parse(path).getroot()
@@ -345,6 +349,8 @@ def parse_junit(path: str) -> dict:
                 outcome = "not_available"
             elif "HARNESS_PENDING" in reason:
                 outcome = "harness_pending"
+            elif reason.startswith("NOT_RUN") or "NOT_RUN:" in reason:
+                outcome = "not_run"
             elif skipped.get("type") == "pytest.xfail":
                 outcome = "xfailed"
             else:
@@ -526,6 +532,44 @@ def classify_replay(result: dict) -> str:
     return "error"
 
 
+_COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
+_REVIEW_EVIDENCE = re.compile(r"/review-evidence/([0-9a-f]{7,40})/")
+
+
+def packet_commit(repo: str, item: dict) -> tuple[str | None, str]:
+    """Which commit's checker produced this packet, and how that was determined (never guessed silently)."""
+    origin = item.get("origin") or {}
+    if origin.get("tested_commit") and _COMMIT.match(origin["tested_commit"]):
+        return origin["tested_commit"], "attempt tested_commit"
+    match = _REVIEW_EVIDENCE.search("/" + (origin.get("path") or ""))
+    if match:
+        return match.group(1), "review-evidence directory commit"
+    if origin.get("path"):
+        done = subprocess.run(["git", "-C", repo, "log", "-1", "--format=%H", "--", origin["path"]],
+                              capture_output=True, text=True)
+        if done.returncode == 0 and _COMMIT.match(done.stdout.strip()):
+            return done.stdout.strip(), "last commit that changed the packet file"
+    return None, "unknown"
+
+
+def original_checker(repo: str, commit: str | None, work: str) -> str | None:
+    """Extract the Counterdex source at ``commit`` (git archive, no checkout); returns its package dir or None."""
+    if not commit or not _COMMIT.match(commit) or subprocess.run(
+            ["git", "-C", repo, "cat-file", "-e", f"{commit}^{{commit}}"], capture_output=True).returncode:
+        return None
+    target = os.path.join(work, f"checker-{commit[:12]}")
+    package = os.path.join(target, "packages", "groundwork_adapter")
+    if not os.path.isdir(package):
+        archive = subprocess.run(["git", "-C", repo, "archive", commit, "packages/groundwork_adapter/counterdex"],
+                                 capture_output=True)
+        if archive.returncode:
+            return None
+        os.makedirs(target, exist_ok=True)
+        with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
+            tar.extractall(target, filter="data")
+    return package if os.path.isdir(os.path.join(package, "counterdex")) else None
+
+
 def run_historical_lane(repo: str, results_dir: str, *, include: tuple[str, ...] = ("results", "owner4-launcher"),
                         timeout: float = 120.0) -> dict:
     science = launcher.science_python(repo)
@@ -566,7 +610,23 @@ def run_historical_lane(repo: str, results_dir: str, *, include: tuple[str, ...]
             row.update(outcome=classify_replay(result), replay_status=result.get("status"),
                        error_code=(result.get("error") or {}).get("code"),
                        replay=body.get("replay"), integrity=body.get("integrity"),
-                       expected_binding=body.get("expected_binding"), reason_code=body.get("reason_code"))
+                       expected_binding=body.get("expected_binding"), reason_code=body.get("reason_code"),
+                       checker={"source": "tested checkout"})
+            if row["outcome"] == "incompatible_version":
+                # A fresh run of the packet's own checker: the engine source at the commit that produced it.
+                commit, basis = packet_commit(repo, item)
+                older = original_checker(repo, commit, work)
+                row["original_checker"] = {"commit": commit, "basis": basis, "available": bool(older)}
+                if older:
+                    again = native.replay(science, older, data, {}, guard_log=guard_log, timeout=timeout,
+                                          application_anchor=anchor)
+                    again_body = again.get("report") or {}
+                    row["original_checker"].update(
+                        source_sha256=engine_controls.engine_source_identity(older)["source_sha256"],
+                        outcome=classify_replay(again), replay=again_body.get("replay"),
+                        error_code=(again.get("error") or {}).get("code"))
+                    if row["original_checker"]["outcome"] == "replayed":
+                        row["outcome"] = "replayed_original_checker"
             rows.append(row)
         finished, duration = _now(), round(time.monotonic() - clock, 1)
         tally = {}
@@ -589,9 +649,11 @@ def run_historical_lane(repo: str, results_dir: str, *, include: tuple[str, ...]
             "requests_and_usage": accounting,
             "status": "passed" if rows and not bad and all(p["passed"] for p in preconditions) and accounting[
                 "external_model_requests"]["status"] == "verified_zero" else "failed",
-            "scope_note": "fresh re-execution of the same checker on retained bytes; no discovery, no inference. "
-                          "Previews and diagnostics are excluded; incompatible_version packets name another "
-                          "checker version and are reported apart from failure."})
+            "scope_note": "fresh re-execution of the checker on retained bytes; no discovery, no inference. "
+                          "A packet the tested checker refuses as another source version is replayed with the "
+                          "engine source extracted at the commit that produced it (replayed_original_checker); "
+                          "only when that is unavailable or also refuses does it stay incompatible_version, "
+                          "reported apart from failure. Previews and diagnostics are excluded."})
         return _store(report, results_dir, {"guard-summary.json": _write_json(work, "guard-summary.json",
                                                                               accounting)})
     finally:
