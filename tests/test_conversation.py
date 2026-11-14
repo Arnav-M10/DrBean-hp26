@@ -1,5 +1,10 @@
-"""Mocked provider controls, separate from any claimed live-model evaluation."""
+"""Controlled provider boundaries and real-science conversation fact checks.
+
+The follow-up controls execute actual approved HTTP science with synthetic input
+and explicit hypothetical readings. No test qualifies live-model behavior.
+"""
 import asyncio
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
@@ -9,6 +14,11 @@ from bean_api.conversation import AssistantResponseRecordBody, ConversationServi
 from bean_api.providers import ProviderFailure, ProviderResult
 from bean_api.store import Store
 from bean_api.workflow import DomainError, Workflow
+import test_native_followup_workflow as native_followup
+
+scientific_client = native_followup.scientific_client
+computed_history = native_followup.computed_history
+computed_design = native_followup.computed_design
 
 
 @pytest.fixture
@@ -573,3 +583,154 @@ def test_known_universal_or_global_design_overclaims_are_suppressed(setup, prose
     assert response["body"]["commentary_suppression_reason"] == "unsupported_claim"
     assert response["body"]["model_commentary"] is None
     assert response["body"]["critical_statements"]
+
+
+def complete_native_followup(history, choice):
+    """Use the backend's public review/approval routes and actual fixed-pair checker."""
+    from bean_api.main import PREFIX
+    from bean_api.worker import Worker
+    from test_scientific_http import post
+    client = history["client"]
+    value, survivors = native_followup.reading_for(history, choice)
+    _, dataset, problem, body = native_followup.revised_inputs(history, value)
+    plan = post(client, f"/workspaces/{history['workspace']}/plans", {
+        "expected_current_revision_id": problem["id"], "plan": body}, "conversation-followup-plan")
+    approval = post(client, f"/plans/{plan['id']}/approvals", {
+        "expected_current_revision_id": problem["id"], "expected_plan_digest": plan["digest"],
+        "accepted": True}, "conversation-followup-approval")
+    run = post(client, f"/plans/{plan['id']}/runs", {
+        "approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "conversation-followup-run")
+    assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 1
+    finished = client.get(PREFIX + f"/runs/{run['id']}").json()
+    assert finished["state"] == "completed", finished
+    evidence = client.get(PREFIX + f"/records/{finished['scenarios'][0]['result_id']}").json()
+    return dataset, problem, finished, evidence, survivors
+
+
+@pytest.mark.parametrize("choice", [0, 1, 2], ids=["first_survives", "second_survives", "both_excluded"])
+def test_real_followup_explanations_preserve_individual_results_and_hypothetical_origin(computed_design, choice):
+    from bean_api.main import PREFIX
+    from bean_api.worker import Worker
+    from test_scientific_http import post
+    history, client = computed_design, computed_design["client"]
+    dataset, problem, run, evidence, survivors = complete_native_followup(history, choice)
+    response = post(client, f"/workspaces/{history['workspace']}/assistant-turns", {
+        "operation": "explain", "client_operation_id": "explain-followup", "expected_conversation_revision": 0,
+        "text": "Explain which selected candidates remain compatible after this hypothetical observation.",
+        "problem_id": problem["id"], "run_id": run["id"]}, "explain-followup")["body"]
+    assert response["author"] == "server" and response["provider_attempt_id"] is None
+    assert response["model_commentary"] is None and response["execution_approved"] is False
+    facts, statements = response["facts"], response["critical_statements"]
+    result = evidence["body"]["result"]
+    assert any(f["record_id"] == evidence["id"] and f["field"] == "candidate_results" and f["value"] == result["candidate_results"] for f in facts)
+    assert any(f["record_id"] == dataset["id"] and f["field"] == "origin" and f["value"] == "hypothetical" for f in facts)
+    assert any("hypothetical observations" in statement for statement in statements)
+    for candidate_id in history["design_result"]["candidate_ids"]:
+        if candidate_id in survivors:
+            assert any(f"Fixed candidate {candidate_id} remains compatible" in statement and "does not identify the true model" in statement for statement in statements)
+        else:
+            assert any(f"Fixed candidate {candidate_id} is excluded" in statement and "does not establish that all allowed assignments are excluded" in statement for statement in statements)
+    if not survivors:
+        assert result["scientific_outcome"] == "inconclusive"
+        assert any("investigation is inconclusive" in statement for statement in statements)
+    assert client.get(PREFIX + f"/records/{evidence['id']}").json() == evidence
+    assert client.get(PREFIX + f"/records/{history['design_record']['id']}").json() == history["design_record"]
+    assert client.get(PREFIX + f"/artifacts/{history['design_result']['artifacts'][0]['id']}").content == history["design_content"]
+    assert client.get(PREFIX + f"/workspaces/{history['workspace']}/provider-attempts").json() == []
+    assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
+
+
+def test_both_candidates_remaining_historically_compatible_is_valid_for_the_design(computed_design):
+    from test_scientific_http import post
+    history, client = computed_design, computed_design["client"]
+    assert len(history["design_result"]["candidate_results"]) == 2
+    assert all(item["verification"] == "valid" for item in history["design_result"]["candidate_results"])
+    response = post(client, f"/workspaces/{history['workspace']}/assistant-turns", {
+        "operation": "explain", "client_operation_id": "explain-design", "expected_conversation_revision": 0,
+        "text": "Explain the selected pair and reviewed future measurement.",
+        "suggestion_id": history["design_record"]["id"]}, "explain-design")["body"]
+    assert any("selected reviewed time" in statement for statement in response["critical_statements"])
+    assert response["author"] == "server" and response["provider_attempt_id"] is None
+
+
+@pytest.mark.parametrize("binding,code,status", [
+    ("matches", "followup_separation_contradiction", 409),
+    ("not_supplied", "reference_binding_mismatch", 422),
+    ("wrong_digest", "reference_binding_mismatch", 422),
+])
+def test_authenticated_separating_followup_cannot_report_both_selected_candidates_compatible(computed_design, monkeypatch, binding, code, status):
+    from bean_api.main import PREFIX
+    history, client = computed_design, computed_design["client"]
+    _, problem, run, evidence, _ = complete_native_followup(history, 0)
+    workflow, provider = client.app.state.workflow, client.app.state.provider
+    original_get = workflow.get
+    attempted_calls = []
+
+    def corrupted_read(actor, record_id, kind=None):
+        record = original_get(actor, record_id, kind)
+        if record_id == evidence["id"]:
+            record = deepcopy(record)
+            for candidate in record["body"]["result"]["candidate_results"]:
+                candidate.update(verification="valid", violating_observation_ids=[], unresolved_observation_ids=[])
+            if binding == "not_supplied":
+                record["body"]["result"].update(problem_digest=None, expected_binding="not_supplied")
+            elif binding == "wrong_digest":
+                record["body"]["result"]["problem_digest"] = "0" * 64
+        return record
+
+    async def forbidden_provider_call(*args, **kwargs):
+        attempted_calls.append(True)
+        raise AssertionError("Contradictory follow-up facts reached the provider")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(workflow, "get", corrupted_read)
+        patch.setattr(provider, "generate", forbidden_provider_call)
+        response = client.post(PREFIX + f"/workspaces/{history['workspace']}/assistant-turns", json={
+            "operation": "explain", "client_operation_id": "contradictory-followup", "expected_conversation_revision": 0,
+            "text": "Explain the reviewed follow-up evidence.", "problem_id": problem["id"], "run_id": run["id"],
+            "consent": {"provider": "gemini", "model": "fixture-model", "source_asset_ids": [],
+                "include_notes": True, "include_existing_values": True, "accepted": True}},
+            headers={"Idempotency-Key": "contradictory-followup"})
+    assert response.status_code == status, response.text
+    assert response.json()["code"] == code
+    assert attempted_calls == []
+    assert workflow.list_records("alice", history["workspace"], "user_turn") == []
+    assert client.get(PREFIX + f"/records/{evidence['id']}").json() == evidence
+    assert client.get(PREFIX + f"/runs/{run['id']}").json() == run
+    assert client.get(PREFIX + f"/records/{history['design_record']['id']}").json() == history["design_record"]
+    assert client.get(PREFIX + f"/workspaces/{history['workspace']}/provider-attempts").json() == []
+
+
+def test_controlled_unsupported_followup_read_without_a_digest_remains_explainable(computed_design, monkeypatch):
+    from bean_api.main import PREFIX
+    from test_scientific_http import post
+    history, client = computed_design, computed_design["client"]
+    dataset, problem, run, evidence, _ = complete_native_followup(history, 0)
+    workflow = client.app.state.workflow
+    original_get = workflow.get
+
+    def unsupported_read(actor, record_id, kind=None):
+        record = original_get(actor, record_id, kind)
+        if record_id == evidence["id"]:
+            # Controlled failure projection only: the actual native evidence
+            # and its authenticated reviewed lineage remain immutable.
+            record = deepcopy(record)
+            record["body"]["result"] = {
+                "scientific_outcome": "unsupported", "verification": "unsupported", "expected_binding": "not_supplied",
+                "replay": "unsupported", "reason_code": "controlled_runtime_unavailable", "problem_id": problem["id"],
+                "candidates": [], "artifacts": []}
+        return record
+
+    with monkeypatch.context() as patch:
+        patch.setattr(workflow, "get", unsupported_read)
+        response = post(client, f"/workspaces/{history['workspace']}/assistant-turns", {
+            "operation": "explain", "client_operation_id": "unsupported-followup", "expected_conversation_revision": 0,
+            "text": "Explain the unavailable follow-up check and how to continue manually.",
+            "problem_id": problem["id"], "run_id": run["id"]}, "unsupported-followup")["body"]
+    assert response["author"] == "server" and response["provider_attempt_id"] is None
+    assert any("scientific capability is unavailable" in statement for statement in response["critical_statements"])
+    assert any("hypothetical observations" in statement for statement in response["critical_statements"])
+    assert any(f["record_id"] == evidence["id"] and f["field"] == "verification" and f["value"] == "unsupported" for f in response["facts"])
+    assert any(f["record_id"] == dataset["id"] and f["field"] == "origin" and f["value"] == "hypothetical" for f in response["facts"])
+    assert client.get(PREFIX + f"/records/{evidence['id']}").json() == evidence
+    assert client.get(PREFIX + f"/workspaces/{history['workspace']}/provider-attempts").json() == []

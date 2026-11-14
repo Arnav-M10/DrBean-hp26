@@ -220,6 +220,11 @@ class ConversationService:
         if request.run_id:
             run = _same_workspace(self.workflow.get_run(actor, request.run_id), workspace_id)
             plan = _same_workspace(self.workflow.get(actor, run["plan_id"], kind="plan"), workspace_id)
+            # Only the backend's admitted follow-up scope establishes that the
+            # new row uses this exact pair, separating time and allowance under
+            # unchanged assumptions. Historical design compatibility alone
+            # cannot justify this consistency check.
+            followup = self.workflow.followup_context(actor, plan["body"]) if plan["body"].get("followup") else None
             if request.problem_id and request.problem_id != plan["body"]["problem_id"]:
                 raise _domain("reference_binding_mismatch", "The selected problem and run refer to different immutable revisions.")
             if not request.problem_id:
@@ -232,6 +237,18 @@ class ConversationService:
                     evidence = _same_workspace(self.workflow.get(actor, result_id, kind="evidence"), workspace_id)
                     if evidence["body"].get("run_id") != run["id"] or evidence["body"].get("scenario_id") != scenario["scenario_id"]:
                         raise _domain("reference_binding_mismatch", "The selected evidence does not belong to this run and scenario.")
+                    if followup is not None:
+                        result = evidence["body"]["result"]
+                        revised = followup["revised_problem"]
+                        if result.get("problem_id") != revised["id"] or result.get("problem_digest") not in {None, revised["digest"]}:
+                            raise _domain("reference_binding_mismatch", "The follow-up evidence does not bind the reviewed revised problem.")
+                        selected = set(followup["design_result"]["body"]["candidate_ids"])
+                        compatible = {item["candidate_id"] for item in result.get("candidate_results", [])
+                                      if item["verification"] == "valid"}
+                        if selected.issubset(compatible):
+                            if result.get("expected_binding") != "matches" or result.get("problem_digest") != revised["digest"]:
+                                raise _domain("reference_binding_mismatch", "The follow-up candidate checks lack matching evidence for the reviewed revised problem.")
+                            raise _domain("followup_separation_contradiction", "Both selected fixed candidates cannot remain compatible after the reviewed separating measurement. Review result binding and scientific semantics; retained evidence has not been changed.", 409)
                     records.append(evidence)
         if request.suggestion_id:
             suggestion = _same_workspace(self.workflow.get(actor, request.suggestion_id, kind="suggestion"), workspace_id)
