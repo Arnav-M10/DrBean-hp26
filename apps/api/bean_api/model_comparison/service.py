@@ -17,6 +17,7 @@ from ..canonical import canonical_bytes, parse_json_strict
 from ..store import utc_now
 from ..workflow import DomainError, Workflow, _json
 from .contract import ModelComparisonRequest, ModelComparisonResult
+from .compute import source_digest
 
 RESULT_KIND = "model_comparison"
 OPERATION = "model-comparison"
@@ -89,8 +90,9 @@ class ModelComparisonService:
             canonical_bytes(result)
             if (result.get("schema_version") != "DB-MODEL-COMPARISON-RESULT-1"
                     or result.get("request") != body
+                    or result.get("source_digest") != source_digest()
                     or result.get("input_digest") != hashlib.sha256(canonical_bytes(body)).hexdigest()):
-                raise DomainError("comparison_invalid_result", "The numerical result is not bound to the reviewed request.", 503)
+                raise DomainError("comparison_invalid_result", "The numerical result is not bound to the reviewed request and current implementation.", 503)
             return self._publish(actor, workspace_id, key, body, result)
         except DomainError as exc:
             self.workflow.fail_operation(actor, workspace_id, OPERATION, key, exc.code)

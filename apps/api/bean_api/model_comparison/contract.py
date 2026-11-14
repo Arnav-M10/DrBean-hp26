@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Literal
+import math
+import re
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
@@ -13,6 +15,8 @@ class StrictModel(BaseModel):
 
 def scalar(value: str, low: str, high: str) -> str:
     try:
+        if not re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", value):
+            raise ValueError("A decimal string without whitespace or separators is required")
         number = Decimal(value)
         if len(value) > 40 or not number.is_finite() or not Decimal(low) <= number <= Decimal(high):
             raise ValueError("Decimal scalar outside admitted bounds")
@@ -70,7 +74,7 @@ class Channel(StrictModel):
 
     @model_validator(mode="after")
     def ordered(self):
-        if self.energy_max_eV is not None and Decimal(self.energy_max_eV) <= Decimal(self.energy_min_eV):
+        if self.energy_max_eV is not None and float(self.energy_max_eV) <= float(self.energy_min_eV):
             raise ValueError("A band-pass upper energy must exceed its lower energy; null means high-pass")
         return self
 
@@ -113,13 +117,13 @@ class FitScope(StrictModel):
     def temperatures(cls, values):
         for value in values:
             scalar(value, "0.1", "1000")
-        if len(set(map(Decimal, values))) != len(values):
-            raise ValueError("Temperature grid contains equivalent duplicates")
+        if len(set(map(float, values))) != len(values):
+            raise ValueError("Temperature grid contains equivalent or binary64-indistinguishable values")
         return values
 
     @model_validator(mode="after")
     def ordered(self):
-        if Decimal(self.density_max_m3) <= Decimal(self.density_min_m3):
+        if float(self.density_max_m3) <= float(self.density_min_m3):
             raise ValueError("Density bounds must have positive width")
         return self
 
@@ -137,8 +141,8 @@ class NoiseScope(StrictModel):
         for value in values:
             scalar(value, "1e-15" if info.field_name == "sigma_grid_A" else "0.1",
                    "1000" if info.field_name == "sigma_grid_A" else "10")
-        if len(set(map(Decimal, values))) != len(values):
-            raise ValueError("Sweep contains equivalent duplicate values")
+        if len(set(map(float, values))) != len(values):
+            raise ValueError("Sweep contains equivalent or binary64-indistinguishable values")
         return values
 
 
@@ -171,6 +175,113 @@ class ModelComparisonRequest(StrictModel):
         return self
 
 
+def finite_output(value: str) -> str:
+    if not math.isfinite(float(value)):
+        raise ValueError("Numerical results must be finite binary64 decimal strings")
+    return value
+
+
+NumberText = Annotated[str, Field(max_length=40, pattern=r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"), AfterValidator(finite_output)]
+ModelId = Literal["electron_isotropic_maxwellian.v1", "electron_gyrotropic_bimaxwellian.v1"]
+
+
+class Prediction(StrictModel):
+    observation_index: int = Field(ge=0)
+    channel_id: str
+    observed_A: NumberText
+    predicted_A: NumberText
+    residual_A: NumberText
+    sigma_A: NumberText
+
+
+class Sensitivity(StrictModel):
+    parameter: str
+    derivative: Literal["d_current_d_log_parameter"]
+    unit: Literal["A"]
+    values: list[NumberText]
+    relative_step: Literal["0.0001"]
+
+
+class FitResult(StrictModel):
+    model_id: ModelId
+    status: Literal["bounded_grid_completed", "no_finite_candidate"]
+    parameter_count: int = Field(ge=2, le=3)
+    evaluations: int = Field(ge=0)
+    parameters: dict[str, NumberText]
+    predictions: list[Prediction]
+    sensitivity: list[Sensitivity]
+    rank_estimate: int = Field(ge=0, le=3)
+    rank_deficient: bool
+    boundary_limited: bool
+    chi_square: NumberText | None
+    reduced_chi_square: NumberText | None
+    degrees_of_freedom: int | None
+    rmse_A: NumberText | None
+    adequate_under_declared_threshold: bool
+
+
+class Frequency(StrictModel):
+    count: int = Field(ge=0)
+    frequency: NumberText
+    wilson_95: list[NumberText] = Field(min_length=2, max_length=2)
+
+
+class Outcomes(StrictModel):
+    generating_band_only: Frequency
+    other_band_only: Frequency
+    both_bands: Frequency
+    neither_band: Frequency
+
+
+class ConditionalSimulation(StrictModel):
+    generating_model_id: ModelId
+    samples: int = Field(ge=32, le=1024)
+    failures: Literal[0]
+    outcomes: Outcomes
+
+    @model_validator(mode="after")
+    def totals(self):
+        outcomes = [getattr(self.outcomes, key) for key in type(self.outcomes).model_fields]
+        if sum(item.count for item in outcomes) != self.samples:
+            raise ValueError("Simulation outcome counts must sum to the sample count")
+        for item in outcomes:
+            low, high = map(float, item.wilson_95)
+            frequency = float(item.frequency)
+            if not 0 <= low <= frequency + 1e-14 or not frequency - 1e-14 <= high <= 1:
+                raise ValueError("Invalid simulation sampling interval")
+            if abs(frequency - item.count / self.samples) > 1e-14:
+                raise ValueError("Simulation frequency does not match count")
+        return self
+
+
+class SettingPrediction(StrictModel):
+    setting: Channel
+    predictions_A: dict[ModelId, NumberText]
+    absolute_difference_A: NumberText
+
+
+class SettingComparison(StrictModel):
+    setting_id: str
+    signal_to_noise: NumberText
+    numerical_band_margin_A: NumberText
+    conditional_simulations: list[ConditionalSimulation] = Field(min_length=2, max_length=2)
+
+
+class NoiseCase(StrictModel):
+    sigma_A: NumberText
+    z_threshold: NumberText
+    selected_channel_bands_separated_numerically: bool
+    decision: str
+    selected_channel_simulations: list[ConditionalSimulation] = Field(min_length=2, max_length=2)
+    settings: list[SettingComparison]
+    suggested_setting_id: str | None
+
+
+class Failure(StrictModel):
+    code: str
+    message: str
+
+
 class ModelComparisonResult(StrictModel):
     schema_version: Literal["DB-MODEL-COMPARISON-RESULT-1"]
     status: Literal["completed", "unsupported", "fit_failed", "budget_exceeded"]
@@ -182,11 +293,11 @@ class ModelComparisonResult(StrictModel):
     methods: dict[str, str]
     simulation_seed: int
     simulation_samples: int
-    model_ids: list[str]
+    model_ids: list[ModelId]
     units: dict[str, str]
-    fits: list[dict]
-    settings: list[dict]
-    noise_sweep: list[dict]
-    failures: list[dict[str, str]]
+    fits: list[FitResult]
+    settings: list[SettingPrediction]
+    noise_sweep: list[NoiseCase]
+    failures: list[Failure]
     limitations: list[str]
     decision: str

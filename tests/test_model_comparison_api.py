@@ -221,7 +221,7 @@ def test_pending_duplicate_never_computes_twice_or_holds_database_lock(applicati
     assert service.compare("alice", workspace, request, "pending") == record and len(calls) == 1
 
 
-@pytest.mark.parametrize("mode", ["timeout", "interrupted", "substitution"])
+@pytest.mark.parametrize("mode", ["timeout", "interrupted", "substitution", "stale_source"])
 def test_failed_or_interrupted_execution_never_publishes_or_retries(application, mode):
     app, client, workspace, _ = application
     calls = []
@@ -236,6 +236,8 @@ def test_failed_or_interrupted_execution_never_publishes_or_retries(application,
             app.state.workflow.recover_interrupted()
         if mode == "substitution":
             computed["request"]["noise"]["seed"] += 1
+        if mode == "stale_source":
+            computed["source_digest"] = "0" * 64
         return computed
 
     app.state.model_comparison.runner = runner

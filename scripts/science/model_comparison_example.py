@@ -22,7 +22,7 @@ def example():
                     for channel in channels]
     return ModelComparisonRequest.model_validate({
         "schema_version": "DB-MODEL-COMPARISON-1", "approval": "approved_for_this_request",
-        "review": {"reviewed": True, "origin": "synthetic", "description": "New synthetic zero-drift electron distribution; density 1e15 m^-3, parallel 4 eV, perpendicular 16 eV. Exact forward means with declared independent Gaussian measurement standard deviations; not acquired data."},
+        "review": {"reviewed": True, "origin": "synthetic", "description": "New synthetic zero-drift electron distribution; density 1e15 m^-3, parallel 4 eV, perpendicular 16 eV. Noise-free forward means computed in binary64 with declared independent Gaussian measurement standard deviations; not acquired data."},
         "instrument": instrument.model_dump(), "channels": [channel.model_dump() for channel in channels],
         "observations": observations, "selected_channel_ids": [channel.id for channel in channels],
         "fit": {"density_min_m3": "100000000000000", "density_max_m3": "10000000000000000",

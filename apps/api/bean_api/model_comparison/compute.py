@@ -20,7 +20,9 @@ from .models import ISOTROPIC, MODELS, predict_current
 def number(value: float) -> str:
     if not math.isfinite(value):
         raise ValueError("Nonfinite numerical result")
-    return format(0.0 if value == 0 else value, ".15g")
+    # Round-trip binary64 values so downloaded candidate bands and margins use
+    # the same numbers as the calculation, including touching-boundary cases.
+    return format(0.0 if value == 0 else value, ".17g")
 
 
 def source_digest() -> str:
@@ -57,13 +59,18 @@ def _fit(request: ModelComparisonRequest, model_id: str, rows: list[tuple]) -> d
                       else {"parallel_eV": point[0], "perpendicular_eV": point[1]})
         parameters["density_m3"] = 1.0
         basis = [predict_current(parameters, channel, request.instrument) for _, _, channel in rows]
-        denominator = math.fsum((unit / float(row.sigma_A))**2 for unit, (_, row, _) in zip(basis, rows, strict=True))
+        weighted_basis = [unit / float(row.sigma_A) for unit, (_, row, _) in zip(basis, rows, strict=True)]
+        scale = max(map(abs, weighted_basis))
         evaluations += 1
-        if denominator == 0:
+        if scale == 0:
             continue
-        numerator = math.fsum(unit * float(row.current_A) / float(row.sigma_A)**2
-                              for unit, (_, row, _) in zip(basis, rows, strict=True))
-        density = min(upper, max(lower, numerator / denominator))
+        # Normalize before squaring: finite tiny high-pass currents otherwise
+        # underflow in the WLS denominator despite a usable forward prediction.
+        normalized = [unit / scale for unit in weighted_basis]
+        denominator = math.fsum(unit * unit for unit in normalized)
+        numerator = math.fsum(unit * float(row.current_A) / float(row.sigma_A)
+                              for unit, (_, row, _) in zip(normalized, rows, strict=True))
+        density = min(upper, max(lower, (numerator / denominator) / scale))
         predictions = [density * unit for unit in basis]
         residuals = [float(row.current_A) - pred for pred, (_, row, _) in zip(predictions, rows, strict=True)]
         chi_square = math.fsum((residual / float(row.sigma_A))**2
@@ -176,6 +183,8 @@ def compute_comparison(request: ModelComparisonRequest) -> dict:
     channels = {item.id: item for item in request.channels}
     rows = [(index, row, channels[row.channel_id]) for index, row in enumerate(request.observations)
             if row.channel_id in request.selected_channel_ids]
+    if any(float(row.sigma_A) < 64 * math.ulp(abs(float(row.current_A))) for _, row, _ in rows):
+        return finish("unsupported", "numerical_resolution", "An observational standard deviation is below the supported binary64 resolution at its current scale; no noise or distinction claim is made.")
     grid_size = len(request.fit.temperature_grid_eV)
     fit_evaluations = grid_size + grid_size*grid_size
     simulation_work = 2 * request.noise.samples * len(request.noise.sigma_grid_A) * len(request.noise.z_thresholds) * (len(rows) + len(request.feasible_settings))
@@ -193,6 +202,11 @@ def compute_comparison(request: ModelComparisonRequest) -> dict:
         result["settings"].append({"setting": setting.model_dump(mode="json"),
                                    "predictions_A": {model: number(value) for model, value in zip(MODELS, means, strict=True)},
                                    "absolute_difference_A": number(abs(means[1] - means[0]))})
+    scale = max(abs(value) for vector in selected_means for value in vector)
+    scale = max(scale, *(abs(float(value)) for setting in result["settings"] for value in setting["predictions_A"].values()))
+    if (any(float(sigma) < 64 * math.ulp(scale) for sigma in request.noise.sigma_grid_A)
+            or any(float(row.sigma_A) < 64 * math.ulp(scale) for _, row, _ in rows)):
+        return finish("unsupported", "numerical_resolution", "A declared standard deviation is below the supported binary64 resolution at the predicted current scale; no simulation or distinction claim is made.")
     rng = random.Random(request.noise.seed)
     selected_draws = [[[rng.gauss(0, 1) for _ in rows] for _ in range(request.noise.samples)] for _ in MODELS]
     setting_draws = [[[rng.gauss(0, 1)] for _ in range(request.noise.samples)] for _ in MODELS]
