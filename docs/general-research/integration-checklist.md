@@ -94,8 +94,9 @@ live smoke the owner can append a grant on the server machine:
 ```
 
 Grants only add capacity; they never erase, refund or reset attempts; a reused decision id or a tampered
-chain is refused (the ledger then fails closed). Free tier remains the owner's assertion, not a billing
-check. Do not grant on behalf of the owner.
+chain is refused (the ledger then fails closed). The chain is tamper-evident against accidental or naive
+edits; it is not a defence against someone who can rewrite the database file. Free tier remains the
+owner's assertion, not a billing check. Do not grant on behalf of the owner.
 
 ## 7. Verify after wiring
 
