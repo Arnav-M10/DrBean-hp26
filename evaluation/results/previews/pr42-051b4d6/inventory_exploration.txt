@@ -1,0 +1,20 @@
+deepagents 0.7.38
+product middleware:
+   FilesystemMiddleware (bean_api.research_coordinator.create_research_coordinator.<locals>.NoFilesystem)
+   _ParentNotifierMiddleware (deepagents.middleware._parent_notifier._ParentNotifierMiddleware)
+   PatchToolCallsMiddleware (deepagents.middleware.patch_tool_calls.PatchToolCallsMiddleware)
+   TodoListMiddleware (langchain.agents.middleware.todo.TodoListMiddleware)
+   Boundary (bean_api.research_coordinator.create_research_coordinator.<locals>.Boundary)
+   AnthropicPromptCachingMiddleware (deepagents.middleware._prompt_caching._LazyAnthropicPromptCachingMiddleware)
+   UnsupportedContentMiddleware (deepagents.middleware.unsupported_content.UnsupportedContentMiddleware)
+   ModelRefusalMiddleware (langchain.agents.middleware.model_refusal.ModelRefusalMiddleware)
+product explicit tools: ['prepare_scientific_proposal', 'publish_research_report', 'read_research_evidence', 'request_clarification', 'run_scientific_operation']
+product checkpointer passed to create_agent: InMemorySaver
+product nodes: ['__start__', 'model', 'tools', '_ParentNotifierMiddleware.after_agent', 'PatchToolCallsMiddleware.before_agent', 'TodoListMiddleware.after_model', 'Boundary.before_model', 'Boundary.after_model', '__end__']
+product tool nodes: [('tools', ['prepare_scientific_proposal', 'publish_research_report', 'read_research_evidence', 'request_clarification', 'run_scientific_operation', 'write_todos'])]
+runtime metadata: {'framework': 'deepagents', 'graph_version': 'research-graph.v1', 'policy_version': 'research-tools.v1', 'prompt_version': 'research-prompt.v2', 'commentary_policy_version': 'evidence-bound-statements.v3', 'port_version': 'research-ports.v1', 'mode': 'controlled', 'tools': ['prepare_scientific_proposal', 'publish_research_report', 'read_research_evidence', 'request_clarification', 'run_scientific_operation', 'write_todos'], 'subagents': False, 'filesystem': False, 'summarization': False, 'checkpointer': 'backend_supplied', 'application_integration_qualified': False, 'live_qualification': 'not_run'}
+start -> CoordinatorFailure research_completion_unaccepted
+tools bound per model turn: [['prepare_scientific_proposal', 'publish_research_report', 'read_research_evidence', 'request_clarification', 'run_scientific_operation', 'write_todos']]
+model calls: 1 | admitted turns: 1 | port calls: ['check_authority', 'check_authority', 'admit_model_turn', 'check_authority', 'check_authority']
+SDK default middleware: ['FilesystemMiddleware', 'SubAgentMiddleware', '_ParentNotifierMiddleware', 'SummarizationMiddleware', 'PatchToolCallsMiddleware', 'AnthropicPromptCachingMiddleware', 'UnsupportedContentMiddleware', 'ModelRefusalMiddleware']
+SDK default tool nodes: [('tools', ['delete', 'edit_file', 'execute', 'glob', 'grep', 'ls', 'read_file', 'task', 'write_file'])]

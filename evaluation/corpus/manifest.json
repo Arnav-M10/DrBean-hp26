@@ -1,0 +1,129 @@
+{
+ "schema": "drbean-paper-corpus/v1",
+ "purpose": "small, difficult paper corpus for qualifying paper -> Gemini -> review -> Deep Agents -> Counterdex; reviewed by hand, never a general-accuracy benchmark",
+ "required_features": [
+  "native-text engine-supported paper",
+  "scanned paper",
+  "table split across pages",
+  "mixed or ambiguous units",
+  "statistical interval / SD trap",
+  "contradictory methods and table",
+  "unsupported model",
+  "missing raw data",
+  "hostile instructions embedded in plausible prose",
+  "clean positive cases (so rejecting everything cannot score well)"
+ ],
+ "development": {
+  "status": "4 of at least 6 rendered by Owner 4 (PR #36, unmerged); gold written by Owner 5 from renderings",
+  "owner": "Owner 4 renders the shared PDF/scan fixtures from Owner 1's canonical scientific data and exact projections",
+  "minimum_documents": 6,
+  "documents": [
+   {
+    "id": "synthetic-native",
+    "file": "fixtures/papers/synthetic-native.pdf",
+    "sha256": "900628e97b08d9c90cec93ee57cc2ab0e29a37300bbb028e34565886afc09aa2",
+    "gold": "evaluation/corpus/development/synthetic-native.gold.json",
+    "eligibility": "eligible",
+    "agreement_with_owner4_manifest": {
+     "compared": 23,
+     "agree": 23,
+     "disagree": [],
+     "owner5_only": []
+    }
+   },
+   {
+    "id": "synthetic-scan",
+    "file": "fixtures/papers/synthetic-scan.pdf",
+    "sha256": "7c898605603e9637c853d5314ece5362a206eb19987caa6bcdd72a09d0a863d7",
+    "gold": "evaluation/corpus/development/synthetic-scan.gold.json",
+    "eligibility": "eligible",
+    "agreement_with_owner4_manifest": {
+     "compared": 23,
+     "agree": 23,
+     "disagree": [],
+     "owner5_only": []
+    }
+   },
+   {
+    "id": "statistical-trap",
+    "file": "fixtures/papers/statistical-trap.pdf",
+    "sha256": "2549b54a2f722a4e2f706759d6f95b47dbf54205b7de3962fcddd39ca761b0d5",
+    "gold": "evaluation/corpus/development/statistical-trap.gold.json",
+    "eligibility": "not_eligible",
+    "agreement_with_owner4_manifest": {
+     "compared": 10,
+     "agree": 10,
+     "disagree": [],
+     "owner5_only": []
+    }
+   },
+   {
+    "id": "unsupported-injection",
+    "file": "fixtures/papers/unsupported-injection.pdf",
+    "sha256": "831e439277c7d7f00e89f24efa583a00128f915b7791383372fde03e4f303f0d",
+    "gold": "evaluation/corpus/development/unsupported-injection.gold.json",
+    "eligibility": "not_eligible",
+    "agreement_with_owner4_manifest": {
+     "compared": 0,
+     "agree": 0,
+     "disagree": [],
+     "owner5_only": [
+      "rows[0].concentration",
+      "rows[0].time",
+      "rows[1].concentration",
+      "rows[1].time",
+      "rows[2].concentration",
+      "rows[2].time",
+      "rows[3].concentration",
+      "rows[3].time"
+     ]
+    }
+   }
+  ],
+  "gold_rule": "Owner 5 writes gold for each development document by inspecting its retained page renderings (evaluation/corpus/tools/render_pages.swift), never from a model response or the product's conversion routine",
+  "shortfall": "the brief asks for at least 6: no development document yet covers mixed or ambiguous units (e.g. Owner 1's minutes/ng-per-mL variant in PR #33) or graph-only/missing raw data; requested from Owner 4"
+ },
+ "held_aside": {
+  "status": "sealed",
+  "count": 4,
+  "ids": [
+   "H1",
+   "H2",
+   "H3",
+   "H4"
+  ],
+  "seal": "evaluation/corpus/holdouts.sealed.json",
+  "author": "Owner 5 (independent of the implementation and prompts)",
+  "provenance_class": "synthetic, labelled on every page"
+ },
+ "lanes": {
+  "controlled_callbacks": "every document, controlled extraction doubles (application handling only)",
+  "controlled_science": "every eligible document through review and real Counterdex with controlled proposals",
+  "live_gemini": "only the predeclared subset, inside one user-enabled shared budget; currently not_run",
+  "historical_replay": "native packets produced by corpus runs, replayed fresh"
+ },
+ "live_subset_predeclared": {
+  "status": "not_run (no user-enabled live budget)",
+  "rule": "one coordinated run; the first case fits one paper session (product ceilings: 12 model requests per action, 24 per session, 16/32 auxiliary operations); the others run only if the user explicitly allocates more and are otherwise reported not_run",
+  "cases": [
+   {
+    "id": "L1",
+    "document": "development native-text engine-supported paper (complete ordinary-user loop)",
+    "priority": 1
+   },
+   {
+    "id": "L2",
+    "document": "development scanned paper",
+    "priority": 2
+   },
+   {
+    "id": "L3",
+    "document": "held-aside H3",
+    "priority": 3,
+    "note": "run only after the freeze; afterwards H3 is regression data, not a generalization case"
+   }
+  ],
+  "denominator_rule": "publish the actual number of live cases run and list the rest as not_run; never extrapolate"
+ },
+ "scoring": "evaluation/drbean_eval/paper_scoring.py: reading precision and coverage (offered and accepted-after-review separately), page-locator correctness, citation source occurrence, unsupported numbers, ambiguity flagging versus silent resolution, trap violations (interval/SD/pooled mean/injected values/authority), human corrections, eligibility"
+}

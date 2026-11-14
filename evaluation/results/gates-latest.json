@@ -1,6 +1,6 @@
 {
   "evidence_commits": [
-    "0085414dd22c21c2264a7eb9b42b17ea6b931262"
+    "c6307df58a7c50ca2eed14cff3b36f32bfea1e21"
   ],
   "evidence_only_paths": [
     "evaluation/results/",
@@ -21,51 +21,51 @@
       "description": "actual HTTP -> science -> separate design -> raw download -> fresh native replay",
       "entries": {
         "RS-HERO-FULL": {
-          "attempt_id": "att_c2ad0599996a4dda",
-          "reason": "failed: baseline_completed_with_evidence",
-          "status": "failed"
+          "attempt_id": "att_f35df18c705641ea",
+          "reason": "",
+          "status": "passed"
         }
       },
       "gate": "real_science_http",
-      "status": "failed"
+      "status": "passed"
     },
     {
       "description": "duplicate starts, design authority, cancellation/restart, changed input, follow-up",
       "entries": {
         "RS-CANCEL-RESTART": {
-          "attempt_id": "att_310404f514344fc9",
-          "reason": "blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for example; no_orphan_after_worker_kill (prerequisite): the run reached failed before the worker was killed, so there was no in-flight work to interrupt; interrupted_not_redispatched (prerequisite): the run reached failed before the worker wa",
-          "status": "blocked"
+          "attempt_id": "att_8191a40f09e04c27",
+          "reason": "",
+          "status": "passed"
         },
         "RS-CHANGED-INPUT": {
-          "attempt_id": "att_f301afa4f3d147a7",
-          "reason": "failed: baseline_completed_with_evidence",
-          "status": "failed"
+          "attempt_id": "att_b219858c4f1d4229",
+          "reason": "",
+          "status": "passed"
         },
         "RS-DESIGN-AUTHORITY": {
-          "attempt_id": "att_0b508346e61a4830",
-          "reason": "blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry)",
-          "status": "blocked"
+          "attempt_id": "att_52bab9921b284cb3",
+          "reason": "",
+          "status": "passed"
         },
         "RS-FOLLOWUP": {
-          "attempt_id": "att_c29cac5f6fcd495e",
-          "reason": "blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run",
-          "status": "blocked"
+          "attempt_id": "att_c15936fb113f4c13",
+          "reason": "",
+          "status": "passed"
         },
         "RS-RETRY-CONCURRENT": {
-          "attempt_id": "att_b7239579bd2f45ff",
+          "attempt_id": "att_dcea53843a3e4c4e",
           "reason": "",
           "status": "passed"
         }
       },
       "gate": "essential_negative_controls_http",
-      "status": "failed"
+      "status": "passed"
     },
     {
       "description": "guard active in API and worker; zero external model attempts in the lane",
       "entries": {
         "RS-ZERO-DISPATCH": {
-          "attempt_id": "att_c3416712499040ea",
+          "attempt_id": "att_90460d9e5c1b4186",
           "reason": "",
           "status": "passed"
         }
@@ -74,44 +74,108 @@
       "status": "passed"
     },
     {
-      "description": "fixed-pair constraint controls, three distinct defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP)",
+      "description": "fixed-pair constraint controls, three distinct defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP); each decided by its newest clean, executed, CPython 3.11 run of the tested engine source",
+      "expected_engine_source_sha256": "ed5a8fb2216dcf4f0113799bd3e341fc464e204492fa3bc673460dec19777750",
       "failed": [],
       "gate": "native_engine_controls",
       "missing": [],
-      "status": "passed"
+      "runs_used": {
+        "2026-11-14T14:36:35+00:00": "c6307df58a7c50ca2eed14cff3b36f32bfea1e21"
+      },
+      "status": "passed",
+      "unqualified": {}
     },
     {
       "description": "image decoder and scientific worker subprocesses work on this host through the real stack",
       "gate": "supported_machine_subprocesses",
       "observed": {
-        "baseline_completed_with_evidence": "failed",
+        "baseline_completed_with_evidence": "passed",
         "runtime": {
           "machine": "arm64",
           "system": "Darwin"
         },
         "source_image_admitted": "passed"
       },
-      "status": "failed"
+      "status": "passed"
+    },
+    {
+      "description": "controlled_callbacks, controlled_science and historical_replay each pass in their newest clean, executed report at the tested source identity (application, harness, fixtures and engine digests); live_gemini is not_run and not required",
+      "gate": "evidence_lanes",
+      "history_problems": [],
+      "lanes": {
+        "controlled_callbacks": {
+          "counts": {
+            "failed": 0,
+            "harness_pending": 0,
+            "not_available": 44,
+            "not_run": 0,
+            "passed": 116,
+            "skipped": 0,
+            "xfailed": 1
+          },
+          "external_model_requests": "verified_zero",
+          "problems": [],
+          "report_id": "lane_8398389c434d4657",
+          "reports_at_other_identities": 15,
+          "status": "passed"
+        },
+        "controlled_science": {
+          "counts": {
+            "failed": 0,
+            "harness_pending": 0,
+            "not_available": 11,
+            "not_run": 2,
+            "passed": 22,
+            "skipped": 0,
+            "xfailed": 0
+          },
+          "external_model_requests": "verified_zero",
+          "problems": [],
+          "report_id": "lane_b4cc77c6a256409a",
+          "reports_at_other_identities": 16,
+          "status": "passed"
+        },
+        "historical_replay": {
+          "counts": {
+            "incompatible_version": 1,
+            "replayed": 212
+          },
+          "external_model_requests": "verified_zero",
+          "problems": [],
+          "report_id": "lane_7b3072ff90f64428",
+          "reports_at_other_identities": 16,
+          "status": "passed"
+        },
+        "live_gemini": {
+          "reason": "not_run: no user-enabled live budget exists for this qualification; no key was inspected and no provider was called. There is deliberately no command here that starts live requests.",
+          "required": false,
+          "status": "not_run"
+        }
+      },
+      "status": "passed",
+      "tested_identity": {
+        "application_tree_sha256": "f6ec6289f9574d9be2a255712cb81c916b00b7330e4045e505b4b5f1449fffb5",
+        "engine_source_sha256": "ed5a8fb2216dcf4f0113799bd3e341fc464e204492fa3bc673460dec19777750",
+        "fixtures_tree_sha256": "e7b96d10c6931b014d81a05d635a0b32bd606922bfcb4f10337b132c90bcc602",
+        "harness_tree_sha256": "e71dcfe13499db86b5223280c231179e3db9f41d2abf1364d777b65827c6cb77"
+      }
     },
     {
       "description": "evaluation/findings.json lists no open P0",
       "gate": "no_unresolved_p0",
-      "open_p0": [
-        "F-ORPHAN-WORKER-KILL",
-        "F-MAC-NPROC"
-      ],
-      "status": "failed"
+      "open_p0": [],
+      "status": "passed"
     },
     {
-      "description": "NOT a current acceptance gate. Live lanes are disabled; activation needs a new explicit user instruction. Placeholder runs are not Gemini evidence.",
+      "description": "NOT a current acceptance gate. Live requests need the user to enable provider consent and one bounded shared qualification budget; none exists. Controlled placeholder runs are never Gemini evidence.",
       "gate": "live_gemini_qualification",
       "required": false,
       "status": "not_run"
     }
   ],
-  "overall": "failed",
+  "overall": "passed",
   "schema": "drbean-release-gates/v1",
   "statement": "Gates read recorded evidence only; they dispatch no provider or scientific work.",
-  "tested_commit": "0085414dd22c21c2264a7eb9b42b17ea6b931262",
+  "tested_commit": "c6307df58a7c50ca2eed14cff3b36f32bfea1e21",
   "worktree_dirty": false
 }

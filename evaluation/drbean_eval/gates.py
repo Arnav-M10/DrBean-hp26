@@ -15,7 +15,7 @@ import json
 import os
 import subprocess
 
-from . import history, manifest as manifest_mod
+from . import engine_controls, history, lanes, manifest as manifest_mod
 from .runner import read_attempts
 
 REQUIRED_SCIENCE = ("RS-HERO-FULL",)
@@ -29,13 +29,17 @@ REQUIRED_CONTROLS = ("fixed_pair:grid-6-8-allowance-0.2", "fixed_pair:grid-6-all
                      "defense:truncated_packet", "defense:oversized_packet", "defense:another_runs_valid_packet",
                      "defense:drop_artifacts", "defense:duplicate_artifact", "defense:unknown_profile",
                      "metamorphic:tightened_row_allowance", "metamorphic:widened_allowances_keep_compatibility",
-                     "metamorphic:excluded_row_is_not_a_constraint", "metamorphic:swapped_pair_order")
+                     "metamorphic:excluded_row_is_not_a_constraint", "metamorphic:swapped_pair_order",
+                     # Coordinator predicates SCI-06 and SCI-05 (DB-COORDINATOR-3OWNER-1)
+                     "followup:both_compatible_declared_allowance",
+                     "semantics:same_reading_at_separating_allowance_is_not_both_compatible",
+                     "defense:forged_both_compatible_rejected", "semantics:numerical_guidance_is_not_checked_separation",
+                     "semantics:unavailable_grid_times_are_kept_and_never_selected")
 
 
 # Changes here cannot alter the application or the harness's behaviour: recorded evidence and its written
 # summaries. Evidence recorded at an ancestor counts for the tested commit only if every later change is here.
-EVIDENCE_ONLY_PATHS = ("evaluation/results/", "evaluation/FINDINGS.md", "evaluation/findings.json",
-                       "evaluation/README.md", "docs/evaluation-protocol.md", "docs/workstreams/05-validation.md")
+EVIDENCE_ONLY_PATHS = lanes.EVIDENCE_ONLY_PATHS
 
 
 def equivalent_commits(repo: str, head: str, candidates: set[str]) -> set[str]:
@@ -59,6 +63,57 @@ def _latest(attempts: list[dict], commits, lane: str) -> dict[str, dict]:
         if attempt.get("lane") == lane and attempt.get("tested_commit") in commits:
             latest[attempt["entry_id"]] = attempt
     return latest
+
+
+def control_record_problems(run: dict, expected_source: str | None) -> list[str]:
+    """Why a control run cannot count as acceptance evidence; empty when it is fully qualified."""
+    problems = []
+    if run.get("worktree_dirty") is not False:
+        problems.append("worktree dirty or not recorded")
+    if run.get("evidence_class") != "executed_acceptance" or run.get("app_under_test"):
+        problems.append(f"not executed acceptance of this checkout ({run.get('evidence_class') or 'unclassified'})")
+    interpreter = run.get("interpreter") or {}
+    if interpreter.get("implementation") != "CPython" or not str(interpreter.get("version", "")).startswith("3.11."):
+        problems.append("engine interpreter is not the qualified CPython 3.11")
+    engine = run.get("engine") or {}
+    if not engine.get("source_sha256"):
+        problems.append("engine identity not recorded")
+    elif engine.get("imported_from") != "repository":
+        problems.append("engine was not imported from the repository source")
+    elif expected_source is None or engine["source_sha256"] != expected_source:
+        problems.append("engine source differs from the tested code")
+    return problems
+
+
+def native_controls_gate(runs: list[dict], expected_source: str | None) -> dict:
+    """Each required control is decided by its newest relevant run (file order = time order).
+
+    An unqualified newest run (dirty, preview, wrong interpreter or engine) blocks that control: older passing
+    evidence never overrides newer invalid evidence. A qualified newest run counts only with ``passed is True``.
+    """
+    newest: dict[str, tuple[dict, dict]] = {}
+    for run in runs:
+        for item in run.get("results") or []:
+            if isinstance(item, dict) and item.get("id"):
+                newest[item["id"]] = (run, item)
+    missing, failed, unqualified, used = [], [], {}, {}
+    for control in REQUIRED_CONTROLS:
+        if control not in newest:
+            missing.append(control)
+            continue
+        run, item = newest[control]
+        used[run.get("at") or "?"] = run.get("tested_commit")
+        problems = control_record_problems(run, expected_source)
+        if problems:
+            unqualified[control] = problems
+        elif item.get("passed") is not True:
+            failed.append(control)
+    return {"gate": "native_engine_controls", "description": "fixed-pair constraint controls, three distinct "
+            "defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP); each "
+            "decided by its newest clean, executed, CPython 3.11 run of the tested engine source",
+            "status": "failed" if failed else "blocked" if missing or unqualified else "passed",
+            "missing": missing, "failed": failed, "unqualified": unqualified,
+            "expected_engine_source_sha256": expected_source, "runs_used": used}
 
 
 def read_jsonl(path: str) -> list[dict]:
@@ -115,17 +170,10 @@ def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path
     if unverified and zero["status"] == "passed":
         zero.update(status="failed", reason=f"entries without verified zero dispatch: {unverified}")
     gates.append(zero)
-    controls = [c for c in all_controls if c.get("tested_commit") in same]
-    latest_controls = {}
-    for run in controls:
-        for item in run.get("results", []):
-            latest_controls[item["id"]] = {**item, "dirty": run.get("worktree_dirty")}
-    missing = [c for c in REQUIRED_CONTROLS if c not in latest_controls]
-    failed = [c for c in REQUIRED_CONTROLS if c in latest_controls and not latest_controls[c]["passed"]]
-    gates.append({"gate": "native_engine_controls", "description": "fixed-pair constraint controls, three distinct "
-                  "defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP)",
-                  "status": "failed" if failed else "blocked" if missing else "passed",
-                  "missing": missing, "failed": failed})
+    gates.append(native_controls_gate([c for c in all_controls if c.get("tested_commit") in same],
+                                      engine_controls.engine_source_identity(
+                                          os.path.join(repo or os.path.dirname(os.path.abspath(root)), "packages",
+                                                       "groundwork_adapter"))["source_sha256"]))
     platform_entry = latest.get("RS-HERO-FULL")
     platform_checks = {c["id"]: c for c in ((platform_entry or {}).get("qualification") or {}).get(
         "executed_checks") or []}
@@ -137,6 +185,7 @@ def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path
                   "failed" if "failed" in (source, worker) else "blocked",
                   "observed": {"source_image_admitted": source, "baseline_completed_with_evidence": worker,
                                "runtime": (platform_entry or {}).get("runtime")}})
+    gates.append(lanes.lanes_gate(results_dir, repo or os.path.dirname(os.path.abspath(root))))
     findings = []
     if findings_path and os.path.exists(findings_path):
         with open(findings_path, encoding="utf-8") as handle:
@@ -145,8 +194,9 @@ def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path
     gates.append({"gate": "no_unresolved_p0", "status": "passed" if not open_p0 else "failed",
                   "description": "evaluation/findings.json lists no open P0", "open_p0": open_p0})
     gates.append({"gate": "live_gemini_qualification", "status": "not_run", "required": False,
-                  "description": "NOT a current acceptance gate. Live lanes are disabled; activation needs a new "
-                                 "explicit user instruction. Placeholder runs are not Gemini evidence."})
+                  "description": "NOT a current acceptance gate. Live requests need the user to enable provider "
+                                 "consent and one bounded shared qualification budget; none exists. Controlled "
+                                 "placeholder runs are never Gemini evidence."})
     required = [g for g in gates if g.get("required", True)]
     overall = ("passed" if all(g["status"] == "passed" for g in required) and not dirty else
                "failed" if any(g["status"] == "failed" for g in required) else "blocked")

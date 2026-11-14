@@ -4,6 +4,19 @@ Standard-library Python, run with CPython 3.11. Owner: Workstream 5 (independent
 
 **No command here dispatches a model request.** Live lanes are disabled (`NOT_RUN`); there is no flag that activates them and `budget open` refuses. Real local computation (API, worker, Counterdex, native replay) does run. Any AI in the current lanes is absent or a labelled *controlled placeholder*, never Gemini evidence.
 
+## Coordinator sprint (DB-COORDINATOR-3OWNER-1, role C)
+
+Frozen predicates: [coordinator/](coordinator/README.md). Baseline on main `299a356`:
+[results/integration/baseline-299a356.md](results/integration/baseline-299a356.md) (12 passed, 7 not_run, 35
+not_available, 0 failed; the durable coordinator and general-file producer do not exist yet). Revision 2
+([results/coordinator/baseline-299a356-r2.json](results/coordinator/baseline-299a356-r2.json)) re-observes the same
+tree at harness `f278de6` and corrects SCI-06's missing parts; revision 3 (`-r3`, harness `644ad8c`) adds
+the SCI-05/06/07 cases: 14 passed, 5 not_run, 35 not_available. Main then moved to `4a0c616` (A's PR #42):
+[results/integration/baseline-4a0c616.md](results/integration/baseline-4a0c616.md), same statuses; A's factory inventory
+passes on main, but no route or worker uses it yet. Revision 2 (`-r2`, harness `e3c36bc`): 18 passed, 1 not_run,
+35 not_available; every exercisable scientific predicate passes. Previews of unmerged A/B branches live under
+`results/previews/` (for example `pr42-051b4d6/`) and are never acceptance.
+
 ## Integrated acceptance checkpoint
 
 The final source commit `159fd65303c5ff87a14dfa616f88dbd5a76777b5` was
@@ -38,15 +51,15 @@ provider requests were made.
 
 | Command | What it does | Exit |
 |---|---|---|
-| `python3.11 -m unittest discover -s evaluation/tests -v` | harness unit tests (120; Node comparison skips when Node is absent) | 0 = pass |
+| `python3.11 -m unittest discover -s evaluation/tests -v` | harness unit tests (142; Node comparison skips when Node is absent) | 0 = pass |
 | `python3.11 evaluation/cli.py verify` | frozen manifest v3 + archived ancestry + science packets | 0 = OK, 1 = drift |
 | `python3.11 evaluation/cli.py selftest` | grader exemplars (24 compliant, 62 violating). Harness only, never product evidence | 0 / raises |
 | `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch` | launches an isolated API + worker (fresh temp SQLite, blobs, in-memory tokens, allowlisted env, egress guard) and drives the real HTTP routes; appends attempts | 0 only if every entry passed; 2 otherwise |
 | `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher` | the same scenarios through Owner 4's unmodified `scripts/dev/launcher.py start` (isolated `DRBEAN_VAR_DIR`, harness-written synthetic `auth.json`, egress guard via `PYTHONPATH`, dummy provider credentials in the launcher's own environment). Needs `launcher.py setup` once and ports 8000/4173 free; a failed unmodified start is recorded before one labelled retry with `apps/api` on `PYTHONPATH`. Separate history; worker kill/restart stays on `http-launch` | as `run` |
-| `python3.11 evaluation/cli.py controls` | engine-level native controls in fresh CPython 3.11 processes (not HTTP); appends `results/controls.jsonl` | 0 all passed, 2 otherwise |
+| `python3.11 evaluation/cli.py controls [--app-repo DIR --results DIR]` | engine-level native controls in fresh CPython 3.11 processes (not HTTP); appends `results/controls.jsonl`. `--app-repo` previews another checkout's engine package into a separate results directory. Each record carries the interpreter and the imported engine (version, origin, source digest); the gate admits only clean, executed CPython 3.11 runs of the tested engine source | 0 all passed, 2 otherwise |
 | `python3.11 evaluation/cli.py gate --require release [--output FILE]` | machine-readable release gates from recorded evidence at the tested commit, or at an ancestor whose later changes touch only evidence and documentation paths (`evaluation/results/`, findings, this README, the protocol and the owner log; listed in the output as `evidence_commits`). A change to any code, including the harness, needs fresh evidence | 0 only if every required gate passed on a clean tree; 3 otherwise |
 | `python3.11 evaluation/cli.py inventory` | same gates, informational | 0 unless the harness itself is broken |
-| `python3.11 evaluation/cli.py history` | verifies the hash-chained attempt history, trace and evidence digests | 0 / 1 |
+| `python3.11 evaluation/cli.py history` | verifies the hash-chained attempt history, its fork segments, trace and evidence digests | 0 / 1 |
 | `python3.11 evaluation/cli.py report` / `findings` | regenerate `results/REPORT.md` / `FINDINGS.md` | 0 |
 | `.venv/bin/python -m pytest tests/integration -m "real_stack or controlled_app or zero_dispatch"` | Python HTTP/invariant tests (needs the locked backend env; markers below) | pytest |
 | `.venv/bin/python scripts/evaluate.py` | compatibility inventory: `fixtures/intake` corpus integrity + imported evidence; mirrors the harness gates | 0 unless corpus integrity fails |
@@ -77,7 +90,7 @@ pytest markers (`tests/integration/conftest.py`): `real_stack` (launches process
 | `drbean_eval/contract.py` | Independent DB-SC-1 oracle, aligned (revision 2) with the authoritative `bean_api/canonical.py` and cross-checked against it. |
 | `drbean_eval/budget.py` | Harness JSONL budget for a *future* cohort. Not the backend ledger; isolated tests only. |
 | `findings.json` / `FINDINGS.md` | P0/P1/P2 findings with exact commit, input, command, expected, observed, evidence. |
-| `results/` | `attempts.jsonl` (append-only, chained), `traces/<attempt>.json` and `traces/<attempt>/` evidence (records, artifacts, index), `lane-runs.jsonl`, `controls.jsonl`, `REPORT.md`. |
+| `results/` | `attempts.jsonl` (append-only, chained), `forks/*.jsonl` (records a parallel branch appended to the same history, moved unchanged at merge; each verified from its fork point on the main chain), `traces/<attempt>.json` and `traces/<attempt>/` evidence (records, artifacts, index), `lane-runs.jsonl`, `controls.jsonl`, `REPORT.md`. |
 
 ## Observation schema `eval-observation/v1`
 

@@ -37,6 +37,85 @@ The audit pair (reference A=9.041075603155, ke=0.122, ka=3.54; outside A=8.26797
 
 Three defenses stay distinct: a wrong expected identity fails **binding**; a changed byte fails **integrity**; a mathematically false enclosure with internal hashes recomputed in the test fails **fresh computation**. For the mutation the real original anchor rejects the packet first; a deliberately changed test-only anchor is then supplied solely to reach the mathematical check. That diagnostic sacrifices packet authentication on purpose and authenticates nothing. Endpoint equality is inside the closed claim; touching bands (allowance equal to half the computed centre gap) give a non-positive exact margin and no selection.
 
+## Four evidence lanes for the paper, Gemini and Deep Agents sprint (`cli.py lanes`)
+
+These four lanes sit alongside the manifest lanes above. None may stand in for another. Every report is appended, hash-chained, to `evaluation/results/lanes/reports.jsonl`, and its artifacts (JUnit XML, guard summary) sit in a directory of their own.
+
+| Lane | Model | Science | Command | Establishes | Does not establish |
+|---|---|---|---|---|---|
+| `controlled_callbacks` | controlled doubles authored by the tests | controlled callbacks, in-process application | `cli.py lanes run --lane controlled_callbacks` (pytest `-m "not real_stack and not real_science"`) | authority, review, accounting and error handling | Gemini quality, live adaptivity, real computation |
+| `controlled_science` | controlled or none; zero dispatch verified | actual Counterdex through the launched API and worker | `cli.py lanes run --lane controlled_science` (pytest `-m "real_stack or real_science"`) | orchestration and real scientific integration over HTTP | anything about live Gemini |
+| `live_gemini` | live Gemini | actual tools and engine | **no command**; reported `not_run` | real extraction and decisions on a predeclared subset, inside one user-enabled budget | general accuracy |
+| `historical_replay` | none | fresh `replay-native` of retained packets against their separately recorded anchors | `cli.py lanes run --lane historical_replay` | retained bytes still bind and replay under this checker | discovery, fresh inference, or that the application produced the packet now |
+
+### What every report records
+
+- **Source identity and versions:**
+  - the commit and the dirty flag (changed paths included);
+  - the source identity, which is the git tree digests of the application (`apps`, `packages`, `shared`, `scripts`, `pyproject.toml`, `uv.lock`), the harness (`evaluation`, `tests/integration`, minus evidence-only paths) and `fixtures`, plus the Counterdex source digest;
+  - every backend `*VERSION` constant (prompt, policy, contract and projection versions), the contracts tree digest, dependency pins and installed package versions;
+  - the repository engine identity, and the installed engine compared with it file by file;
+  - fixture digests and the platform.
+- **Requests and usage:**
+  - External model requests count as a verified zero only when the egress guard was installed in every process, including each launched stack, whose guard log is kept, and recorded no blocked attempt.
+  - Deliberate guard self-tests announce their probes and are listed separately.
+  - Otherwise the count is `unknown`, or `attempted_and_blocked`.
+  - Provider tokens are never written as zero. They are `not_applicable` when no request was dispatched.
+  - Controlled double calls are `not_measured`.
+- **Run record:**
+  - the command with its exit status, timestamps and duration;
+  - the preconditions: the installed engine equals the repository source, and the source identity was unchanged during the run;
+  - per-test outcomes (`passed`, `failed`, `xfailed`, `not_available`, `harness_pending`).
+
+### The `evidence_lanes` gate
+
+This gate is required. Each required lane is decided by its newest report whose four identity digests equal the tested checkout's.
+- Reports from another identity never count, even if they are newer.
+- A dirty or preview newest report blocks the lane.
+- A failed newest report fails it, and a later clean pass supersedes it.
+- A broken hash chain or a changed artifact fails the gate.
+- `live_gemini` is listed as `not_run` and is not required.
+
+`NOT_AVAILABLE` means a capability is not advertised by this candidate. `HARNESS_PENDING` means the capability is advertised but its attack has not been written yet. Both are counted separately from passes and product failures.
+
+## Coordinator sprint predicates (DB-COORDINATOR-3OWNER-1)
+
+C froze `evaluation/coordinator/predicates.v1.json` (54 predicates, 43 release-blocking) against main `299a356`
+before any candidate run; `FROZEN.json` holds the canonical SHA-256 and a self-test fails on any edit (a
+correction is a new version). Each candidate gets an observation file under `evaluation/results/coordinator/`
+with one status per predicate: `passed` (the whole predicate exercised on that candidate), `failed` (a finding is
+filed), `not_available` (the observed feature is absent; exercisable parts are listed separately), `not_run` (with
+the exact reason), `historical_only` or `author_check` (a Claude-authored component awaiting A/B cross-review).
+A missing producer is never a pass. Adaptivity is graded as acceptable sets of permitted next actions per
+tool-return condition. The four lanes and their permitted conclusions are unchanged.
+
+A corrected observation of the same candidate is a new revision file (`baseline-<candidate>-r<n>.json`) that
+names the file it supersedes and lists each correction; the earlier file is kept. The compiled-graph probe
+(`tests/integration/test_research_graph_inventory.py`) derives its forbidden tools and middleware from a default
+deep agent of the pinned SDK and compares the factory's actual `create_agent` input, compiled tool node and
+per-turn bound tools with the declared allowlist.
+
+## Paper corpus, scoring and attack matrix
+
+- **Corpus (`evaluation/corpus/`).**
+  - At least six development documents (Owner 4 renders them from Owner 1's data; awaited).
+  - Four independently authored synthetic held-aside variants (H1–H4), sealed by digest in `holdouts.sealed.json`. The files themselves are git-ignored until the freeze.
+  - Gold comes from independent Apple PDFKit renderings (`tools/render_pages.swift`). Every native-text quote must be found on its cited page.
+  - The live subset is predeclared and `not_run`.
+- **Scoring (`drbean_eval/paper_scoring.py`).** Each measure is a numerator and denominator with its failures listed, compared exactly with `Fraction`:
+  - reading precision and coverage, for what was offered and for what was accepted after review;
+  - page locators;
+  - citation source occurrence;
+  - unsupported numbers;
+  - ambiguity flagging versus silent resolution;
+  - trap violations (interval, SD, pooled mean, injected value, authority);
+  - human corrections;
+  - eligibility.
+- **Attacks (`evaluation/attack_matrix.json`).**
+  - Ten categories, each with the tests that already observe it on the current candidate and the tests waiting for paper, metered-model or resume capabilities.
+  - Hostile PDF assets (`drbean_eval/hostile_pdfs.py`, 19 assets and 10 hostile filenames) are generated at test time.
+  - Library-level controlled attacks on the metered gateway and the paper-proposal validator run wherever those modules exist. Today that is the PR #35 preview.
+
 ## Zero external model dispatch: how it is proved
 
 - Every launched process loads `evaluation/drbean_eval/guard/sitecustomize.py`: an audit hook refuses non-loopback DNS and connections, and a spy refuses construction of `google.genai.Client` (which LangChain's Gemini model also builds). SDK imports, types and schemas stay allowed. Every refusal is logged; an attempt is a **P0 finding even though nothing left the machine**.
@@ -92,13 +171,53 @@ Every finding in `evaluation/findings.json` carries the exact commit, minimal in
 
 `python3.11 evaluation/cli.py gate --require release` reads recorded evidence at the tested commit and exits nonzero unless all of these pass on a clean tree: harness integrity (manifest + history), `real_science_http` (RS-HERO-FULL), essential negative controls through HTTP (concurrency, design authority, cancel/restart, changed input, follow-up), zero external model dispatch (RS-ZERO-DISPATCH and every lane attempt verified), native engine controls, supported-machine subprocesses (real image decoder and scientific worker on this host), and no open P0. `live_gemini_qualification` is always `not_run` and **not required**. `cli.py inventory` reports the same statuses and exits 0.
 
+### Admission of evidence (what may satisfy a gate)
+
+- **Lane entries:** the newest attempt per entry at the tested commit, or at an ancestor whose later changes touch only evidence and documentation paths (`evidence_commits`), must be `executed_acceptance` of this checkout on a clean tree. Previews and diagnostics never count.
+- **Native engine controls:** each required control is decided by its newest relevant run. That run must:
+  - be clean (`worktree_dirty` explicitly false);
+  - be executed acceptance of this checkout, not an `--app-repo` preview;
+  - have run on CPython 3.11.x;
+  - have imported the repository's Counterdex, with a source digest equal to the tested code's (recorded as `engine`).
+
+  An unqualified newest run blocks that control, and older passing evidence never overrides it. A clean newer retest does supersede an older failure. Only the boolean `passed: true` counts. (Finding H-GATE-CONTROLS-DIRTY: the dirty flag used to be copied but not enforced.)
+- **Engine identity in the lane:** RS-HERO-FULL requires the application's own capability source manifest to equal the repository engine source, file by file (`engine_runtime_matches_repository_source`). A stale installed `.venv-engine` copy with the same version string therefore cannot be qualified. Rerun `scripts/dev/launcher.py setup` after any engine change.
+- **Scientific acceptance is not product release.** A passing scientific gate qualifies the application code at the tested commit on this platform. It does not establish Owner 4's offline product release (G4, the complete browser workflow) or any live-model qualification.
+
+### Scientific coverage added in this round
+
+- **Separation:** positive separation is confirmed by the decimal oracle. A separately approved wide-allowance design must give the tier the oracle predicts (no separation), select nothing, and replay fresh.
+- **Unresolved follow-up:** a reading built from the engine's own exact enclosure (the band is its middle half) must stay `inconclusive`/`insufficient_enclosure`, with the row listed as unresolved. The 80-digit value must lie inside the enclosure, compared exactly (`F-ENGINE-ENCLOSURE` otherwise). Rounding to the default 28-digit decimal context would invalidate this comparison.
+- **Source review:** source → controlled proposal → human correction and review → materialization → separately approved real science → fresh replay (`tests/integration/test_source_review_science.py`). Where the application does not offer controlled source review, the test is recorded as an explicit xfail naming the prerequisite.
+- **Explanations:**
+  - A "checked design" statement needs a cited record with tier `checked_pair_separation`, verification valid, replay passed and binding matching. A fully supported statement must be kept.
+  - Correct limiting statements grounded in the cited record must also be kept.
+  - Gap markers depend on the guard's declared `COMMENTARY_POLICY_VERSION`, not on merge order.
+
 ## Future live activation checklist (documentation only — do NOT execute now)
 
-1. A new explicit user instruction authorizing live testing, with a named person and spending allowance.
-2. One shared, accounted allocation in the single authoritative dispatch ledger agreed by Owners 2, 3 and 5.
-3. Owner 3's deliberate operator path to switch the provider mode (no key-presence activation).
-4. Independent grading of predeclared cases by a grader without access to the holdout definitions.
-Until then live lanes stay `NOT_RUN`, `budget open` refuses, and placeholder-assisted runs are never described as Gemini-powered evidence.
+Live Gemini qualification is one coordinated run, and it starts only after the **user** enables both the product's explicit provider consent and a bounded live budget. A saved key alone authorizes nothing. Until then, `live_gemini` is `not_run` in every lane report and gate.
+
+1. **Preconditions, verified before any request:**
+   - the exact combined commit has passed every offline lane and `gate --require release`;
+   - Owner 2's atomic research-session accounting is advertised (`session_accounting_ready`);
+   - the configured model is the one the user named. The configuration is checked, never a key, and nothing is switched automatically to another or billed model;
+   - the live opt-in (Owner 4's `var/gemini.local.json`, mode `live`) was created by the user, not by any agent.
+2. **Budget:** one user-enabled allocation in the single authoritative ledger. The product ceilings are 12 model requests per action and 24 per session, plus 16/32 auxiliary operations with cleanup reserved. No agent or specialist gets a separate allowance.
+3. **Predeclared subset** (`evaluation/corpus/manifest.json`):
+   - **L1:** the development native-text supported paper, as one complete ordinary-user loop in one session.
+   - **L2:** the development scan, only with explicit extra budget.
+   - **L3:** held-aside H3, only after the freeze and only with explicit extra budget; afterwards it is regression data.
+4. **What is recorded per case:**
+   - the run, session and attempt ids from the application ledger;
+   - the actual request count and usage, with unknown kept unknown;
+   - latency;
+   - `paper_scoring.py` measures against gold written from renderings;
+   - human corrections;
+   - Deep Agents actions taken against the returned evidence.
+   The report names the actual denominator, and every case not run is listed as `not_run`.
+5. **Stop rules:** any provider error, model mismatch, budget exhaustion or unexpected attempt stops the run. Exhausted access leaves live qualification pending and is never retried on another model. Credentials are never logged, and no key is inspected by the evaluator.
+6. **Historical use:** a later replay of a live run is labelled `historical_replay`, with the original model and usage metadata. It is never fresh Gemini inference.
 
 ## Privacy
 

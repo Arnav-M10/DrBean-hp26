@@ -15,7 +15,20 @@ if str(EVALUATION) not in sys.path:
 from drbean_eval import launcher  # noqa: E402
 from drbean_eval.http_client import ApiClient  # noqa: E402
 
-SESSION_GUARD_LOG = os.path.join(tempfile.gettempdir(), f"drbean-pytest-guard-{os.getpid()}.jsonl")
+# A lane runner names the log (DRBEAN_SESSION_GUARD_LOG) so its report can count this process's guard events.
+SESSION_GUARD_LOG = (os.environ.get("DRBEAN_SESSION_GUARD_LOG")
+                     or os.path.join(tempfile.gettempdir(), f"drbean-pytest-guard-{os.getpid()}.jsonl"))
+
+
+def announce_guard_probe(expect: str, test: str) -> None:
+    """Label the next guard event of kind ``expect`` in this process as a deliberate self-test of the guard.
+
+    Lane accounting pairs each announcement with that one event and reports it as a probe. Any blocked event without
+    an announcement still counts as an attempted external model request."""
+    import time
+    with open(SESSION_GUARD_LOG, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"kind": "guard_self_test_probe", "expect": expect, "test": test,
+                                 "pid": os.getpid(), "at": time.time()}) + "\n")
 
 
 def session_guard_events() -> list[dict]:
