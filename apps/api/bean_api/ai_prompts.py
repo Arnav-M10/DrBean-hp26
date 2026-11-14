@@ -161,11 +161,6 @@ def commentary_rejection(text: str, facts: list[dict]) -> CommentaryRejection | 
     ``field``/``value``. Exact decimal/rational equivalents compare equally.
     Typed fact cards remain authoritative; these guards are not semantic proof.
     """
-    for match in _CLAIM.finditer(text):
-        prefix = _CLAUSE.split(text[:match.start()])[-1]
-        prefix = re.sub(r"\bnot\s+only\b", "", prefix, flags=re.I)
-        if not _QUALIFIER.search(prefix) and not _FOLLOWING_QUALIFIER.search(text[match.end():]):
-            return "unsupported_claim"
     allowed: set[Fraction] = set()
     for fact in facts:
         if isinstance(fact.get("field"), str) and "value" in fact:
@@ -180,4 +175,11 @@ def commentary_rejection(text: str, facts: list[dict]) -> CommentaryRejection | 
         exact = _exact(match.group())
         if exact is None or exact not in allowed:
             return "unsupported_numeric_claim"
+    # Preserve the existing public numeric-failure classification when a
+    # statement also overclaims. A supported number never excuses an overclaim.
+    for match in _CLAIM.finditer(text):
+        prefix = _CLAUSE.split(text[:match.start()])[-1]
+        prefix = re.sub(r"\bnot\s+only\b", "", prefix, flags=re.I)
+        if not _QUALIFIER.search(prefix) and not _FOLLOWING_QUALIFIER.search(text[match.end():]):
+            return "unsupported_claim"
     return None

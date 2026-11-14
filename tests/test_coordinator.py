@@ -356,6 +356,15 @@ def test_numeric_policy_uses_ranges_parameter_vectors_selected_options_and_searc
     assert commentary_rejection("Opaque evidence a123b and candidate-999 retain their original IDs.", facts) is None
 
 
+@pytest.mark.parametrize("facts, reason", [
+    ([], "unsupported_numeric_claim"),
+    ([{"ke": "37/500"}], "unsupported_claim"),
+])
+def test_numeric_failure_precedence_preserves_overclaim_rejection(facts, reason):
+    from bean_api.ai_prompts import commentary_rejection
+    assert commentary_rejection("The true parameter is ke = 0.074 per hour.", facts) == reason
+
+
 @pytest.mark.parametrize("module", [None, "langchain_google_genai.chat_models", "langchain_openai.chat_models", "langchain_anthropic.chat_models"])
 def test_offline_gate_rejects_absent_and_inherited_hosted_models_before_graph_or_ledger(monkeypatch, module):
     from bean_api.coordinator import CoordinatorFailure
