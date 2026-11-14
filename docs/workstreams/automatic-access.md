@@ -201,3 +201,13 @@ with zero application model calls. Prompt v4 deliberately refuses existing v3
 checkpoints; old evidence remains readable, but an old agent thread is not silently
 migrated or resumed. Final main must be retested after merging; earlier branch
 receipts alone are not combined-release qualification.
+
+Exact candidate `e3a9025ee98215998715f6e5dbc15344c6aaa62c` passed all 20
+combined automatic-access gates with a clean tracked tree. Retained receipt:
+`/tmp/drbean-automatic-access-e3a9025/receipt.json`. This includes desktop/phone
+keyboard navigation, unchanged operation ledgers, and the corrected Start page
+showing the current completed investigation exactly once. Backend source unchanged
+from `e00bdc1` passed 1,292 tests; launcher/share 50; fresh replay 34; privacy/native
+controls 13 passed with one explicitly inapplicable disabled-dispatch-only case
+skipped. Those privacy tests are C-authored but were executed by the integrator.
+No provider calls, real credential reads or schema-fixture edits occurred.
