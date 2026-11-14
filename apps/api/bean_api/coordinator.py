@@ -23,6 +23,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+
 from .contracts import GroundedExplanation
 
 from .providers import (
@@ -47,6 +51,7 @@ class CoordinatorScope:
     permitted_tools: tuple[str, ...] | None = None
     question: str = "Explain the evidence and a permitted next step."
     kind: Literal["investigation", "design"] = "investigation"
+    optional_scenario_condition: Literal["baseline_inconclusive", "checked_counterexample"] | None = None
     max_model_turns: int = 4
     max_tool_calls: int = 6
     max_scientific_reservations: int = 2
@@ -60,6 +65,8 @@ class CoordinatorScope:
         if self.scenario_problem_ids.get(self.baseline_scenario_id, self.problem_id) != self.problem_id:
             raise CoordinatorFailure("agent_scope_invalid")
         if len(self.optional_scenario_ids) > 1 or self.baseline_scenario_id in self.optional_scenario_ids:
+            raise CoordinatorFailure("agent_scope_invalid")
+        if self.optional_scenario_condition not in {None, "baseline_inconclusive", "checked_counterexample"}:
             raise CoordinatorFailure("agent_scope_invalid")
         if self.kind not in {"investigation", "design"}:
             raise CoordinatorFailure("agent_scope_invalid")
@@ -113,7 +120,7 @@ def _safe_fact(evidence: dict[str, Any]) -> dict[str, Any]:
         raise CoordinatorFailure("agent_evidence_limit")
     if not isinstance(evidence.get("id"), str):
         raise CoordinatorFailure("agent_evidence_identity_missing")
-    return evidence
+    return json.loads(encoded)
 
 
 def _validate_explanation(value: GroundedExplanation, facts: dict[str, dict[str, Any]]) -> None:
@@ -139,18 +146,83 @@ def _validate_explanation(value: GroundedExplanation, facts: dict[str, dict[str,
             raise CoordinatorFailure("explanation_binding_mismatch")
 
 
+def _condition_met(fact: dict[str, Any], condition: str) -> bool:
+    if fact.get("expected_binding") != "matches":
+        return False
+    if condition == "checked_counterexample":
+        return fact.get("scientific_outcome") == "certified_counterexample" and fact.get("verification") == "valid"
+    return fact.get("scientific_outcome") in {"inconclusive", "no_counterexample_found", "numerical_candidate"}
+
+
+class OfflineChatModel(BaseChatModel):
+    """Explicit local-only injection boundary; subclasses must implement local computation.
+
+    This class is for trusted in-process code, never an HTTP-selectable model.
+    No generic provider model is accepted as an offline implementation.
+    """
+
+
+class ControlledEvidenceModel(OfflineChatModel):
+    """Scripted placeholder decisions over returned facts, not Gemini reasoning.
+
+    The same immutable reviewed objective/condition accompanies both branches.
+    Science remains entirely in authenticated, approval-bound worker callbacks.
+    """
+    model_name: str = "dr-bean-controlled-placeholder-v1"
+    offered: list[str] = []
+
+    @property
+    def _llm_type(self):
+        return "dr-bean-controlled-placeholder"
+
+    def bind_tools(self, tools, **kwargs):
+        self.offered = sorted(tool.name for tool in tools)
+        return self
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        envelope = json.loads(next(m.content for m in messages if isinstance(m, HumanMessage)))
+        observed = [m for m in messages if isinstance(m, ToolMessage)]
+        facts = [json.loads(m.content) for m in observed if m.name in {"execute_approved_scenario", "execute_approved_design"}]
+        baseline = envelope["baseline_scenario_id"]
+        optional = envelope.get("optional_scenario_ids", [])
+        acted = {json.loads(m.content).get("scenario_id") for m in observed if m.name == "record_allowed_skip"}
+        if not observed:
+            name = "execute_approved_design" if envelope["kind"] == "design" else "execute_approved_scenario"
+            args = {} if envelope["kind"] == "design" else {"scenario_id": baseline}
+        elif optional and len(facts) == 1 and optional[0] not in acted:
+            condition = envelope.get("optional_scenario_condition")
+            if condition and _condition_met(facts[0], condition):
+                name, args = "execute_approved_scenario", {"scenario_id": optional[0]}
+            else:
+                name, args = "record_allowed_skip", {"scenario_id": optional[0], "reason_code": "not_relevant"}
+        elif not optional and "prepare_design_proposal" in self.offered and not any(m.name == "prepare_design_proposal" for m in observed):
+            name, args = "prepare_design_proposal", {"scenario_id": baseline}
+        else:
+            name = "return_grounded_explanation"
+            args = {"fact_ids": [f["id"] for f in facts],
+                    "text": "Controlled placeholder output: the named records retain their reported scientific scope. Review the exact evidence before further work.",
+                    "next_action": "review_design" if facts and facts[0].get("scientific_outcome") == "certified_counterexample" and facts[0].get("verification") == "valid" and facts[0].get("expected_binding") == "matches" else "stop"}
+        message = AIMessage(content="", tool_calls=[{"id": f"controlled-call-{len(observed)}", "type": "tool_call", "name": name, "args": args}])
+        return ChatResult(generations=[ChatGeneration(message=message)])
+
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        return self._generate(messages, stop, run_manager, **kwargs)
+
+
 class _Invocation:
     def __init__(self, config: ProviderConfig, ledger: AttemptLedger, context: AttemptContext,
                  scope: CoordinatorScope, callbacks: ScopedCallbacks):
         self.config, self.ledger, self.context, self.scope, self.callbacks = config, ledger, context, scope, callbacks
         self.started = time.monotonic()
-        self.turns = self.tool_calls = self.reservations = 0
+        self.turns = self.tool_calls = self.reservations = self.provider_requests = 0
         self.executed: set[str] = set()
         self.skipped: set[str] = set()
+        self.baseline_fact_ids: set[str] = set()
         self.facts: dict[str, dict[str, Any]] = {}
         self.explanation: dict[str, Any] | None = None
         self.trace: list[dict[str, Any]] = []
         self.allowed_tools: set[str] = set()
+        self.controlled = config.mode == "controlled"
 
     async def event(self, event: dict[str, Any]) -> None:
         item = {"sequence": len(self.trace), "at": utc_now(), **event}
@@ -167,6 +239,8 @@ class _Invocation:
         fact = _safe_fact(evidence)
         if fact.get("problem_id") not in {self.scope.problem_id, *self.scope.scenario_problem_ids.values()}:
             raise CoordinatorFailure("agent_evidence_problem_mismatch")
+        if fact["id"] in self.facts and self.facts[fact["id"]] != fact:
+            raise CoordinatorFailure("agent_evidence_record_changed")
         self.facts[fact["id"]] = fact
         return fact
 
@@ -176,6 +250,10 @@ class _Invocation:
             raise CoordinatorFailure("scenario_not_approved")
         if scenario_id != self.scope.baseline_scenario_id and self.scope.baseline_scenario_id not in self.executed:
             raise CoordinatorFailure("baseline_must_execute_first")
+        if scenario_id != self.scope.baseline_scenario_id and self.scope.optional_scenario_condition:
+            baseline = next((f for f in self.facts.values() if f.get("id") in self.baseline_fact_ids), None)
+            if not baseline or not _condition_met(baseline, self.scope.optional_scenario_condition):
+                raise CoordinatorFailure("optional_scenario_condition_unmet")
         if scenario_id in self.skipped:
             raise CoordinatorFailure("scenario_already_skipped")
         if scenario_id not in self.executed:
@@ -189,13 +267,19 @@ class _Invocation:
             raise CoordinatorFailure("agent_evidence_problem_mismatch")
         fact = self.add_evidence(evidence)
         self.executed.add(scenario_id)
+        if scenario_id == self.scope.baseline_scenario_id:
+            self.baseline_fact_ids.add(fact["id"])
         return fact
 
     async def read(self, evidence_id: str) -> dict[str, Any]:
         await self.authority()
         if evidence_id not in self.facts:
             raise CoordinatorFailure("evidence_outside_invocation")
-        return self.add_evidence(await _await(self.callbacks.read_evidence(evidence_id)))
+        original = self.facts[evidence_id]
+        returned = await _await(self.callbacks.read_evidence(evidence_id))
+        if returned != original:
+            raise CoordinatorFailure("agent_evidence_record_changed")
+        return self.add_evidence(returned)
 
     async def skip(self, scenario_id: str, reason_code: str) -> dict[str, Any]:
         await self.authority()
@@ -238,8 +322,10 @@ class _Invocation:
         await self.authority()
         if self.scope.baseline_scenario_id not in self.executed:
             raise CoordinatorFailure("baseline_must_execute_first")
+        if set(self.scope.optional_scenario_ids) - self.executed - self.skipped:
+            raise CoordinatorFailure("optional_scenario_unresolved")
         _validate_explanation(value, self.facts)
-        self.explanation = {**value.model_dump(), "authorship": "gemini_commentary", "scientific_authority": False}
+        self.explanation = {**value.model_dump(), "authorship": "controlled_placeholder_commentary" if self.controlled else "gemini_commentary", "scientific_authority": False}
         return {"accepted": True, "fact_ids": value.fact_ids, "scientific_state_changed": False}
 
 
@@ -278,23 +364,30 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
                 raise CoordinatorFailure("agent_context_budget_exhausted")
             inv.turns += 1
             started = time.monotonic()
-            attempt_id = inv.ledger.begin_attempt(inv.context.checked_dict(), {
-                "provider": "gemini", "model": inv.config.model,
-                "operation": "coordinator", "framework": "deepagents",
-                "framework_version": package_version("deepagents"),
-                "sdk_version": package_version("langchain-google-genai"),
-                "prompt_version": "gf2-coordinator-v1", "schema_version": "DB-SC-1",
-                "started_at": utc_now(), "turn": inv.turns,
-                "reserved_input_tokens": reservation, "reserved_output_tokens": inv.config.max_output_tokens,
-                "prompt_sha256": hashlib.sha256(serialized.encode()).hexdigest(), "retry_policy": "none",
-            })
-            await inv.event({"type": "model_request", "attempt_id": attempt_id, "turn": inv.turns})
+            attempt_id = None
+            if not inv.controlled:
+                attempt_id = inv.ledger.begin_attempt(inv.context.checked_dict(), {
+                    "provider": "gemini", "model": inv.config.model,
+                    "operation": "coordinator", "framework": "deepagents",
+                    "framework_version": package_version("deepagents"),
+                    "sdk_version": package_version("langchain-google-genai"),
+                    "prompt_version": "gf2-coordinator-v1", "schema_version": "DB-SC-1",
+                    "started_at": utc_now(), "turn": inv.turns,
+                    "reserved_input_tokens": reservation, "reserved_output_tokens": inv.config.max_output_tokens,
+                    "prompt_sha256": hashlib.sha256(serialized.encode()).hexdigest(), "retry_policy": "none",
+                })
+            await inv.event({"type": "controlled_model_turn" if inv.controlled else "model_request",
+                             "turn": inv.turns, "transport": "controlled" if inv.controlled else "live",
+                             **({"attempt_id": attempt_id} if attempt_id else {}),
+                             "provenance": "controlled placeholder output" if inv.controlled else "unqualified live model"})
             usage = None
             try:
+                if not inv.controlled:
+                    inv.provider_requests += 1
                 response = await handler(request)
                 for message in response.result:
                     raw_usage = getattr(message, "usage_metadata", None)
-                    if raw_usage:
+                    if raw_usage and not inv.controlled:
                         details = raw_usage.get("output_token_details") or {}
                         reasoning = details.get("reasoning")
                         total_out = raw_usage.get("output_tokens")
@@ -317,20 +410,23 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
                     if usage and ((usage["input_tokens"] or 0) > reservation or
                                   (usage["output_tokens"] or 0) + (usage["thought_tokens"] or 0) > inv.config.max_output_tokens):
                         raise CoordinatorFailure("provider_usage_exceeded_reservation")
-                inv.ledger.finish_attempt(attempt_id, {"status": "validated", "finished_at": utc_now(),
-                    "duration_ms": int((time.monotonic() - started) * 1000), "usage": usage,
-                    "validation_outcome": "allowed_tool_request_or_unaccepted_text"})
+                if attempt_id is not None:
+                    inv.ledger.finish_attempt(attempt_id, {"status": "validated", "finished_at": utc_now(),
+                        "duration_ms": int((time.monotonic() - started) * 1000), "usage": usage,
+                        "validation_outcome": "allowed_tool_request_or_unaccepted_text"})
                 return response
             except asyncio.CancelledError:
-                inv.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome", "finished_at": utc_now(),
-                    "code": "provider_cancelled_unknown_outcome", "usage": usage})
+                if attempt_id is not None:
+                    inv.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome", "finished_at": utc_now(),
+                        "code": "provider_cancelled_unknown_outcome", "usage": usage})
                 raise
             except Exception as exc:
                 code, retryable = (exc.code, exc.retryable) if isinstance(exc, ProviderFailure) else classify_failure(exc)
                 code = _safe_failure_code(exc, code)
-                inv.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome" if "unknown_outcome" in code else "failed",
-                    "finished_at": utc_now(), "duration_ms": int((time.monotonic() - started) * 1000),
-                    "code": code, "usage": usage})
+                if attempt_id is not None:
+                    inv.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome" if "unknown_outcome" in code else "failed",
+                        "finished_at": utc_now(), "duration_ms": int((time.monotonic() - started) * 1000),
+                        "code": code, "usage": usage})
                 raise CoordinatorFailure(code, retryable, attempt_id) from None
 
         async def awrap_tool_call(self, request: Any, handler: Any) -> Any:
@@ -345,7 +441,7 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
             safe_arguments = {key: value for key, value in call["args"].items()
                               if key in {"scenario_id", "evidence_id", "reason_code", "fact_ids", "next_action"}}
             await inv.event({"type": "tool_request", "tool": call["name"], "arguments": safe_arguments,
-                             "decision_source": "model"})
+                             "decision_source": "controlled placeholder output" if inv.controlled else "model"})
             try:
                 result = await handler(request)
                 await inv.event({"type": "tool_result", "tool": call["name"], "completed": True,
@@ -385,15 +481,23 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
 
     functions = [read_scoped_evidence, return_grounded_explanation]
     if inv.scope.kind == "design":
-        functions += [execute_approved_design]
+        if inv.callbacks.execute_design is not None:
+            functions += [execute_approved_design]
     else:
         functions += [execute_approved_scenario, record_allowed_skip]
-        if inv.callbacks.prepare_design_proposal is not None:
+        if inv.callbacks.prepare_design_proposal is not None and inv.scope.permitted_tools is not None and "prepare_design_proposal" in inv.scope.permitted_tools:
             functions.append(prepare_design_proposal)
     if inv.scope.permitted_tools is not None:
         functions = [fn for fn in functions if fn.__name__ in inv.scope.permitted_tools]
         if set(inv.scope.permitted_tools) != {fn.__name__ for fn in functions}:
             raise CoordinatorFailure("agent_tool_not_implemented")
+    callback_names = {"read_scoped_evidence": inv.callbacks.read_evidence,
+                      "execute_approved_scenario": inv.callbacks.execute_scenario,
+                      "record_allowed_skip": inv.callbacks.record_skip,
+                      "prepare_design_proposal": inv.callbacks.prepare_design_proposal,
+                      "execute_approved_design": inv.callbacks.execute_design}
+    if any(fn.__name__ in callback_names and not callable(callback_names[fn.__name__]) for fn in functions):
+        raise CoordinatorFailure("agent_callback_unavailable")
     typed_tools = [StructuredTool.from_function(coroutine=fn, return_direct=fn is return_grounded_explanation)
                    for fn in functions]
     for tool in typed_tools:
@@ -424,8 +528,10 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
     if len(inventories) != 1 or inventories[0] != inv.allowed_tools:
         raise CoordinatorFailure("agent_unsafe_tool_inventory")
     runtime = {"framework": "deepagents", "framework_version": package_version("deepagents"),
-               "provider_adapter": "langchain-google-genai", "provider_adapter_version": package_version("langchain-google-genai"),
-               "model": inv.config.model, "api_surface": "Gemini Developer API v1beta", "tool_inventory": sorted(inv.allowed_tools),
+               "provider_adapter": "controlled_local" if inv.controlled else "langchain-google-genai", "provider_adapter_version": package_version("langchain-google-genai"),
+               "model": getattr(model, "model_name", None), "api_surface": "offline controlled model" if inv.controlled else "Gemini Developer API v1beta",
+               "provenance": "controlled placeholder output" if inv.controlled else "unqualified live model",
+               "provider_requests": 0 if inv.controlled else None, "provider_usage": None, "tool_inventory": sorted(inv.allowed_tools),
                "filesystem": "disabled_by_middleware_replacement", "backend": "isolated_ephemeral_StateBackend",
                "shell": False, "subagents": False, "memory": False, "summarization": False,
                "tracing": "disabled", "observed_graph_nodes": sorted(nodes), "middleware_policy": "gf2-allowlist-v1", "live_qualified": False}
@@ -434,7 +540,18 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
 
 async def run_coordinator(config: ProviderConfig, ledger: AttemptLedger, context: AttemptContext,
                           scope: CoordinatorScope, callbacks: ScopedCallbacks, *, chat_model: Any = None) -> CoordinatorResult:
-    config.check_ready()
+    if not 1 <= config.max_input_tokens <= 64_000 or not 1 <= config.max_output_tokens <= 16_000 or not 1 <= config.request_timeout_seconds <= 60:
+        raise CoordinatorFailure("provider_budget_invalid")
+    controlled = config.mode == "controlled"
+    if controlled:
+        if chat_model is None:
+            chat_model = ControlledEvidenceModel()
+        if not isinstance(chat_model, OfflineChatModel):
+            raise CoordinatorFailure("agent_controlled_model_required")
+    else:
+        config.check_ready()
+        if chat_model is not None:
+            raise CoordinatorFailure("agent_live_model_injection_forbidden")
     context.checked_dict()
     scope.validate()
     inv = _Invocation(config, ledger, context, scope, callbacks)
@@ -448,11 +565,11 @@ async def run_coordinator(config: ProviderConfig, ledger: AttemptLedger, context
         if chat_model.client.vertexai:
             raise CoordinatorFailure("provider_backend_mismatch")
     agent, runtime = _make_graph(inv, chat_model)
-    runtime["execution_lane"] = "controlled_model" if type(chat_model).__module__.split(".")[0] != "langchain_google_genai" else "live_model"
+    runtime["execution_lane"] = "controlled_model" if controlled else "live_model"
     await inv.event({"type": "runtime_inventory", **runtime})
     envelope = {"plan_id": scope.plan_id, "run_id": scope.run_id, "problem_id": scope.problem_id,
                 "kind": scope.kind, "baseline_scenario_id": scope.baseline_scenario_id,
-                "optional_scenario_ids": list(scope.optional_scenario_ids), "question": scope.question,
+                "optional_scenario_ids": list(scope.optional_scenario_ids), "optional_scenario_condition": scope.optional_scenario_condition, "question": scope.question,
                 "approved_context": scope.context,
                 "budget": {"model_turns": scope.max_model_turns, "tool_calls": scope.max_tool_calls,
                            "scientific_reservations": scope.max_scientific_reservations, "wall_seconds": scope.wall_seconds}}
@@ -481,5 +598,7 @@ async def run_coordinator(config: ProviderConfig, ledger: AttemptLedger, context
                 chat_model.client.close()
             except Exception:
                 pass
+    if not controlled:
+        runtime["provider_requests"] = inv.provider_requests
     return CoordinatorResult(status, inv.explanation, list(inv.facts.values()), inv.trace, runtime,
                              inv.turns, inv.tool_calls, inv.reservations, code)

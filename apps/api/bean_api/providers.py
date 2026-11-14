@@ -19,6 +19,8 @@ from typing import Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from .ai_prompts import CONVERSATION_PROMPT_VERSION, SOURCE_PROMPT_VERSION
+
 Operation = Literal["intake", "explanation", "design_proposal", "observation_proposal", "coordinator"]
 T = TypeVar("T", bound=BaseModel)
 
@@ -41,11 +43,16 @@ class ProviderConfig:
     max_output_tokens: int = 2_048
     image_token_upper_bound: int | None = None
     request_timeout_seconds: int = 30
+    mode: Literal["placeholder", "controlled", "live"] = "placeholder"
 
-    def check_ready(self) -> None:
-        if not self.api_key or not self.model:
+    def check_ready(self, *, allow_controlled: bool = False) -> None:
+        # Key presence is never authority. Keep this check before even inspecting it.
+        controlled = self.mode == "controlled" and allow_controlled
+        if self.mode != "live" and not controlled:
+            raise ProviderFailure("provider_placeholder_disabled")
+        if not controlled and (not self.api_key or not self.model):
             raise ProviderFailure("provider_not_configured")
-        if not self.account_gate_passed or not self.account_decision_id:
+        if not controlled and (not self.account_gate_passed or not self.account_decision_id):
             raise ProviderFailure("provider_account_gate_unmet")
         if not 1 <= self.max_input_tokens <= 64_000 or not 1 <= self.max_output_tokens <= 16_000:
             raise ProviderFailure("provider_budget_invalid")
@@ -81,10 +88,12 @@ class AttemptLedger(Protocol):
 @dataclass(frozen=True)
 class ProviderResult:
     value: BaseModel
-    attempt_id: str
+    attempt_id: str | None
     model: str
     usage: dict[str, int | None] | None
     finish_reason: str | None
+    transport: Literal["controlled", "live"] = "live"
+    provenance: str = "gemini_unqualified"
 
 
 def utc_now() -> str:
@@ -159,10 +168,24 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+class _ControlledAttempts:
+    """Local test observations, deliberately separate from the persistent dispatch ledger."""
+    def __init__(self):
+        self.records: list[dict[str, Any]] = []
+
+    def begin_attempt(self, context, metadata):
+        self.records.append({"context": context, "metadata": metadata, "result": None})
+        return str(len(self.records))
+
+    def finish_attempt(self, attempt_id, metadata):
+        self.records[int(attempt_id) - 1]["result"] = metadata
+
+
 class GeminiProvider:
     def __init__(self, config: ProviderConfig, ledger: AttemptLedger, *, client_factory: Any = None):
         self.config = config
         self.ledger = ledger
+        self.controlled_attempts = _ControlledAttempts()
         self._client_factory = client_factory  # Explicit controlled-test injection; production uses SDK.
 
     def capabilities(self) -> dict[str, Any]:
@@ -173,8 +196,10 @@ class GeminiProvider:
         except ProviderFailure as exc:
             gate, reason = False, exc.code
         return {"provider": "gemini", "implemented": True,
-                "configured": bool(self.config.api_key and self.config.model),
+                "mode": self.config.mode,
+                "configured": gate,
                 "account_gate_passed": gate, "model": self.config.model,
+                "live_qualification": "pending", "external_dispatch_enabled": gate and self._client_factory is None,
                 "reachable": None, "verified_in_environment": False,
                 "unavailable_reason": reason, "sdk_version": package_version("google-genai"),
                 "image_budget_configured": self.config.image_token_upper_bound is not None}
@@ -184,7 +209,13 @@ class GeminiProvider:
                        mime_type: str | None = None) -> ProviderResult:
         if operation not in {"intake", "explanation", "design_proposal", "observation_proposal"}:
             raise ProviderFailure("provider_operation_unsupported")
-        self.config.check_ready()
+        controlled = self.config.mode == "controlled"
+        if self.config.mode == "live" and self._client_factory is not None:
+            raise ProviderFailure("provider_controlled_mode_required")
+        self.config.check_ready(allow_controlled=controlled and self._client_factory is not None)
+        if controlled and self._client_factory is None:
+            raise ProviderFailure("provider_placeholder_disabled")
+        ledger = self.controlled_attempts if controlled else self.ledger
         checked_context = context.checked_dict()
         if not isinstance(prompt, str) or not prompt or len(prompt.encode("utf-8")) > 48_000:
             raise ProviderFailure("provider_context_limit")
@@ -206,24 +237,27 @@ class GeminiProvider:
         if input_reservation > self.config.max_input_tokens:
             raise ProviderFailure("provider_input_budget_exceeded")
         wall_cap = min(self.config.request_timeout_seconds, 60 if operation == "intake" else 30)
-        metadata = {"provider": "gemini", "model": self.config.model,
+        metadata = {"provider": "controlled_placeholder" if controlled else "gemini", "model": self.config.model,
+                    "transport": "controlled" if controlled or self._client_factory is not None else "live",
+                    "provenance": "controlled_placeholder_output" if controlled or self._client_factory is not None else "gemini_unqualified",
                     "sdk_version": package_version("google-genai"), "adapter_version": "gemini-v1",
-                    "prompt_version": "gf2-proposal-v1", "schema_version": "DB-SC-1",
+                    "prompt_version": SOURCE_PROMPT_VERSION if operation == "intake" else CONVERSATION_PROMPT_VERSION,
+                    "schema_version": "DB-SC-1",
                     "operation": operation, "modality": "image" if image_bytes is not None else "text",
                     "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
                     "account_decision_id": self.config.account_decision_id,
                     "started_at": utc_now(), "reserved_input_tokens": input_reservation,
                     "reserved_output_tokens": self.config.max_output_tokens, "max_requests": 1,
-                    "timeout_seconds": wall_cap, "retry_policy": "none", "api_surface": "Gemini Developer API v1beta",
+                    "timeout_seconds": wall_cap, "retry_policy": "none", "api_surface": "controlled SDK request shape; no provider dispatch" if controlled else "Gemini Developer API v1beta",
                     "test_transport": self._client_factory is not None}
-        attempt_id = self.ledger.begin_attempt(checked_context, metadata)
+        attempt_id = ledger.begin_attempt(checked_context, metadata)
         started = time.monotonic()
         client = None
         usage = None
         try:
             from google import genai
             from google.genai import types
-            kwargs = {"api_key": self.config.api_key, "vertexai": False,
+            kwargs = {"api_key": "controlled-placeholder-token" if controlled else self.config.api_key, "vertexai": False,
                       "http_options": types.HttpOptions(api_version="v1beta",
                                                          base_url="https://generativelanguage.googleapis.com",
                                                          timeout=wall_cap * 1000,
@@ -258,23 +292,156 @@ class GeminiProvider:
                 output_used = (usage["output_tokens"] or 0) + (usage["thought_tokens"] or 0)
                 if (input_used is not None and input_used > input_reservation) or output_used > self.config.max_output_tokens:
                     raise ProviderFailure("provider_usage_exceeded_reservation")
-            self.ledger.finish_attempt(attempt_id, {"status": "validated", "finished_at": utc_now(),
+            ledger.finish_attempt(attempt_id, {"status": "validated", "finished_at": utc_now(),
                 "duration_ms": int((time.monotonic() - started) * 1000), "usage": usage,
-                "provider_request_id": _request_id(response), "finish_reason": finish_reason,
+                "provider_request_id": None if controlled or self._client_factory is not None else _request_id(response), "finish_reason": finish_reason,
                 "validation_outcome": "schema_valid_unaccepted"})
-            return ProviderResult(value, attempt_id, self.config.model or "", usage, finish_reason)
+            test_transport = controlled or self._client_factory is not None
+            return ProviderResult(value, None if test_transport else attempt_id,
+                                  self.config.model or "controlled-placeholder", None if test_transport else usage,
+                                  finish_reason, transport="controlled" if test_transport else "live",
+                                  provenance="controlled_placeholder_output" if test_transport else "gemini_unqualified")
         except asyncio.CancelledError:
-            self.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome", "code": "provider_cancelled_unknown_outcome",
+            ledger.finish_attempt(attempt_id, {"status": "unknown_outcome", "code": "provider_cancelled_unknown_outcome",
                 "finished_at": utc_now(), "duration_ms": int((time.monotonic() - started) * 1000), "usage": None})
             raise
         except Exception as exc:
             code, retryable = (exc.code, exc.retryable) if isinstance(exc, ProviderFailure) else classify_failure(exc)
-            self.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome" if "unknown_outcome" in code else "failed",
+            ledger.finish_attempt(attempt_id, {"status": "unknown_outcome" if "unknown_outcome" in code else "failed",
                 "code": code, "finished_at": utc_now(), "duration_ms": int((time.monotonic() - started) * 1000), "usage": usage})
-            raise ProviderFailure(code, retryable, attempt_id) from None
+            raise ProviderFailure(code, retryable, None if controlled or self._client_factory is not None else attempt_id) from None
         finally:
             if client is not None:
                 try:
                     await client.aio.aclose()
                 except Exception:
                     pass  # Cleanup failure cannot cause a hidden retry or alter scientific data.
+
+
+@dataclass(frozen=True)
+class ControlledSourceResult:
+    """Local fixture projection, never a Gemini response or dispatch-ledger attempt."""
+    value: BaseModel
+    source_digest: str
+    fixture_id: str
+    fixture_digest: str
+    transport: Literal["controlled"] = "controlled"
+    provenance: str = "controlled_placeholder_output"
+    label: str = "Controlled example, not Gemini transcription"
+    provider_attempt_id: None = None
+    provider_requests: int = 0
+    usage: None = None
+
+
+class ControlledSourceProvider:
+    """Project known frozen development packets only. This is not image recognition.
+
+    The explicit constructor has no `generate` method: current IntakeService insists
+    on gemini_vision plus a provider attempt ID. Its owner must adopt controlled
+    provenance before wiring this adapter into the public persistence route.
+    """
+    model = "controlled-source-v1"
+    transport = "controlled"
+    provenance = "controlled_placeholder_output"
+    DEVELOPMENT_PACKETS = ("c01a", "c01b", "c02a", "c02b", "c03a", "c03b", "c04a", "c04b", "c05a", "c06a", "c06b", "c10b")
+
+    def __init__(self, fixtures: dict[str, dict[str, Any]]):
+        self._fixtures = json.loads(json.dumps(fixtures))
+
+    @classmethod
+    def from_development_fixtures(cls, repository_root=None):
+        from pathlib import Path
+        root = Path(repository_root) if repository_root is not None else Path(__file__).resolve().parents[3]
+        fixtures = {}
+        for packet in cls.DEVELOPMENT_PACKETS:
+            # Explicit allowlist excludes sealed h01/h04, including their answers.
+            raw = (root / "evaluation" / "sources" / "expected" / f"{packet}.json").read_bytes()
+            meta = json.loads(raw)
+            image = (root / "evaluation" / "sources" / f"{packet}.png").read_bytes()
+            if hashlib.sha256(image).hexdigest() != meta["sha256"]:
+                raise ProviderFailure("controlled_fixture_source_mismatch")
+            fixtures[meta["sha256"]] = {"packet": meta, "fixture_digest": hashlib.sha256(raw).hexdigest()}
+        return cls(fixtures)
+
+    def capabilities(self):
+        return {"provider": "none", "mode": "controlled", "transport": "controlled",
+                "label": "Controlled example, not Gemini transcription", "automatic_extraction": False,
+                "verified_in_environment": False, "gemini_live_qualification": "pending",
+                "provider_requests": 0, "usage": None}
+
+    @staticmethod
+    def _path(name: str) -> str | None:
+        match = re.fullmatch(r"row([1-9][0-9]*)_(time|concentration|allowance)", name)
+        if match:
+            field_name = "hard_allowance" if match[2] == "allowance" else match[2]
+            return f"rows[{int(match[1]) - 1}].{field_name}"
+        match = re.fullmatch(r"(A|ke|ka)_(min|max)", name)
+        if match:
+            return f"domain.{match[1]}.{'lower' if match[2] == 'min' else 'upper'}"
+        return {"target_min": "target.lower", "target_max": "target.upper"}.get(name)
+
+    def propose(self, source: dict[str, Any], image_bytes: bytes, *, existing_values=None,
+                current_revision_id: str | None = None) -> ControlledSourceResult:
+        from .contracts import IntakeProposalBody
+        source_id, metadata = source["id"], source.get("body", source)
+        digest = hashlib.sha256(image_bytes).hexdigest()
+        if digest != metadata.get("sha256"):
+            raise ProviderFailure("provider_source_binding_mismatch")
+        fixture = self._fixtures.get(digest)
+        if fixture is None:
+            raise ProviderFailure("placeholder_source_unrecognized")
+        packet = fixture["packet"]
+        if (metadata.get("width") != packet["width_px"] or metadata.get("height") != packet["height_px"]
+                or metadata.get("observed_media_type") != packet["media_type"]):
+            raise ProviderFailure("provider_source_binding_mismatch")
+        existing = existing_values or {}
+        fields, diagnostics = [], [{"code": "controlled_placeholder_output", "field_path": "source_asset_id",
+            "message": "Controlled example, not Gemini transcription. Inspect the source and review every field.", "blocking": False}]
+
+        def diagnostic(code, path, message):
+            diagnostics.append({"code": code, "field_path": path, "message": message, "blocking": True})
+
+        if packet["sheet_id"] == "c10b":
+            diagnostic("unsupported_model", "model", "The source uses an unsupported two-compartment IV/AUC model. Enter a supported experiment manually; do not substitute models.")
+        else:
+            ambiguous = {}
+            for ambiguity in packet.get("ambiguities", []):
+                for name in ambiguity["fields"]:
+                    ambiguous[name] = ambiguity["reason"]
+            missing = set(packet.get("intentionally_missing", []))
+            for name, item in packet["fields"].items():
+                path = self._path(name)
+                if path is None:
+                    continue
+                is_allowance = name.endswith("_allowance")
+                reason = ambiguous.get(name) or (ambiguous.get("hard_allowance") if is_allowance else None)
+                if is_allowance and "hard_allowance" in missing:
+                    reason = reason or "State an explicit hard bound; an assay standard deviation is not one."
+                unit = "h" if name.endswith("_time") else "mg/L" if name.endswith(("_concentration", "_allowance")) else "mg/L" if name.startswith("A_") else "1/h"
+                # Missing/unsupported units remain unresolved. Do not relabel mg/mL as mg/L.
+                header = packet["fields"].get("concentration_header", {}).get("printed_text", "")
+                if name.endswith(("_concentration", "_allowance")) and "mg/L" not in header:
+                    unit = None
+                    reason = reason or "Confirm concentration units and the explicit conversion before using mg/L."
+                candidate = None if reason else item.get("exact_value")
+                x, y, w, h = item["region_xywh_px"]
+                fields.append({"field_path": path, "original_value": item["printed_text"], "candidate_exact": candidate,
+                    "unit": unit, "source_asset_id": source_id,
+                    "locator": {"page": 1, "label": name, "excerpt": item["printed_text"], "bbox": [x, y, x + w, y + h]},
+                    "method": "manual", "grounding": "unreviewed_visual", "ambiguity": reason})
+                if reason:
+                    diagnostic("clarification_required", path, f"Review {path}: {reason}")
+                if path in existing and existing[path] not in {candidate, item["printed_text"]}:
+                    diagnostic("existing_value_conflict", path, f"Review {path}: existing input differs from the source; choose explicitly and record a reason.")
+            for name in sorted(missing):
+                path = self._path(name)
+                if path and not any(f["field_path"] == path for f in fields):
+                    diagnostic("missing_source_field", path, f"Supply the missing {path}; the source states no exact value.")
+            if any("target_min" in a.get("fields", []) for a in packet.get("ambiguities", [])):
+                diagnostic("conflicting_source_values", "target.lower", "Choose the intended cited target interval and retain the reason; the cited source intervals conflict.")
+            if packet.get("embedded_instructions_are_untrusted_content"):
+                diagnostics.append({"code": "source_instruction_ignored", "field_path": "source_asset_id",
+                    "message": "Embedded instructions are source content only; they cannot change allowances, tools or approval.", "blocking": False})
+        value = IntakeProposalBody.model_validate({"source_asset_id": source_id, "source_digest": digest,
+            "current_revision_id": current_revision_id, "fields": fields, "diagnostics": diagnostics})
+        return ControlledSourceResult(value, digest, packet["sheet_id"], fixture["fixture_digest"])
