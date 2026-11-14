@@ -1,6 +1,6 @@
 {
   "evidence_commits": [
-    "1ae19ffa84aaa2a3dd3442191f775c4e5328db0b"
+    "d6503da24c302b52ec2a831fe77bc74a6e62ff18"
   ],
   "evidence_only_paths": [
     "evaluation/results/",
@@ -21,7 +21,7 @@
       "description": "actual HTTP -> science -> separate design -> raw download -> fresh native replay",
       "entries": {
         "RS-HERO-FULL": {
-          "attempt_id": "att_4f59be4f35e84857",
+          "attempt_id": "att_866e469362da42be",
           "reason": "failed: baseline_completed_with_evidence",
           "status": "failed"
         }
@@ -33,27 +33,27 @@
       "description": "duplicate starts, design authority, cancellation/restart, changed input, follow-up",
       "entries": {
         "RS-CANCEL-RESTART": {
-          "attempt_id": "att_69bdddcc92584c58",
+          "attempt_id": "att_9602d602a3f24550",
           "reason": "blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for example; no_orphan_after_worker_kill (prerequisite): the run reached failed before the worker was killed, so there was no in-flight work to interrupt; interrupted_not_redispatched (prerequisite): the run reached failed before the worker wa",
           "status": "blocked"
         },
         "RS-CHANGED-INPUT": {
-          "attempt_id": "att_11ab242913bc40e2",
+          "attempt_id": "att_08dea46e6a694a72",
           "reason": "failed: baseline_completed_with_evidence",
           "status": "failed"
         },
         "RS-DESIGN-AUTHORITY": {
-          "attempt_id": "att_1a4fbdc9b63c4aeb",
+          "attempt_id": "att_c75dc53c4c3447ba",
           "reason": "blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry)",
           "status": "blocked"
         },
         "RS-FOLLOWUP": {
-          "attempt_id": "att_c9c61bb12cdb4ed8",
+          "attempt_id": "att_e9ba83b68310408b",
           "reason": "blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run",
           "status": "blocked"
         },
         "RS-RETRY-CONCURRENT": {
-          "attempt_id": "att_88204969306c4fde",
+          "attempt_id": "att_a1f778c413974597",
           "reason": "",
           "status": "passed"
         }
@@ -65,7 +65,7 @@
       "description": "guard active in API and worker; zero external model attempts in the lane",
       "entries": {
         "RS-ZERO-DISPATCH": {
-          "attempt_id": "att_8a36671cbe27459b",
+          "attempt_id": "att_5354ba66334244bf",
           "reason": "",
           "status": "passed"
         }
@@ -98,7 +98,8 @@
       "gate": "no_unresolved_p0",
       "open_p0": [
         "F-ORPHAN-WORKER-KILL",
-        "F-MAC-NPROC"
+        "F-MAC-NPROC",
+        "F-RESTART-EPERM"
       ],
       "status": "failed"
     },
@@ -112,6 +113,6 @@
   "overall": "failed",
   "schema": "drbean-release-gates/v1",
   "statement": "Gates read recorded evidence only; they dispatch no provider or scientific work.",
-  "tested_commit": "1ae19ffa84aaa2a3dd3442191f775c4e5328db0b",
+  "tested_commit": "d6503da24c302b52ec2a831fe77bc74a6e62ff18",
   "worktree_dirty": false
 }
