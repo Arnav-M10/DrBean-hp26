@@ -134,7 +134,7 @@ def general_research_capabilities(app: FastAPI) -> dict:
     """Capability block for ``/capabilities``: available only when routes and a dispatch path are reachable."""
     service: GeneralResearchService | None = getattr(app.state, "general_research", None)
     base = {"implemented": True, "contract_version": L.CONTRACT_VERSION, "media_types": SUPPORTED_MEDIA_TYPES,
-            "max_assets": L.MAX_ANALYSIS_ASSETS, "max_file_bytes": L.MAX_ASSET_BYTES,
+            "max_assets": L.MAX_ANALYSIS_ASSETS, "max_file_bytes": L.MAX_ASSET_BYTES, "max_pdf_bytes": L.MAX_PDF_BYTES,
             "max_total_bytes": L.MAX_ANALYSIS_BYTES, "max_pdf_pages": L.MAX_PDF_PAGES,
             "limits": L.public_limits(), "data_origins": list(DATA_ORIGINS)}
     if service is None:

@@ -123,7 +123,8 @@ export class BeanApi {
   }
   async uploadResearchAsset(workspace, file, operationId) {
     if (operationId !== undefined && (typeof operationId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(operationId))) throw new Error('A bounded upload operation identity is required.')
-    if (!Number.isInteger(file.size) || file.size < 1 || file.size > 5242880) throw new Error('Choose a research file up to 5 MiB.')
+    // The client ceiling is the largest admitted kind (a 25 MiB PDF); the server enforces each kind's own limit.
+    if (!Number.isInteger(file.size) || file.size < 1 || file.size > 26214400) throw new Error('Choose a research file up to 25 MiB (PDF) or 5 MiB (other files).')
     const bytes = await file.arrayBuffer()
     if (bytes.byteLength !== file.size) throw new Error('The research file changed while it was read.')
     // File type is only an admission hint: the server inspects the original bytes.
