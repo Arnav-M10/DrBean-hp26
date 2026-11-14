@@ -275,6 +275,35 @@ def test_checkpoint_binding_is_not_reusable_under_changed_context(changed):
     asyncio.run(exercise())
 
 
+@pytest.mark.parametrize("version", ["GRAPH_VERSION", "POLICY_VERSION", "PROMPT_VERSION", "COMMENTARY_POLICY_VERSION"])
+@pytest.mark.parametrize("continuation", ["snapshot", "resume", "approval_action", "advance"])
+def test_version_change_refuses_retained_checkpoint_before_any_new_admission(monkeypatch, version, continuation):
+    from bean_api import research_coordinator
+
+    async def exercise():
+        ports, saver = Ports(), InMemorySaver()
+        first = factory(ports, saver=saver)
+        await first.start()
+        assert first.runtime["prompt_version"] == research_coordinator.PROMPT_VERSION
+        assert first.runtime["commentary_policy_version"] == research_coordinator.COMMENTARY_POLICY_VERSION
+        ports.review["decision"] = "approved"
+        if continuation == "advance":
+            await first.resume()
+        before = (copy.deepcopy(ports.turns), copy.deepcopy(ports.tool_admissions),
+                  copy.deepcopy(ports.children), copy.deepcopy(ports.reports), list(ports.execute_calls))
+        monkeypatch.setattr(research_coordinator, version, "changed-policy-version")
+        next_context = context(action_id="next-action") if continuation in {"advance", "approval_action"} else context()
+        restored = factory(ports, saver=saver, ctx=next_context)
+        with pytest.raises(CoordinatorFailure, match="research_checkpoint_incompatible"):
+            if continuation == "approval_action":
+                await restored.resume(new_action=True)
+            else:
+                await getattr(restored, continuation)()
+        assert before == (ports.turns, ports.tool_admissions, ports.children, ports.reports, ports.execute_calls)
+
+    asyncio.run(exercise())
+
+
 def test_revocation_on_resume_does_not_read_or_execute():
     async def exercise():
         ports = Ports()
@@ -320,6 +349,46 @@ def test_reporting_refuses_fabricated_scientific_claim_after_real_child():
         with pytest.raises(CoordinatorFailure, match="explanation_unsupported_claim"):
             await graph.resume()
         assert len(ports.children) == 1 and not ports.reports
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("kind", ["investigation", "design", "followup"])
+@pytest.mark.parametrize("mutation", [{}, {"accepted": True}, {"proposal_id": "invented-plan"},
+                                     {"kind": "unrecognized"}, {"reason": ""}, {"reason": " "},
+                                     {"available": 0, "proposal_id": "invented-plan"},
+                                     {"available": "false", "proposal_id": "invented-plan"},
+                                     {"available": None, "proposal_id": "invented-plan"},
+                                     {"available": True, "proposal_id": "invented-plan"}])
+def test_unavailable_proposal_causes_clarification_without_executable_authority(kind, mutation):
+    class MissingInputsModel(ResearchModel):
+        def _generate(self, messages, **kwargs):
+            observed = [m for m in messages if isinstance(m, ToolMessage)]
+            if not observed:
+                name, args = "prepare_scientific_proposal", {"kind": kind, "reference_ids": ["reviewed-input"]}
+            else:
+                result = json.loads(observed[-1].content)
+                assert result["available"] is False and result["accepted"] is False
+                assert not any(k in result for k in ("proposal_id", "review_id", "approval_id"))
+                name, args = "request_clarification", {"fields": ["reviewed_inputs"], "question": result["reason"]}
+            return ChatResult(generations=[ChatGeneration(message=AIMessage(content="", tool_calls=[{
+                "name": name, "args": args, "id": f"missing-input-{len(observed)}", "type": "tool_call"}]))])
+
+    async def exercise():
+        ports = Ports()
+        ports.prepare_proposal = lambda requested, references: {
+            "accepted": False, "available": False, "kind": requested,
+            "reason": "Supply the missing reviewed inputs.", **mutation}
+        parent = factory(ports, MissingInputsModel())
+        if mutation:
+            with pytest.raises(CoordinatorFailure, match="research_proposal_authority_violation"):
+                await parent.start()
+        else:
+            result = await parent.start()
+            assert result["terminal"]["kind"] == "clarification" and not result["paused"]
+            assert len(ports.turns) == 2
+        assert not ports.children and not ports.reports
+        assert not any(e.get("type") == "review_required" for e in ports.events)
+
     asyncio.run(exercise())
 
 

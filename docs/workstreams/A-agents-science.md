@@ -70,20 +70,124 @@ All subagent and root checks here are **A author checks**, not C's independent
 acceptance. In-memory checkpoint reconstruction does not claim fresh-process
 storage/lease/browser qualification. Live model adaptivity is `not_run`.
 
+### Committed component qualification
+
+Code commit: **`63357c0b9bb653be3edc6bcbe29e904cbb07d27b`**, clean at test start.
+[PR #42](https://github.com/Arnav-M10/DrBean-hp26/pull/42) is draft for B's
+application integration; A did not merge it or alter main.
+The final combined component regression passed **340 tests in 28.78s**:
+
+```sh
+env -i PATH="$ENGINE_BIN:/opt/homebrew/bin:/usr/bin:/bin" LANG=C.UTF-8 \
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$PWD/evaluation/drbean_eval/guard" \
+  DRBEAN_EGRESS_GUARD_LOG=/tmp/drbean-63357c0-guard.jsonl BEAN_AI_MODE=placeholder \
+  BEAN_COUNTERDEX_PYTHON="$ENGINE_PYTHON" BEAN_COUNTERDEX_REPLAY_PYTHON="$ENGINE_PYTHON" \
+  "$BACKEND_PYTHON" -m pytest -q -p no:cacheprovider \
+  tests/test_research_coordinator.py tests/test_research_coordinator_adversarial.py \
+  tests/test_research_integration.py tests/test_research_coordinator_native.py \
+  tests/test_gemini_chat_model.py tests/test_gemini_chat_gateway.py \
+  tests/test_coordinator.py tests/test_controlled_native_workflow.py \
+  tests/test_provider.py tests/test_conversation.py tests/test_ledger.py \
+  tests/test_ledger_accounting.py tests/test_restart_workflow.py
+```
+
+Here `BACKEND_PYTHON` was the sibling
+`DrBean-hp26-shared-integration/.venv/bin/python`; `ENGINE_PYTHON` was its
+`.venv-engine/bin/python`, and `ENGINE_BIN` its `.venv-engine/bin` directory.
+No source or package install was modified by this check. Guard telemetry was
+39 `guard_installed` events and no other events: zero provider constructions,
+network attempts or credential lookups in this run. Ruff on `apps tests scripts`,
+secret scan (zero findings), and `git diff --check` passed at the same source.
+
+CI for that code commit:
+[run 43599016318](https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43599016318).
+That run was superseded by the docs receipt push before all jobs completed.
+All six jobs passed for `472659cc4a888bdf937b59444143493ac9d941ae` in
+[run 43599151587](https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43599151587):
+backend/lint/schema, engine/native replay, evaluation self-checks, web units,
+browser review/design/native replay and actual-stack restart/reopen. Those
+browser checks exercise the existing application path, not new unregistered
+coordinator routes. Any final combined B commit requires its own qualification.
+
 ## B/C handoff and next condition
 
-B published `DB-RESEARCH-1` at `d224846` in
+B published `DB-RESEARCH-1` at `d224846` and the authority/checkpoint slice at
+`0c69912aa021ca94e0d87e2ecb3b9a82b851566e` in
 [PR #41](https://github.com/Arnav-M10/DrBean-hp26/pull/41).
 A has requested concrete snapshot/review/child/report shapes, atomic frozen
 review-digest validation, read authority and cumulative model/tool/physical
 admission. The application adapter consumes that contract; missing producer
 capabilities fail closed rather than simulating a live service.
 
-Remaining B dependencies: actual durable records/checkpointer, leases and
-recovery journal, routes/worker registration, canonical decisions, precise
-session/action accounting and ordinary browser loop. Default live allocation is
+The latter implements durable records/checkpointer, fenced leases and the
+child-intent journal. Remaining B dependencies: actual graph/worker/routes/UI
+registration, canonical observation receipt and separately approved recheck,
+explicit reviewed-input and changed-design transitions, complete report
+snapshots, precise session/action accounting and ordinary browser loop.
+Default live allocation is
 unchanged; a version marker is not permission or new capacity. Current main's
 ledger cannot admit this live coordinator lane.
+
+B's proposed eight logical model turns per session also needs an explicit
+whole-loop policy decision: the minimal one-tool-per-turn baseline/design/
+observation/report sequence needs roughly nine selections before optional reads
+or plan revision. A raised this concrete bound on PR #41; it grants no live
+capacity and does not change the four-turn action limit or the real global ledger.
+
+A cross-reviewed actual B `0c69912` in an isolated archive and temporary store.
+Using `hero-baseline.request.json` plus feasible times `8/1,6/1`, allowance `1/5`,
+horizon `8/1` and checked construction/continuation permission, the ordinary
+worker returned `certified_counterexample / valid / passed` and then
+`checked_pair_separation`. A report first created after baseline was reused
+after design with zero retained designs; a fresh canonical snapshot had one.
+Changing the design allowance to `100/1` returned `research_effect_conflict`
+under the fixed session design key. These concrete B-owned gaps were reported
+on PR #41; no B code was duplicated. Its 13 authority/checkpoint controls passed
+as A cross-checks. Its tiny-StateGraph checkpoint reconstruction is same-process
+component evidence, not a fresh-process or browser result.
+
+C's published gate-0 predicates were inspected at `8580d3e`, with sealed
+holdouts left untouched. Its session-capacity finding was routed to B. The
+exposed narration over-suppression cases produced a narrow A correction:
+four exact limiting sentences require matching cited categorical statuses.
+Uncited or split-record support, conflicts and appended overclaims remain
+refused. Commentary policy is now `evidence-bound-statements.v3`; graph prompt
+is `research-prompt.v2`. Both versions join graph/tool policy in checkpoint
+compatibility, including new approval actions and advance. C must independently
+retest its own strict expected-failure markers; A did not edit C's tests.
+
+### Current boundary correction and combined component check
+
+A's adapter now consumes B's actual immutable evidence/suggestion envelopes,
+checks their original digest, identity/workspace/type/lineage and preserves all
+scientific axes, candidate vectors and design options in the bounded projection.
+Explicit unavailable preparation is a useful negative result with no executable
+identity. Malformed availability values and invented proposal IDs are refused.
+An observation request remains distinct from an approved executable follow-up.
+
+Focused narration checks passed 139 cases after the last prompt correction.
+The adapter passed 43 tests in A's checkout with one explicit B-module skip.
+An isolated combination of B `0c69912` plus these A source files passed **141
+graph/adversarial/adapter/authority tests**. That includes actual Deep Agents
+review pause in one Python process, canonical approval and checkpoint restore in
+another, preserving todos and queuing exactly one deterministic child with zero
+physical model calls. This test does not execute that child or exercise product
+startup/UI. The complete Counterdex computations above are separate checks.
+
+Reproduction after assembling those two source sets uses:
+
+```sh
+python -m pytest -q tests/test_research_coordinator.py \
+  tests/test_research_coordinator_adversarial.py tests/test_research_integration.py \
+  tests/test_research_authority.py
+```
+
+The retained test selects the exact checkout in its child processes, refuses
+provider/network construction and uses temporary stores. A-only checkout skips
+that B-dependent test honestly; it does not substitute an in-memory producer.
+The final clean-commit combined regression and CI receipt are recorded on
+[PR #42](https://github.com/Arnav-M10/DrBean-hp26/pull/42). These remain A author
+checks; B alone integrates and C qualifies the resulting application candidate.
 
 C should challenge the resulting combined commit with independent holdouts,
 same-input binding, review races, child/checkpoint crash recovery, valid and

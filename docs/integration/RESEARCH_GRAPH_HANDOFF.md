@@ -3,6 +3,7 @@
 Assignment: DB-COORDINATOR-3OWNER-1. A branch:
 `codex/three-owner-agent-science`, from main `299a356`.
 B's canonical application seam is **DB-RESEARCH-1**, published at `d224846`
+and implemented in its authority/checkpoint slice at `0c69912`,
 in `apps/api/bean_api/research_contracts.py` and
 `shared/contracts/DB-RESEARCH-1/README.md` on
 `codex/durable-research-application` ([PR #41](https://github.com/Arnav-M10/DrBean-hp26/pull/41)).
@@ -27,11 +28,15 @@ pinned Deep Agents graph. `ResearchCoordinator.start`, `resume`, `advance`, and
   remain cumulative; this method creates no allocation.
 - `snapshot` is an authorized read. It never invokes a model or scientific job.
 
-State and tool policy are `research-graph.v1` / `research-tools.v1`; internal
+State and tool policy are `research-graph.v1` / `research-tools.v1`; prompt and
+commentary policy are `research-prompt.v2` / `evidence-bound-statements.v3`; internal
 adapter ports are `research-ports.v1`. A's internal `ResearchContext` is built
 from B's private runtime and authorized snapshot. It binds workspace/session,
 action, question, exact input digest, reviewed context, mode, limits and policy.
-Changed context or an incompatible graph version cannot resume an old action.
+All four versions are retained in checkpoint state and exposed in runtime
+metadata. Missing or changed versions refuse snapshot/resume, an approval's new
+action, and advance before admission. No implicit checkpoint migration is
+performed. Changed context cannot resume an old action.
 
 The effective compiled tool inventory is exactly:
 
@@ -55,6 +60,10 @@ Normal model termination without an accepted backend report or clarification is
 `research_completion_unaccepted`. Arbitrary prose cannot finish an investigation.
 Model-generated report commentary uses the existing narrow scientific explanation
 guard; canonical facts and report manifests remain backend/Counterdex authority.
+The v3 guard admits four complete limiting statements only from matching cited
+categorical fields; it rejects missing, conflicting, uncited or cross-record
+support and appended overclaims. This is a bounded narration correction, not a
+general natural-language verifier.
 
 ## Review and side-effect predicates
 
@@ -75,6 +84,10 @@ operations. A parent model decision does not widen their scopes. Missing hard
 allowances, units, time origins, distinct compatible candidates or reviewed
 design constraints produce clarification/unavailable behavior. Numerical or
 inconclusive evidence never becomes checked separation or a proved claim.
+An explicitly unavailable preparation returns only `accepted: false`,
+`available: false`, the requested `kind` and a bounded reason. It supplies no
+executable proposal/review identity. The graph can clarify or report the
+limitation; malformed unavailable responses still fail closed.
 
 `GraphInterrupt` is allowed to bubble to LangGraph; no blanket exception handler
 converts human waiting to failure. Active deadlines exclude human waiting, but
@@ -127,8 +140,27 @@ states if an operation is not implemented:
 
 The adapter fails closed for absent requirements. A supplied `InMemorySaver`
 can prove graph reconstruction in tests; it cannot prove a process restart.
+`test_published_backend_restores_actual_graph_in_separate_processes` also tests
+the actual A graph with B's SQLite saver: review pause in one process, canonical
+approval and restore in another, then one queued deterministic child. It skips
+when B's producer modules are absent. Passing it in the combined source overlay
+establishes that component boundary, not product startup, child execution or
+ordinary browser recovery.
 Production capability flags must stay unavailable until actual startup, storage,
 worker and UI registration are qualified.
+
+At B's `0c69912`, authority, canonical child journaling and a disk-backed safe
+checkpointer are implemented as components. The full loop still needs B's
+worker/routes/UI registration and a canonical reviewed-observation transition.
+An observation request is not an executable follow-up plan: its accepted reading
+must bind the new time/allowance while retaining the original candidate/history,
+then receive separate recheck approval. B's current input-head check correctly
+refuses arbitrary changes; the authorized transition must be explicit. Its
+baseline-anchored report returns only baseline `evidence_ids`; the fixed session
+report key also reuses an earlier snapshot after later design evidence appears.
+The full report must retain the actual design/follow-up references selected for
+that snapshot. A preserves binding refusals until that producer contract is
+implemented and tested.
 
 ## Metered model boundary
 

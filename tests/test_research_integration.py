@@ -1,10 +1,12 @@
-"""Actual A graph with controlled canonical-port producers; no B runtime claims.
+"""Actual graph, published B envelopes and explicitly controlled tool authority.
 
-The producer response shapes below are explicit adapter requirements pending B's
-published implementation. Missing contracts fail closed instead of falling back.
+Retained native fixtures test projection, not fresh mathematical computation.
+The optional producer test runs only when B's actual implementation is installed.
 """
 import asyncio
 import copy
+import json
+from pathlib import Path
 import socket
 from types import SimpleNamespace
 
@@ -15,10 +17,25 @@ from langgraph.checkpoint.memory import InMemorySaver
 from bean_api.coordinator import CoordinatorFailure
 from bean_api.research_coordinator import GRAPH_VERSION
 from bean_api.research_integration import (
-    ACTION_POLICY, CHECKPOINT_VERSION, create_application_research_coordinator,
+    ACTION_POLICY, CHECKPOINT_VERSION, _evidence_fact, create_application_research_coordinator,
 )
+from bean_api.workflow import _digest as entity_digest
 from test_research_coordinator import ResearchModel
 from test_research_coordinator_adversarial import ToolScript
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def retained_result(name):
+    return json.loads((ROOT / "packages/groundwork_adapter/fixtures/decision" / name).read_text())["result"]
+
+
+def entity(kind="evidence", result=None):
+    result = result if result is not None else retained_result("hero-baseline.response.json")
+    body = {"run_id": "job", "scenario_id": "baseline", "result": result} if kind == "evidence" else result
+    return {"id": "evidence", "workspace_id": "workspace", "kind": kind, "body": body,
+            "digest": entity_digest(kind, body), "parent_id": "job", "created_by": "actor",
+            "created_at": "2026-11-14T00:00:00.000Z"}
 
 
 @pytest.fixture(autouse=True)
@@ -110,7 +127,7 @@ class CanonicalBackend:
     async def read_evidence(self, evidence_id):
         await self.check_authority()
         assert evidence_id == "evidence" and self.children
-        return copy.deepcopy(self.fact)
+        return entity()
 
     async def request_clarification(self, fields, reason):
         return {"id": "clarification", "fields": fields, "reason": reason}
@@ -298,12 +315,15 @@ def test_design_uses_only_explicit_canonical_constraints_or_refuses(constraints)
         model = ToolScript(calls=[("prepare_scientific_proposal", {"kind": "design", "reference_ids": ["reviewed-input"]}),
                                   ("request_clarification", {"fields": ["measurement"], "question": "Obtain the reviewed reading."})])
         graph = await build(backend, model=model)
+        assert (await graph.start())["terminal"]["kind"] == "clarification"
         if constraints is None:
-            with pytest.raises(CoordinatorFailure, match="research_design_constraints_unavailable"):
-                await graph.start()
             assert not backend.design_arguments
+            state = await graph._graph.aget_state(graph._config)
+            result = next(json.loads(m.content) for m in state.values["messages"]
+                          if getattr(m, "name", None) == "prepare_scientific_proposal")
+            assert result["available"] is False and result["accepted"] is False
+            assert set(result) == {"available", "accepted", "kind", "reason"}
         else:
-            assert (await graph.start())["terminal"]["kind"] == "clarification"
             assert backend.design_arguments == [constraints]
             assert backend.snapshot["design_constraints"] == constraints
         assert not backend.children
@@ -351,3 +371,220 @@ def test_wrong_report_evidence_is_not_accepted_as_a_terminal_success():
         state = await graph._graph.aget_state(graph._config)
         assert state.values.get("research_terminal") is None and len(backend.children) == 1
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("kind", ["investigation", "design", "followup"])
+def test_published_unavailable_response_stops_for_clarification_without_authority(kind):
+    async def exercise():
+        backend = CanonicalBackend()
+        backend.snapshot["design_constraints"] = {"feasible_times": ["1/1"]}
+        async def unavailable(*args):
+            return {"available": False, "reason": "The reviewed prerequisites are absent."}
+        setattr(backend, {"investigation": "prepare_investigation", "design": "prepare_design",
+                          "followup": "prepare_followup"}[kind], unavailable)
+        model = ToolScript(calls=[("prepare_scientific_proposal", {"kind": kind, "reference_ids": ["reviewed-input"]}),
+            ("request_clarification", {"fields": ["reviewed-input"], "question": "Supply the reviewed prerequisites."})])
+        graph = await build(backend, model=model)
+        assert (await graph.start())["terminal"]["kind"] == "clarification"
+        assert not backend.children and not backend.reports and not backend.snapshot["reviews"]
+        state = await graph._graph.aget_state(graph._config)
+        projection = next(json.loads(m.content) for m in state.values["messages"]
+                          if getattr(m, "name", None) == "prepare_scientific_proposal")
+        assert projection == {"accepted": False, "available": False, "kind": kind,
+                              "reason": "The reviewed prerequisites are absent."}
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("value", [
+    {"available": True, "reason": "Ready"}, {"available": 0, "reason": "Missing"},
+    {"available": False, "reason": ""}, {"available": False, "reason": "x" * 1001},
+    {"available": False}, {"available": False, "reason": "Missing", "approval_id": "forged"},
+    {"available": False, "reason": "Missing", "proposal_id": "forged"},
+])
+def test_malformed_unavailable_response_cannot_smuggle_authority(value):
+    async def exercise():
+        backend = CanonicalBackend()
+        async def invalid():
+            return value
+        backend.prepare_investigation = invalid
+        model = ToolScript(calls=[("prepare_scientific_proposal",
+                                  {"kind": "investigation", "reference_ids": ["reviewed-input"]})])
+        with pytest.raises(CoordinatorFailure, match="research_backend_binding_invalid"):
+            await (await build(backend, model=model)).start()
+        assert not backend.children and not backend.snapshot["reviews"]
+    asyncio.run(exercise())
+
+
+def test_observation_request_is_not_mislabeled_as_an_executable_followup():
+    async def exercise():
+        backend = CanonicalBackend()
+        async def observation():
+            return {**backend.review, "kind": "observation"}
+        backend.prepare_followup = observation
+        model = ToolScript(calls=[("prepare_scientific_proposal",
+                                  {"kind": "followup", "reference_ids": ["reviewed-input"]})])
+        with pytest.raises(CoordinatorFailure, match="research_backend_binding_invalid"):
+            await (await build(backend, model=model)).start()
+        assert not backend.children
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("kind,name", [("evidence", "hero-baseline.response.json"),
+                                       ("suggestion", "hero-design.response.json")])
+def test_retained_native_projection_preserves_all_science_axes_and_entity_binding(kind, name):
+    result = retained_result(name)
+    result["native_replay"]["duplicated_proof_transcript"] = "x" * 30_000
+    result["native_replay"].update(outcome="unresolved", historical_compatibility=False,
+                                  recorded_result_matches=False, search_replayed=False)
+    record = entity(kind, result)
+    fact = _evidence_fact(record, "evidence", "workspace")
+    assert fact["id"] == record["id"] and fact["evidence_digest"] == record["digest"]
+    assert fact["kind"] == kind and fact["parent_id"] == "job"
+    for key in ("verification", "replay", "reason_code", "artifacts", "verification_record", "candidate_results",
+                "scientific_problem_digest", "scientific_design_digest", "native_suggestion_digest",
+                "candidates", "design_tier", "options", "selected_time", "algorithm", "future_hard_allowance"):
+        if key in result:
+            assert fact[key] == result[key]
+    assert fact["expected_binding"] == result["verification_record"]["expected_binding"]
+    assert "duplicated_proof_transcript" not in fact["native_replay"]
+    for key in ("outcome", "historical_compatibility", "recorded_result_matches", "search_replayed"):
+        assert fact["native_replay"][key] == result["native_replay"][key]
+    assert len(json.dumps(fact).encode()) < 12_000
+    assert len(record["body"].get("result", record["body"])["native_replay"]["duplicated_proof_transcript"]) == 30_000
+
+
+def test_numerical_design_projection_cannot_gain_checked_authority_from_passed_replay():
+    from bean_api.ai_prompts import commentary_rejection
+    # A controlled typed numerical record, not a new mathematical computation.
+    result = {"design_tier": "numerical_guidance", "verification": "not_checked", "replay": "passed",
+        "reason_code": "numerical_only", "selected_time": "8/1", "candidate_ids": ["reference", "outside"],
+        "future_hard_allowance": "1/5", "algorithm": "controlled_numerical",
+        "options": [{"time": "8/1", "state": "evaluated", "reason_code": "numerical_only", "exact_margin": "1/10"}],
+        "candidate_results": [], "native_replay": {"replay": "passed", "verification": "not_checked",
+                                                   "expected_binding": "matches", "scope": "numerical"}}
+    fact = _evidence_fact(entity("suggestion", result), "evidence", "workspace")
+    assert fact["design_tier"] == "numerical_guidance" and fact["verification"] == "not_checked"
+    assert fact["options"][0]["exact_margin"] == "1/10" and fact["replay"] == "passed"
+    assert "expected_binding" not in fact and "verification_record" not in fact
+    assert fact["native_replay"] == result["native_replay"]
+    assert commentary_rejection("This design is numerical guidance without checked pair separation.", [fact]) is None
+    assert commentary_rejection("This design establishes checked pair separation.", [fact]) == "unsupported_claim"
+
+
+@pytest.mark.parametrize("mutation", ["id", "workspace", "kind", "digest", "body", "result", "extra", "lineage"])
+def test_wrong_or_malformed_entity_envelope_refuses_before_scientific_use(mutation):
+    record = entity()
+    if mutation in {"id", "digest"}:
+        record[mutation] = "0" * 64
+    elif mutation == "workspace":
+        record["workspace_id"] = "another-workspace"
+    elif mutation == "kind":
+        record["kind"] = "run_summary"
+    elif mutation == "body":
+        record["body"] = {"result": {}}
+    elif mutation == "result":
+        record["body"]["result"]["verification"] = "not_checked"
+        record["digest"] = entity_digest("evidence", record["body"])
+    elif mutation == "extra":
+        record["approved"] = True
+    else:
+        del record["body"]["run_id"]
+        record["digest"] = entity_digest("evidence", record["body"])
+    with pytest.raises(CoordinatorFailure, match="research_evidence_binding_invalid|research_backend_binding_invalid"):
+        _evidence_fact(record, "evidence", "workspace")
+
+
+class PublishedBackendModel(ResearchModel):
+    """Controlled plan choices with actual canonical IDs returned by B."""
+
+    reference_id: str
+
+    def _generate(self, messages, **kwargs):
+        from langchain_core.messages import AIMessage, ToolMessage
+        from langchain_core.outputs import ChatGeneration, ChatResult
+        observed = [message for message in messages if isinstance(message, ToolMessage)]
+        if len(observed) == 1:
+            message = AIMessage(content="", tool_calls=[{"name": "prepare_scientific_proposal",
+                "args": {"kind": "investigation", "reference_ids": [self.reference_id]},
+                "id": "research-call-1", "type": "tool_call"}])
+            return ChatResult(generations=[ChatGeneration(message=message)])
+        return super()._generate(messages, **kwargs)
+
+
+def _actual_backend_phase(directory, phase):
+    """Subprocess helper: real B authority + SQLite saver, no hosted or solver calls."""
+    from bean_api.research import ResearchService
+    from bean_api.research_checkpoints import ResearchCheckpointer
+    from bean_api.research_tools import ApplicationResearchPorts
+    from bean_api.store import Store
+    from bean_api.workflow import Workflow
+    from test_workflow import create_problem, dataset_body
+    import google.genai
+
+    def denied(*args, **kwargs):
+        raise AssertionError("Actual backend checkpoint checks cannot contact providers/network")
+    socket.socket.connect = socket.socket.connect_ex = socket.create_connection = google.genai.Client = denied
+    directory = Path(directory)
+    flow = Workflow(Store(directory / "actual-backend.sqlite3"))
+    service = ResearchService(flow)
+    retained_path = directory / "review-pause.json"
+
+    async def exercise():
+        if phase == "start":
+            workspace = flow.create_workspace("alice", "Actual A and B checkpoint component")['id']
+            dataset = flow.create_dataset("alice", workspace, dataset_body(), "data")
+            problem = create_problem(flow, workspace, dataset)
+            session = service.create("alice", workspace, {"objective": "Does this exact reviewed range survive?",
+                "problem_id": problem["id"], "expected_problem_digest": problem["digest"]}, "session")
+            queued = service.advance("alice", session["id"], {"expected_revision": session["revision"]}, "advance")
+        else:
+            retained = json.loads(retained_path.read_text())
+            session = service.get("alice", retained["session_id"])
+            queued = service.decide("alice", session["id"], {"expected_revision": session["revision"],
+                "pending_review_id": retained["review_id"], "expected_review_digest": retained["review_digest"],
+                "decision": "approve", "accepted": True}, "approve")
+            problem = flow.get("alice", session["problem_id"])
+        context = service.acquire("alice", queued["action"]["id"], "worker-" + phase, seconds=300)
+        ports = ApplicationResearchPorts(service, context)
+        snapshot = await ports.context()
+        observations = []
+        graph = await create_application_research_coordinator(context=context, ports=ports,
+            checkpointer=ResearchCheckpointer(service, context),
+            model_factory=lambda: PublishedBackendModel(reference_id=problem["id"]),
+            event_sink=observations.append, policy=snapshot["budget"])
+        if phase == "start":
+            paused = await graph.start()
+            assert paused["awaiting_review"] is True
+            review = paused["interrupts"][0]
+            retained_path.write_text(json.dumps({"session_id": session["id"], "review_id": review["review_id"],
+                "review_digest": review["review_digest"], "todos": paused["todos"]}))
+            service.release(context, "waiting_review")
+            return {"phase": phase, "review_paused": True}
+        waiting = await graph.resume(new_action=True)
+        assert waiting["interrupts"][0]["kind"] == "canonical_scientific_child"
+        assert waiting["todos"] == retained["todos"]
+        with service.store.read() as conn:
+            assert conn.execute("SELECT count(*) FROM jobs").fetchone()[0] == 1
+            assert conn.execute("SELECT count(*) FROM research_effects WHERE kind='child'").fetchone()[0] == 1
+        current = service.get("alice", session["id"])
+        assert current["usage"]["physical_calls"] == 0 and current["usage"]["child_count"] == 1
+        service.release(context, "waiting_child", waiting_job_id=waiting["interrupts"][0]["job_id"])
+        return {"phase": phase, "restored_review": True, "one_authorized_child": True, "physical_calls": 0}
+    return asyncio.run(exercise())
+
+
+def test_published_backend_restores_actual_graph_in_separate_processes(tmp_path):
+    import importlib.util
+    import os
+    import subprocess
+    import sys
+    if importlib.util.find_spec("bean_api.research") is None:
+        pytest.skip("B research runtime is absent in A-only checkout; run the documented combined-source overlay")
+    child_env = {**os.environ, "PYTHONPATH": os.pathsep.join((str(ROOT / "apps/api"), str(ROOT / "tests"),
+                                                            os.environ.get("PYTHONPATH", "")))}
+    for phase in ("start", "approve"):
+        code = ("import json; from test_research_integration import _actual_backend_phase; "
+                f"print(json.dumps(_actual_backend_phase({str(tmp_path)!r}, {phase!r})))")
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=45, env=child_env)
+        assert result.returncode == 0, result.stderr + result.stdout
+        assert json.loads(result.stdout)["phase"] == phase
