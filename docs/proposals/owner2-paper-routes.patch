@@ -1,0 +1,133 @@
+diff --git a/apps/api/bean_api/http.py b/apps/api/bean_api/http.py
+index c4a68b2..7724ec8 100644
+--- a/apps/api/bean_api/http.py
++++ b/apps/api/bean_api/http.py
+@@ -15,8 +15,10 @@ def error_body(request_id: str, code: str, message: str, *, field_paths: list[st
+ 
+ 
+ class RequestBoundary:
+-    def __init__(self, app, max_json_bytes: int = 262_144, max_upload_bytes: int = 5 * 1024 * 1024):
++    def __init__(self, app, max_json_bytes: int = 262_144, max_upload_bytes: int = 5 * 1024 * 1024,
++                 max_paper_bytes: int = 20 * 1024 * 1024):
+         self.app, self.max_json_bytes, self.max_upload_bytes = app, max_json_bytes, max_upload_bytes
++        self.max_paper_bytes = max_paper_bytes
+ 
+     async def __call__(self, scope, receive, send):
+         if scope["type"] != "http":
+@@ -26,7 +28,8 @@ class RequestBoundary:
+         headers = dict(scope.get("headers", []))
+         content_type = headers.get(b"content-type", b"").split(b";")[0].lower()
+         is_json = content_type == b"application/json"
+-        limit = self.max_json_bytes if is_json else self.max_upload_bytes
++        # Papers have their own cap; the buffer still stops at that cap before reading further.
++        limit = self.max_json_bytes if is_json else self.max_paper_bytes if content_type == b"application/pdf" else self.max_upload_bytes
+ 
+         async def wrapped_send(message):
+             if message["type"] == "http.response.start":
+diff --git a/apps/api/bean_api/main.py b/apps/api/bean_api/main.py
+index b0414d1..45a67ec 100644
+--- a/apps/api/bean_api/main.py
++++ b/apps/api/bean_api/main.py
+@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse, Response
+ from pydantic import ValidationError
+ 
+ from .auth import AuthenticationError, principal
++from .papers import capabilities as paper_capabilities
++from .papers.service import PaperService
+ from .canonical import canonical_bytes, parse_decimal
+ from .config import Settings
+ from .contracts import (
+@@ -65,6 +67,7 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
+     provider = provider or GeminiProvider(provider_config_from_env(), ledger)
+     adapter = adapter or create_science_adapter(settings.counterdex_python, settings.science_adapter)
+     sources = SourceService(workflow, settings.blob_dir)
++    papers = PaperService(workflow, settings.blob_dir)
+     intake = IntakeService(workflow, sources, provider, controlled_source_proposer=controlled_source_proposer)
+     conversation = ConversationService(workflow, provider, sources)
+     artifacts = ArtifactService(workflow, settings.artifact_dir)
+@@ -118,6 +121,9 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
+                                   "execution_mode": settings.source_intake_mode,
+                                   "application_review_integration": "available" if controlled_source_proposer else "disabled",
+                                   "controlled_authorship": "controlled_fixture" if controlled_source_proposer else None},
++                "paper_intake": {**paper_capabilities(), "available": True, "max_papers_per_source_workflow": 1,
++                                 "model_extraction": "unavailable: no paper proposal contract yet",
++                                 "review_integration": "manual page-cited entry only"},
+                 "model_templates": [{"id": "two_rate_concentration", "schema_implemented": True,
+                                      "scientific_adapter_qualified": bool(adapter.capabilities().get("verified_in_environment")),
+                                      "units": {"time": "h", "concentration": "mg/L", "rates": "1/h"},
+@@ -240,6 +246,62 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
+         return await run_in_threadpool(sources.admit, actor, workspace_id, raw,
+                                       request.headers.get("content-type", "").split(";")[0], origin, retention, key)
+ 
++    @app.post(PREFIX + "/workspaces/{workspace_id}/papers", status_code=201)
++    async def upload_paper(workspace_id: str, request: Request, actor: Actor, key: OperationKey,
++                           origin: Literal["synthetic", "public"] = Query(...), retention: Literal["retain"] = Query(...),
++                           filename: str = Query("paper.pdf", max_length=200)):
++        from starlette.concurrency import run_in_threadpool
++        raw = await request.body()  # bounded by RequestBoundary's paper cap before buffering further
++        return await run_in_threadpool(papers.admit, actor, workspace_id, raw,
++                                      request.headers.get("content-type", "").split(";")[0], origin, retention, filename, key)
++
++    @app.get(PREFIX + "/workspaces/{workspace_id}/papers")
++    def list_papers(workspace_id: str, actor: Actor):
++        return [papers.public_record(r) for r in workflow.list_records(actor, workspace_id, "paper_source")]
++
++    @app.get(PREFIX + "/papers/{paper_id}")
++    def paper(paper_id: str, actor: Actor):
++        return papers.public_record(workflow.get(actor, paper_id, "paper_source"))
++
++    @app.get(PREFIX + "/papers/{paper_id}/content")
++    def paper_content(paper_id: str, actor: Actor):
++        record, content = papers.read(actor, paper_id)
++        return Response(content, media_type="application/pdf", headers={
++            "X-Artifact-SHA256": record["body"]["sha256"], "Content-Disposition": f'attachment; filename="dr-bean-{paper_id}.pdf"'})
++
++    @app.get(PREFIX + "/papers/{paper_id}/pages/{page}/text")
++    def paper_page_text(paper_id: str, page: int, actor: Actor):
++        return papers.page_text(actor, paper_id, page)
++
++    @app.get(PREFIX + "/papers/{paper_id}/pages/{page}/preview")
++    async def paper_page_preview(paper_id: str, page: int, actor: Actor, scale: float = Query(1.5, gt=0, le=3)):
++        from starlette.concurrency import run_in_threadpool
++        rendered = await run_in_threadpool(papers.page_preview, actor, paper_id, page, scale)
++        meta = rendered["preview"]
++        return Response(rendered["png"], media_type="image/png", headers={
++            "X-Artifact-SHA256": meta["png_sha256"], "X-Preview-Scale": meta["scale"], "Content-Disposition": "inline"})
++
++    @app.post(PREFIX + "/papers/{paper_id}/page-selections", status_code=201)
++    async def paper_selection(paper_id: str, body: dict, actor: Actor, key: OperationKey):
++        from starlette.concurrency import run_in_threadpool
++        pages = body.get("pages") if isinstance(body, dict) and set(body) == {"pages"} else None
++        if not isinstance(pages, list) or any(type(p) is not int for p in pages):
++            raise DomainError("field_validation_failed", "Send {\"pages\": [physical page numbers]}.", 422, ["pages"])
++        return await run_in_threadpool(papers.select, actor, paper_id, pages, key)
++
++    @app.get(PREFIX + "/paper-page-selections/{selection_id}/content")
++    def paper_selection_content(selection_id: str, actor: Actor):
++        record, content = papers.subset_content(actor, selection_id)
++        return Response(content, media_type="application/pdf", headers={
++            "X-Artifact-SHA256": record["body"]["subset_sha256"], "Content-Disposition": f'attachment; filename="dr-bean-{selection_id}.pdf"'})
++
++    @app.post(PREFIX + "/papers/{paper_id}/citation-checks")
++    def paper_citation(paper_id: str, body: dict, actor: Actor):
++        page, excerpt, box = (body or {}).get("page"), (body or {}).get("excerpt", ""), (body or {}).get("box")
++        if type(page) is not int or not isinstance(excerpt, str) or len(excerpt) > 1000 or set(body) - {"page", "excerpt", "box"}:
++            raise DomainError("field_validation_failed", "Send page (integer), excerpt (text) and optional box.", 422, ["page", "excerpt"])
++        return papers.check_citation(actor, paper_id, page, excerpt, box)
++
+     @app.get(PREFIX + "/source-assets/{source_id}")
+     def source_metadata(source_id: str, actor: Actor):
+         return sources.public_record(workflow.get(actor, source_id, "source_asset"))
+diff --git a/pyproject.toml b/pyproject.toml
+index 9f978b0..92e0645 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -13,6 +13,8 @@ dependencies = [
+   "uvicorn==0.52.1",
+   "httpx==0.28.1",
+   "Pillow==13.0.0",
++  "pypdf==7.1.0",
++  "pypdfium2==5.15.2",
+   "google-genai==3.3.0",
+   "deepagents==0.7.38",
+   "langchain-google-genai==4.5.0",

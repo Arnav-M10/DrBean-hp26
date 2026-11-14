@@ -9,13 +9,16 @@ from pathlib import Path
 import subprocess
 import sys
 
+from ..workflow import DomainError
 from . import limits as L
 
 WORKER = Path(__file__).with_name("_pdf_worker.py")
 
 
-class PaperError(Exception):
-    """A user-facing refusal with a fixed code; never contains document content."""
+class PaperError(DomainError):
+    """A user-facing refusal with a fixed code; never contains document content.
+
+    A DomainError, so the API's existing error handler returns the standard error body."""
 
     MESSAGES = {
         "unsupported_media_type": "Only PDF papers are admitted on this path. Images use the image source path.",
@@ -37,9 +40,8 @@ class PaperError(Exception):
     STATUS = {"decoder_setup_failed": 503, "worker_output_invalid": 503}
 
     def __init__(self, code: str):
-        self.code = code if code in self.MESSAGES else "malformed_pdf"
-        self.status = self.STATUS.get(self.code, 422)
-        super().__init__(self.MESSAGES[self.code])
+        code = code if code in self.MESSAGES else "malformed_pdf"
+        super().__init__(code, self.MESSAGES[code], self.STATUS.get(code, 422))
 
 
 def sniff_pdf(raw: bytes, declared_mime: str) -> None:
