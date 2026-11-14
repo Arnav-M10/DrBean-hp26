@@ -328,3 +328,73 @@ def test_actual_baseline_approval_evidence_and_report_through_metered_model(mete
     assert fresh["verification"] == "valid" and fresh["replay"] == "passed"
     assert worker.tick() == 0
     assert len(wire.requests) == 6
+
+
+@pytest.mark.parametrize("metered_app", ["native"], indirect=True)
+def test_reviewed_design_constraints_baseline_fits_the_documented_operator_allocation(metered_app):
+    """Owner 5 author check: admission estimate for the predeclared live sample.
+
+    The browser demo saves reviewed design constraints with the question, so the
+    live baseline carries them in every request. With the documented operator
+    allocation (6 requests, 64,000 input, 3,072 output tokens) main aa51f16
+    reserved 49,524 input tokens for the first five requests and refused the
+    sixth (the report) with provider_budget_exhausted after the science ran.
+    research-prompt.v4's bounded views must complete it with headroom. The SDK
+    is substituted; this is accounting evidence, not live qualification.
+    """
+    client, service, worker, wire = metered_app
+    wire.research_policy = True
+    root = Path(__file__).resolve().parents[1]
+    fixture = json.loads((root / "packages/groundwork_adapter/fixtures/decision/hero-baseline.request.json").read_text())
+    conditions = json.loads((root / "docs/agent/controlled-conditions.v1.json").read_text())["inputs"]
+
+    def accepted(path, body, key):
+        response = post(client, path, body, key)
+        assert response.status_code in {200, 201, 202}, response.text
+        return response.json()
+
+    workspace = accepted("/workspaces", {"name": "Live sample admission estimate"}, "workspace")["id"]
+    dataset = accepted(f"/workspaces/{workspace}/datasets", {
+        "experiment_id": "explicit-offline-metered-test", "time_origin": fixture["dataset"]["body"]["time_origin"],
+        "origin": "hypothetical", "change_reason": "Synthetic reviewed measurements, no fixed candidate outputs",
+        "rows": fixture["dataset"]["body"]["rows"]}, "dataset")
+    problem = accepted(f"/workspaces/{workspace}/problems", {
+        "dataset_id": dataset["id"], "dataset_digest": dataset["digest"],
+        "domain": fixture["problem"]["body"]["domain"], "target": fixture["problem"]["body"]["target"]}, "problem")
+    session = accepted(f"/workspaces/{workspace}/research-sessions", {
+        "objective": conditions["objective"], "mode": "live", "problem_id": problem["id"],
+        "expected_problem_digest": problem["digest"], "design_constraints": conditions["design_constraints"]}, "session")
+    consent(client, session)
+    service.allocate_provider("alice", session["id"], {"physical_requests": 6,
+        "input_tokens": 64_000, "output_tokens": 3072, "accepted": True}, "offline-operator-allocation")
+
+    def reserved_before_sdk():
+        attempts = client.app.state.ledger.list_attempts("alice", workspace)
+        assert len(attempts) == len(wire.requests) + 1 and attempts[-1]["state"] == "reserved"
+    wire.before_request = reserved_before_sdk
+    assert advance(client, session).status_code == 200
+    worker.tick()
+    waiting = service.get("alice", session["id"])
+    assert waiting["state"] == "waiting_review" and not waiting["children"]
+    accepted(f"/research-sessions/{session['id']}/decisions", {
+        "expected_revision": waiting["revision"], "pending_review_id": waiting["pending_review"]["id"],
+        "expected_review_digest": waiting["pending_review_digest"], "decision": "approve", "accepted": True}, "approve")
+    for _ in range(4):
+        worker = Worker(service.workflow, settings=client.app.state.settings,
+            provider_config=worker.config, ledger=client.app.state.ledger)
+        worker.tick()
+        final = service.get("alice", session["id"])
+        if final["state"] != "waiting_child":
+            break
+    assert final["state"] == "completed" and len(final["reports"]) == 1, final
+    attempts = client.app.state.ledger.list_attempts("alice", workspace)
+    reserved = [item["metadata"]["reserved_input_tokens"] for item in attempts]
+    assert len(attempts) == len(wire.requests) == 6 and all(item["state"] == "completed" for item in attempts)
+    assert [call["name"] for call in wire.policy_calls] == ["write_todos", "prepare_scientific_proposal",
+        "run_scientific_operation", "read_research_evidence", "write_todos", "publish_research_report"]
+    assert sum(reserved) <= 60_000, reserved  # measured 57,206 at research-prompt.v4
+    assert sum(item["metadata"]["reserved_output_tokens"] for item in attempts) <= 3072
+    steps = final["plan"]["body"]["steps"]
+    evidence_id = final["children"][0]["scenarios"][0]["result_id"]
+    assert [step["status"] for step in steps] == ["completed", "completed", "pending"]
+    assert all(step["reference_ids"] == [evidence_id] for step in steps[:2])
