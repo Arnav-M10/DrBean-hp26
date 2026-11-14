@@ -137,7 +137,7 @@ class ResearchService:
         children = []
         for effect in conn.execute("SELECT job_id FROM research_effects WHERE session_id=? AND job_id IS NOT NULL ORDER BY created_at,id", (session["id"],)):
             children.append(self.workflow._job(conn, session["actor_id"], effect["job_id"]))
-        return {"schema_version": RESEARCH_VERSION, "id": session["id"], "workspace_id": session["workspace_id"],
+        snapshot = {"schema_version": RESEARCH_VERSION, "id": session["id"], "workspace_id": session["workspace_id"],
             "objective": creation["body"]["objective"], "mode": session["mode"], "state": session["state"], "revision": session["revision"],
             "problem_id": session["problem_id"], "problem_digest": session["problem_digest"],
             "sources": json.loads(session["source_refs"]), "plan": plan,
@@ -151,6 +151,8 @@ class ResearchService:
             "provider_allocation": {"physical_requests": session["physical_allocation"], "input_tokens": session["input_allocation"], "output_tokens": session["output_allocation"]},
             "checkpoint_version": session["checkpoint_version"], "policy_version": session["policy_version"],
             "created_at": session["created_at"], "updated_at": session["updated_at"]}
+        from .research_projection import session_projection
+        return {**snapshot, **session_projection(conn, self, session, snapshot)}
 
     def get(self, actor, session_id):
         with self.store.read() as conn:
@@ -519,6 +521,9 @@ class ResearchService:
             unknown = conn.execute("SELECT 1 FROM provider_attempts p JOIN research_attempt_bindings b ON b.attempt_id=p.id WHERE b.action_id=? AND p.state IN ('unknown_outcome','reserved')", (action["id"],)).fetchone()
             if unknown:
                 raise DomainError("provider_outcome_unknown", "The provider outcome remains unknown and reserved; inference will not be automatically repeated.", 409)
+            if action["error_code"] in {"research_model_outcome_unrecoverable", "research_checkpoint_reconciliation_required"}:
+                raise DomainError(action["error_code"], "No safely replayable tool decision is retained for this action. "
+                                  "Inspect preserved evidence and accounting, or cancel this action; no model request will be repeated.", 409)
             # Same action, same cumulative counters, same journal and graph thread.
             conn.execute("UPDATE research_actions SET state='queued',error_code=NULL,updated_at=? WHERE id=?", (utc_now(), action["id"]))
             conn.execute("UPDATE research_sessions SET state='queued',revision=revision+1,updated_at=? WHERE id=?", (utc_now(), session_id))

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Callable, Literal, Protocol
 
 from langchain.agents.middleware import AgentMiddleware, AgentState, TodoListMiddleware
+from langchain.agents.middleware.types import hook_config
 from langchain.tools import ToolRuntime
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.types import Command, interrupt
@@ -34,6 +35,19 @@ PORT_VERSION = "research-ports.v1"
 FACT_VIEW_VERSION = "agent-evidence-view.v1"
 TOOLS = frozenset({"write_todos", "prepare_scientific_proposal", "run_scientific_operation",
                    "read_research_evidence", "request_clarification", "publish_research_report"})
+
+
+def _safe_tool_batch(calls: list[dict]) -> bool:
+    """Only planning plus an independent proposal/report may share one request.
+
+    Science and evidence-dependent tools never run in parallel with their inputs.
+    Every tool still consumes its own durable admission and authority checks.
+    """
+    names = [call.get("name") for call in calls]
+    return (len(names) <= 1 and all(name in TOOLS for name in names)) or (
+        len(names) == 2 and len(set(names)) == 2 and set(names) in (
+            {"write_todos", "prepare_scientific_proposal"},
+            {"write_todos", "publish_research_report"}))
 
 
 @dataclass(frozen=True)
@@ -303,16 +317,23 @@ def _plan_evidence(messages: list[Any]) -> dict[str, list[str]]:
                     unbound.clear()
         elif isinstance(message, ToolMessage) and message.status != "error":
             call = calls.get(message.tool_call_id)
-            if call is None or call["name"] != "read_research_evidence":
+            if call is None or call["name"] not in {"read_research_evidence", "run_scientific_operation"}:
                 continue
             try:
                 value = json.loads(message.content)
             except (TypeError, ValueError):
                 continue
-            reference = call["args"].get("evidence_id")
-            if (isinstance(value, dict) and isinstance(reference, str) and value.get("id") == reference
-                    and reference not in unbound and not any(reference in refs for refs in bound.values())):
-                unbound.append(reference)
+            if call["name"] == "read_research_evidence":
+                observed = [(call["args"].get("evidence_id"), value)]
+            elif isinstance(value, dict) and value.get("state") == "completed":
+                observed = [(fact.get("id"), fact) for fact in value.get("canonical_evidence", [])
+                            if isinstance(fact, dict) and fact.get("id") in value.get("evidence_ids", [])]
+            else:
+                observed = []
+            for reference, fact in observed:
+                if (isinstance(fact, dict) and isinstance(reference, str) and fact.get("id") == reference
+                        and reference not in unbound and not any(reference in refs for refs in bound.values())):
+                    unbound.append(reference)
     return bound
 
 
@@ -383,7 +404,7 @@ class ResearchCoordinator:
         return {"research_binding": self.context.binding(), **_checkpoint_versions(),
             "session_binding": self.context.session_binding(), "action_id": self.context.action_id,
             "input_binding": self.context.input_binding(),
-            "model_turns": 0, "tool_calls": 0, "research_terminal": None}
+            "model_turns": 0, "tool_calls": 0, "research_terminal": None, "jump_to": None}
 
     def _action_input(self) -> dict[str, Any]:
         return {**self._action_state(),
@@ -472,17 +493,34 @@ class ResearchCoordinator:
             # The terminal result reached the checkpointer, but the worker's
             # acknowledgement may have been lost. Reading it creates no work.
             return self._result(state.values)
-        if (state.next != ("tools",) or len(state.tasks) != 1
-                or state.tasks[0].name != "tools"):
-            raise CoordinatorFailure("research_checkpoint_reconciliation_required")
+        if (state.values.get("research_terminal") and state.next == ("Boundary.before_model",)
+                and state.tasks and all(task.name == "Boundary.before_model" for task in state.tasks)):
+            # A mixed planning/report batch has completed both tools. The
+            # boundary's terminal guard writes END without admitting/calling a
+            # model. Complete that guard so a later explicit action can advance.
+            return await self._invoke(None)
+        if (state.next != ("tools",) or not 1 <= len(state.tasks) <= 2
+                or any(task.name != "tools" for task in state.tasks)):
+            # Without a committed tool decision the model output is not
+            # reconstructible here. A completed physical request may have lost
+            # its checkpoint acknowledgement, even when it is not marked
+            # unknown by the provider ledger. Never infer permission to resend.
+            raise CoordinatorFailure("research_model_outcome_unrecoverable")
         messages = state.values.get("messages") or []
-        last = messages[-1] if messages else None
-        calls = last.tool_calls if isinstance(last, AIMessage) else []
-        if (len(calls) != 1 or calls[0].get("name") not in TOOLS
-                or last.invalid_tool_calls):
+        index = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], AIMessage)), None)
+        decision = messages[index] if index is not None else None
+        calls = decision.tool_calls if decision is not None else []
+        # A safe two-tool batch can have one already committed ToolMessage and
+        # one pending task. Preserve that response and continue only the graph's
+        # pending writes; never substitute a new decision or replay the model.
+        responses = messages[index + 1:] if index is not None else []
+        call_ids = {call.get("id") for call in calls}
+        if (not calls or not _safe_tool_batch(calls) or decision.invalid_tool_calls
+                or len(state.tasks) > len(calls) or len(call_ids) != len(calls)
+                or any(not isinstance(message, ToolMessage) or message.tool_call_id not in call_ids for message in responses)
+                or len({message.tool_call_id for message in responses}) != len(responses)):
             raise CoordinatorFailure("research_checkpoint_reconciliation_required")
-        task = state.tasks[0]
-        if task.interrupts and task.error is None:
+        if any(task.interrupts and task.error is None for task in state.tasks):
             # An unanswered canonical pause still needs the normal current
             # review checks. A failed resumed task instead consumes its already
             # committed resume writes when invoked with None below.
@@ -619,8 +657,16 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
                 raise CoordinatorFailure("research_child_binding_invalid")
             await authority()
             if result["state"] not in {"pending", "running"}:
-                return _child_view(result, proposal_id=proposal_id, proposal_digest=proposal_digest,
+                view = _child_view(result, proposal_id=proposal_id, proposal_digest=proposal_digest,
                                    review_digest=review_digest, input_digest=context.input_digest)
+                if context.mode == "live_gemini" and result["state"] == "completed" and result.get("evidence_ids"):
+                    _references(result["evidence_ids"])
+                    # Read the actual immutable records once the child finishes.
+                    # Returning them saves a model turn; it does not synthesize
+                    # science, bypass validation or replace the explicit read tool.
+                    from .research_fact_view import live_fact
+                    view["canonical_evidence"] = [live_fact(_model_fact(await complete_fact(ref))) for ref in result["evidence_ids"]]
+                return view
             expected_job = result["job_id"]
             interrupt({"kind": "canonical_scientific_child", "proposal_id": proposal_id,
                        "proposal_digest": proposal_digest, "review_id": review_id,
@@ -636,14 +682,18 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
 
     async def read_research_evidence(evidence_id: str) -> dict[str, Any]:
         """Read scoped immutable evidence without scientific execution."""
-        return _model_fact(await complete_fact(evidence_id))
+        fact = _model_fact(await complete_fact(evidence_id))
+        if context.mode == "live_gemini":
+            from .research_fact_view import live_fact
+            return live_fact(fact)
+        return fact
 
     def terminal(kind: str, record: Any, runtime: ToolRuntime) -> Command:
         record = _bounded(record, 8000)
         if (not isinstance(record, dict) or not isinstance(record.get("id"), str)
                 or not 1 <= len(record["id"]) <= 256):
             raise CoordinatorFailure("research_terminal_record_required")
-        return Command(update={"research_terminal": {"kind": kind, "record_id": record["id"]},
+        return Command(update={"research_terminal": {"kind": kind, "record_id": record["id"]}, "jump_to": "end",
                                "messages": [ToolMessage(content=json.dumps(record), tool_call_id=runtime.tool_call_id)]})
 
     async def request_clarification(fields: list[str], question: str, runtime: ToolRuntime) -> Command:
@@ -673,10 +723,15 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     class Boundary(AgentMiddleware):
         state_schema = ResearchState
 
+        @hook_config(can_jump_to=["end"])
         async def abefore_model(self, state: Any, runtime: Any) -> dict[str, Any]:
             await authority()
             if state.get("research_binding") != context.binding() or not _versions_match(state):
                 raise CoordinatorFailure("research_checkpoint_incompatible")
+            if state.get("research_terminal"):
+                # A plan/report batch finishes both tools; the SDK routes mixed
+                # return_direct tools here. Do not spend another model request.
+                return {"jump_to": "end"}
             turns = state.get("model_turns", 0)
             if turns >= context.max_model_turns:
                 raise CoordinatorFailure("agent_model_budget_exhausted")
@@ -687,6 +742,10 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
             await authority()
             if {tool.name for tool in request.tools} != TOOLS:
                 raise CoordinatorFailure("agent_tool_inventory_changed")
+            if context.mode == "live_gemini":
+                from .research_context import model_messages
+                request = request.override(messages=model_messages(request.messages, request.state,
+                    question=context.question, reviewed_context=_model_context(context.reviewed_context)))
             _bounded({"messages": [m.model_dump(mode="json") for m in request.messages],
                       "system": request.system_message.content if request.system_message else "",
                       "tools": [{"name": t.name, "description": t.description,
@@ -696,7 +755,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
             calls = [c for m in response.result for c in getattr(m, "tool_calls", [])]
             if any(getattr(m, "invalid_tool_calls", []) for m in response.result):
                 raise CoordinatorFailure("agent_malformed_tool_call")
-            if len(calls) > 1 or any(c["name"] not in TOOLS for c in calls):
+            if not _safe_tool_batch(calls):
                 raise CoordinatorFailure("agent_forbidden_tool")
             if request.state.get("tool_calls", 0) + len(calls) > context.max_tool_calls:
                 raise CoordinatorFailure("agent_tool_budget_exhausted")
@@ -770,18 +829,17 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     # tool/schema while supplying the research-specific instruction once. This
     # reduces charged context without dropping any reviewed input or evidence.
     planning = TodoListMiddleware(
-        system_prompt="Plan with write_todos; update from evidence. Keep completed steps. Todos grant no authority.",
-        tool_description="Update proposed steps (pending/in_progress/completed); preserve completed steps. No scientific authority.")
+        system_prompt="Maintain evidence-based todos; preserve completed steps; no authority.",
+        tool_description="Update proposed steps; preserve completed ones. No authority.")
     graph = create_deep_agent(model=model, tools=typed, middleware=[NoFilesystem(), planning, Boundary()],
         state_schema=ResearchState, backend=StateBackend(), checkpointer=checkpointer,
         subagents=[], skills=None, memory=None, store=None, cache=None, debug=False,
-        system_prompt=("One tool/turn; canonical references only. Baseline, read evidence, choose next action. "
-            "Human approval alone authorizes science. Missing assumptions: clarify; never invent data. "
-            "Closed claims require compatible strictly-outside witnesses; bounded misses are not proofs. "
-            "Designs need distinct checked candidates, reviewed feasible times/allowance and separate approval; "
-            "separation requires positive checked margin. Preserve history and readings' time/allowance/origin. "
-            "Exclusions aren't global conclusions. Execution/binding/verification/replay differ. "
-            "Cite evidence: 'The evidence has a conditional scope.' Finish with report/clarification."))
+        system_prompt=("Use canonical IDs. Plan; prepare; human approve; run; use canonical_evidence; report/clarify. "
+            "Batch only independent todos+prepare/report. Snapshots keep prior facts. Clarify missing assumptions; invent nothing. "
+            "A counterexample is compatible and strictly outside the CLOSED claim. Bounded misses prove nothing. "
+            "Design: distinct checked candidates, reviewed times/allowance, separate approval, positive checked margin. "
+            "Keep history and readings' time/allowance/origin. Exclusions aren't global. Execution/binding/verification/replay differ. "
+            "Cite evidence: 'The evidence has a conditional scope.'"))
     inventories = [set(n.data.tools_by_name) for n in graph.get_graph().nodes.values()
                    if hasattr(n.data, "tools_by_name")]
     if inventories != [set(TOOLS)]:
@@ -790,5 +848,6 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
                "port_version": PORT_VERSION, "mode": context.mode, "tools": sorted(TOOLS),
                "subagents": False, "filesystem": False, "summarization": False,
                "checkpointer": "backend_supplied", "application_integration_qualified": False,
+               "model_context_version": "research-canonical-context.v1",
                "live_qualification": "not_run"}
     return ResearchCoordinator(context, ports, graph, runtime)

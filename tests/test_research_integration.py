@@ -132,8 +132,9 @@ class CanonicalBackend:
     async def request_clarification(self, fields, reason):
         return {"id": "clarification", "fields": fields, "reason": reason}
 
-    async def publish_report(self):
-        report = {"id": "report", "evidence_ids": ["evidence"]}
+    async def publish_report(self, *, evidence_ids=None, commentary=None):
+        report = {"id": "report", "evidence_ids": ["evidence"],
+                  "agent_commentary": copy.deepcopy(commentary), "commentary_persisted": commentary is not None}
         self.reports.append(report)
         return copy.deepcopy(report)
 
@@ -179,8 +180,8 @@ def test_actual_graph_uses_canonical_review_child_and_report_after_reconstructio
         report_message = record.values["messages"][-1]
         report = json.loads(report_message.content)
         assert report["agent_commentary"]["scientific_authority"] is False
-        assert report["commentary_persisted"] is False
-        assert "agent_commentary" not in backend.reports[0]
+        assert report["commentary_persisted"] is True
+        assert report["agent_commentary"] == backend.reports[0]["agent_commentary"]
         assert all("arguments" not in event and "args" not in event for event in backend.events)
         requested = [event for event in backend.events if event["summary"] == "tool_requested: run_scientific_operation"]
         assert len(requested) == 2 and requested[0]["observation_key"] == requested[1]["observation_key"]
@@ -363,10 +364,29 @@ def test_wrong_report_evidence_is_not_accepted_as_a_terminal_success():
         graph = await build(backend)
         await graph.start()
         backend.review.update(decision="approve", approval_id="approval")
-        async def wrong_report():
+        async def wrong_report(**kwargs):
             return {"id": "wrong-report", "evidence_ids": ["other-input-evidence"]}
         backend.publish_report = wrong_report
         with pytest.raises(CoordinatorFailure, match="research_report_binding_invalid"):
+            await graph.resume()
+        state = await graph._graph.aget_state(graph._config)
+        assert state.values.get("research_terminal") is None and len(backend.children) == 1
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("alteration", ["not_persisted", "changed_commentary"])
+def test_report_requires_acknowledgement_of_the_exact_persisted_commentary(alteration):
+    async def exercise():
+        backend = CanonicalBackend()
+        graph = await build(backend)
+        await graph.start()
+        backend.review.update(decision="approve", approval_id="approval")
+        async def incomplete_report(*, evidence_ids, commentary):
+            annotation = {**commentary, "next_action": "stop"} if alteration == "changed_commentary" else commentary
+            return {"id": "unconfirmed-report", "evidence_ids": evidence_ids,
+                    "agent_commentary": annotation, "commentary_persisted": alteration != "not_persisted"}
+        backend.publish_report = incomplete_report
+        with pytest.raises(CoordinatorFailure, match="research_report_commentary_not_persisted"):
             await graph.resume()
         state = await graph._graph.aget_state(graph._config)
         assert state.values.get("research_terminal") is None and len(backend.children) == 1

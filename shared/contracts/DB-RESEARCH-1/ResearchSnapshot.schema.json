@@ -125,6 +125,204 @@
       "title": "ResearchBudget",
       "type": "object"
     },
+    "ResearchInteraction": {
+      "additionalProperties": false,
+      "properties": {
+        "waiting_for_review": {
+          "title": "Waiting For Review",
+          "type": "boolean"
+        },
+        "waiting_for_observation": {
+          "title": "Waiting For Observation",
+          "type": "boolean"
+        },
+        "provider_consent_required": {
+          "title": "Provider Consent Required",
+          "type": "boolean"
+        },
+        "quota_exhausted": {
+          "title": "Quota Exhausted",
+          "type": "boolean"
+        },
+        "recovery": {
+          "$ref": "#/$defs/ResearchRecovery"
+        },
+        "results": {
+          "$ref": "#/$defs/ResearchResultAvailability"
+        },
+        "suggested_action": {
+          "enum": [
+            "reconcile",
+            "inspect_accounting_or_cancel",
+            "wait",
+            "review",
+            "review_observation",
+            "inspect_results",
+            "review_provider_consent",
+            "inspect_allocation",
+            "advance"
+          ],
+          "title": "Suggested Action",
+          "type": "string"
+        }
+      },
+      "required": [
+        "waiting_for_review",
+        "waiting_for_observation",
+        "provider_consent_required",
+        "quota_exhausted",
+        "recovery",
+        "results",
+        "suggested_action"
+      ],
+      "title": "ResearchInteraction",
+      "type": "object"
+    },
+    "ResearchProviderRemaining": {
+      "additionalProperties": false,
+      "properties": {
+        "physical_requests": {
+          "minimum": 0,
+          "title": "Physical Requests",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "physical_requests",
+        "input_tokens",
+        "output_tokens"
+      ],
+      "title": "ResearchProviderRemaining",
+      "type": "object"
+    },
+    "ResearchProviderUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "const": "research_session",
+          "title": "Scope",
+          "type": "string"
+        },
+        "physical_requests": {
+          "minimum": 0,
+          "title": "Physical Requests",
+          "type": "integer"
+        },
+        "reserved_input_tokens": {
+          "minimum": 0,
+          "title": "Reserved Input Tokens",
+          "type": "integer"
+        },
+        "reserved_output_tokens": {
+          "minimum": 0,
+          "title": "Reserved Output Tokens",
+          "type": "integer"
+        },
+        "accounted_input_tokens": {
+          "minimum": 0,
+          "title": "Accounted Input Tokens",
+          "type": "integer"
+        },
+        "accounted_output_tokens": {
+          "minimum": 0,
+          "title": "Accounted Output Tokens",
+          "type": "integer"
+        },
+        "reported_input_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reported Input Tokens"
+        },
+        "reported_output_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reported Output Tokens"
+        },
+        "reported_thought_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reported Thought Tokens"
+        },
+        "reported_total_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reported Total Tokens"
+        },
+        "reported_attempts": {
+          "minimum": 0,
+          "title": "Reported Attempts",
+          "type": "integer"
+        },
+        "unresolved_attempts": {
+          "minimum": 0,
+          "title": "Unresolved Attempts",
+          "type": "integer"
+        },
+        "accounting_valid": {
+          "title": "Accounting Valid",
+          "type": "boolean"
+        },
+        "remaining": {
+          "$ref": "#/$defs/ResearchProviderRemaining"
+        }
+      },
+      "required": [
+        "scope",
+        "physical_requests",
+        "reserved_input_tokens",
+        "reserved_output_tokens",
+        "accounted_input_tokens",
+        "accounted_output_tokens",
+        "reported_input_tokens",
+        "reported_output_tokens",
+        "reported_thought_tokens",
+        "reported_total_tokens",
+        "reported_attempts",
+        "unresolved_attempts",
+        "accounting_valid",
+        "remaining"
+      ],
+      "title": "ResearchProviderUsage",
+      "type": "object"
+    },
     "ResearchRecord": {
       "additionalProperties": false,
       "properties": {
@@ -192,6 +390,119 @@
         "created_at"
       ],
       "title": "ResearchRecord",
+      "type": "object"
+    },
+    "ResearchRecovery": {
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Code"
+        },
+        "can_reconcile": {
+          "title": "Can Reconcile",
+          "type": "boolean"
+        },
+        "next_action": {
+          "enum": [
+            "none",
+            "reconcile",
+            "inspect_accounting_or_cancel"
+          ],
+          "title": "Next Action",
+          "type": "string"
+        }
+      },
+      "required": [
+        "required",
+        "code",
+        "can_reconcile",
+        "next_action"
+      ],
+      "title": "ResearchRecovery",
+      "type": "object"
+    },
+    "ResearchResultAvailability": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "title": "Available",
+          "type": "boolean"
+        },
+        "report_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "Report Ids",
+          "type": "array"
+        },
+        "latest_report_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Report Id"
+        },
+        "evidence_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "download_job_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "Download Job Ids",
+          "type": "array"
+        },
+        "commentary_available": {
+          "title": "Commentary Available",
+          "type": "boolean"
+        },
+        "deterministic_summary_available": {
+          "title": "Deterministic Summary Available",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "available",
+        "report_ids",
+        "latest_report_id",
+        "evidence_ids",
+        "download_job_ids",
+        "commentary_available",
+        "deterministic_summary_available"
+      ],
+      "title": "ResearchResultAvailability",
       "type": "object"
     },
     "ResearchReviewedContext": {
@@ -490,6 +801,28 @@
       },
       "title": "Provider Allocation",
       "type": "object"
+    },
+    "interaction": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResearchInteraction"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "provider_usage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResearchProviderUsage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "created_at": {
       "title": "Created At",

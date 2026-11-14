@@ -113,7 +113,7 @@ def test_pending_model_failure_is_never_retried_by_tool_continuation():
         with pytest.raises(RuntimeError, match="unknown model outcome"):
             await factory(ports, model, saver).start()
         before = (len(ports.turns), model.calls)
-        with pytest.raises(CoordinatorFailure, match="research_checkpoint_reconciliation_required"):
+        with pytest.raises(CoordinatorFailure, match="research_model_outcome_unrecoverable"):
             await factory(ports, model, saver).continue_pending()
         assert before == (len(ports.turns), model.calls)
         assert not ports.children
@@ -216,5 +216,53 @@ def test_actual_sqlite_child_commit_and_lost_ack_recover_one_reservation(tmp_pat
             assert conn.execute("SELECT count(*) FROM jobs").fetchone()[0] == 1
             assert conn.execute("SELECT count(*) FROM provider_attempts").fetchone()[0] == 0
             assert json.loads(new_action["budget"]) == json.loads(old_action["budget"])
+
+    asyncio.run(exercise())
+
+
+def test_completed_plan_report_batch_finishes_terminal_guard_without_provider_reentry():
+    """Only a completed safe batch may cross the deterministic END guard."""
+    from langchain_core.messages import AIMessage, ToolMessage
+    from langchain_core.outputs import ChatGeneration, ChatResult
+
+    class BatchedReportModel(ResearchModel):
+        def _generate(self, messages, **kwargs):
+            result = super()._generate(messages, **kwargs)
+            call = result.generations[0].message.tool_calls[0]
+            if call["name"] != "publish_research_report":
+                return result
+            plan = {"name": "write_todos", "id": "final-plan", "type": "tool_call", "args": {
+                "todos": [{"content": "Investigate reviewed measurements", "status": "in_progress"},
+                          {"content": "Review useful next measurement", "status": "pending"}]}}
+            return ChatResult(generations=[ChatGeneration(message=AIMessage(content="", tool_calls=[plan, call]))])
+
+    class LostAcknowledgementSaver(InMemorySaver):
+        failed = False
+
+        def put(self, config, checkpoint, metadata, new_versions):
+            saved = super().put(config, checkpoint, metadata, new_versions)
+            if checkpoint.get("channel_values", {}).get("research_terminal") and not self.failed:
+                self.failed = True
+                raise RuntimeError("terminal tools saved before process loss")
+            return saved
+
+    async def exercise():
+        ports, saver = Ports(), LostAcknowledgementSaver()
+        graph = factory(ports, BatchedReportModel(), saver)
+        await graph.start()
+        ports.review["decision"] = "approved"
+        with pytest.raises(RuntimeError, match="terminal tools saved"):
+            await graph.resume()
+        restored = factory(ports, BatchedReportModel(), saver)
+        state = await restored._snapshot()
+        assert state.next == ("Boundary.before_model",)
+        assert state.values["research_terminal"]["kind"] == "report"
+        assert all(isinstance(message, ToolMessage) for message in state.values["messages"][-2:])
+        before = (len(ports.turns), len(ports.tool_admissions), len(ports.children), len(ports.reports))
+        result = await restored.continue_pending()
+        assert result["terminal"] == {"kind": "report", "record_id": "report"}
+        assert not (await restored._snapshot()).next
+        assert before == (len(ports.turns), len(ports.tool_admissions), len(ports.children), len(ports.reports))
+        assert await restored.continue_pending() == result
 
     asyncio.run(exercise())
