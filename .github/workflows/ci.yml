@@ -106,6 +106,7 @@ jobs:
         if: always()
         run: |
           if ls tests/integration/test_*.py >/dev/null 2>&1; then
+            export DRBEAN_SCIENCE_PYTHON="$PWD/.venv-engine/bin/python"
             .venv/bin/python -m pytest -q tests/integration
           else
             echo "not delivered yet: recorded as unrun, not as passed"

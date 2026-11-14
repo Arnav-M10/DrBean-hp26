@@ -44,7 +44,7 @@ export function designRequest(run, evidence, draft) {
     observable: 'concentration', feasible_times: times, future_hard_allowance: allowance,
     allowance_origin: { kind: draft.allowanceOrigin, description }, maximum_horizon: horizon,
     allow_construction: Boolean(draft.allowConstruction), allow_continuation: Boolean(draft.allowContinuation),
-    source_artifact_ids: sources.map(artifact => artifact.id),
+    source_artifact_ids: [],
     budget: { wall_seconds: 120, fixed_vector_constructions: 2, pair_verifications: 2, bundle_bytes: 4194304 },
   }
 }

@@ -33,7 +33,7 @@ test('design preserves returned pair identities and approved grid order without 
   assert.equal(request.historical_run_id, run.id)
   assert.equal(request.scenario_id, source.body.scenario_id)
   assert.deepEqual(request.candidate_vectors, [...source.body.result.candidates].reverse().map(c => c.parameter_vector))
-  assert.deepEqual(request.source_artifact_ids, ['returned-native'])
+  assert.deepEqual(request.source_artifact_ids, [])
   request.candidate_vectors[0].A = '99/1'
   assert.deepEqual(source, before)
 })

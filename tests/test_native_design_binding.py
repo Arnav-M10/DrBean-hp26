@@ -46,16 +46,18 @@ def native_designs():
                 "arrived_after_cancel": False}
     contexts = {}
     for name, allowance, construct in (("checked", "1/5", True), ("wide", "3/5", True),
-                                       ("numerical", "1/5", False), ("reversed", "1/5", True)):
+                                       ("numerical", "1/5", False), ("reversed", "1/5", True),
+                                       ("explicit_numerical", "1/5", False)):
         selected = list(reversed(candidates)) if name == "reversed" else candidates
         request = DesignRequestBody.model_validate({"historical_run_id": "binding_baseline", "scenario_id": "baseline",
             "problem_id": problem["id"], "problem_digest": problem["digest"],
             "candidate_ids": [c["id"] for c in selected], "candidate_vectors": [c["parameter_vector"] for c in selected],
             "feasible_times": ["8/1", "6/1"], "future_hard_allowance": allowance,
-            "scientific_profile": "counterdex.v1", "requested_tier": "checked_pair_separation",
-            "allowance_origin": {"kind": "reviewed_hard_bound", "description": "Explicit synthetic future allowance"},
-            "maximum_horizon": "8/1", "allow_construction": construct, "allow_continuation": construct,
-            "source_artifact_ids": [artifact["id"]]}).model_dump(mode="json")
+            "scientific_profile": "counterdex.v1",
+            "requested_tier": "numerical_guidance" if name == "explicit_numerical" else "checked_pair_separation",
+            "allowance_origin": {"kind": "hypothetical", "description": "Explicit synthetic future allowance"},
+            "maximum_horizon": "10/1", "allow_construction": construct, "allow_continuation": construct,
+            "source_artifact_ids": []}).model_dump(mode="json")
         request_digest = semantic_digest("design-request", request)
         job = {"id": "binding_design_" + name, "plan_id": "design_plan_" + name, "approval_id": "design_approval_" + name}
         response = adapter._run({"protocol": "counterdex.bridge.v1", "operation": "design",
@@ -85,13 +87,19 @@ def native_designs():
 
 @pytest.mark.parametrize("name,tier,checked", [("checked", "checked_pair_separation", True),
                                                ("wide", "no_separation_established", True),
-                                               ("numerical", "numerical_guidance", False)])
+                                               ("numerical", "numerical_guidance", False),
+                                               ("explicit_numerical", "numerical_guidance", False)])
 def test_actual_design_states_keep_faithful_scope_and_replay(native_designs, name, tier, checked):
     context = native_designs[name]
     validate_design_packet(**context)
     assert context["result"]["design_tier"] == tier
     assert design_result_checked(context["result"]) is checked
     assert [row["time"] for row in context["result"]["options"]] == ["8/1", "6/1"]
+    packet = json.loads(context["content"])
+    science = json.loads(base64.b64decode(packet["scientific"]["bytes_base64"]))
+    assert packet["binding"]["mapping_policy"] == "DB-SC-1-design-to-groundwork-v2"
+    assert science["design"]["allowance_origin"] == context["request"]["allowance_origin"]
+    assert science["design"]["horizon_policy"]["maximum_horizon"] == "10/1"
 
 
 def test_reversed_approved_pair_keeps_vectors_and_accepts_checker_id_order(native_designs):
@@ -161,7 +169,7 @@ def mutate_packet(context, mutation):
     result["artifacts"][0].update(sha256=digest, byte_size=len(context["content"]))
 
 
-@pytest.mark.parametrize("mutation", ["approval", "history", "budget", "horizon", "pair", "grid"])
+@pytest.mark.parametrize("mutation", ["approval", "history", "budget", "horizon", "pair", "grid", "allowance_origin", "mapping_policy"])
 def test_rehashed_packet_cannot_replace_approved_context(native_designs, mutation):
     context = deepcopy(native_designs["checked"])
     def change(packet, science):
@@ -175,6 +183,10 @@ def test_rehashed_packet_cannot_replace_approved_context(native_designs, mutatio
             science["design"]["horizon_policy"]["maximum_horizon"] = "9/1"
         elif mutation == "pair":
             science["design"]["candidates"][0]["parameters"]["A"] = "1/1"
+        elif mutation == "allowance_origin":
+            science["design"]["allowance_origin"] = {"kind": "reviewed_hard_bound", "description": "Unapproved replacement"}
+        elif mutation == "mapping_policy":
+            packet["binding"]["mapping_policy"] = "DB-SC-1-to-groundwork-v1"
         else:
             science["design"]["grid"] = science["design"]["grid"][:1]
     mutate_packet(context, change)
@@ -200,3 +212,41 @@ def test_retained_history_bytes_must_match_independent_hash(native_designs):
     context["historical_artifact"]["sha256"] = "0" * 64
     with pytest.raises(DomainError, match="independently retained"):
         validate_design_packet(**context)
+
+
+def test_resealed_numerical_approval_cannot_publish_retained_checked_facts(native_designs):
+    context = deepcopy(native_designs["checked"])
+    context["request"]["requested_tier"] = "numerical_guidance"
+    context["request_digest"] = semantic_digest("design-request", context["request"])
+    context["anchor"]["app_request_digest"] = context["request_digest"]
+
+    def replace_review(packet, science):
+        packet["binding"]["request"] = deepcopy(context["request"])
+        packet["binding"]["request_digest"] = context["request_digest"]
+        science["design"]["requested_tier"] = "numerical_guidance"
+
+    # Every request/design/suggestion/raw identity is internally resealed. The
+    # original exact report and fresh facts still look mathematically valid;
+    # rejection must enforce what this new numerical approval permits.
+    mutate_packet(context, replace_review)
+    packet = json.loads(context["content"])
+    science = json.loads(base64.b64decode(packet["scientific"]["bytes_base64"]))
+    adapter = CounterdexAdapter()
+    design = adapter._native_design_projection(context["request"], context["projection"], context["request_digest"])
+    assert science["design"] == design
+    DesignRequestBody.model_validate(context["request"])
+    DesignResult.model_validate(context["result"])
+    with pytest.raises(DomainError, match="Numerical-only approval"):
+        validate_design_packet(**context)
+
+    history = {"problem": context["projection"]["binding"]["problem"],
+        "dataset": context["projection"]["binding"]["dataset"], "run_id": context["job"]["id"],
+        "expected_request_digest": context["request_digest"], "workflow": science["workflow"],
+        "historical_artifact": context["historical_artifact"], "evidence": {"body": context["historical_evidence"]}}
+    artifact = {**context["result"]["artifacts"][0],
+                "bytes_base64": base64.b64encode(context["content"]).decode("ascii")}
+    response = {"protocol": "counterdex.bridge.v1", "ok": True, "anchors": context["anchor"],
+        "native_artifacts": [artifact], "result": context["result"],
+        "details": {"fresh_replay": context["result"]["native_replay"], "scientific_report": science["report"]}}
+    assert adapter._native_design_output(response, context["request"], history, context["projection"], design) == {
+        "worker_error": "binding_mismatch"}

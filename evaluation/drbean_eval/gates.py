@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 
 from . import history, manifest as manifest_mod
 from .runner import read_attempts
@@ -24,13 +25,38 @@ REQUIRED_CONTROLS = ("fixed_pair:grid-6-8-allowance-0.2", "fixed_pair:grid-6-all
                      "fixed_pair:grid-6-8-allowance-0.6", "defense:wrong_expected_identity", "defense:changed_byte",
                      "defense:mutation_rejected_by_original_anchor", "defense:mutation_rejected_by_fresh_mathematics",
                      "semantics:touching_bands_do_not_separate", "semantics:closed_endpoint_is_inside",
-                     "followup:3.4", "followup:4.57", "followup:4.0")
+                     "followup:3.4", "followup:4.57", "followup:4.0",
+                     "defense:truncated_packet", "defense:oversized_packet", "defense:another_runs_valid_packet",
+                     "defense:drop_artifacts", "defense:duplicate_artifact", "defense:unknown_profile",
+                     "metamorphic:tightened_row_allowance", "metamorphic:widened_allowances_keep_compatibility",
+                     "metamorphic:excluded_row_is_not_a_constraint", "metamorphic:swapped_pair_order")
 
 
-def _latest(attempts: list[dict], commit: str, lane: str) -> dict[str, dict]:
+# Changes here cannot alter the application or the harness's behaviour: recorded evidence and its written
+# summaries. Evidence recorded at an ancestor counts for the tested commit only if every later change is here.
+EVIDENCE_ONLY_PATHS = ("evaluation/results/", "evaluation/FINDINGS.md", "evaluation/findings.json",
+                       "evaluation/README.md", "docs/evaluation-protocol.md", "docs/workstreams/05-validation.md")
+
+
+def equivalent_commits(repo: str, head: str, candidates: set[str]) -> set[str]:
+    """``head`` plus each ancestor whose difference from ``head`` touches only evidence and documentation paths."""
+    same = {head}
+    for commit in sorted(c for c in candidates if c and c != head):
+        if not head or subprocess.run(["git", "-C", repo, "merge-base", "--is-ancestor", commit, head],
+                                      capture_output=True).returncode != 0:
+            continue
+        diff = subprocess.run(["git", "-C", repo, "diff", "--name-only", commit, head], capture_output=True, text=True)
+        changed = [path for path in diff.stdout.splitlines() if path.strip()]
+        if diff.returncode == 0 and all(path.startswith(EVIDENCE_ONLY_PATHS) for path in changed):
+            same.add(commit)
+    return same
+
+
+def _latest(attempts: list[dict], commits, lane: str) -> dict[str, dict]:
+    commits = {commits} if isinstance(commits, str) else set(commits)
     latest = {}
     for attempt in attempts:
-        if attempt.get("lane") == lane and attempt.get("tested_commit") == commit:
+        if attempt.get("lane") == lane and attempt.get("tested_commit") in commits:
             latest[attempt["entry_id"]] = attempt
     return latest
 
@@ -50,9 +76,12 @@ def _entry_gate(name: str, latest: dict, entries: tuple[str, ...], description: 
             states[entry] = {"status": "blocked", "reason": "no attempt at the tested commit"}
             continue
         status = attempt["status"]
+        app = attempt.get("app_under_test") or {}
+        foreign_app = bool(app) and (app.get("commit") != attempt.get("tested_commit") or app.get("dirty"))
         if status == "passed" and (attempt.get("evidence_class") != "executed_acceptance" or attempt.get(
-                "worktree_dirty")):
-            status, reason = "blocked", "passed only as an imported claim or on a dirty worktree"
+                "worktree_dirty") or foreign_app):
+            status, reason = "blocked", ("passed only as an imported claim, preview, diagnostic, foreign application "
+                                         "commit or dirty worktree; not release acceptance")
         else:
             reason = attempt.get("reason")
         states[entry] = {"status": {"passed": "passed", "failed": "failed", "error": "failed"}.get(status, "blocked"),
@@ -62,11 +91,15 @@ def _entry_gate(name: str, latest: dict, entries: tuple[str, ...], description: 
     return {"gate": name, "status": status, "description": description, "entries": states}
 
 
-def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path: str | None = None) -> dict:
+def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path: str | None = None,
+            repo: str | None = None) -> dict:
     manifest_problems = manifest_mod.verify(root)
     history_problems = history.verify(results_dir)
     attempts = read_attempts(results_dir)
-    latest = _latest(attempts, commit, "offline_real_science")
+    all_controls = read_jsonl(os.path.join(results_dir, "controls.jsonl"))
+    same = equivalent_commits(repo or os.path.dirname(os.path.abspath(root)), commit,
+                              {a.get("tested_commit") for a in attempts} | {c.get("tested_commit") for c in all_controls})
+    latest = _latest(attempts, same, "offline_real_science")
     gates = [{"gate": "harness_integrity", "description": "frozen manifest and append-only history verify",
               "status": "passed" if not manifest_problems and not history_problems else "failed",
               "problems": (manifest_problems + history_problems)[:20]}]
@@ -76,13 +109,13 @@ def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path
                              "duplicate starts, design authority, cancellation/restart, changed input, follow-up"))
     zero = _entry_gate("zero_external_model_dispatch", latest, ("RS-ZERO-DISPATCH",),
                        "guard active in API and worker; zero external model attempts in the lane")
-    lane_attempts = [a for a in attempts if a.get("lane") == "offline_real_science" and a.get("tested_commit") == commit]
+    lane_attempts = [a for a in attempts if a.get("lane") == "offline_real_science" and a.get("tested_commit") in same]
     unverified = [a["entry_id"] for a in lane_attempts if (a.get("external_model_requests") or {}).get("value") != 0
                   and a["status"] != "unrun"]
     if unverified and zero["status"] == "passed":
         zero.update(status="failed", reason=f"entries without verified zero dispatch: {unverified}")
     gates.append(zero)
-    controls = [c for c in read_jsonl(os.path.join(results_dir, "controls.jsonl")) if c.get("tested_commit") == commit]
+    controls = [c for c in all_controls if c.get("tested_commit") in same]
     latest_controls = {}
     for run in controls:
         for item in run.get("results", []):
@@ -118,5 +151,6 @@ def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path
     overall = ("passed" if all(g["status"] == "passed" for g in required) and not dirty else
                "failed" if any(g["status"] == "failed" for g in required) else "blocked")
     return {"schema": "drbean-release-gates/v1", "tested_commit": commit, "worktree_dirty": dirty,
+            "evidence_commits": sorted(same), "evidence_only_paths": list(EVIDENCE_ONLY_PATHS),
             "overall": overall, "gates": gates,
             "statement": "Gates read recorded evidence only; they dispatch no provider or scientific work."}

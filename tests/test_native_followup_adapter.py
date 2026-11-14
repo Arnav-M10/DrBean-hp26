@@ -8,8 +8,8 @@ import math
 
 import pytest
 
-from bean_api.canonical import semantic_digest
-from bean_api.contracts import ScientificResult
+from bean_api.canonical import canonical_bytes, semantic_digest
+from bean_api.contracts import ObservationProposalBody, ScientificResult
 from bean_api.followup_evidence import followup_result_checked, validate_followup_packet
 from bean_api.workflow import DomainError
 import test_native_design_adapter as design_test
@@ -151,3 +151,157 @@ def test_rehashed_followup_cannot_swap_selected_vectors(native_reviews):
     data["anchor"]["artifact_sha256"] = hashlib.sha256(data["content"]).hexdigest()
     with pytest.raises(DomainError, match="candidate IDs and vectors"):
         validate_followup_packet(**data)
+
+
+@pytest.fixture(scope="module")
+def native_recheck(native_reviews):
+    source = native_reviews["first"]
+    context = deepcopy(source["context"])
+    parent = json.loads(base64.b64decode(context["historical_artifact"]["bytes_base64"]))
+    original = parent["binding"]["application"]
+    problem, dataset = deepcopy(original["problem"]), deepcopy(original["dataset"])
+    row = {**source["dataset"]["body"]["rows"][-1], "id": "actual_own_time",
+           "time": "79/10", "concentration": "100/1", "hard_allowance": "7/20",
+           "notes": "Synthetic input declaring an actual observation for the contract control"}
+    body = ObservationProposalBody(dataset_id=dataset["id"], experiment_id=dataset["body"]["experiment_id"],
+        origin="actual", row=row, source_description="Reviewed acquisition declaration in a synthetic control",
+        change_reason="Append exactly the reviewed observation at its own time and allowance").model_dump(mode="json")
+    proposal = {"id": "accepted_actual_proposal", "body": body,
+                "digest": hashlib.sha256(canonical_bytes(body)).hexdigest()}
+    previous_id = dataset["id"]
+    dataset["id"] = "actual_own_time_dataset"
+    dataset["body"].update(parent_id=previous_id, change_reason=body["change_reason"], rows=[*dataset["body"]["rows"], row])
+    dataset["digest"] = semantic_digest("dataset", dataset["body"])
+    problem["id"] = "actual_own_time_problem"
+    problem["body"].update(dataset_id=dataset["id"], dataset_digest=dataset["digest"])
+    problem["digest"] = semantic_digest("problem", problem["body"])
+    context.update(run_id="actual_recheck_run", scenario_id="actual_recheck_scenario", observation_proposal=proposal,
+        workflow={"plan_id": "actual_recheck_plan", "approval_id": "actual_recheck_approval",
+                  "operation_id": "actual_recheck_run", "execution_id": "actual_recheck_run"})
+    result = source["adapter"].recheck(problem, dataset, {"scientific_wall_seconds": 60}, context)
+    assert "worker_error" not in result, result
+    public = ScientificResult.model_validate({key: val for key, val in result.items() if not key.startswith("_")}).model_dump(mode="json")
+    return {"adapter": source["adapter"], "problem": problem, "dataset": dataset, "context": context,
+            "result": public, "artifact": result["_native_artifacts"][0], "projection": result["_application_projection"]}
+
+
+def recheck_validation(case):
+    return {**validation(case), "observation_proposal": deepcopy(case["context"]["observation_proposal"])}
+
+
+def test_proposal_bound_recheck_keeps_declared_origin_own_reading_and_valid_exclusions(native_recheck):
+    data = recheck_validation(native_recheck)
+    validate_followup_packet(**data)
+    assert followup_result_checked(native_recheck["result"])
+    packet = json.loads(data["content"])
+    assert packet["operation"] == "recheck"
+    assert packet["binding"]["observation_proposal"] == data["observation_proposal"]
+    assert packet["binding"]["observation_proposal"]["body"]["origin"] == "actual"
+    assert native_recheck["result"]["native_replay"]["dataset_origin"] == "synthetic"
+    assert native_recheck["result"]["scientific_outcome"] == "inconclusive"
+    assert all(row["verification"] == "invalid" for row in native_recheck["result"]["candidate_results"])
+    assert native_recheck["adapter"].replay_native(data["content"], expected=data["anchor"]) == native_recheck["result"]["native_replay"]
+
+
+@pytest.mark.parametrize("mutation", ["digest", "body", "id"])
+def test_recheck_requires_the_independently_accepted_proposal(native_recheck, mutation):
+    data = deepcopy(recheck_validation(native_recheck))
+    proposal = data["observation_proposal"]
+    if mutation == "body":
+        proposal["body"]["source_description"] = "Another provenance description"
+    else:
+        proposal[mutation] = "0" * 64 if mutation == "digest" else "another_proposal"
+    with pytest.raises(DomainError, match="proposal"):
+        validate_followup_packet(**data)
+
+
+@pytest.mark.parametrize("mutation", ["parent", "row", "origin", "parent_run", "operation"])
+def test_resealed_recheck_cannot_replace_proposal_lineage_or_materialized_origin(native_recheck, mutation):
+    data = deepcopy(recheck_validation(native_recheck))
+    packet = json.loads(data["content"])
+    if mutation in {"parent", "row", "origin"}:
+        body = data["observation_proposal"]["body"]
+        if mutation == "parent":
+            body["dataset_id"] = "another_parent_dataset"
+        elif mutation == "row":
+            body["row"]["time"] = "7/1"
+        else:
+            body.update(origin="hypothetical", generating_choices={"generator": "different declared origin"})
+        data["observation_proposal"]["digest"] = hashlib.sha256(canonical_bytes(body)).hexdigest()
+        packet["binding"]["observation_proposal"] = deepcopy(data["observation_proposal"])
+    elif mutation == "parent_run":
+        packet["binding"]["parent"]["run_id"] = "another_parent_run"
+    else:
+        packet["operation"] = "review"
+    data["content"] = canonical_bytes(packet)
+    with pytest.raises(DomainError):
+        validate_followup_packet(**data)
+    # A diagnostic raw anchor deliberately reaches the independent lineage check.
+    data["anchor"]["artifact_sha256"] = hashlib.sha256(data["content"]).hexdigest()
+    with pytest.raises(DomainError, match="proposal|approved revision"):
+        validate_followup_packet(**data)
+
+
+def test_recheck_publication_rejects_a_search_outcome_for_excluded_original_candidates(native_recheck):
+    data = deepcopy(recheck_validation(native_recheck))
+    data["result"]["scientific_outcome"] = "no_counterexample_found"
+    with pytest.raises(DomainError):
+        validate_followup_packet(**data)
+    assert not followup_result_checked(data["result"])
+
+
+@pytest.mark.parametrize("operation", ["review", "recheck"])
+def test_resealed_report_cannot_change_original_vectors_while_retaining_candidate_declarations(native_reviews, native_recheck, operation):
+    data = deepcopy(validation(native_reviews["first"]) if operation == "review" else recheck_validation(native_recheck))
+    packet = json.loads(data["content"])
+    science = json.loads(base64.b64decode(packet["scientific"]["bytes_base64"]))
+    checked = science["report"]["checked"]["candidate_results"]
+    checked[0]["parameters"]["A"] = "1/1"
+    science["baseline_digest"] = semantic_digest("report", {key: value for key, value in science.items() if key != "baseline_digest"})
+    encoded = canonical_bytes(science)
+    packet["scientific"] = {"sha256": hashlib.sha256(encoded).hexdigest(), "bytes_base64": base64.b64encode(encoded).decode()}
+    changed = canonical_bytes(packet)
+    data["content"] = changed
+    # The genuine raw anchor rejects changed bytes before the binding check.
+    with pytest.raises(DomainError):
+        validate_followup_packet(**data)
+    digest = hashlib.sha256(changed).hexdigest()
+    data["anchor"]["artifact_sha256"] = digest
+    result = data["result"]
+    result["native_replay"].update(baseline_digest=science["baseline_digest"], candidate_results=deepcopy(checked), anchors=data["anchor"])
+    result["candidates"][0]["parameter_vector"]["A"] = "1/1"
+    result["artifacts"][0].update(sha256=digest, byte_size=len(changed))
+    result["verification_record"]["artifact_sha256"] = digest
+    with pytest.raises(DomainError, match="original candidate ID"):
+        validate_followup_packet(**data)
+
+
+@pytest.mark.parametrize("operation", ["review", "recheck"])
+def test_resealed_report_cannot_upgrade_excluded_candidate_without_changing_retained_rows(native_reviews, native_recheck, operation):
+    data = deepcopy(validation(native_reviews["neither"]) if operation == "review" else recheck_validation(native_recheck))
+    packet = json.loads(data["content"])
+    science = json.loads(base64.b64decode(packet["scientific"]["bytes_base64"]))
+    facts = science["report"]["checked"]["candidate_results"]
+    facts[0].update(verification="valid", reason_code=None, violating_observation_ids=[])
+    assert facts[0]["outside_closed_claim"] is False
+    assert any(row["status"] == "incompatible" for row in facts[0]["rows"])
+    science["report"]["outcome"]["compatible_candidate_ids"] = [facts[0]["candidate_id"]]
+    science["baseline_digest"] = semantic_digest("report", {key: value for key, value in science.items() if key != "baseline_digest"})
+    encoded = canonical_bytes(science)
+    packet["scientific"] = {"sha256": hashlib.sha256(encoded).hexdigest(), "bytes_base64": base64.b64encode(encoded).decode()}
+    data["content"] = canonical_bytes(packet)
+    with pytest.raises(DomainError):
+        validate_followup_packet(**data)
+    digest = hashlib.sha256(data["content"]).hexdigest()
+    data["anchor"]["artifact_sha256"] = digest
+    result = data["result"]
+    result["native_replay"].update(baseline_digest=science["baseline_digest"], candidate_results=deepcopy(facts),
+                                    outcome=deepcopy(science["report"]["outcome"]), anchors=data["anchor"])
+    result["candidates"][0]["verification"] = "valid"
+    result["candidate_results"][0].update(verification="valid", reason_code=None, violating_observation_ids=[])
+    result["artifacts"][0].update(sha256=digest, byte_size=len(data["content"]))
+    result["verification_record"]["artifact_sha256"] = digest
+    ScientificResult.model_validate(result)
+    with pytest.raises(DomainError, match="retained row statuses"):
+        validate_followup_packet(**data)
+    assert not followup_result_checked(result)
