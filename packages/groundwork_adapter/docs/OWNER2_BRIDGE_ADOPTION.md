@@ -1,6 +1,112 @@
 # Owner 2: adopt the application bridge in the existing worker
 
-## Current continuation: native design consumer needs the 0.3 mapping
+## Current continuation: merged follow-up consumes a valid 0.3 parent
+
+At science merge `304070d`, integrated main `80f95a4` contains design PR #9 and
+hypothetical follow-up PR #11. Counterdex 0.3.0 source, metadata and all fixtures
+remain unchanged. The pinned backend Python 3.13.18 / Pydantic 2.13.4 consumed
+freshly computed evidence from prepared Python 3.11.17; no backend guard changed.
+
+The current design admission still has the history/reuse and v1/v2 conflicts
+documented below. To examine the newly merged follow-up independently, the audit
+sent a separately reviewed v2 request through the real scientific transport:
+empty prospective reuse list, complete baseline history, horizon `10/1`. Its
+fresh checked `8/1` design then fed the actual merged `CounterdexAdapter.review`.
+
+| New hypothetical reading | Current consumer result, current DTO and fresh replay |
+|---|---|
+| Near first computed candidate | `inconclusive`; first valid, second invalid |
+| Near second computed candidate | `certified_counterexample`; first invalid, second valid |
+| Between the separated reading bands | `inconclusive`; both invalid |
+
+All three returned `verification: valid`, replay `passed`, qualified with the
+merged `followup_result_checked`, and retained the complete original v2 parent
+bytes. These adapter checks establish compatibility after a valid parent is
+available; they do not establish HTTP/worker acceptance past the upstream or Mac
+blockers. Candidate facts are keyed by ID; scientific vector order follows the
+reviewed request while certificate/public facts use canonical ID order.
+
+The existing proposal-bound `recheck` also freshly returned `valid` / `passed`
+for an actual-origin declaration at `79/10` hours with allowance `7/20`, and its
+result validates the current DTO. The merged review qualifier rejects it because
+it only admits operation `review` and a plain application binding. For broader
+follow-up, Owner 2 should retain the already resolved observation proposal in
+`Worker._followup_history`, dispatch **`recheck`**, and validate its
+`counterdex.followup-binding.v1` proposal/parent binding at qualification and
+publication. The current workflow additionally restricts origin, time and
+allowance; changing those needs explicit application admission and new approval.
+Keep legacy review's narrower meaning rather than silently widening it.
+
+Two new package controls exercise a fresh v2 parent with a reversed reviewed
+pair through both legacy review and actual own-time recheck, prohibit discovery,
+preserve exact vectors/order/history, and reject parent-run or vector substitution
+under both genuine and deliberately resealed diagnostic anchors. The changed
+bridge and follow-up modules pass **41 tests in 7.111 s**. Run:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=packages/groundwork_adapter:packages/groundwork_adapter/tests \
+  python3.11 -m unittest -q test_bridge test_followup
+```
+
+Reproduce one merged-adapter compatibility control and retain its actual bytes
+for separate replay. Use prepared trusted `BACKEND_PYTHON` / `ENGINE_PYTHON`;
+run from this combined checkout. Fixture helpers construct synthetic input
+records; baseline and design evidence are computed anew.
+
+```sh
+env -i PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONPATH=apps/api:tests:packages/groundwork_adapter:packages/groundwork_adapter/tests \
+  BEAN_COUNTERDEX_PYTHON="$ENGINE_PYTHON" "$BACKEND_PYTHON" - <<'PY'
+import base64, json, tempfile
+from fractions import Fraction
+from pathlib import Path
+from bean_api.canonical import semantic_digest
+from bean_api.contracts import ScientificResult
+from bean_api.followup_evidence import followup_result_checked
+from test_native_design_adapter import native_design_history
+from test_bridge import review_request
+adapter, history, request = native_design_history.__wrapped__()
+request.update(source_artifact_ids=[], maximum_horizon="10/1")
+parent = adapter._run({"protocol": "counterdex.bridge.v1", "operation": "design",
+    "problem": history["problem"], "dataset": history["dataset"],
+    "run_id": history["run_id"], "workflow": history["workflow"], "request": request,
+    "expected_request_digest": semantic_digest("design-request", request),
+    "historical_evidence": history["evidence"]["body"],
+    "historical_artifact": history["historical_artifact"]}, 60)
+assert parent["ok"], parent
+child = review_request(history["problem"], history["dataset"], parent, Fraction(100), suffix="consumer_probe")
+context = {key: child[key] for key in ("run_id", "scenario_id", "workflow", "historical_artifact")}
+context["workflow"].update(operation_id=context["run_id"], execution_id=context["run_id"])
+context["design_request"] = request
+result = adapter.review(child["problem"], child["dataset"], {"scientific_wall_seconds": 60}, context)
+assert "worker_error" not in result, result
+ScientificResult.model_validate({k: v for k, v in result.items() if not k.startswith("_")})
+assert followup_result_checked(result)
+artifact = result["_native_artifacts"][0]
+raw = base64.b64decode(artifact["content_base64"], validate=True)
+assert adapter.replay_native(raw, expected=artifact["anchor"]) == result["native_replay"]
+assert all(row["verification"] == "invalid" for row in result["candidate_results"])
+destination = Path(tempfile.mkdtemp(prefix="counterdex-followup-consumer-"))
+(destination / "review.native.json").write_bytes(raw)
+(destination / "review.anchors.json").write_text(json.dumps(artifact["anchor"]))
+print(destination)
+PY
+```
+
+Replay with `"$ENGINE_PYTHON" -I -m counterdex replay-native
+PATH/review.native.json --anchors PATH/review.anchors.json` using that returned
+directory. It rechecks fixed candidates and lineage; it does not rerun search.
+
+Separate Owner 2 blocker: merged process observation catches `FileNotFoundError`
+but still misses `ProcessLookupError(errno=3)` when `/proc/PID/stat` vanishes
+during `read_text`, the exact previously retained Linux CI trace. A deterministic
+read-only reviewer probe reproduces that uncaught exception; the new ordinary
+file-disappearance unit passes. Handle both disappearance outcomes while keeping
+the live-descendant assertion. This does not qualify cleanup, and the unchanged
+Mac `RLIMIT_NPROC=256` issue remains separate. No known-failing Mac worker suite
+was repeated and no guard was bypassed.
+
+## Earlier native design audit: consumer needs the 0.3 mapping
 
 Request **SCI-OWNER2-NATIVE-DESIGN-03**, science to Owner 2, blocking G2.
 This continuation inspected merged `main` at `9cc90e0`, incorporated in the

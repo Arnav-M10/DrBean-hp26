@@ -366,6 +366,78 @@ class BridgeTests(unittest.TestCase):
                     self.assertFalse(checked["is_counterexample"])
                 self.assertIsNone(native["search"])
 
+    def test_v2_design_followup_preserves_ordered_pair_and_distinct_observation_scope(self):
+        parent_input = deepcopy(self.design_input)
+        parent_input["request"].update(scientific_profile="counterdex.v1", requested_tier="checked_pair_separation",
+            allowance_origin={"kind": "hypothetical", "description": "Separately reviewed follow-up design"},
+            maximum_horizon="10/1", source_artifact_ids=[])
+        parent_input["request"]["candidate_ids"].reverse()
+        parent_input["request"]["candidate_vectors"].reverse()
+        parent_input["expected_request_digest"] = semantic_digest("design-request", parent_input["request"])
+        parent = self.dispatch(parent_input)
+        self.assert_native(parent)
+        parent_packet, parent_native = scientific_from(parent)
+        original_parent = deepcopy(parent)
+        vectors = list(zip(parent_input["request"]["candidate_ids"], parent_input["request"]["candidate_vectors"]))
+        requests = [review_request(self.problem, self.dataset, parent, Fraction(100), suffix="v2_review"),
+                    recheck_request(self.problem, self.dataset, parent, suffix="v2_recheck",
+                                    origin="actual", time="79/10", allowance="7/20", reading="100/1")]
+        for request in requests:
+            with self.subTest(operation=request["operation"]), \
+                 patch("counterdex.search.search_candidates", side_effect=AssertionError("Follow-up cannot discover replacement vectors")):
+                response = self.dispatch(request)
+                _, fresh = self.assert_native(response)
+                packet, native = scientific_from(response)
+                self.assertEqual(packet["history"], artifact_from(parent))
+                self.assertEqual([(c["id"], c["parameters"]) for c in native["candidates"]], vectors)
+                self.assertEqual([c["candidate_id"] for c in fresh["candidate_results"]], sorted(c[0] for c in vectors))
+                self.assertEqual(native["operation"], "fixed_candidate_review")
+                self.assertIsNone(native["search"])
+                self.assertEqual(native["exact_trials"], [])
+                self.assertEqual(response["result"]["scientific_outcome"], "inconclusive")
+                self.assertTrue(all(c["verification"] == "invalid" for c in fresh["candidate_results"]))
+                row = native["problem"]["observations"][-1]
+                if request["operation"] == "review":
+                    self.assertEqual(packet["binding"]["schema_version"], "counterdex.application-binding.v1")
+                    self.assertEqual((row["time"], row["allowance"]), (parent["result"]["selected_time"], "1/5"))
+                    self.assertEqual(fresh["dataset_origin"], "hypothetical")
+                else:
+                    self.assertEqual(packet["binding"]["schema_version"], "counterdex.followup-binding.v1")
+                    self.assertEqual(packet["binding"]["observation_proposal"], request["observation_proposal"])
+                    self.assertEqual(packet["binding"]["parent"]["run_id"], parent_packet["run_id"])
+                    self.assertEqual((row["time"], row["allowance"]), ("79/10", "7/20"))
+                    self.assertEqual(fresh["dataset_origin"], "synthetic")
+        self.assertEqual(parent, original_parent)
+        self.assertEqual([(c["id"], c["parameters"]) for c in parent_native["design"]["candidates"]], vectors)
+
+    def test_v2_parent_recheck_replay_rejects_resealed_lineage_and_vector_substitution(self):
+        parent_input = deepcopy(self.design_input)
+        parent_input["request"].update(scientific_profile="counterdex.v1", requested_tier="checked_pair_separation",
+            allowance_origin={"kind": "hypothetical", "description": "Separately reviewed follow-up design"},
+            maximum_horizon="10/1", source_artifact_ids=[])
+        parent_input["expected_request_digest"] = semantic_digest("design-request", parent_input["request"])
+        parent = self.dispatch(parent_input)
+        response = self.dispatch(recheck_request(self.problem, self.dataset, parent, origin="actual"))
+        self.assert_native(response)
+        original_packet, original_native = scientific_from(response)
+        for mutation, expected_code in (("parent_run", "wrong_specification_binding"), ("vector", "candidate_mismatch")):
+            packet, native = deepcopy(original_packet), deepcopy(original_native)
+            if mutation == "parent_run":
+                packet["binding"]["parent"]["run_id"] = "another_original_design"
+            else:
+                native["candidates"][0]["parameters"] = deepcopy(native["candidates"][1]["parameters"])
+                native["baseline_digest"] = semantic_digest("report", {k: v for k, v in native.items() if k != "baseline_digest"})
+                encoded = canonical_bytes(native)
+                packet["scientific"] = {"sha256": artifact_digest(encoded), "bytes_base64": base64.b64encode(encoded).decode("ascii")}
+            changed = canonical_bytes(packet)
+            with self.subTest(mutation=mutation):
+                with self.assertRaises(AdapterError) as original:
+                    replay_packet(changed, expected=response["anchors"])
+                self.assertEqual(original.exception.code, "artifact_mismatch")
+                with self.assertRaises(AdapterError) as diagnostic:
+                    replay_packet(changed, expected=packet_anchors(changed))
+                self.assertEqual(diagnostic.exception.code, expected_code)
+
     def test_recheck_rejects_wrong_proposal_hash_row_and_history(self):
         original = recheck_request(self.problem, self.dataset, self.design)
         variants = {}

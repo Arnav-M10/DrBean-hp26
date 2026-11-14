@@ -1,10 +1,10 @@
 # Owner 5: native acceptance handoff
 
-Current science base: `0543a0d` on `codex/science-next`, incorporating `main`
-`9cc90e0` and its merged evaluator PR #8. Counterdex remains **0.3.0**,
+Current science base: `304070d` on `codex/science-next`, incorporating `main`
+`80f95a4` and its merged backend design/follow-up. Counterdex remains **0.3.0**,
 CPython **3.11.17**, source
 `90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
-The newer evaluator at **`219dc0c`** on
+The newer evaluator at **`80c2bcf`** on
 `origin/claude/adversarial-validation` is **not yet merged into that main**.
 Keep these consumer states distinct. No ordinary HTTP acceptance gate was
 executed or passed by this handoff.
@@ -48,6 +48,38 @@ proposal-bound **`recheck`** remains an Owner 2 seam. The existing operation
 supports actual/transcription/hypothetical declarations and a reading's own
 time/allowance without replacing the original fixed vectors. No new science
 producer or evaluator rewrite is needed.
+
+## Newly merged follow-up route: use its explicit scope
+
+Main now implements a separately approved hypothetical fixed-pair review;
+the evaluator `80c2bcf` follow-up still omits `plan.followup`, which selects
+ordinary discovery. For the implemented narrow route, retain the accepted
+observation proposal/review and set the current `FollowupScope` fields:
+
+```text
+design_job_id, design_result_id, design_result_digest,
+observation_proposal_id, source_artifact_id
+```
+
+Use the actual original design job/result/digest, its retained artifact, and the
+proposal that created this revised dataset. The plan requires the explicit
+Counterdex profile/objective, one manual baseline scenario, provider `none`,
+and its own approval. Current admission allows only a hypothetical appended row
+at the checked selected time/allowance. Do not promote an actual or off-time
+reading into that route; Owner 2 must adopt the already available `recheck` path
+and proposal binding for that wider case.
+
+After the upstream v2 design and runtime blockers are fixed, require the exact
+original candidate IDs/vectors, candidate-specific feedback, no discovery search,
+the retained design → baseline native history, downloaded bytes and all eight
+independent anchors. Current review replay identifies operation `review`; a
+successful exclusion can return certificate `valid` with one or both candidates
+`invalid`. The actual merged adapter passed all three survival/exclusion cases
+with a fresh 0.3 v2 parent, current DTO validation and separate replay. This is
+adapter compatibility, not an HTTP gate. The [Owner 2 reproduction](OWNER2_BRIDGE_ADOPTION.md)
+retains a freshly computed review packet for independent CLI replay. Native
+classification/full-anchor handling is already implemented in the proposed
+evaluator and does not need another implementation.
 
 ## Earlier findings, retained with their original scope
 

@@ -10,7 +10,36 @@ are isolated development tools, not scientific runtime dependencies.
 The user confirmed permission for the work and requested an independent
 implementation; all supplied example measurements are newly constructed fixtures.
 
-## Current native consumer checkpoint
+## Current merged follow-up checkpoint
+
+At `304070d`, main `80f95a4` adds the actual backend hypothetical follow-up
+consumer. Scientific 0.3.0 source, metadata and fixture bytes remain unchanged.
+After fresh discovery and a valid explicit v2 design, the merged adapter passed
+all three first-survives/second-survives/both-excluded cases, authoritative DTO
+validation, native qualification and separate matching replay. The valid parent
+retains horizon `10/1`, hypothetical allowance provenance and complete baseline
+history. This direct-adapter evidence does not resolve the upstream mapping or
+Mac resource blockers and does not qualify an HTTP gate.
+
+Two new tests cover the v2 parent → legacy review / proposal-bound actual
+own-time recheck transition, reversed selected pair order, no replacement search,
+complete lineage and genuine/diagnostic-anchor rejection of lineage/vector
+mutations. **2 passed in 1.309 s**; full changed bridge/follow-up modules:
+**41 passed in 7.111 s**. Current authoritative schemas separately accepted all
+**8 requests and 8 results** with no errors. The [Owner 2 handoff](OWNER2_BRIDGE_ADOPTION.md)
+contains an executed fresh-adapter reproduction producing portable bytes and
+separate anchors; independent installed CLI replay returns valid/passed/matches,
+both candidates excluded, no search. Its initial generic workflow-ID mismatch
+was corrected to the existing backend job-ID rule without a production change.
+
+The [Owner 5 handoff](OWNER5_NATIVE_ACCEPTANCE.md) identifies the now available
+application `FollowupScope`; current evaluation still uses ordinary discovery
+when it omits that field. Actual/off-time proposal-bound application adoption,
+upstream v2 mapping, the Mac process guard and Linux `ESRCH` observer correction
+remain other-owner integration tasks. No new package defect was found; no full
+package/build rerun, source-version bump, fixture churn or provider call occurred.
+
+## Earlier native consumer checkpoint
 
 Science base `0543a0d` incorporates `main` `9cc90e0`. The production package
 remains **0.3.0**, CPython **3.11.17**, source

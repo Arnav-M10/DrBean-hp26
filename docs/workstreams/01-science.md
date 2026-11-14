@@ -2,6 +2,69 @@
 
 Owner: Person 1 / Counterdex.
 
+## Current continuation — merged follow-up with a fresh v2 parent
+
+Resumed from clean `457fb6e`; current main `80f95a4` merged as `304070d`.
+This includes backend design/follow-up PRs #9/#11 while retaining the science
+branch's Counterdex **0.3.0**, CPython **3.11.17**, source
+`90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
+No scientific source, metadata or current/archived fixture bytes changed.
+
+The newly actionable checkpoint was merged follow-up consumption after a valid
+0.3 parent, beyond the already known upstream design/history mapping conflict.
+A fresh baseline and separately reviewed explicit v2 design (horizon `10/1`,
+empty prospective reuse, complete historical bytes) ran through the actual
+scientific transport. The merged backend `CounterdexAdapter.review` then passed
+three real computed hypothetical cases: first survives, second survives, and
+both excluded. Every result validates the current authoritative DTO, qualifies
+with `followup_result_checked`, retains the complete original parent bytes and
+matches a separate fresh replay. The outside-survives case remains a scoped
+counterexample; the other cases are inconclusive, never global exclusion.
+
+Existing proposal-bound `recheck` also accepts an actual-origin declaration at
+`79/10` hours with allowance `7/20`, produces valid/passed native checking and
+validates the current DTO. The merged review qualifier rejects its operation
+and proposal-bound profile. Owner 2 must carry the resolved proposal through the
+worker and adopt `recheck` plus explicit application admission/approval for that
+wider case; the scientific operation is already implemented.
+
+Two new regression tests exercise a fresh v2 parent with reversed candidate
+ID/vector order through both legacy review and actual own-time recheck. They
+preserve the exact pair/history, forbid discovery, retain the distinct binding
+and origin meanings, and reject parent-run/vector substitution under both the
+genuine external anchor and deliberately resealed diagnostic anchors. Targeted
+tests: **2 passed in 1.309 s**. Full changed modules: **41 passed in 7.111 s**:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=packages/groundwork_adapter:packages/groundwork_adapter/tests \
+  python3.11 -m unittest -q test_bridge test_followup
+```
+
+The current authoritative-schema fixture check also passed **8 requests and
+8 results**, no errors, using pinned backend Python **3.13.18** / Pydantic
+**2.13.4**. The Owner 2 handoff contains an executed direct-adapter reproduction
+that retains native bytes/anchors; its installed isolated CLI replay returns
+valid/passed/matching with no search and both selected candidates excluded.
+The first draft of that reproduction used generic package workflow IDs and
+failed binding; correcting it to the existing backend job-ID rule made it pass.
+No production predicate changed. Independent read-only review accepted the
+two tests and updated handoffs.
+
+Owner 5's advanced `80c2bcf` already has the native replay consumer; its current
+follow-up plan still lacks the now-implemented `FollowupScope`, so it selects
+ordinary discovery. The handoff names all five current fields and required
+fixed-pair/download/replay assertions. Do not recreate its native handling.
+
+Remaining blockers: the upstream v2/history mapping request; unchanged Mac
+per-user process cap 256; dedicated proposal-bound recheck application adoption;
+and independent HTTP acceptance. A fresh reviewer also confirmed the merged
+Linux process observer still misses the actual prior CI `ProcessLookupError`
+(`ESRCH`, errno 3) while handling only `FileNotFoundError`; cleanup is unqualified.
+The unchanged known-failing Mac suite was not repeated. No guard bypass,
+provider call, credential read, dependency install or other-owner edit occurred.
+Owned checkpoint is ready for review/publication; stop expansion until those
+consumer changes land, then rerun their actual focused routes and replay.
+
 ## Post-push CI at `8af34e4`
 
 PR #5 is ready for review, with teammate main `9cc90e0` incorporated. CI
