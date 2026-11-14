@@ -1,132 +1,207 @@
-# Dr. Bean
+<h1 align="center">Dr. Bean</h1>
 
-Dr. Bean is a research evidence assistant. Its goal is one decision loop: review measurements, find a compatible counterexample to a claimed parameter range, choose a next measurement that tells two candidate explanations apart, check which survives a new reading, and replay the exact evidence. The scientific engine is **Counterdex** (`packages/groundwork_adapter/counterdex`).
+<p align="center">
+  <strong>Scientific model comparison, counterexample discovery, and measurement design.</strong>
+</p>
 
-This README states what the repository does at the tested commit. Status by gate is in [docs/INTEGRATION_STATUS.md](docs/INTEGRATION_STATUS.md).
+<p align="center">
+  <a href="https://github.com/Arnav-M10/DrBean-hp26/actions/workflows/ci.yml"><img src="https://github.com/Arnav-M10/DrBean-hp26/actions/workflows/ci.yml/badge.svg" alt="Continuous integration"></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.12%20%7C%203.13-3776AB?logo=python&logoColor=white" alt="Backend Python 3.12 and 3.13"></a>
+  <a href="packages/groundwork_adapter/README.md"><img src="https://img.shields.io/badge/exact%20checker-CPython%203.11-555555" alt="Exact checker on CPython 3.11"></a>
+</p>
 
-## Current state in one paragraph
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#workflows">Workflows</a> ·
+  <a href="#examples">Examples</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#documentation">Documentation</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
 
-The API, worker and web workspace start with one command and survive a restart. An approved baseline runs the real engine and returns scoped results with native evidence that replays in a separate process. The browser supports reviewed exact inputs, frozen plans, separate approvals, actual baseline and next-measurement design, history and native downloads. Backend follow-up checks retain the original pair and a separately reviewed reading. The browser also supports retained-source inspection, proposal correction/materialization and hypothetical follow-up revisions. Strict clean-checkout release qualification is tracked separately. The independent HTTP suite is delivered; qualification depends on its retained results for the current commit. Counterdex also works offline on CPython 3.11. **Gemini is disabled by default. An explicit private local opt-in enables bounded image proposals and selected-run commentary, each with separate consent. Live autonomous Deep Agents coordination is not integrated.**
+Dr. Bean is a research assistant for examining what scientific data support and deciding what to measure next. It combines file analysis with **Google Gemini**, research coordination with **LangChain Deep Agents**, and deterministic scientific computation with **Counterdex**.
 
-## Run it
+The main interface is the **study workspace** at `/study/`. Researchers bring files and a question, review the proposed analysis, inspect the answer, and choose a next step. Supported scientific checks retain the reviewed inputs, assumptions, computation, and evidence needed to inspect or replay a result.
 
-Requirements: [uv](https://docs.astral.sh/uv/) and Node 20 or newer. uv installs the Python runtimes: the backend on Python 3.12/3.13 from `uv.lock`, the engine on CPython 3.11 (its only qualified runtime). Do not use whichever `python3` is on your PATH for product code.
+<p align="center">
+  <img src="docs/images/study-workspace.png" alt="Dr. Bean study workspace with a question, file intake, and the Data, Approval, Answer, and Next step stages" width="100%">
+</p>
 
-```sh
+## Workflows
+
+| Workflow | Input and method | Output |
+| --- | --- | --- |
+| **Research file analysis** | A question with PDFs, images, CSV, TSV, JSON, text, or Markdown; Gemini interprets selected material after consent. | Source-linked analysis, quotations checked against retained text, extracted tables, limitations, and suggested next steps. |
+| **Parameter-claim investigation** | Reviewed time–concentration measurements, hard allowances, a supported model, and a claimed parameter interval. | Discovered candidates, exact compatibility checks, an outside witness when found, and replayable native evidence. |
+| **Next-measurement design** | Two retained candidates, feasible measurement times, and a reviewed future hard allowance. | A checked separation result for the fixed pair when supported, or an explicitly numerical or inconclusive result. |
+| **Numerical model comparison** | Reviewed synthetic electron-current observations and an idealized collector response. | Isotropic versus gyrotropic bi-Maxwellian fits, residuals, noise sensitivity, conditional Monte Carlo results, and candidate measurement settings. |
+
+General file analysis can address questions across disciplines. Exact scientific verification applies to the supported mathematical model; numerical comparisons and AI explanations have their own stated scope.
+
+### Core capabilities
+
+- **Review before execution.** Scientific operations bind to the exact inputs and assumptions the researcher approved. Changed inputs require a new review.
+- **Evidence-dependent planning.** The Deep Agents coordinator maintains a plan, invokes scoped tools, reads returned scientific evidence, and proposes a next action.
+- **Readable results.** Reports explain the question, finding, conditional meaning, uncertainty, and next step. Exact values and machine-readable records remain available.
+- **Persistent investigations.** Private workspaces retain sessions, approvals, events, reports, and scientific artifacts. Committed actions support reconciled checkpoint continuation.
+- **Reproducible evidence.** Exact-check packets retain rational inputs and separately supplied replay anchors. Numerical results retain their assumptions and provenance.
+- **Shared Gemini access.** One server key serves authorized browser workspaces through a shared request ledger. Keys stay out of browser code and the repository.
+
+## Quick start
+
+**Requirements:** [uv](https://docs.astral.sh/uv/) and Node.js 20 or newer. The launcher prepares the backend on Python 3.12/3.13 and the exact checker on CPython 3.11.
+
+```bash
+git clone https://github.com/Arnav-M10/DrBean-hp26.git
+cd DrBean-hp26
+
 scripts/dev/setup.sh
+scripts/dev/start.sh
 ```
 
-Installs both runtimes, creates the private local auth file if absent, and prints the doctor report. It never deletes data in `var/`.
+Open **<http://127.0.0.1:4173/study/#data>**, or append `/study/#data` to the web address printed by the launcher when using a different port. Browser access uses an automatically established private session; researchers do not copy an access token or Gemini key into the interface.
 
-```sh
-scripts/dev/start.sh --controlled-source-examples
+A fresh checkout runs without a model-provider key. The scientific examples use real computations; the default controlled coordinator is an offline policy running through the actual Deep Agents graph. Live Gemini requires the server configuration described below.
+
+```bash
+scripts/dev/doctor.py       # Inspect service and runtime readiness
+scripts/dev/stop.sh         # Stop launcher-managed services; retain saved work
 ```
 
-Starts the API (`127.0.0.1:8000`), the durable worker and the web workspace (`127.0.0.1:4173`) on one SQLite store under `var/`, waits until they answer, and prints service facts. Loopback only. This option enables the packaged synthetic source examples. Without the separate live opt-in below, Gemini remains disabled; omit the option for manual-only source intake.
+See [Getting started](docs/getting-started.md) for Gemini setup, shared access, alternate interfaces, and recovery.
 
-```sh
-scripts/dev/stop.sh
+## Examples
+
+### Challenge a parameter interval
+
+In the study workspace, select **drug levels after a dose**, or import a table with time, concentration, and hard-allowance columns. The supported exact model is
+
+$$
+C(t)=A\left(e^{-k_e t}-e^{-k_a t}\right),
+\qquad A>0,\quad 0<k_e<k_a.
+$$
+
+For the synthetic example, ask whether the measurements force the elimination rate into the closed interval $k_e\in[0.10,0.17]\;\mathrm{h}^{-1}$. Review the measurements and assumptions, inspect the maintained research plan, and approve the proposed scientific operation.
+
+The example has compatible parameter assignments outside the claimed interval. A verified outside witness establishes that the reviewed assumptions do **not** force the claim; it does not identify the true physical parameters. A subsequent design can compare two retained candidates at separately reviewed measurement times.
+
+The [decision example](packages/groundwork_adapter/docs/DECISION_EXAMPLE.md) documents the calculation. The [portable replay example](packages/groundwork_adapter/fixtures/repro/README.md) includes a native packet and its matching anchors.
+
+### Compare electron-distribution models
+
+Select **electron currents at a collector**. Review the synthetic observations, collector geometry, model bounds, and noise assumptions before comparing an isotropic Maxwellian with a gyrotropic bi-Maxwellian having parallel and perpendicular temperatures.
+
+The numerical workflow shows where fitted predictions differ and whether the difference exceeds the selected noise criterion. Its planar response is an idealized synthetic example, not a calibrated experimental instrument. See the [comparison walkthrough](workspace-preview/README.md#numerical-plasma-comparison-walkthrough).
+
+### Run numerical comparison without the application
+
+The separate `counterdex-models` package provides bounded fitting, sensitivity analysis, seeded Monte Carlo, and finite-grid measurement ranking for registered models:
+
+```bash
+python3.11 packages/counterdex_models/examples/demo.py
 ```
 
-Stops only the processes the launcher started. Data is kept.
+This provider-free example compares single- and two-exponential models under different observation windows, noise assumptions, and detection thresholds. See the [package documentation](packages/counterdex_models/README.md) for request schemas and model registration.
 
-```sh
-scripts/dev/doctor.py
+## Architecture
+
+```mermaid
+flowchart TD
+    UI[Study workspace] --> Files[Research files and question]
+    Files --> Gemini[Gemini analysis with source references]
+    UI --> Review[Reviewed scientific inputs]
+    Gemini -->|Researcher reviews extracted values| Review
+    Review --> Agent[Deep Agents coordinator]
+    Agent --> Approval[Scientific scope approval]
+    Approval --> Exact[Counterdex investigation or pair design]
+    Exact --> Evidence[Retained scientific evidence]
+    Evidence -->|Informs the next action| Agent
+    Review --> Numerical[Numerical model comparison]
+    Evidence --> Reports[Reports and downloads]
+    Numerical --> Reports
 ```
 
-Reports, as separate facts: API ready, worker ready, scientific adapter available and qualified, native replay supported, and Gemini opt-in/server dispatch state. Configuration and readiness do not establish live qualification.
+The FastAPI service owns workspace access, input revisions, approvals, provider accounting, and retained records. A supervised worker executes the research graph and scientific jobs. SQLite stores application records and LangGraph checkpoints.
 
-Open the web address printed by the launcher. It connects automatically to a private browser workspace; researchers do not enter an access token or provider key. Reloads and additional tabs reuse the session cookie. Saved work stays on the server; unsaved drafts stay in the current tab. Operator API documentation remains at `http://127.0.0.1:8000/docs`.
+Deep Agents supplies the planning and tool-execution graph. The application exposes six tools: `write_todos`, `prepare_scientific_proposal`, `run_scientific_operation`, `read_research_evidence`, `request_clarification`, and `publish_research_report`. Scientific dispatch pauses at a canonical approval boundary. The coordinator uses these tools rather than unrestricted shell access or a general-purpose subagent.
 
-If a start fails, the launcher prints the log tail and stops what it started. Port already in use: it refuses and kills nothing. After an unclean stop, run `python3 scripts/dev/launcher.py recover` before the next start. Details: [docs/release-runbook.md](docs/release-runbook.md).
+Counterdex constructs exact enclosures for selected parameter vectors in the supported two-rate model. The numerical comparison layer is separate: a fit, model ranking, or Monte Carlo frequency is not an exact Counterdex certificate.
 
-## Optional live Gemini
+### Execution and evidence
 
-One backend uses one server-side Gemini key for all authorized users and workspaces. Teammates connecting to that backend do not provide their own Gemini keys. The server owner configures it once; cloning the repository does not copy the private key. The launcher discards shell provider credentials. After setup on the server, create an owner-only configuration from the disabled example:
+| Mode or result | Interpretation |
+| --- | --- |
+| **Controlled coordinator** | Deterministic offline model driving the actual graph, worker, and scientific tools. It makes no provider calls. |
+| **Live Gemini** | Configured server-side model calls with consent, admission, and shared accounting. Readiness and live qualification are separate facts. |
+| **Exact scientific check** | Compatibility of the named fixed vectors with the reviewed hard bounds, model, and claim. |
+| **Numerical comparison** | Conditional numerical results for the registered models, supplied observations, and noise assumptions. |
+| **Native replay** | Fresh execution of the matching checker against retained bytes and independent expected identities. It is not a second proof system. |
 
-```sh
+The server exposes current capabilities and qualification state. Historical tests and saved examples retain their original commit identities. General paper interpretation does not certify arbitrary mathematical proofs, and a bounded search that finds no counterexample does not prove a universal claim.
+
+## Gemini configuration
+
+The launcher reads an owner-only `var/gemini.local.json` file. It deliberately does not inherit provider keys from the shell. To prepare the disabled template after setup:
+
+```bash
 cp scripts/dev/gemini.local.example.json var/gemini.local.json
 chmod 600 var/gemini.local.json
 ```
 
-Edit that private file on the server: enter the owner's `GEMINI_API_KEY`, set `mode` to `live`, set `BEAN_GEMINI_ACCOUNT_GATE` to `approved`, and record the owner's decision in `BEAN_GEMINI_ACCOUNT_DECISION_ID` using 1–128 letters, digits, dots, underscores, colons or hyphens, starting with a letter or digit. Keep `BEAN_GEMINI_FREE_TIER_ONLY` at `1`. The model is explicitly selected as `gemini-3.5-flash-lite`; `gemini-2.5-flash-lite` is also supported. No model fallback is performed. Restart the launcher after changing the file. Setting `mode` to `disabled` and restarting disables dispatch again.
+Configure the server-side key and explicit opt-in, then restart the launcher. File analysis and autonomous coordination are distinct capabilities; live coordination also requires a consented session and an operator allocation. [Configuration instructions](docs/getting-started.md#configure-gemini) describe both paths.
 
-This free-tier flag records your assertion about the Google project. The application does not verify its billing state or establish a dollar-denominated spending guarantee. Use a project without billing enabled when zero spend is required. API keys, bearer tokens, local stores and live-test records under `var/` are excluded from Git.
+The free-tier flag records the operator's project declaration; it does not verify Google billing or guarantee a dollar-denominated cap. Shared accounting limits application requests, including failed or uncertain attempts, without automatic retries or model fallback.
 
-After connecting and selecting a workspace, upload one public or synthetic PNG/JPEG, review the image disclosure, and choose **Ask Gemini to read this image**. Live images are limited to 1600 × 1600 pixels and 5 MiB. Review each proposed value and complete missing assumptions before scientific approval. With a completed run open, **Ask Gemini about this investigation** sends the question and selected research context after separate consent. The app shows server-owned scientific statements separately from model commentary and withholds commentary that fails grounding checks.
+## Development
 
-**Show Gemini call budget** reads the local ledger without calling a model. The live ledger permits at most eight requests with total conservative reservations of 64,000 input and 16,000 output tokens. These limits apply across the local store, not separately to each workspace or to Google's quota. Failed/uncertain requests retain reservations, and the app makes no automatic retry. Manual discovery, measurement design, follow-up checking and native replay make no model calls. PDF intake and live autonomous coordination remain unavailable. A local smoke test does not satisfy the formal live release gate.
+Run setup before using the managed backend and engine environments. Routine checks are provider-free:
 
-## One shared server for teammates
-
-Run the app and configure Gemini once on the owner's Mac. Install Cloudflare's `cloudflared` tool (`brew install cloudflared` on macOS), then run:
-
-```sh
-python3 scripts/dev/share.py start
-python3 scripts/dev/share.py status
+```bash
+uv run ruff check apps tests scripts
+uv run pytest -q tests --ignore=tests/integration
+.venv-engine/bin/python -m unittest discover -s packages/groundwork_adapter/tests
+.venv-engine/bin/python -m unittest discover -s packages/counterdex_models/tests
+node --test apps/web/*.test.mjs
+node --test workspace-preview/tests/*.test.mjs
 ```
 
-The printed HTTPS link opens the running application. Each browser connects automatically to its own private workspace. Sharing the URL does not share another visitor’s research. Teammates do not enter an access token or provider key, or start a backend. All workspaces share the existing conservative provider budget, including earlier tests; connecting never resets or increases it.
+Some backend tests need the prepared engine interpreter. The [development instructions](docs/getting-started.md#development-checks) include the relevant environment variables and browser-test setup. [CI](.github/workflows/ci.yml) additionally exercises contracts, browser workflows, process boundaries, and the evaluation harness on macOS and Linux. Offline CI does not qualify live Gemini.
 
-The API, web server and sharing gateway remain bound to loopback. The gateway admits the exact current HTTPS tunnel origin, strips visitor-supplied owner credentials, and forwards only the private session cookie. It never reads or sends the Gemini key. This is a temporary development preview: keep the Mac on and connected; the URL changes on a new sharing session. Status/health checks make no model calls. Stop the public link separately with:
+### Repository layout
 
-```sh
-python3 scripts/dev/share.py stop
+| Path | Responsibility |
+| --- | --- |
+| [`apps/web/study/`](apps/web/study/) | Main study interface: Data, Approval, Answer, and Next step. |
+| [`apps/api/bean_api/`](apps/api/bean_api/) | API, durable worker, research coordination, file analysis, and model comparison. |
+| [`packages/groundwork_adapter/`](packages/groundwork_adapter/) | Counterdex exact checker, native evidence, and application adapter. |
+| [`packages/counterdex_models/`](packages/counterdex_models/) | Separate bounded numerical model-comparison library. |
+| [`shared/contracts/`](shared/contracts/) | Versioned request, response, and evidence schemas. |
+| [`evaluation/`](evaluation/) | Independent checks, retained evidence, and qualification tooling. |
+| [`scripts/`](scripts/) | Setup, service management, sharing, and release checks. |
+| [`workspace-preview/`](workspace-preview/) | Additional connected research/comparison views and labelled static examples. |
+
+## Documentation
+
+- **Use the application:** [Getting started](docs/getting-started.md), [study workspace](apps/web/study/README.md), [shared server](docs/shared-server.md).
+- **Integrate services:** [research-file API](docs/general-research/api.md), [research contracts](shared/contracts/DB-RESEARCH-1/README.md), [scientific contracts](shared/contracts/README.md).
+- **Understand the computation:** [Counterdex](packages/groundwork_adapter/README.md), [numerical model comparison](packages/counterdex_models/README.md), [decision example](packages/groundwork_adapter/docs/DECISION_EXAMPLE.md).
+- **Inspect qualification:** [evaluation harness](evaluation/README.md), [preferred-research evidence](docs/frontend/preferred-research/README.md), [release runbook](docs/release-runbook.md).
+
+## Contributing
+
+Use [GitHub Issues](https://github.com/Arnav-M10/DrBean-hp26/issues) for reproducible bugs and proposed changes. Include the relevant workflow, configuration mode, expected behavior, and a small public or synthetic input. Exclude credentials, private research material, and local stores.
+
+Contributions should preserve the distinctions among model commentary, numerical analysis, and exact scientific evidence. Extend supported models through explicit contracts and tests; keep the scientific engine independent of provider credentials and the web interface. Open a pull request with the change, its scientific scope, and the checks performed.
+
+## Referencing the project
+
+Dr. Bean is a research prototype developed for HackPrinceton 2026. To reference a particular implementation, include the repository URL and the commit used for your experiments.
+
+```bibtex
+@software{drbean2026,
+  author = {{Dr. Bean contributors}},
+  title  = {{Dr. Bean}: Scientific Model Comparison and Checkable Evidence},
+  year   = {2026},
+  url    = {https://github.com/Arnav-M10/DrBean-hp26}
+}
 ```
-
-Cloudflare Quick Tunnel behavior and limitations are documented at <https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/>. Detailed setup and verification are in [Shared server](docs/shared-server.md).
-
-## What works, and how it is checked
-
-| Area | State | Check |
-|---|---|---|
-| One-command launch, restart, reopen evidence, credential and origin refusal | works | `python3 scripts/release/stack_smoke.py` (31 checks, isolated store) |
-| Manual HTTP path: dataset, problem, plan, approval, one run, report | works with real Counterdex discovery | `stack_smoke.py --require-science`; backend and HTTP tests |
-| Browser to API: plan, approval, run retrieval, downloads | works | `node apps/web/check-backend.mjs` |
-| Web editor: exact entry, validation, export | works | `node --test` in `apps/web`; `tests/integration/web_manual_smoke.mjs` |
-| Counterdex engine standalone: candidate discovery, exact check, fixed-pair design, native replay | works on CPython 3.11 | 257 engine tests; replay of the prepared synthetic bundle |
-| Source intake and review | controlled examples plus explicitly opted-in live image proposals | backend tests; `tests/test_live_provider_opt_in.py`; web source tests |
-| deepagents graph | backend-tested with **controlled placeholder** models only; live coordinator unavailable | backend tests |
-| Baseline discovery through the API and browser | works with the prepared engine interpreter | `stack_smoke.py --require-science`; `node apps/web/check-backend.mjs` |
-| Design, native export and replay through the API (gate G2) | real discovered pair, separate approval, native replay | backend tests |
-| Browser controls for source review, design and follow-up | implemented; controlled source proposal, real science and hypothetical follow-up | `node apps/web/check-backend.mjs` |
-| Live Gemini | explicit opt-in for image proposals and selected-run commentary; disabled by default; formal live qualification not run | substituted SDK transport tests and browser control tests; live qualification is separate |
-
-```sh
-python3 scripts/release/checklist.py
-```
-
-Runs every suite above and prints checks, gates and boundaries for the current commit. Exit 0 here is a status report, not a release.
-
-```sh
-python3 scripts/release/checklist.py --strict-offline
-```
-
-Exits nonzero unless every offline gate has passing evidence. It currently fails, correctly.
-
-```sh
-scripts/release/clean_checkout.sh
-```
-
-Repeats the checks in a clean clone with freshly installed runtimes.
-
-## What a result would and would not mean
-
-A checked candidate outside a claimed interval shows that the reviewed measurements and model do not force the parameter into that interval. It does not identify the true parameter, validate the model or support a clinical decision. A suggested measurement time concerns only the two named candidates, the reviewed feasible times and the stated future hard allowance. A later reading can exclude either candidate or both; it never proves the interval. Replay is a fresh run of the same checker, not an independent proof system. The person reviews assumptions and authorizes work; the checker decides mathematical validity; AI output, placeholder or live, can do neither.
-
-## Scope
-
-One model, `C(t) = A*(exp(-ke*t) - exp(-ka*t))`, hours and mg/L. One PNG or JPEG source. Local SQLite with optional temporary HTTPS sharing from the owner's Mac. No PDF intake, managed production deployment, second database, blockchain, messaging or extra model provider. All data in this repository is synthetic.
-
-## Documents
-
-- [Integration status by gate](docs/INTEGRATION_STATUS.md), [cross-owner issue ledger](docs/issue-ledger.md) and [workstream logs](docs/workstreams/)
-- [Release runbook](docs/release-runbook.md) and [operational handoff](docs/handoff-owner04.md)
-- [Ownership and layout](docs/ownership-and-layout.md)
-- [Two-minute demo script](docs/demo/demo-script.md) and [submission draft](docs/submission-draft.md)
-- [Consultation and observed-task protocol](docs/human-task/task-protocol.md)
-- [Provenance and eligibility](docs/provenance-and-eligibility.md)
-- Backend: [handoff](docs/HANDOFF.md), [validation](docs/VALIDATION.md), [shared contracts](shared/contracts/README.md)
-- Engine: [integration](packages/groundwork_adapter/docs/INTEGRATION.md), [README](packages/groundwork_adapter/README.md)
-- Evaluation: [protocol](docs/evaluation-protocol.md), [harness](evaluation/README.md)
-- Web: [workspace notes](apps/web/README.md)
