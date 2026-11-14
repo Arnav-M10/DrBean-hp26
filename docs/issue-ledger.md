@@ -18,13 +18,13 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 | I-010 | 2, 3 | open | Conditional objective for harness cases C08/C09 versus the real plan contract |
 | I-011 | 2 | open, minor | Float in JSON is refused without naming the field |
 | I-012 | 3 | **closed on `main` at `fa91e13`** | Provider stays unconfigured with key, model and gate variables set; API reports `ai_mode: disabled_placeholder` |
-| I-013 | 2 | **open, blocks G1 and G2** (now Owner 2) | The engine has discovery and a prepared bridge since PR #4; the backend child still reports `baseline_discovery: false` and never calls it. Interface request below. |
+| I-013 | 2 | **closed on `main` at `1f75bdc` (PR #6)** | Baseline discovery now runs through ordinary startup: `stack_smoke.py --require-science` exits 0 with a certified counterexample, 2 candidates and a native artifact |
 | I-014 | 1, 2 | **closed** | Two runtimes; the backend calls the engine in a child process on CPython 3.11 |
 | I-015 | 2, 4 | open, target platform | `resource_policy.py` now omits `RLIMIT_AS` on macOS; still unverified on the Mac |
 | I-016 | 5 | open, blocks strict gate | HTTP/invariant suite and offline real-science lane not delivered |
-| I-017 | 4 | open, waits for G1 | Browser controls for source review, design and follow-up not built |
-| I-019 | 2, 4 | open, question | Which capability field should enable the browser's queue button |
-| I-018 | 2 | **open, launch blocker for every ordinary user** | Scientific child's process-count limit counts all of the user's processes, so real jobs fail for anyone who is not root |
+| I-017 | 4 | **open, now unblocked** | Browser controls for source review, design and follow-up not built |
+| I-019 | 2, 4 | **closed** | PR #6 gates queueing on `science.available` and `baseline_discovery` (`baselineAvailable`), the same fields proposed |
+| I-018 | 2 | **closed on `main` at `1f75bdc`** (pending CI confirmation on the runner) | `user_conditions_check.py` now passes locally: 5 of 5 as an unprivileged user owning 64 processes |
 
 ## I-011: float refusal does not name the field (Owner 2)
 

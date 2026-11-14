@@ -213,6 +213,8 @@ def _collect(fast):
         "owner5_http_suite": owner5_suite(),
         "web_source_review_browser_check": {"status": "unrun", "detail": "no source/value review control exists "
                                                                          "in the web workspace yet"},
+        "web_design_followup_browser_check": {"status": "unrun", "detail": "no next-measurement or follow-up "
+                                                                           "control exists in the web workspace yet"},
     }
     skipped = {"status": "unrun", "detail": "skipped by --fast"}
     if fast:

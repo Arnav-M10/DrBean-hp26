@@ -12,6 +12,10 @@ Standing brief: master document DB-MASTER-1, section 2. This log is a navigation
 | AI mode | controlled placeholder; live Gemini disabled and not run; provider requests made: 0 |
 | Evidence | `docs/release-evidence/release-checklist.json`, `docs/release-evidence/stack-smoke.json` (each names its commit) |
 
+## Update after merging `main` at `1f75bdc` (PR #6)
+
+Supersedes rows 2 to 5 and 8 of the table below. Fresh, as root: stack smoke 31/31 and G1 passed (`certified_counterexample`, 2 candidates, 1 native artifact); `user_conditions_check.py` 5/5; backend 290 passed; engine 257 passed; web 23 passed; browser check with real discovery, native and anchor download and separate-process replay passed 3 of 4 runs (one unexplained failure on the first run after the merge; watch for flakiness); editor smoke 17/17. Checklist: G0 passed; G1 to G3 wait on Workstream 5's suite; G4 waits on the design, follow-up and source-review controls, which are now this workstream's next task (I-017).
+
 ## Gate table
 
 "Fresh" means run by this workstream on this branch. Nothing here restates a teammate's report as qualified.

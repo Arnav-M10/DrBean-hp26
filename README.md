@@ -6,7 +6,7 @@ This README states what the repository does at the tested commit. Status by gate
 
 ## Current state in one paragraph
 
-The API, worker and web workspace start with one command and survive a restart. **Known launch blocker: unless you run as root, approved runs currently fail** because of a process limit in the backend's scientific sandbox ([issue I-018](docs/issue-ledger.md)); check with `python3 scripts/release/user_conditions_check.py`. The manual path (exact inputs, frozen plan, approval, one run, report download) works over HTTP and in the browser. The API now reaches the scientific engine for fixed-pair design and native replay, **but baseline discovery is not available through the application** (the engine has it; the backend does not call it yet): an approved baseline returns an honest `unsupported` result with no candidates, and without candidates no design can be requested. So no counterexample, measurement suggestion or replayable evidence has yet been produced through the application. The engine works on its own (CPython 3.11) and replays its prepared synthetic bundle. **Gemini is a placeholder: no model provider has ever been called by this project, and the launcher makes that impossible by removing provider credentials from every process it starts.**
+The API, worker and web workspace start with one command and survive a restart. An approved baseline now runs the real engine: on the shared five-row example it returns a checked counterexample with native evidence that replays in a separate process. The manual path (exact inputs, frozen plan, approval, one run, report download) works over HTTP and in the browser. The API now reaches the scientific engine for fixed-pair design and native replay, and baseline discovery works through the application. **Next-measurement design and follow-up are not yet connected in the browser**, and Workstream 5's independent HTTP suite is not delivered, so the full decision loop is not yet qualified. The engine works on its own (CPython 3.11) and replays its prepared synthetic bundle. **Gemini is a placeholder: no model provider has ever been called by this project, and the launcher makes that impossible by removing provider credentials from every process it starts.**
 
 ## Run it
 
@@ -50,7 +50,7 @@ If a start fails, the launcher prints the log tail and stops what it started. Po
 | Web editor: exact entry, validation, export | works | `node --test` in `apps/web`; `tests/integration/web_manual_smoke.mjs` |
 | Counterdex engine standalone: candidate discovery, exact check, fixed-pair design, native replay | works on CPython 3.11 | 257 engine tests; replay of the prepared synthetic bundle |
 | Source intake and review, deepagents graph | backend-tested with **controlled placeholder** models only | backend tests |
-| Baseline discovery through the API (gate G1) | **not available** (`baseline_producer_unavailable`) | smoke reports G1 not passed |
+| Baseline discovery through the API and browser | works (as root locally; CI is the non-root lane) | `stack_smoke.py --require-science`; `node apps/web/check-backend.mjs` |
 | Design, native export and replay through the API (gate G2) | backend-tested from a seeded regression pair only; unreachable over ordinary HTTP until discovery exists | backend tests |
 | Browser controls for source review, design and follow-up | **not built** (waits for G1) | |
 | Live Gemini | **not run; disabled** | |

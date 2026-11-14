@@ -1,6 +1,6 @@
 # Integration status
 
-Concise summary, at `main` `adac945` plus this branch. Each workstream's own log is in `docs/workstreams/`. Details, inputs and owners are in the [issue ledger](issue-ledger.md); commands are in the [runbook](release-runbook.md). Regenerate the facts with `python3 scripts/release/checklist.py --record`.
+Concise summary, at `main` `1f75bdc` plus this branch. **The gate table below predates PR #6; current facts:** real baseline discovery passes through ordinary startup and in the browser (certified counterexample, native evidence and anchors downloaded and replayed in a separate process); the non-root launch failure (I-018) is fixed locally; G0 passes; G1 to G3 still lack Workstream 5's HTTP suite; G4 lacks the design, follow-up and source-review browser controls. Run `python3 scripts/release/checklist.py` for the live table. Each workstream's own log is in `docs/workstreams/`. Details, inputs and owners are in the [issue ledger](issue-ledger.md); commands are in the [runbook](release-runbook.md). Regenerate the facts with `python3 scripts/release/checklist.py --record`.
 
 **AI mode: placeholder. Live Gemini: disabled, not run. Model provider requests made by this project: 0.**
 
