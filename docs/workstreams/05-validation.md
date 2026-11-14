@@ -6,7 +6,7 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 
 | Item | Value |
 |---|---|
-| Branch | `claude/adversarial-validation` (pushed). PR #8 merged it into `main` up to `4ea7cb3`; `main` `80f95a4` (PR #9 design + PR #11 follow-up) merged back as `7747180`. Later harness commits (native consumer, `.venv-engine` discovery, Owner 4 launch path, design-bound follow-up, group-aware orphan cleanup) reach `main` only through a new PR |
+| Branch | `claude/adversarial-validation` (pushed). PR #8 merged it into `main` up to `4ea7cb3`; `main` `55403ab` (PR #9 design, PR #10 offline AI, PR #11 follow-up) merged back as `98cef50`. Later harness commits (native consumer, `.venv-engine` discovery, Owner 4 launch path, design-bound follow-up, group-aware orphan cleanup, evidence-equivalent gates) reach `main` only through a new PR |
 | Integration branch | `main` (GitHub default since the PR #3/#4 merges) |
 | Last recorded lane run | `3b55843` (app code = `main` `9cc90e0`), on **both launch paths**: the harness's own isolated launch (`evaluation/results/`) and Owner 4's `scripts/dev/launcher.py` (`evaluation/results/owner4-launcher/`). Same verdicts: hero and changed input fail with `scientific_runtime_unavailable` (F-MAC-NPROC); retry/concurrency and zero dispatch pass. Owner 4's path with `relax_nproc`: `evaluation/results/owner4-launcher/relax_nproc/` |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 from Owner 4's `.venv-engine` (created by `launcher.py setup`); checkout under iCloud-synced `~/Documents` (see F-LAUNCHER-HIDDEN-PTH) |
@@ -23,7 +23,8 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 | G1 (history) | was blocked on `main` | `RS-HERO-FULL` fails: on the Mac `scientific_runtime_unavailable` (F-MAC-NPROC); on any host the baseline producer is unavailable on `main` (F-BASELINE-DISCOVERY). Image admission passes. **Preview of Owner 2's `backend/browser-baseline` cc779bf (diagnostic relax_nproc):** real discovery, certified counterexample, baseline packet download + fresh `replay-native` all pass. |
 | G2 decision loop | **blocked on this Mac by F-MAC-NPROC only** | On merged `main` (diagnostic): changed input, design authority and the design-bound follow-up pass (application, fresh replay and the decimal oracle agree per candidate). Earlier notes below this row are history. |
 | G2 (history) | blocked | engine-level controls 12/12. Preview: changed input, design authority, three hypothetical lineages pass; checked design blocked by F-DESIGN-SOURCE-ARTIFACTS (without source ids the same pair separates at 8 h and replays fresh); per-candidate follow-up feedback has no route (F-FOLLOWUP-FEEDBACK). |
-| G3 AI-ready offline | mostly evidenced | zero-dispatch tests 7/7 incl. legacy live switch; controlled boundary 28 passed + 2 strict xfail (P2 residuals); real Worker + deepagents graph contrast and vanished-scenario refusal pass |
+| G3 AI-ready offline | **evidenced on `main` `55403ab`** | AI-boundary + zero-dispatch suites 38/38 after PR #10; both coordinator residuals and F-AI-INTEGRATION-SEAM closed by retest; strict-xfail markers removed. Earlier notes below this row are history. |
+| G3 (history) | mostly evidenced | zero-dispatch tests 7/7 incl. legacy live switch; controlled boundary 28 passed + 2 strict xfail (P2 residuals); real Worker + deepagents graph contrast and vanished-scenario refusal pass |
 | G4 usable release | **blocked on this Mac** | Owner 4's one-command start fails here (F-LAUNCHER-HIDDEN-PTH, P1): iCloud Drive hides `.venv`, CPython skips its editable `.pth`, `bean_api` is not importable, doctor still says ready. With `apps/api` on `PYTHONPATH` the unmodified launcher passes readiness and zero dispatch and keeps provider credentials out of the API and worker |
 
 ## Unresolved findings and owners
@@ -70,6 +71,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
+| merged `main` (`55403ab`, after PR #10) in this checkout | harness `1ae19ff` | diagnostic relax_nproc: **6/7 pass** again (hero, changed input, retry, design authority, follow-up, zero dispatch); plain acceptance on both launch paths: F-MAC-NPROC; gate exit 3. |
 | merged `main` (`80f95a4`) in this checkout | harness `b827c61`/`f992b48` | diagnostic relax_nproc: **6/7 pass** (hero, changed input, retry, design authority, follow-up, zero dispatch); with science_barrier the worker-kill orphan reproduces (F-ORPHAN-WORKER-KILL) and is now terminated before the barrier is released. Plain acceptance on both launch paths: F-MAC-NPROC. |
 | `backend/followup` (PR #11, stacked on PR #9; now merged) | `8525cab` | diagnostic relax_nproc: **6/7 entries pass incl. RS-FOLLOWUP** (design-bound `PlanBody.followup`: application, fresh replay and decimal oracle agree per candidate on all three readings; tampered/substituted/foreign scopes refused; qualifier 125/125); RS-CANCEL-RESTART unrun without the barrier. With relax_nproc + science_barrier: running cancel passes, **worker SIGKILL still orphans the child** (F-ORPHAN-WORKER-KILL). |
 | `backend/browser-design` | `8451c1f` | plain: hero fails (F-MAC-NPROC). diagnostic: **RS-HERO-FULL passes** — discovery, checked design with documented source ids (8 h, positive exact margin), both native packets replay fresh, 33/33 qualifier re-checks; follow-up per-candidate still blocked. |
@@ -81,7 +83,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 1. F-MAC-NPROC (P0, Owner 2) is the single blocker for release acceptance on this Mac: when Owner 2's platform-aware process guard lands, rerun the plain lane on both launch paths, then `gate --require release`.
 2. F-ORPHAN-WORKER-KILL (P0, Owner 2): reproduced on merged `main`. Ask for a product-side test barrier so the retest can be acceptance evidence, not only a diagnostic.
-3. When PR #10 (Owner 3) merges: remove the two strict-xfail markers and rerun the worker-boundary tests. PR #12 (Owner 4 launcher recovery) and PR #13 (controlled acceptance) are open: preview them when they are ready.
+3. Done: PR #10 merged, markers removed, AI findings closed. PR #12 (Owner 4 launcher cleanup; adds `DRBEAN_SCIENCE_PYTHON` to CI, which also resolves H-CI-ENGINE there) and PR #13 (Owner 2 controlled agents with real science) are open; PR #13 previewed locally: integration suite unchanged (no regressions).
 4. A new PR from this branch to `main` would ship the native consumer, `.venv-engine` discovery (fixes H-CI-ENGINE in CI), the Owner 4 launch subject and group-aware orphan cleanup. Opening it is the user's call.
 5. Owner 4: F-LAUNCHER-HIDDEN-PTH (P1) and F-LAUNCHER-ENV-READ (P2); rerun `--subject http-owner4-launcher` after a fix (it then records no workaround).
 
