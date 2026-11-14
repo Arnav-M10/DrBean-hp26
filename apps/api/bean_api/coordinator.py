@@ -15,6 +15,7 @@ and reconcile durable reservations; cancellation here only ends orchestration.
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import inspect
 import json
@@ -24,6 +25,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 from .contracts import GroundedExplanation
+from .canonical import canonical_bytes
+from .ai_prompts import commentary_rejection
 
 from .providers import (
     AttemptContext, AttemptLedger, ProviderConfig, ProviderFailure, SYSTEM_INSTRUCTION,
@@ -107,13 +110,55 @@ async def _await(value: Any) -> Any:
 
 
 def _safe_fact(evidence: dict[str, Any]) -> dict[str, Any]:
-    """Bound typed records from trusted callbacks; never pass arbitrary exception text."""
+    """Bound trusted facts, keeping replay states rather than proof transcripts."""
     encoded = json.dumps(evidence, ensure_ascii=False, allow_nan=False)
     if len(encoded.encode()) > 12_000:
         raise CoordinatorFailure("agent_evidence_limit")
     if not isinstance(evidence.get("id"), str):
         raise CoordinatorFailure("agent_evidence_identity_missing")
-    return evidence
+    # A trusted callback can retain and later mutate its own response object.
+    # Keep the bounded serialized value, not that shared mutable reference.
+    fact = json.loads(encoded)
+    replay = fact.get("native_replay")
+    if isinstance(replay, dict):
+        # The authoritative top-level candidate results, vectors, artifacts and
+        # verification record remain intact. Native replay can duplicate those
+        # vectors with long per-observation proof rows, which are unnecessary
+        # for an agent choosing a permitted action. Full bytes remain available
+        # through the evidence/artifact routes, not conversational context.
+        fact["native_replay"] = {key: replay[key] for key in (
+            "replay", "scope", "integrity", "verification", "expected_binding",
+            "recorded_result_matches", "reason_code", "dataset_origin", "operation",
+            "packet_profile", "anchors", "baseline_digest", "problem_digest",
+            "design_digest", "suggestion_digest", "outcome", "historical_compatibility",
+            "search_replayed",
+        ) if key in replay}
+        # Bind the complete callback record, including omitted transcript
+        # fields, so rereading one immutable ID cannot replace hidden content.
+        fact["source_fact_digest"] = hashlib.sha256(canonical_bytes(evidence)).hexdigest()
+        fact["fact_projection_version"] = "coordinator-facts.v1"
+    return fact
+
+
+def _require_controlled_model(model: Any) -> None:
+    """Admit a trusted local test model without constructing a hosted client.
+
+    Injection is a trusted application seam, not a security sandbox for arbitrary
+    Python objects. Inspect the MRO so a locally declared subclass of a known
+    hosted adapter cannot accidentally bypass the offline application policy.
+    """
+    hosted_modules = (
+        "langchain_google_genai", "langchain_google_vertexai", "langchain_openai",
+        "langchain_anthropic", "langchain_aws", "langchain_cohere",
+        "langchain_mistralai", "langchain_together", "langchain_groq",
+        "langchain_nvidia_ai_endpoints", "langchain_fireworks", "langchain_deepseek",
+        "langchain_xai", "langchain_community.chat_models", "langchain.chat_models",
+    )
+    if model is None or any(
+        cls.__module__ == prefix or cls.__module__.startswith(prefix + ".")
+        for cls in type(model).__mro__ for prefix in hosted_modules
+    ):
+        raise CoordinatorFailure("provider_dispatch_disabled")
 
 
 def _validate_explanation(value: GroundedExplanation, facts: dict[str, dict[str, Any]]) -> None:
@@ -121,19 +166,11 @@ def _validate_explanation(value: GroundedExplanation, facts: dict[str, dict[str,
         raise CoordinatorFailure("explanation_missing_facts")
     if any(ref not in facts for ref in value.fact_ids) or len(set(value.fact_ids)) != len(value.fact_ids):
         raise CoordinatorFailure("explanation_unknown_fact")
-    # These explicit controls catch known bad claims; they are not a semantic
-    # proof of free-form prose. The UI must separately render trusted fact cards.
     prose = value.text.lower()
-    forbidden = ("proves the interval", "proves your interval", "the true parameter", "identifies the true",
-                 "disproved nature", "guaranteed accurate", "proves the model is correct", "interval is proven", "interval is proved")
-    if any(fragment in prose for fragment in forbidden):
-        raise CoordinatorFailure("explanation_unsupported_claim")
-    text_facts = json.dumps([facts[ref] for ref in value.fact_ids], ensure_ascii=False)
-    number_pattern = r"(?<![\w/])-?\d+(?:\.\d+|/\d+)?(?![\w/])"
-    allowed_numbers = set(re.findall(number_pattern, text_facts))
-    for number in re.findall(number_pattern, value.text):
-        if number not in allowed_numbers:
-            raise CoordinatorFailure("explanation_unsupported_number")
+    rejection = commentary_rejection(value.text, [facts[ref] for ref in value.fact_ids])
+    if rejection:
+        raise CoordinatorFailure("explanation_unsupported_claim" if rejection == "unsupported_claim"
+                                 else "explanation_unsupported_number")
     if any(facts[ref].get("expected_binding") == "mismatch" for ref in value.fact_ids):
         if any(word in prose for word in ("certified", "verified", "proves")):
             raise CoordinatorFailure("explanation_binding_mismatch")
@@ -167,6 +204,8 @@ class _Invocation:
         fact = _safe_fact(evidence)
         if fact.get("problem_id") not in {self.scope.problem_id, *self.scope.scenario_problem_ids.values()}:
             raise CoordinatorFailure("agent_evidence_problem_mismatch")
+        if fact["id"] in self.facts and self.facts[fact["id"]] != fact:
+            raise CoordinatorFailure("agent_evidence_changed")
         self.facts[fact["id"]] = fact
         return fact
 
@@ -195,7 +234,10 @@ class _Invocation:
         await self.authority()
         if evidence_id not in self.facts:
             raise CoordinatorFailure("evidence_outside_invocation")
-        return self.add_evidence(await _await(self.callbacks.read_evidence(evidence_id)))
+        evidence = await _await(self.callbacks.read_evidence(evidence_id))
+        if evidence.get("id") != evidence_id:
+            raise CoordinatorFailure("agent_evidence_identity_mismatch")
+        return self.add_evidence(evidence)
 
     async def skip(self, scenario_id: str, reason_code: str) -> dict[str, Any]:
         await self.authority()
@@ -238,8 +280,10 @@ class _Invocation:
         await self.authority()
         if self.scope.baseline_scenario_id not in self.executed:
             raise CoordinatorFailure("baseline_must_execute_first")
+        if set(self.scope.optional_scenario_ids) - self.executed - self.skipped:
+            raise CoordinatorFailure("scenario_accounting_incomplete")
         _validate_explanation(value, self.facts)
-        self.explanation = {**value.model_dump(), "authorship": "gemini_commentary", "scientific_authority": False}
+        self.explanation = {**value.model_dump(), "authorship": "controlled_commentary", "scientific_authority": False}
         return {"accepted": True, "fact_ids": value.fact_ids, "scientific_state_changed": False}
 
 
@@ -279,28 +323,25 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
             inv.turns += 1
             started = time.monotonic()
             attempt_id = inv.ledger.begin_attempt(inv.context.checked_dict(), {
-                "provider": "gemini", "model": inv.config.model,
+                "provider": "controlled_local", "model": model_name,
+                "active_mode": "controlled_offline", "external_provider_calls": 0,
+                "actual_model_tokens": 0, "provider_request_id": None,
                 "operation": "coordinator", "framework": "deepagents",
                 "framework_version": package_version("deepagents"),
-                "sdk_version": package_version("langchain-google-genai"),
                 "prompt_version": "gf2-coordinator-v1", "schema_version": "DB-SC-1",
                 "started_at": utc_now(), "turn": inv.turns,
-                "reserved_input_tokens": reservation, "reserved_output_tokens": inv.config.max_output_tokens,
+                "simulated_input_token_reservation": reservation,
+                "simulated_output_token_reservation": inv.config.max_output_tokens,
                 "prompt_sha256": hashlib.sha256(serialized.encode()).hexdigest(), "retry_policy": "none",
             })
-            await inv.event({"type": "model_request", "attempt_id": attempt_id, "turn": inv.turns})
+            await inv.event({"type": "model_request", "local_attempt_id": attempt_id,
+                             "active_mode": "controlled_offline", "provider_request_id": None, "turn": inv.turns})
             usage = None
             try:
                 response = await handler(request)
                 for message in response.result:
-                    raw_usage = getattr(message, "usage_metadata", None)
-                    if raw_usage:
-                        details = raw_usage.get("output_token_details") or {}
-                        reasoning = details.get("reasoning")
-                        total_out = raw_usage.get("output_tokens")
-                        usage = {"input_tokens": raw_usage.get("input_tokens"),
-                                 "output_tokens": (total_out - (reasoning or 0)) if type(total_out) is int else None,
-                                 "thought_tokens": reasoning, "total_tokens": raw_usage.get("total_tokens")}
+                    # Fixture usage metadata is not observed provider billing.
+                    # The context reservation above is a simulated local bound.
                     calls = getattr(message, "tool_calls", [])
                     attempted_count = len(calls) + len(getattr(message, "invalid_tool_calls", []))
                     inv.tool_calls += attempted_count
@@ -314,23 +355,22 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
                         raise CoordinatorFailure("agent_forbidden_tool")
                     if len(calls) > 1:
                         raise CoordinatorFailure("agent_parallel_tools_unsupported")
-                    if usage and ((usage["input_tokens"] or 0) > reservation or
-                                  (usage["output_tokens"] or 0) + (usage["thought_tokens"] or 0) > inv.config.max_output_tokens):
-                        raise CoordinatorFailure("provider_usage_exceeded_reservation")
                 inv.ledger.finish_attempt(attempt_id, {"status": "validated", "finished_at": utc_now(),
                     "duration_ms": int((time.monotonic() - started) * 1000), "usage": usage,
+                    "active_mode": "controlled_offline", "actual_model_tokens": 0,
                     "validation_outcome": "allowed_tool_request_or_unaccepted_text"})
                 return response
             except asyncio.CancelledError:
                 inv.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome", "finished_at": utc_now(),
-                    "code": "provider_cancelled_unknown_outcome", "usage": usage})
+                    "code": "controlled_model_interrupted", "usage": usage,
+                    "active_mode": "controlled_offline", "actual_model_tokens": 0})
                 raise
             except Exception as exc:
                 code, retryable = (exc.code, exc.retryable) if isinstance(exc, ProviderFailure) else classify_failure(exc)
                 code = _safe_failure_code(exc, code)
                 inv.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome" if "unknown_outcome" in code else "failed",
                     "finished_at": utc_now(), "duration_ms": int((time.monotonic() - started) * 1000),
-                    "code": code, "usage": usage})
+                    "code": code, "usage": usage, "active_mode": "controlled_offline", "actual_model_tokens": 0})
                 raise CoordinatorFailure(code, retryable, attempt_id) from None
 
         async def awrap_tool_call(self, request: Any, handler: Any) -> Any:
@@ -385,7 +425,8 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
 
     functions = [read_scoped_evidence, return_grounded_explanation]
     if inv.scope.kind == "design":
-        functions += [execute_approved_design]
+        if inv.callbacks.execute_design is not None:
+            functions.append(execute_approved_design)
     else:
         functions += [execute_approved_scenario, record_allowed_skip]
         if inv.callbacks.prepare_design_proposal is not None:
@@ -413,7 +454,8 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
         system_prompt=SYSTEM_INSTRUCTION + (
             " Execute the mandatory baseline first using execute_approved_scenario. After its actual result, "
             "choose a useful allowed action: run one explicitly approved optional scenario only if relevant, "
-            "skip it with an allowed reason, or finish. For design scope use only execute_approved_design. "
+            "or skip it with an allowed reason. Account for every optional scenario before finishing. "
+            "For design scope use only execute_approved_design. "
             "Issue exactly one tool per model turn. Finish using return_grounded_explanation referencing actual "
             "returned fact IDs. Do not write an unreferenced final answer. A completed job does not prove a "
             "claim. No counterexample found leaves the interval unproved. Mismatched evidence cannot certify "
@@ -424,8 +466,11 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
     if len(inventories) != 1 or inventories[0] != inv.allowed_tools:
         raise CoordinatorFailure("agent_unsafe_tool_inventory")
     runtime = {"framework": "deepagents", "framework_version": package_version("deepagents"),
-               "provider_adapter": "langchain-google-genai", "provider_adapter_version": package_version("langchain-google-genai"),
-               "model": inv.config.model, "api_surface": "Gemini Developer API v1beta", "tool_inventory": sorted(inv.allowed_tools),
+               "provider_adapter": "controlled_local_model", "model": model_name,
+               "intended_provider": "gemini", "configured_model": inv.config.model,
+               "active_mode": "controlled_offline", "transport_provenance": "trusted_local_model_injection",
+               "external_provider_calls": 0, "actual_model_tokens": 0,
+               "live_qualification": "not_run", "tool_inventory": sorted(inv.allowed_tools),
                "filesystem": "disabled_by_middleware_replacement", "backend": "isolated_ephemeral_StateBackend",
                "shell": False, "subagents": False, "memory": False, "summarization": False,
                "tracing": "disabled", "observed_graph_nodes": sorted(nodes), "middleware_policy": "gf2-allowlist-v1", "live_qualified": False}
@@ -434,21 +479,16 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
 
 async def run_coordinator(config: ProviderConfig, ledger: AttemptLedger, context: AttemptContext,
                           scope: CoordinatorScope, callbacks: ScopedCallbacks, *, chat_model: Any = None) -> CoordinatorResult:
+    _require_controlled_model(chat_model)
     config.check_ready()
     context.checked_dict()
+    # frozen=True prevents attribute replacement, not mutation of nested dicts.
+    # Freeze reviewed context/mappings before callbacks or graph work can await.
+    scope = copy.deepcopy(scope)
     scope.validate()
     inv = _Invocation(config, ledger, context, scope, callbacks)
-    owns_model = chat_model is None
-    if chat_model is None:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        chat_model = ChatGoogleGenerativeAI(model=config.model, api_key=config.api_key,
-            vertexai=False, api_version="v1beta", base_url="https://generativelanguage.googleapis.com",
-            max_retries=1, timeout=min(config.request_timeout_seconds, scope.wall_seconds),
-            max_output_tokens=config.max_output_tokens, cache=False)
-        if chat_model.client.vertexai:
-            raise CoordinatorFailure("provider_backend_mismatch")
     agent, runtime = _make_graph(inv, chat_model)
-    runtime["execution_lane"] = "controlled_model" if type(chat_model).__module__.split(".")[0] != "langchain_google_genai" else "live_model"
+    runtime["execution_lane"] = "controlled_model"
     await inv.event({"type": "runtime_inventory", **runtime})
     envelope = {"plan_id": scope.plan_id, "run_id": scope.run_id, "problem_id": scope.problem_id,
                 "kind": scope.kind, "baseline_scenario_id": scope.baseline_scenario_id,
@@ -468,18 +508,11 @@ async def run_coordinator(config: ProviderConfig, ledger: AttemptLedger, context
         if inv.explanation is None:
             status, code = "failed", "agent_grounded_explanation_missing"
     except asyncio.CancelledError:
-        await inv.event({"type": "invocation_cancelled", "termination": "orchestrator_cancelled_provider_outcome_unknown"})
+        await inv.event({"type": "invocation_cancelled", "termination": "controlled_orchestrator_cancelled"})
         raise
     except Exception as exc:
         status = "failed"
         code = _safe_failure_code(exc, "agent_wall_budget_exhausted" if isinstance(exc, TimeoutError) else "agent_execution_failed")
         await inv.event({"type": "invocation_failed", "code": code})
-    finally:
-        if owns_model:
-            try:
-                await chat_model.client.aio.aclose()
-                chat_model.client.close()
-            except Exception:
-                pass
     return CoordinatorResult(status, inv.explanation, list(inv.facts.values()), inv.trace, runtime,
                              inv.turns, inv.tool_calls, inv.reservations, code)
