@@ -272,6 +272,42 @@ conversion. Use `admission-golden.json` for trailing-newline rationals, JSON
 negative zero, depth, digit and byte caps; do not relax server admission to
 match a different evaluator oracle.
 
+## Controlled coordinator facts and future accounting
+
+The backend passes `agent-evidence.v1` fact cards to the existing restricted Deep
+Agents callbacks. Cards preserve the evidence ID/digest, run/scenario, exact
+candidate vectors, per-candidate results, independent scientific status axes,
+verification record, artifact references and search summary. Repeated native
+replay rows stay in the immutable evidence record and native downloads. Cards
+are context for explanation, not replacement replay packets. Core facts that
+still exceed 12,000 bytes fail explicitly; facts are never silently truncated.
+
+The controlled acceptance path injects an explicitly local test model into the
+ordinary worker, runs actual Counterdex discovery/checking, and records all
+model/tool attempts in the controlled lane. It demonstrates evidence-dependent
+execution or skipping of a separately reviewed comparison, denied ineligible
+work, and retained downloadable evidence after invalid narration. This does not
+activate a production provider or qualify live Gemini. Ordinary startup remains
+provider-disabled; no new runtime activation switch is introduced.
+
+`ProviderLedger` is still the single future spending authority. Reservation and
+usage counts must be bounded nonnegative integers (positive reservations).
+Canonical/provider aliases use the maximum supplied value; output accounting
+includes thought tokens. Unallocated reported totals conservatively consume both
+possible component budgets. Reservations and unknown outcomes are never refunded.
+An exact repeated reconciliation is idempotent; a different outcome or unknown
+attempt ID raises an error without overwriting recorded history. Invalid new
+usage leaves the reservation outstanding. Existing malformed accounting returns
+`accounting_state: "needs_review"`, zero remaining capacity, and blocks new
+reservations while leaving historical bytes untouched. Provider dispatch remains
+disabled regardless of the reported capacity.
+
+Run `tests/test_controlled_native_workflow.py` for the authenticated returned-ID
+flow and independent native replay; `tests/test_agent_evidence.py` reproduces the
+seven-row context overflow; `tests/test_ledger_accounting.py` covers isolated
+offline accounting controls. Owner 5 should evaluate these same production
+callbacks and HTTP records, without any special evaluator endpoint.
+
 ## Verification commands
 
 ```sh

@@ -361,9 +361,18 @@ class Worker:
             return self.workflow.create_record(actor, job["workspace_id"], "agent_event",
                 {"run_id": job["id"], **item}, f"{job['id']}:{item['sequence']}", operation="agent-event")
 
+        from .agent_evidence import project_evidence_fact
+
+        async def execute_agent_scenario(scenario_id):
+            fact = await self._scenario(actor, job["id"], scenario_id)
+            # Preserve complete native replay in immutable storage. Only the
+            # bounded authoritative fact card enters the controlled model context.
+            record = self.workflow.get(actor, fact["id"], "evidence")
+            return project_evidence_fact(record)
+
         callbacks = ScopedCallbacks(check_authority=lambda: self.workflow.check_run_scope(actor, job["id"]),
-            execute_scenario=lambda scenario_id: self._scenario(actor, job["id"], scenario_id),
-            read_evidence=lambda evidence_id: self._fact(self.workflow.read_evidence(actor, job["id"], evidence_id)),
+            execute_scenario=execute_agent_scenario,
+            read_evidence=lambda evidence_id: project_evidence_fact(self.workflow.read_evidence(actor, job["id"], evidence_id)),
             record_skip=lambda scenario_id, reason: self.workflow.skip_scenario(actor, job["id"], scenario_id, reason),
             record_event=event)
         context = AttemptContext(actor, job["workspace_id"], operation["id"], permission["id"])

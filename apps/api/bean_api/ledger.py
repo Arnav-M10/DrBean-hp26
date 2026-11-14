@@ -17,10 +17,73 @@ class LedgerBudgetExceeded(RuntimeError):
     pass
 
 
+MAX_TOKEN_COUNT = 2**63 - 1
+
+
+def _count(value):
+    if type(value) is not int or not 0 <= value <= MAX_TOKEN_COUNT:
+        raise ValueError("Token counts must be bounded nonnegative integers")
+    return value
+
+
+def _aliases(values, *names):
+    # Providers may supply both names. Never discard the larger reported count.
+    present = [values[name] for name in names if values.get(name) is not None]
+    return max((_count(value) for value in present), default=0)
+
+
+def _reservations(metadata):
+    if type(metadata) is not dict:
+        raise ValueError("Reservation metadata must be an object")
+    incoming = _aliases(metadata, "reserved_input_tokens", "input_token_reservation")
+    outgoing = _aliases(metadata, "reserved_output_tokens", "output_token_reservation")
+    if incoming < 1 or outgoing < 1:
+        raise ValueError("A positive conservative token reservation is required")
+    return incoming, outgoing
+
+
+def _usage(metadata):
+    if type(metadata) is not dict:
+        raise ValueError("Outcome metadata must be an object")
+    usage = metadata.get("usage")
+    if usage is None:
+        return 0, 0
+    if type(usage) is not dict:
+        raise ValueError("Usage must be an object or null")
+    incoming = _aliases(usage, "input_tokens", "prompt_token_count")
+    outgoing = _aliases(usage, "output_tokens", "candidates_token_count")
+    thoughts = _aliases(usage, "thought_tokens", "thoughts_token_count")
+    outgoing = _count(outgoing + thoughts)
+    total = _aliases(usage, "total_tokens", "total_token_count")
+    known = _count(incoming + outgoing)
+    if any(usage.get(key) is not None for key in ("total_tokens", "total_token_count")) and total < known:
+        raise ValueError("Reported total tokens cannot be smaller than component counts")
+    # Missing components cannot make an observed total disappear. Attribute any
+    # unallocated tokens conservatively to each cap until exact usage is known.
+    return max(incoming, total - outgoing), max(outgoing, total - incoming)
+
+
+def _accounting(rows):
+    incoming = outgoing = malformed = 0
+    for row in rows:
+        try:
+            reserved_in, reserved_out = _reservations(json.loads(row["metadata"]))
+            actual_in, actual_out = _usage(json.loads(row["response_metadata"] or "{}"))
+            incoming += max(reserved_in, actual_in)
+            outgoing += max(reserved_out, actual_out)
+        except (TypeError, ValueError, OverflowError):
+            # Preserve historical bytes and capacity; diagnostics remain useful
+            # while further dispatch fails closed instead of guessing a refund.
+            malformed += 1
+    return incoming, outgoing, malformed
+
+
 class ProviderLedger:
     def __init__(self, store: Store, *, request_cap: int = 32,
                  input_token_cap: int = 64_000, output_token_cap: int = 16_000):
-        if not 1 <= request_cap <= 32 or not 1 <= input_token_cap <= 64_000 or not 1 <= output_token_cap <= 16_000:
+        if (any(type(value) is not int for value in (request_cap, input_token_cap, output_token_cap))
+                or not 1 <= request_cap <= 32 or not 1 <= input_token_cap <= 64_000
+                or not 1 <= output_token_cap <= 16_000):
             raise ValueError("GF-2 ledger caps can only be lowered in this release")
         self.store = store
         self.request_cap = request_cap
@@ -30,10 +93,10 @@ class ProviderLedger:
     def begin_attempt(self, context: dict[str, Any], metadata: dict[str, Any]) -> str:
         """Commit the request and token reservation before any network dispatch."""
         combined = {**metadata, "context": context}
-        reserved_in = combined.get("reserved_input_tokens", combined.get("input_token_reservation"))
-        reserved_out = combined.get("reserved_output_tokens", combined.get("output_token_reservation"))
-        if type(reserved_in) is not int or type(reserved_out) is not int or reserved_in < 1 or reserved_out < 1:
-            raise LedgerBudgetExceeded("A conservative token reservation is required before dispatch")
+        try:
+            reserved_in, reserved_out = _reservations(combined)
+        except ValueError as error:
+            raise LedgerBudgetExceeded(str(error)) from error
         combined["reserved_input_tokens"] = reserved_in
         combined["reserved_output_tokens"] = reserved_out
         encoded = json.dumps(combined, ensure_ascii=False, allow_nan=False)
@@ -52,15 +115,9 @@ class ProviderLedger:
             if not membership or not operation:
                 raise ValueError("Provider attempt requires an owned durable operation")
             rows = conn.execute("SELECT metadata, response_metadata FROM provider_attempts").fetchall()
-            used_in = used_out = 0
-            for row in rows:
-                reservation = json.loads(row["metadata"])
-                usage = json.loads(row["response_metadata"] or "{}")
-                actual = usage.get("usage") or {}
-                actual_in = actual.get("input_tokens") or actual.get("prompt_token_count") or 0
-                actual_out = (actual.get("output_tokens") or actual.get("candidates_token_count") or 0) + (actual.get("thought_tokens") or 0)
-                used_in += max(reservation.get("reserved_input_tokens", 0), actual_in)
-                used_out += max(reservation.get("reserved_output_tokens", 0), actual_out)
+            used_in, used_out, malformed = _accounting(rows)
+            if malformed:
+                raise LedgerBudgetExceeded("Historical provider accounting requires review before further dispatch")
             if len(rows) >= self.request_cap or used_in + reserved_in > self.input_token_cap or used_out + reserved_out > self.output_token_cap:
                 raise LedgerBudgetExceeded("The shared GF-2 provider ledger cannot admit another request")
             conn.execute(
@@ -70,7 +127,11 @@ class ProviderLedger:
         return attempt_id
 
     def finish_attempt(self, attempt_id: str, metadata: dict[str, Any]) -> None:
+        _usage(metadata)
         outcome = metadata.get("outcome", metadata.get("status", "completed"))
+        if not isinstance(outcome, str) or ("outcome" in metadata and "status" in metadata
+                                            and metadata["outcome"] != metadata["status"]):
+            raise ValueError("Provider outcome must be an unambiguous status string")
         if outcome in {"timeout", "cancelled", "unknown_outcome", "interrupted"}:
             state = "unknown_outcome"
         elif outcome in {"completed", "success", "valid", "validated", "schema_valid"}:
@@ -81,6 +142,13 @@ class ProviderLedger:
         if len(encoded.encode()) > 16_384:
             raise ValueError("Provider outcome metadata exceeds its bound")
         with self.store.transaction() as conn:
+            attempt = conn.execute("SELECT state,response_metadata FROM provider_attempts WHERE id=?", (attempt_id,)).fetchone()
+            if attempt is None:
+                raise ValueError("Unknown provider attempt")
+            if attempt["state"] != "reserved":
+                if attempt["state"] == state and json.loads(attempt["response_metadata"] or "{}") == metadata:
+                    return
+                raise ValueError("Provider attempt already has a different immutable outcome")
             conn.execute(
                 "UPDATE provider_attempts SET state=?,response_metadata=?,finished_at=? WHERE id=? AND state='reserved'",
                 (state, encoded, utc_now(), attempt_id),
@@ -99,22 +167,14 @@ class ProviderLedger:
         """Global capacity only, never disclose another workspace's attempt data."""
         with self.store.read() as conn:
             rows = conn.execute("SELECT metadata,response_metadata,state FROM provider_attempts").fetchall()
-        reserved_in = reserved_out = 0
-        unknown = 0
-        for row in rows:
-            reservation = json.loads(row["metadata"])
-            response = json.loads(row["response_metadata"] or "{}")
-            usage = response.get("usage") or {}
-            reserved_in += max(reservation.get("reserved_input_tokens", 0),
-                               usage.get("input_tokens") or usage.get("prompt_token_count") or 0)
-            reserved_out += max(reservation.get("reserved_output_tokens", 0),
-                                (usage.get("output_tokens") or usage.get("candidates_token_count") or 0)
-                                + (usage.get("thought_tokens") or 0))
-            unknown += int(row["state"] in {"reserved", "unknown_outcome"})
+        reserved_in, reserved_out, malformed = _accounting(rows)
+        unknown = sum(row["state"] in {"reserved", "unknown_outcome"} for row in rows)
         return {"dispatch_enabled": False, "current_mode": "disabled_placeholder",
                 "accounting_policy": "conservative_no_refund.v1", "historical_attempts": len(rows),
                 "unknown_outcome_reservations": unknown,
-                "remaining": {"requests": max(0, self.request_cap-len(rows)),
-                              "input_tokens": max(0, self.input_token_cap-reserved_in),
-                              "output_tokens": max(0, self.output_token_cap-reserved_out)},
+                "accounting_state": "needs_review" if malformed else "valid",
+                "malformed_historical_attempts": malformed,
+                "remaining": {"requests": 0 if malformed else max(0, self.request_cap-len(rows)),
+                              "input_tokens": 0 if malformed else max(0, self.input_token_cap-reserved_in),
+                              "output_tokens": 0 if malformed else max(0, self.output_token_cap-reserved_out)},
                 "controlled_placeholder_records": "separate; zero external requests and actual model tokens"}
