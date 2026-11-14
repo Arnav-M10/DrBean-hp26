@@ -157,6 +157,9 @@ try {
   await page.getByRole('button', { name: 'Use reviewed values in measurement draft', exact: true }).click()
   await page.click('#measurements button[type=submit]')
   await page.click('#question-form button[type=submit]')
+  // The hash change routes asynchronously and moves the source panel into Review; typing before that
+  // move finishes can lose focus mid-fill and leave the explanation empty. Wait for the route first.
+  await page.waitForSelector('#review:not([hidden]) #source-path #backend-source-review textarea')
   await page.getByLabel('Explanation for the remaining manually reviewed inputs and assumptions', { exact: true }).fill('Reviewed synthetic example measurements, units, domain and claim entered explicitly for this browser test')
   await page.getByRole('button', { name: 'Preview source-bound inputs', exact: true }).click()
   await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some(button => button.textContent === 'Accept preview and prepare investigation plan' && !button.disabled) || !document.querySelector('#backend-error').hidden)
