@@ -91,8 +91,8 @@ try {
   await page.selectOption('#dataset-origin', 'synthetic')
   await page.click('#question-form button[type=submit]')
 
-  async function prepareApproveAndRun(expectCounterexample = true) {
-    await page.getByRole('button', { name: 'Save inputs and prepare plan' }).click()
+  async function prepareApproveAndRun(expectCounterexample = true, prepared = false) {
+    if (!prepared) await page.getByRole('button', { name: 'Save inputs and prepare plan' }).click()
     await page.waitForSelector('#approve-scope')
     assert.equal(await page.getByRole('button', { name: 'Approve reviewed plan' }).isDisabled(), true)
     assert.equal(await page.getByRole('button', { name: 'Queue approved manual run' }).isDisabled(), true)
@@ -129,13 +129,33 @@ try {
     }
     return finished
   }
-  const run = await prepareApproveAndRun()
-  assert.equal(run.state, 'completed')
   const workspace = await page.locator('#workspace-select').inputValue()
+  // Source proposal is an explicitly controlled intake fixture; science runs normally.
+  await page.locator('#source-image-file').setInputFiles(join(root, 'evaluation/sources/c01a.png'))
+  await page.selectOption('#source-origin', 'synthetic')
+  await page.getByRole('button', { name: 'Upload source for inspection', exact: true }).click()
+  await page.waitForFunction(() => /Retained source source_/.test(document.querySelector('#source-review').textContent))
+  const sourceId = (await page.locator('#source-review').textContent()).match(/Retained source (source_[a-zA-Z0-9_]+)/)[1]
+  const fixture = start(python, ['scripts/release/controlled_source_proposal.py', 'web-test', workspace, sourceId])
+  assert.equal(await waitForExit(fixture), 0, fixture.output)
+  const controlled = JSON.parse(fixture.output)
+  assert.equal(controlled.mode, 'controlled_test_double')
+  await page.fill('#source-proposal-id', controlled.id)
+  await page.getByRole('button', { name: 'Open source proposal', exact: true }).click()
+  await page.getByLabel('rows[0].hard_allowance Reviewed value', { exact: true }).fill('0.50')
+  await page.getByLabel('rows[0].hard_allowance value origin', { exact: true }).selectOption('corrected_transcription')
+  await page.getByLabel('rows[0].hard_allowance Correction or assumption reason', { exact: true }).fill('Reviewed source uses a synthetic hard allowance of 0.50 mg/L')
+  await page.getByRole('button', { name: 'Accept reviewed source values', exact: true }).click()
+  await page.getByLabel('Explanation for the remaining manually reviewed inputs and assumptions', { exact: true }).fill('Reviewed synthetic example measurements, units, domain and claim entered explicitly for this browser test')
+  await page.getByRole('button', { name: 'Preview source-bound inputs', exact: true }).click()
+  await page.getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }).click()
+  const run = await prepareApproveAndRun(true, true)
+  assert.equal(run.state, 'completed')
   const evidence = await api(`/records/${run.scenarios[0].result_id}`)
   const reference = evidence.body.result.artifacts[0]
   const dataset = (await api(`/workspaces/${workspace}/records?kind=dataset`))[0]
-  assert.equal(dataset.body.rows[0].original_values.concentration, '4.80')
+  assert.equal(dataset.body.rows[0].original_values.hard_allowance, '0.05')
+  assert.equal(dataset.body.rows[0].source_asset_id, sourceId)
   assert.equal(dataset.body.rows[0].concentration, '24/5')
   const plan = await api(`/records/${run.plan_id}`)
   assert.equal(plan.body.scientific_profile, 'counterdex.v1')

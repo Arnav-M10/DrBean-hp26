@@ -96,3 +96,19 @@ test('follow-up explanation preserves pair scope and refuses unchecked conclusio
     assert.match(baselineExplanation({ ...result, ...changed }), /incomplete or its evidence does not match/)
   }
 })
+
+test('source upload preserves bytes and retains the operation identity after a lost response', async () => {
+  const seen = [], bytes = new Uint8Array([137, 80, 78, 71])
+  const api = new BeanApi('private-token', async (url, options) => {
+    seen.push({ url, ...options })
+    if (seen.length === 1) throw new Error('lost response')
+    return new Response('{"id":"source_test"}')
+  })
+  const file = { type: 'image/png', size: bytes.length, arrayBuffer: async () => bytes.buffer }
+  await assert.rejects(api.uploadSource('workspace', file, 'synthetic'), error => error.kind === 'uncertain')
+  assert.equal((await api.uploadSource('workspace', file, 'synthetic')).id, 'source_test')
+  assert.equal(seen[0].headers['Idempotency-Key'], seen[1].headers['Idempotency-Key'])
+  assert.equal(seen[0].headers['Content-Type'], 'image/png')
+  assert.deepEqual(new Uint8Array(seen[0].body), bytes)
+  await assert.rejects(api.uploadSource('workspace', { ...file, type: 'application/pdf' }, 'synthetic'), /PNG or JPEG/)
+})

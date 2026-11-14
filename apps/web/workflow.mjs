@@ -1,3 +1,4 @@
+import { setupSourceWorkflow } from './source-workflow.mjs'
 import { BeanApi, baselineAvailable, baselineExplanation } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 import { setupDesignWorkflow } from './design-workflow.mjs'
@@ -18,7 +19,11 @@ export function setupWorkflow(getDraft) {
   const currentPlan = () => plan && frozen === fingerprint()
   const available = () => baselineAvailable(capabilities)
   const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save })
-  function reset() { clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
+  const sources = setupSourceWorkflow({ context: () => ({ api, workspace, busy }), getDraft, button, node, exactRecord, useInputs: async materialized => {
+    const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(materialized.problem))
+    inputs = materialized; plan = prepared; frozen = fingerprint(); approval = undefined
+  } })
+  function reset() { sources.reset(); clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
   function button(parent, label, action, disabled = false) {
     const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy
     b.addEventListener('click', () => perform(action)); parent.append(b); return b
@@ -149,6 +154,7 @@ export function setupWorkflow(getDraft) {
     }
     designs.render(investigations)
     investigations.append(node('p', 'Adding and checking a follow-up observation is a separate workflow. A design approval does not authorize a new observation or investigation.'))
+    const sourcePanel = byId('backend-source-review'); sourcePanel.replaceChildren(); sources.render(sourcePanel)
     const reports = byId('backend-report'); reports.replaceChildren(node('h3', 'Reviewer snapshot'))
     reports.append(node('p', 'A report freezes the selected run, inputs and evidence inventory at creation. Download native scientific evidence and its separate replay anchors from Investigations. A report JSON byte hash is not scientific replay. Public reviewer sharing is unavailable.'))
     button(reports, 'Create report for selected run', async () => { report = await api.json(`/runs/${run.id}/reports`, {}) }, !api || !run)
