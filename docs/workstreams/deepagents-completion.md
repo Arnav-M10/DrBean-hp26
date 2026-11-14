@@ -226,3 +226,49 @@ no scientific facts, checks or quotas were relaxed.
 This structural repair is not yet live-qualified. Both actual failed runs remain
 failed, and PR #63 cannot be merged as a qualified live workflow without a fresh
 explicitly authorized qualification.
+
+## Final authorized live qualification — failed, integration remains blocked
+
+The user authorized one final run of at most six requests, with the qualification
+grant ceiling raised from 22 to 28 and merge conditional on success. The exact
+tested candidate was `17c7f7a82972be2ebc7b296b41277c1f395f1968`, incorporating
+main `04a9012` and its paper-profile changes. Root ran Claude's existing harness
+through the preferred workspace; this was not independent Claude execution.
+
+Gemini's first response was rejected as `provider_malformed_tool_call`, with
+the bounded diagnostic `wrong_argument_type` for `write_todos`. No tool was
+admitted and no canonical review, scientific child, report or download was
+created. The browser correctly showed the stopped state and absent results.
+The retained diagnostic does not identify the failing field or value; rejected
+raw arguments were deliberately not retained. It does not establish a specific
+model-versus-SDK cause. Harness completion is not scientific or live acceptance.
+Read-only inspection found the pinned `write_todos` public schema unchanged by
+provider conversion. A conforming SDK-shaped response passed offline, while six
+different malformed shapes reproduced the same diagnostic. All 98 targeted
+model, gateway, diagnostic and structural-handoff checks passed; no reproducible
+adapter defect was established and no speculative type coercion was added.
+
+The single physical request reserved/accounted 7,388 input and 512 output tokens.
+Provider-reported usage was 1,738 input, 41 output and 1,779 total; thought-token
+usage was unreported, with zero unresolved attempts. Historical actual requests
+now total 15, and effective grants total 28. The five unused slots are not
+released or replenished. Live testing has stopped; no further run is authorized.
+An internal read-only receipt audit independently rejected the completed-action
+predicate, without claiming Claude's independent acceptance.
+
+The same candidate passed all 12 provider-free preferred-browser predicates,
+including actual Counterdex execution, separate approvals, evidence-dependent
+next steps, downloads, fresh native replay and model-failure retention. It also
+passed 151 UI tests, 180 focused backend checks and the complete backend suite:
+1,601 passed in 170.53 seconds with zero skips or failures under the matching
+engine runtime. These do not qualify Gemini.
+The successful-at-capacity UI correction keeps a validated next-step proposal
+visible alongside the capacity warning; it grants no additional execution.
+
+Receipts: [final live failure](../../evaluation/results/sprint/live-final-17c7f7a/qualification.json),
+[full retained run](../../evaluation/results/sprint/live-final-17c7f7a/record.json),
+and [separate controlled browser checks](../../evaluation/results/sprint/live-final-17c7f7a/controlled-browser-receipt.json).
+PR #63 remains draft and unmerged. Backend/model-adapter owners must establish
+the tool-shape failure offline before another live qualification is considered;
+Claude's actual independent acceptance remains outstanding. No application
+limits, scientific checks, consent or private-session boundaries were relaxed.

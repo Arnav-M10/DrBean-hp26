@@ -56,6 +56,16 @@
       "input_tokens": 64000,
       "output_tokens": 3072,
       "qualification_extension": "user-repaired-followthrough-2026-11-14"
+    },
+    {
+      "at": "2026-11-14T22:38:00Z",
+      "purpose": "baseline-preview-17c7f7a82972be2ebc7b296b41277c1f395f1968",
+      "research_session_id": "research_session_b0d69692f4184ce7998a1314b927ae21",
+      "allocation_record": "research_provider_allocation_026fe02985b546608140546b9ce8d883",
+      "physical_requests": 6,
+      "input_tokens": 64000,
+      "output_tokens": 3072,
+      "qualification_extension": "user-final-handoff-2026-11-14"
     }
   ],
   "released": [
@@ -78,10 +88,11 @@
     "research_session_06ba9e94df9747debe0d02eb07f9514e": 0,
     "research_session_7233afd76ccb49a98c99017392f0b6d6": 3,
     "research_session_615696b8c14f4bcc8ebdbab2f0c221b2": 2,
-    "research_session_bc8916cb6e8d4937b51c3e29193e3b4a": 4
+    "research_session_bc8916cb6e8d4937b51c3e29193e3b4a": 4,
+    "research_session_b0d69692f4184ce7998a1314b927ae21": 1
   },
-  "sprint_physical_requests_total": 14,
-  "note": "Grants bound dispatch; failed and uncertain attempts count. Live traffic stopped after the 8th request (provider_malformed_tool_call) per the stop-on-defect rule.",
+  "sprint_physical_requests_total": 15,
+  "note": "Grants bound dispatch; failed and uncertain attempts count. Historical failed receipts and unused grants remain retained. Live traffic stopped after the final authorized run: 15 actual requests, 28 effective grants. No further live run is authorized.",
   "qualification_extensions": [
     {
       "id": "user-followthrough-2026-11-14",
@@ -138,5 +149,21 @@
     "remaining_extension_requests_released": false,
     "next_live_run_authorized": false,
     "note": "Valid reviewed dataset references were used, but planning and preparation repeated before run requested canonical review. Four-turn action limit stopped the action before any approval or scientific child. No retry, third grant, refund or replenishment."
+  },
+  "qualification_final_handoff": {
+    "operator": "root",
+    "tested_commit": "17c7f7a82972be2ebc7b296b41277c1f395f1968",
+    "receipt": "live-final-17c7f7a/record.json",
+    "status": "failed",
+    "code": "provider_malformed_tool_call",
+    "validation_detail": {
+      "reason": "wrong_argument_type",
+      "tool_name": "write_todos"
+    },
+    "physical_requests": 1,
+    "total_physical_requests_after_run": 15,
+    "remaining_extension_requests_released": false,
+    "next_live_run_authorized": false,
+    "note": "Final authorized run stopped after the first malformed planning response. No retry, fourth run, refund or replenishment. Raw rejected arguments were not retained; the failing field and value are unknown. PR remains unmerged."
   }
 }

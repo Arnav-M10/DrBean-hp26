@@ -3,7 +3,9 @@
 Backend branch: `codex/deepagents-completion`, based on main `7d40d1c`.
 This is a compatibility handoff; the browser owner retains all view implementation.
 No provider call is required to read a snapshot. Controlled graph execution is an
-offline fixture and never qualifies Gemini. Claude owns all live qualification.
+offline fixture and never qualifies Gemini. Claude owns independent live
+qualification. Later explicit user authorizations allowed root-operated bounded
+reproductions; those are reported separately and do not imply Claude acceptance.
 
 ## Existing routes remain unchanged
 
