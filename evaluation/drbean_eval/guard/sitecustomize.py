@@ -106,6 +106,55 @@ def _wrap_client(module) -> None:
     client.__init__ = guarded_init
 
 
+def _relax_nproc(module) -> None:
+    """DIAGNOSTIC ONLY (opt-in): lift the per-user RLIMIT_NPROC cap that blocks spawning on macOS (F-MAC-NPROC).
+
+    Never active unless DRBEAN_DIAGNOSTIC_OVERRIDES contains relax_nproc. Every other guard stays as configured.
+    Runs recorded with it are diagnostic evidence about downstream behaviour, never acceptance.
+    """
+    original = getattr(module, "apply_limits", None)
+    if original is None or getattr(original, "_drbean_relaxed", False):
+        return
+
+    def relaxed(**kwargs):
+        kwargs["processes"] = 1_000_000  # apply_limits caps this at the inherited hard limit
+        _record("diagnostic_override_applied", override="relax_nproc", module=module.__name__)
+        return original(**kwargs)
+
+    relaxed._drbean_relaxed = True  # type: ignore[attr-defined]
+    module.apply_limits = relaxed
+
+
+def _science_barrier(module) -> None:
+    """DIAGNOSTIC ONLY (opt-in): deterministic barrier inside the scientific child, after setsid and limits.
+
+    Wraps CounterdexAdapter.investigate/design/review so a spawned child waits while the harness-owned barrier file
+    exists (at most 120 s). The path is captured at import because the child clears its environment before it
+    calls the adapter. Cancellation and kill handling under test remain the product's own code.
+    """
+    barrier = os.environ.get("DRBEAN_DIAGNOSTIC_BARRIER")
+    adapter = getattr(module, "CounterdexAdapter", None)
+    if not barrier or adapter is None or getattr(adapter, "_drbean_barrier", False):
+        return
+
+    def hold(method):
+        def wrapped(self, *args, **kwargs):
+            started = time.time()
+            if os.path.exists(barrier):
+                _record("diagnostic_barrier_wait", method=method.__name__)
+                while os.path.exists(barrier) and time.time() - started < 120:
+                    time.sleep(0.05)
+                _record("diagnostic_barrier_released", method=method.__name__, waited=round(time.time() - started, 3))
+            return method(self, *args, **kwargs)
+        wrapped.__name__ = method.__name__
+        return wrapped
+
+    for name in ("investigate", "design", "review"):  # every scientific operation run_bounded accepts
+        if hasattr(adapter, name):
+            setattr(adapter, name, hold(getattr(adapter, name)))
+    adapter._drbean_barrier = True
+
+
 class _WrapAfterImport:
     """Meta-path finder that patches google.genai.client once Python finishes loading it."""
     targets = {"google.genai.client": _wrap_client}
@@ -133,6 +182,27 @@ class _WrapAfterImport:
         return None
 
 
+def _watch_credential_reads() -> None:
+    """Record when a process reads a provider-credential variable that is present. Name only, never the value.
+
+    Covers os.environ[...] and os.getenv/os.environ.get in this interpreter. It cannot see native code that calls
+    getenv(3) directly; the launcher's allowlisted environment is the primary control.
+    """
+    environ_type = type(os.environ)
+    if getattr(environ_type.__getitem__, "_drbean_watched", False):
+        return
+    original = environ_type.__getitem__
+
+    def watched(self, key):
+        value = original(self, key)
+        if key in _CREDENTIAL_NAMES:
+            _record("credential_read", name=key)
+        return value
+
+    watched._drbean_watched = True  # type: ignore[attr-defined]
+    environ_type.__getitem__ = watched
+
+
 def install(log_path: str | None) -> bool:
     """Install once per interpreter. Returns True when this call installed the guard."""
     global _LOG
@@ -143,6 +213,14 @@ def install(log_path: str | None) -> bool:
     present = sorted(name for name in _CREDENTIAL_NAMES if os.environ.get(name) is not None)
     _record("guard_installed", python=sys.version.split()[0], credential_names_present=present)
     sys.addaudithook(_audit)
+    _watch_credential_reads()
+    overrides = set(filter(None, os.environ.get("DRBEAN_DIAGNOSTIC_OVERRIDES", "").split(",")))
+    if "relax_nproc" in overrides:
+        _WrapAfterImport.targets = {**_WrapAfterImport.targets, "bean_api.science": _relax_nproc}
+        _record("diagnostic_override_enabled", override="relax_nproc")
+    if "science_barrier" in overrides:
+        _WrapAfterImport.targets = {**_WrapAfterImport.targets, "bean_api.counterdex_adapter": _science_barrier}
+        _record("diagnostic_override_enabled", override="science_barrier")
     sys.meta_path.insert(0, _WrapAfterImport())
     if "google.genai.client" in sys.modules:
         _wrap_client(sys.modules["google.genai.client"])

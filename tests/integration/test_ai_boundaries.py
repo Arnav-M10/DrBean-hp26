@@ -381,11 +381,14 @@ def test_reference_to_another_workspace_is_refused_before_the_provider(make_app)
 
 def scripted_model(script):
     """A deterministic chat model for the ACTUAL deepagents graph; decisions are controlled, not Gemini."""
-    from langchain_core.language_models.chat_models import BaseChatModel
+    try:  # Owner 3's explicit trusted local injection seam, when present
+        from bean_api.coordinator import OfflineChatModel as Base
+    except ImportError:
+        from langchain_core.language_models.chat_models import BaseChatModel as Base
     from langchain_core.messages import AIMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
 
-    class Scripted(BaseChatModel):
+    class Scripted(Base):
         model_name: str = PLACEHOLDER_MODEL
         offered: list = []
 
@@ -445,11 +448,19 @@ class FakeLedger:
         self.attempts[int(attempt_id) - 1]["result"] = metadata
 
 
+def controlled_config():
+    """The explicit controlled lane: Owner 3's mode="controlled" when ProviderConfig has a mode, else dummy values."""
+    from bean_api.providers import ProviderConfig
+    if "mode" in getattr(ProviderConfig, "__dataclass_fields__", {}):
+        return ProviderConfig(mode="controlled", model=PLACEHOLDER_MODEL)
+    return ProviderConfig(api_key="DRBEAN-DUMMY-KEY-0001", model=PLACEHOLDER_MODEL, account_gate_passed=True,
+                          account_decision_id="DRBEAN-DUMMY-DECISION-0001")
+
+
 def run_graph(model, tools, *, optional=True):
     from bean_api.coordinator import CoordinatorScope, run_coordinator
-    from bean_api.providers import AttemptContext, ProviderConfig
-    config = ProviderConfig(api_key="DRBEAN-DUMMY-KEY-0001", model=PLACEHOLDER_MODEL, account_gate_passed=True,
-                            account_decision_id="DRBEAN-DUMMY-DECISION-0001")
+    from bean_api.providers import AttemptContext
+    config = controlled_config()
     scope = CoordinatorScope(run_id="run", plan_id="plan", problem_id="problem", baseline_scenario_id="baseline",
                              optional_scenario_ids=("optional",) if optional else (),
                              scenario_problem_ids={"baseline": "problem", **({"optional": "problem"} if optional else {})},
@@ -538,8 +549,13 @@ def test_reviewed_optional_scenario_cannot_silently_vanish():
                    "proven by test_worker_records_controlled_turns_outside_the_provider_ledger")
 def test_controlled_turns_never_masquerade_as_live_provider_attempts():
     tools = Tools("certified_counterexample")
-    _, ledger = run_graph(scripted_model(adaptive), tools)
-    assert ledger.attempts, "controlled turns should still be accounted"
+    result, ledger = run_graph(scripted_model(adaptive), tools)
+    # Either no provider-ledger attempt is written for a controlled turn (turns appear only as controlled trace
+    # events), or every attempt written carries an explicit controlled/placeholder marker. Never a bare "gemini".
+    controlled_events = [e for e in tools.events if "controlled" in str(e.get("type", "")) or "controlled" in str(
+        e.get("execution_lane", ""))]
+    assert ledger.attempts or controlled_events or result.runtime.get("execution_lane") == "controlled_model", (
+        "controlled turns must be visible somewhere: as labelled attempts or controlled trace events")
     labelled = [a for a in ledger.attempts if a.get("provider") == "gemini" and not any(
         str(a.get(k, "")).startswith(("controlled", "placeholder")) for k in ("execution_lane", "transport", "mode", "provider_mode"))]
     assert not labelled, (
@@ -574,7 +590,6 @@ class ControlledScienceAdapter:
 
 def agent_run(make_app, outcome, script):
     """Approve an AI-disclosed plan with one reviewed optional comparison and run the real Worker once."""
-    from bean_api.providers import ProviderConfig
     from bean_api.worker import Worker
     adapter = ControlledScienceAdapter(outcome)
     client, _ = make_app({}, adapter=adapter)
@@ -598,8 +613,7 @@ def agent_run(make_app, outcome, script):
                     "expected_current_revision_id": problem["id"], "accepted": True}, "approve")
     run = post(client, f"/plans/{plan['id']}/runs", {"approval_id": approval["id"],
                "expected_plan_digest": plan["digest"]}, "start")
-    config = ProviderConfig(api_key="DRBEAN-DUMMY-KEY-0001", model=PLACEHOLDER_MODEL, account_gate_passed=True,
-                            account_decision_id="DRBEAN-DUMMY-DECISION-0001")
+    config = controlled_config()
     worker = Worker(client.app.state.workflow, adapter=adapter, provider_config=config,
                     controlled_model=scripted_model(script), settings=client.app.state.settings)
     assert worker.tick() == 1

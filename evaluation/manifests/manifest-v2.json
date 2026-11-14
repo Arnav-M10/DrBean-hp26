@@ -1,0 +1,547 @@
+{
+  "ancestry_archive": "manifests/manifest-v<N>.json holds every superseded manifest byte-for-byte",
+  "caps": {
+    "cohort": {
+      "input_tokens": 64000,
+      "output_tokens": 16000,
+      "provider_requests": 32
+    },
+    "invocation": {
+      "agent": {
+        "provider_requests": 4,
+        "scientific_reservations": 2,
+        "tool_calls": 6,
+        "wall_seconds": 300
+      },
+      "design_job": {
+        "constructions": 2,
+        "pair_verification_passes": 2,
+        "times": 64,
+        "wall_seconds": 120
+      },
+      "explanation": {
+        "displayed_characters": 2000,
+        "provider_requests": 1,
+        "wall_seconds": 30
+      },
+      "intake": {
+        "proposed_fields": 50,
+        "provider_requests": 2,
+        "repair_requests": 1,
+        "wall_seconds": 60
+      }
+    },
+    "max_scientific_jobs_in_portfolio": 2,
+    "request_allocation": {
+      "agent": {
+        "max_input_tokens": 1600,
+        "max_output_tokens": 400
+      },
+      "intake": {
+        "max_input_tokens": 3000,
+        "max_output_tokens": 700
+      }
+    }
+  },
+  "cases": {
+    "C01": {
+      "file": "cases/C01.json",
+      "sha256": "3cea29b59279a808224b828591c8a6c167a13ed2c7082f0dcaf7fec813ac7a00"
+    },
+    "C02": {
+      "file": "cases/C02.json",
+      "sha256": "1eadf0f6159b31638dda1ae754abfc1436dba351cd5091d6bd910f67ed20f283"
+    },
+    "C03": {
+      "file": "cases/C03.json",
+      "sha256": "5c126995ad476b66224ef6e23b9b439838b1dd0a3e5b6fb8fa630af643796ed7"
+    },
+    "C04": {
+      "file": "cases/C04.json",
+      "sha256": "e6432c4ca7a030571cde2d43c3fb22bc18454fd9895ed4c25586dde24bede85f"
+    },
+    "C05": {
+      "file": "cases/C05.json",
+      "sha256": "eee0fb51f3da9c8560ef3fcbf6ee08c9590a9cec0de92d56ebd66ad3e50614a7"
+    },
+    "C06": {
+      "file": "cases/C06.json",
+      "sha256": "5e1009d01a591e7b21e7d0ca1f6b33dbe03eb721212e8a3a30de18d9747a6ee3"
+    },
+    "C07": {
+      "file": "cases/C07.json",
+      "sha256": "9f804d51d50edd8cba9d5a6f2708acd04e53be5d3f2ef7c926faccfafcd2cfb4"
+    },
+    "C08": {
+      "file": "cases/C08.json",
+      "sha256": "c0d7c4cc222c8347d6a5e5578c32e7eecbf9e043835085e785f582085a173cfc"
+    },
+    "C09": {
+      "file": "cases/C09.json",
+      "sha256": "34483aac7764d220f5ba62ad0bbb4d386f153c561f5b123ca71c69ceab0ba2be"
+    },
+    "C10": {
+      "file": "cases/C10.json",
+      "sha256": "3de5e7fa8f8d6d89a80b5d1395fba5ee73b75ce990842555701b57bbcdd07e7f"
+    },
+    "C11": {
+      "file": "cases/C11.json",
+      "sha256": "b0fbe5543647aa07a2576f60b9e2224eb04ca2cf9858df6173cff8197027be36"
+    },
+    "C12": {
+      "file": "cases/C12.json",
+      "sha256": "a9facd2ad73f3ac3a54015bc7b5322ef3372885b6f97f1db7c8d5a0eeb4728c3"
+    }
+  },
+  "contract": {
+    "revision": "GF-2",
+    "source_sha256": "2dc232c8f2477ed959864e039d97655c287e6cce61cc54179daa6b0569f0fe59",
+    "wire_profile": "DB-SC-1"
+  },
+  "frozen_at": "2026-11-14T03:22:25Z",
+  "harness_version": "0.2.0",
+  "holdouts": {
+    "items": {
+      "h01": {
+        "bytes": 82174,
+        "expected": "sources/expected/h01.json",
+        "expected_sha256": "6ff10313d29d9c63576351329dc2fd08ecbae09d3a666c3ae2da65fe45546337",
+        "file": "sources/h01.png",
+        "sha256": "064e3bcbebc1b54c83fc80a2717b2c6b000c8aad3115214390eaacad426c82de"
+      },
+      "h04": {
+        "bytes": 80508,
+        "expected": "sources/expected/h04.json",
+        "expected_sha256": "8802ab26ab841798b507a32b4c5d0dbf28e74e357c6458c82438c8fc6554689a",
+        "file": "sources/h04.png",
+        "sha256": "afe0475b83a64b261f972e00051078dea41b8681e786ff2bfd421436b8d49abe"
+      }
+    },
+    "status": "prepared and sealed by digest; not used for prompt tuning; ungraded"
+  },
+  "lanes": {
+    "actual_full_stack": {
+      "cohort": true,
+      "enabled": false,
+      "live_provider": true,
+      "meaning": "v1 lane coupling real science to a live provider; retained, disabled, NOT_RUN",
+      "provider": [
+        "live"
+      ],
+      "tools": "real",
+      "version": 1,
+      "zero_dispatch_required": false
+    },
+    "fixture_contract": {
+      "cohort": false,
+      "enabled": true,
+      "live_provider": false,
+      "meaning": "offline controlled model/application boundary; never evidence about Gemini or science",
+      "provider": [
+        "controlled",
+        "none"
+      ],
+      "tools": null,
+      "version": 1,
+      "zero_dispatch_required": false
+    },
+    "live_agent_controlled_tools": {
+      "cohort": true,
+      "enabled": false,
+      "live_provider": true,
+      "meaning": "future live Gemini agent decisions; NOT_RUN",
+      "provider": [
+        "live"
+      ],
+      "tools": "controlled",
+      "version": 1,
+      "zero_dispatch_required": false
+    },
+    "live_intake": {
+      "cohort": true,
+      "enabled": false,
+      "live_provider": true,
+      "meaning": "future live Gemini intake; NOT_RUN until a new explicit user instruction",
+      "provider": [
+        "live"
+      ],
+      "tools": null,
+      "version": 1,
+      "zero_dispatch_required": false
+    },
+    "offline_real_science": {
+      "cohort": false,
+      "enabled": true,
+      "live_provider": false,
+      "meaning": "actual local API, worker and science through HTTP; zero external model dispatch",
+      "provider": [
+        "none",
+        "controlled"
+      ],
+      "tools": "real",
+      "version": 1,
+      "zero_dispatch_required": true
+    }
+  },
+  "live_activation": "disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared accounted allocation, Owner 3's operator path and independent grading of predeclared cases. The CLI has no switch for it.",
+  "manifest_version": 2,
+  "modality": {
+    "chosen": "image/png",
+    "pdf": "not selected; unrun by decision"
+  },
+  "observation_schema": "eval-observation/v1",
+  "schedule": {
+    "actual_full_stack": [
+      {
+        "entry_id": "FS-BASELINE",
+        "lane": "actual_full_stack",
+        "note": "real baseline agent invocation; approves the baseline scenario only",
+        "operation": "agent"
+      },
+      {
+        "entry_id": "FS-DESIGN",
+        "lane": "actual_full_stack",
+        "note": "distinct design agent invocation after separate human review and approval",
+        "operation": "agent"
+      }
+    ],
+    "fixture_contract": [
+      {
+        "case_id": "C01",
+        "entry_id": "C01-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C01",
+        "entry_id": "C01-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C02",
+        "entry_id": "C02-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C02",
+        "entry_id": "C02-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C03",
+        "entry_id": "C03-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C03",
+        "entry_id": "C03-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C04",
+        "entry_id": "C04-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C04",
+        "entry_id": "C04-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C05",
+        "entry_id": "C05-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C05",
+        "entry_id": "C05-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C06",
+        "entry_id": "C06-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C06",
+        "entry_id": "C06-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C07",
+        "entry_id": "C07-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C07",
+        "entry_id": "C07-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C08",
+        "entry_id": "C08-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C08",
+        "entry_id": "C08-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C09",
+        "entry_id": "C09-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C09",
+        "entry_id": "C09-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C10",
+        "entry_id": "C10-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C10",
+        "entry_id": "C10-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C11",
+        "entry_id": "C11-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C11",
+        "entry_id": "C11-B",
+        "variant": "B"
+      },
+      {
+        "case_id": "C12",
+        "entry_id": "C12-A",
+        "variant": "A"
+      },
+      {
+        "case_id": "C12",
+        "entry_id": "C12-B",
+        "variant": "B"
+      }
+    ],
+    "live": [
+      {
+        "case_id": "C01",
+        "entry_id": "C01-A-live1",
+        "lane": "live_intake",
+        "scheduled_attempt": 1,
+        "variant": "A"
+      },
+      {
+        "case_id": "C01",
+        "entry_id": "C01-A-live2",
+        "lane": "live_intake",
+        "scheduled_attempt": 2,
+        "variant": "A"
+      },
+      {
+        "case_id": "C04",
+        "entry_id": "C04-A-live1",
+        "lane": "live_intake",
+        "scheduled_attempt": 1,
+        "variant": "A"
+      },
+      {
+        "case_id": "C04",
+        "entry_id": "C04-A-live2",
+        "lane": "live_intake",
+        "scheduled_attempt": 2,
+        "variant": "A"
+      },
+      {
+        "case_id": "C08",
+        "entry_id": "C08-A-live1",
+        "lane": "live_agent_controlled_tools",
+        "scheduled_attempt": 1,
+        "variant": "A"
+      },
+      {
+        "case_id": "C08",
+        "entry_id": "C08-A-live2",
+        "lane": "live_agent_controlled_tools",
+        "scheduled_attempt": 2,
+        "variant": "A"
+      },
+      {
+        "case_id": "C09",
+        "entry_id": "C09-A-live1",
+        "lane": "live_agent_controlled_tools",
+        "scheduled_attempt": 1,
+        "variant": "A"
+      },
+      {
+        "case_id": "C09",
+        "entry_id": "C09-A-live2",
+        "lane": "live_agent_controlled_tools",
+        "scheduled_attempt": 2,
+        "variant": "A"
+      }
+    ],
+    "offline_real_science": [
+      {
+        "entry_id": "RS-HERO-FULL",
+        "lane": "offline_real_science",
+        "note": "real baseline, separate design approval, raw artifact download, fresh native replay",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-CHANGED-INPUT",
+        "lane": "offline_real_science",
+        "note": "changed scientific input: fresh identities and computation, original result unchanged",
+        "operation": "science",
+        "packet": "changed-input-v1"
+      },
+      {
+        "entry_id": "RS-RETRY-CONCURRENT",
+        "lane": "offline_real_science",
+        "note": "concurrent and retried starts: one accepted run, no duplicate science",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-DESIGN-AUTHORITY",
+        "lane": "offline_real_science",
+        "note": "baseline approval cannot authorize design; pair, allowance and grid bound",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-FOLLOWUP",
+        "lane": "offline_real_science",
+        "note": "hypothetical readings: new lineage, new approval, per-candidate outcomes",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-CANCEL-RESTART",
+        "lane": "offline_real_science",
+        "note": "queued and running cancellation, worker restart: no orphan, no redispatch",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-ZERO-DISPATCH",
+        "lane": "offline_real_science",
+        "note": "whole lane: guard active in API and worker, zero external model dispatch",
+        "operation": "science",
+        "packet": "hero-v1"
+      }
+    ]
+  },
+  "science_packets": {
+    "changed-input-v1": {
+      "file": "cases/science/changed-input-v1.json",
+      "sha256": "1062680b4b3193b6f00d22ad7bd826ffdf5b8074d3356359a5ac9396402e3837"
+    },
+    "fixed-pair-regression-v1": {
+      "file": "cases/science/fixed-pair-regression-v1.json",
+      "sha256": "04ffef6d9d47bcc59f8283fdeacc3383d46072cac5021546ab0d2cf334d2a7f2"
+    },
+    "hero-v1": {
+      "file": "cases/science/hero-v1.json",
+      "sha256": "696e1809f493d28a764cc0208ad180cf16b564b4eb816899e027887ac7803c10"
+    }
+  },
+  "sources": {
+    "c01a": {
+      "bytes": 82952,
+      "expected": "sources/expected/c01a.json",
+      "expected_sha256": "674e1e7fee61253fc960a84f914bb11dbff4e4dc9f8df9daa4fac0084dc2388c",
+      "file": "sources/c01a.png",
+      "sha256": "600976f6b4b019ef2ca444bc7e45ea3ba5871948e51ff5baaad65bea6c29c9e7"
+    },
+    "c01b": {
+      "bytes": 80567,
+      "expected": "sources/expected/c01b.json",
+      "expected_sha256": "8330be709919ee5a942699ded873d67bd7a29dc8c4c1a2f1d308c059ebc8e5d9",
+      "file": "sources/c01b.png",
+      "sha256": "f6b4b9c248f1c136eb73a0d2ddf43b01884b6442853ebaac97784e222fe42b43"
+    },
+    "c02a": {
+      "bytes": 82006,
+      "expected": "sources/expected/c02a.json",
+      "expected_sha256": "57f0a21b336fd79a20a5d1cdf4da752f501a5922f6790128bea6ead40ddd489e",
+      "file": "sources/c02a.png",
+      "sha256": "ad5704cb97a81d1fba82d31d0b0d136a0e42e087f1ea1d5eebc416cfbf653610"
+    },
+    "c02b": {
+      "bytes": 82100,
+      "expected": "sources/expected/c02b.json",
+      "expected_sha256": "68874e6f240963693734081ba2ec10f144da42e32a5221448545c5d405ec1c06",
+      "file": "sources/c02b.png",
+      "sha256": "c22f1245615c065fec2815ca814fa9ff68890ae7d3a9b8cbfdfdb4b957e4c080"
+    },
+    "c03a": {
+      "bytes": 82211,
+      "expected": "sources/expected/c03a.json",
+      "expected_sha256": "fadcf58ed22a047cde70820625d768208478737a87ba70fefc41e3e3280b8777",
+      "file": "sources/c03a.png",
+      "sha256": "60668dec8fd02496f5ece2fda8626ea62be2dd366dc1c608ba6956973d1d4f9c"
+    },
+    "c03b": {
+      "bytes": 82599,
+      "expected": "sources/expected/c03b.json",
+      "expected_sha256": "6f2d3d91ec0d4a4fbe404fa63f9f3964a851a8e7492ebd41fba19ca810cead0b",
+      "file": "sources/c03b.png",
+      "sha256": "ee71a2b60590bcaba4f5688b5c990accbb5acfc260160c8de1e0da67dcdbd402"
+    },
+    "c04a": {
+      "bytes": 83358,
+      "expected": "sources/expected/c04a.json",
+      "expected_sha256": "96466f02d93df6f8e095da659fda28e92c316e857e3defe0f2c510eba0661ba3",
+      "file": "sources/c04a.png",
+      "sha256": "b7fdffd8400cb9948698917ec47cbcd0d203b3efad0dd6a05b6aa3099272c5b6"
+    },
+    "c04b": {
+      "bytes": 82809,
+      "expected": "sources/expected/c04b.json",
+      "expected_sha256": "0315de34248ba7a05a773fac8c8695b92d2baabbcbae7946ebcd292e193146f1",
+      "file": "sources/c04b.png",
+      "sha256": "d438d6b6867dfaa0f9cbbde1266c5a9f919de259ddf3c8547e09e7bb0d796f9a"
+    },
+    "c05a": {
+      "bytes": 97667,
+      "expected": "sources/expected/c05a.json",
+      "expected_sha256": "f2efc63fe6e7ff4d6b3cc5ab7e7821d917ca00c947858a1d8aaef59035fbe501",
+      "file": "sources/c05a.png",
+      "sha256": "08d02a1385ad1dd25a789cacd43372cb552db5fe44d9147729bcd9dd818c0bc6"
+    },
+    "c06a": {
+      "bytes": 95766,
+      "expected": "sources/expected/c06a.json",
+      "expected_sha256": "f9da26bda07a6ae1460ba6b46ff3562dcaa792b88dfbfd89c3deae3f37156863",
+      "file": "sources/c06a.png",
+      "sha256": "8e619b2e5cf5430deac3bf2f29c4381768bdf25be3136f5c0c607e6024b06d64"
+    },
+    "c06b": {
+      "bytes": 97205,
+      "expected": "sources/expected/c06b.json",
+      "expected_sha256": "0e145ba142956db8feab9ec4a2da72b6dcde7a7e3ceef7a790671ae4a0b8a0e9",
+      "file": "sources/c06b.png",
+      "sha256": "6d0233bb0feccd78ead6ca1ca5a8bfa970c1d8e88be5d2e41a9e0472370cd6e9"
+    },
+    "c10b": {
+      "bytes": 84986,
+      "expected": "sources/expected/c10b.json",
+      "expected_sha256": "8e202b5509b1fcae637ca75b7b897075d9a3e27aa8921b9bcafb534f445dfee6",
+      "file": "sources/c10b.png",
+      "sha256": "4a9cf5389ecafa09368eefbcc292369f4c99527f6778c531a689f67c0c62996e"
+    }
+  },
+  "supersedes": [
+    {
+      "archived": "manifests/manifest-v1.json",
+      "manifest_version": 1,
+      "sha256": "f72c61ddedf9809052e64fa8ea11fd13c77aeecc57fe63affeb9fea4c6940d57"
+    }
+  ]
+}

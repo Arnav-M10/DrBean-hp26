@@ -44,16 +44,16 @@ LANE_RULES = {
 LIVE_ACTIVATION = ("disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared "
                    "accounted allocation, Owner 3's operator path and independent grading of predeclared cases. "
                    "The CLI has no switch for it.")
-SCIENCE_PACKETS = ("hero-v1", "changed-input-v1", "fixed-pair-regression-v1")
+SCIENCE_PACKETS = ("hero-v1", "hero-v2", "changed-input-v1", "fixed-pair-regression-v1")
 OFFLINE_SCIENCE_ENTRIES = (
-    ("RS-HERO-FULL", "hero-v1", "real baseline, separate design approval, raw artifact download, fresh native replay"),
+    ("RS-HERO-FULL", "hero-v2", "real baseline, separate design approval, raw artifact download, fresh native replay"),
     ("RS-CHANGED-INPUT", "changed-input-v1", "changed scientific input: fresh identities and computation, "
                                              "original result unchanged"),
-    ("RS-RETRY-CONCURRENT", "hero-v1", "concurrent and retried starts: one accepted run, no duplicate science"),
-    ("RS-DESIGN-AUTHORITY", "hero-v1", "baseline approval cannot authorize design; pair, allowance and grid bound"),
-    ("RS-FOLLOWUP", "hero-v1", "hypothetical readings: new lineage, new approval, per-candidate outcomes"),
-    ("RS-CANCEL-RESTART", "hero-v1", "queued and running cancellation, worker restart: no orphan, no redispatch"),
-    ("RS-ZERO-DISPATCH", "hero-v1", "whole lane: guard active in API and worker, zero external model dispatch"),
+    ("RS-RETRY-CONCURRENT", "hero-v2", "concurrent and retried starts: one accepted run, no duplicate science"),
+    ("RS-DESIGN-AUTHORITY", "hero-v2", "baseline approval cannot authorize design; pair, allowance and grid bound"),
+    ("RS-FOLLOWUP", "hero-v2", "hypothetical readings: new lineage, new approval, per-candidate outcomes"),
+    ("RS-CANCEL-RESTART", "hero-v2", "queued and running cancellation, worker restart: no orphan, no redispatch"),
+    ("RS-ZERO-DISPATCH", "hero-v2", "whole lane: guard active in API and worker, zero external model dispatch"),
 )
 # Proposed pre-request maxima (tokens). Ceilings to enforce, not measurements:
 # 8*3000 + 24*1600 = 62,400 input and 8*700 + 24*400 = 15,200 output.
