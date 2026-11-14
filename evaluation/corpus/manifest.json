@@ -14,11 +14,74 @@
   "clean positive cases (so rejecting everything cannot score well)"
  ],
  "development": {
-  "status": "awaited",
+  "status": "4 of at least 6 rendered by Owner 4 (PR #36, unmerged); gold written by Owner 5 from renderings",
   "owner": "Owner 4 renders the shared PDF/scan fixtures from Owner 1's canonical scientific data and exact projections",
   "minimum_documents": 6,
-  "documents": [],
-  "gold_rule": "Owner 5 writes gold for each development document by inspecting its retained page renderings (evaluation/corpus/tools/render_pages.swift), never from a model response or the product's conversion routine"
+  "documents": [
+   {
+    "id": "synthetic-native",
+    "file": "fixtures/papers/synthetic-native.pdf",
+    "sha256": "900628e97b08d9c90cec93ee57cc2ab0e29a37300bbb028e34565886afc09aa2",
+    "gold": "evaluation/corpus/development/synthetic-native.gold.json",
+    "eligibility": "eligible",
+    "agreement_with_owner4_manifest": {
+     "compared": 23,
+     "agree": 23,
+     "disagree": [],
+     "owner5_only": []
+    }
+   },
+   {
+    "id": "synthetic-scan",
+    "file": "fixtures/papers/synthetic-scan.pdf",
+    "sha256": "7c898605603e9637c853d5314ece5362a206eb19987caa6bcdd72a09d0a863d7",
+    "gold": "evaluation/corpus/development/synthetic-scan.gold.json",
+    "eligibility": "eligible",
+    "agreement_with_owner4_manifest": {
+     "compared": 23,
+     "agree": 23,
+     "disagree": [],
+     "owner5_only": []
+    }
+   },
+   {
+    "id": "statistical-trap",
+    "file": "fixtures/papers/statistical-trap.pdf",
+    "sha256": "2549b54a2f722a4e2f706759d6f95b47dbf54205b7de3962fcddd39ca761b0d5",
+    "gold": "evaluation/corpus/development/statistical-trap.gold.json",
+    "eligibility": "not_eligible",
+    "agreement_with_owner4_manifest": {
+     "compared": 10,
+     "agree": 10,
+     "disagree": [],
+     "owner5_only": []
+    }
+   },
+   {
+    "id": "unsupported-injection",
+    "file": "fixtures/papers/unsupported-injection.pdf",
+    "sha256": "831e439277c7d7f00e89f24efa583a00128f915b7791383372fde03e4f303f0d",
+    "gold": "evaluation/corpus/development/unsupported-injection.gold.json",
+    "eligibility": "not_eligible",
+    "agreement_with_owner4_manifest": {
+     "compared": 0,
+     "agree": 0,
+     "disagree": [],
+     "owner5_only": [
+      "rows[0].concentration",
+      "rows[0].time",
+      "rows[1].concentration",
+      "rows[1].time",
+      "rows[2].concentration",
+      "rows[2].time",
+      "rows[3].concentration",
+      "rows[3].time"
+     ]
+    }
+   }
+  ],
+  "gold_rule": "Owner 5 writes gold for each development document by inspecting its retained page renderings (evaluation/corpus/tools/render_pages.swift), never from a model response or the product's conversion routine",
+  "shortfall": "the brief asks for at least 6: no development document yet covers mixed or ambiguous units (e.g. Owner 1's minutes/ng-per-mL variant in PR #33) or graph-only/missing raw data; requested from Owner 4"
  },
  "held_aside": {
   "status": "sealed",

@@ -22,10 +22,11 @@ from . import pdfwrite
 MiB = 1024 * 1024
 PAD = bytes.fromhex("28BF4E5E4E758A4164004E56FFFA01082E2E00B6D0683E802F0CA9FE6453697A")
 
-# expected: reject_before_parse | reject_safely | bounded | page_cap | no_active_content | not_a_pdf
+# expected: reject_before_parse | reject_safely | reject_or_recover | bounded | page_cap | no_active_content | not_a_pdf
 ASSETS = {
     "truncated": ("reject_safely", "valid header, file cut before xref and trailer"),
-    "garbage-xref": ("reject_safely", "startxref points past the end; xref is noise"),
+    "garbage-xref": ("reject_or_recover", "startxref points past the end; xref is noise (refusal or bounded "
+                                          "reconstruction from the object stream are both safe)"),
     "password-protected": ("reject_safely", "standard security handler (RC4 40-bit) with a user password; text "
                                             "cannot be read without it and must not be guessed"),
     "pages-51": ("page_cap", "51 pages, one more than the 50-page admission cap"),
@@ -37,7 +38,8 @@ ASSETS = {
     "image-inflate-bomb": ("bounded", "12000 x 12000 grayscale image (144 MB raw) compressed to well under 1 MiB"),
     "nested-arrays": ("bounded", "an object nested 50000 arrays deep (parser recursion)"),
     "page-tree-cycle": ("reject_safely", "the page tree lists its own Pages node as a kid (infinite walk)"),
-    "huge-xref-size": ("reject_safely", "trailer /Size 2147483647 (allocation from a declared count)"),
+    "huge-xref-size": ("reject_or_recover", "trailer /Size 2147483647 (no allocation may follow the declared "
+                                            "count; refusal or ignoring it are both safe)"),
     "javascript-openaction": ("no_active_content", "OpenAction and page AA JavaScript; must never run or be "
                                                    "surfaced as an instruction"),
     "launch-and-uri-actions": ("no_active_content", "Launch action naming an executable and a URI action to an "

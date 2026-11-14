@@ -51,6 +51,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 | F-PAPER-HARD-BOUND-CONTEXT | P2 | 3 | open | A stated hard bound is refused, and the whole proposal discarded, when an unrelated SD or CI appears anywhere on the same page |
 | F-PAPER-EXPONENT-FLATTENING | P2 | 3 (with 4: parser) | open | A superscript exponent flattened by the PDF text layer ('1.1 × 10' + superscript '1' read as '1.1 × 101') is accepted as the exact value 101 with no visual-review flag |
 | H-LANE-ENGINE-PRECONDITION | P2 | 5 (harness) | retested | Lane reports judged the engine precondition by the engine interpreter's installed copy, so checkouts without one (preview worktrees) were reported failed although the application ran the repository source |
+| F-PAPER-RENDER-MEMORY | P1 | 4 (papers worker; resource_policy with 2) | open | On macOS a page preview of a small PDF whose content inflates to gigabytes drives the PDF worker to multiple GiB: memory is bounded only by time |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -467,6 +468,14 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Observed:** precondition FAILED ('installed Counterdex None differs in None'); 111 passed / 10 xfailed and 17 passed / 7 NOT_AVAILABLE were recorded as failed lane reports
 - **Evidence:** {"failed_reports": ["lane_3022c056c95f4f23", "lane_95503c92ead24a0d"], "regression": "evaluation/tests/test_lanes.py::EnginePreconditionTests"}
 - **Retest at harness e12c512 against previews 3a7816e (PR #35) and d0148aa (PR #33):** The same preview runs now pass their preconditions (application import resolves the repository source; no installed copy in the worktree interpreter). Closed by retest. (evidence: {"reports": ["lane_1c86a89352b248ec", "lane_65fd953469e04b65", "lane_14457236e1b143be", "lane_e403723180574529"]})
+
+## F-PAPER-RENDER-MEMORY (P1, owner 4 (papers worker; resource_policy with 2), open)
+
+- **Input:** a 4.2 MB PDF (under the 20 MiB cap) whose page-1 content stream FlateDecode-inflates to 4 GiB (hostile_pdfs._compressed_zeros(4 GiB) as the page's content stream)
+- **Command:** `PR #36 preview + its proposed route patch: DRBEAN_HEAVY_RESOURCE_ATTACKS=1 .venv/bin/python -m pytest -q tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (watchdog samples the application's process tree every 50 ms and kills children above 1.5 GiB)`
+- **Expected:** the preview is refused (resource_limit) or completes within the worker's 768 MiB memory bound, as on Linux where RLIMIT_AS enforces it
+- **Observed:** without the watchdog kill: the request returned 200 after the process tree peaked at 2440 MiB; with it: killed at 1549 MiB, then a 422 resource_limit. resource_policy reports address_space 'unavailable' on darwin, so only RLIMIT_CPU (12 s) and the 15 s wall clock bound the renderer; inspection stays bounded (pypdf caps decompression; 236 MiB peak)
+- **Evidence:** {"library_probe": "inspect: 236 MiB peak; render: watchdog killed at 2228 MiB in 0.93 s", "preview": "7139c90 = 500ba3c + PR #36 081bbdc, plus f02e2a6 applying docs/proposals/owner2-paper-routes.patch (unreviewed by Owner 2) and an unlocked uv resolution of pypdf 7.1.0 / pypdfium2 5.15.2; labelled preview", "regression": "tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (opt-in; strict xfail on darwin)"}
 
 ## Check-level finding ids (raised only when the check fails)
 

@@ -1,0 +1,185 @@
+{
+ "absent": [
+  "experiment identifier",
+  "a text layer (values need visual review)"
+ ],
+ "ambiguities": [],
+ "assumptions": {
+  "hard_allowance": {
+   "applies_to": "each reading",
+   "exists": true,
+   "pages": [
+    1
+   ],
+   "quote": "Each reading has a hard allowance of 0.50 mg/L: the",
+   "quote_checkable": false,
+   "unit": "mg/L",
+   "value": "0.50"
+  },
+  "initial_concentration": {
+   "exists": true,
+   "pages": [
+    1
+   ],
+   "quote": "with C(0) = 0 and ka",
+   "quote_checkable": false,
+   "value": "0"
+  },
+  "model": {
+   "exists": true,
+   "pages": [
+    1
+   ],
+   "quote": "C(t) = A × (exp(−ke × t) − exp(−ka × t))",
+   "quote_checkable": false,
+   "supported_by_engine": true,
+   "value": "two_rate_concentration"
+  },
+  "parameter_domain": {
+   "exists": true,
+   "pages": [
+    1
+   ],
+   "quote": "ke ∈ [0.015, 0.35]",
+   "quote_checkable": false,
+   "value": {
+    "A": [
+     "0.001",
+     "30"
+    ],
+    "ka": [
+     "0.4",
+     "8"
+    ],
+    "ke": [
+     "0.015",
+     "0.35"
+    ]
+   }
+  },
+  "time_origin": {
+   "exists": true,
+   "pages": [
+    1
+   ],
+   "quote": "Time is elapsed hours from dosing (t = 0)",
+   "quote_checkable": false,
+   "value": "t = 0 at dosing; elapsed hours"
+  }
+ },
+ "claim": {
+  "closed": true,
+  "kind": "deterministic_parameter_range",
+  "lower": "0.10",
+  "pages": [
+   1
+  ],
+  "parameter": "ke",
+  "quote": "closed interval ke ∈ [0.10, 0.17]",
+  "quote_checkable": false,
+  "unit": "1/h",
+  "upper": "0.17"
+ },
+ "document_id": "synthetic-scan",
+ "eligibility": {
+  "reasons": [
+   "same content as synthetic-native, readable on the rendering; every value must be visually reviewed because there is no text layer"
+  ],
+  "status": "eligible"
+ },
+ "file": {
+  "bytes": 209857,
+  "name": "fixtures/papers/synthetic-scan.pdf",
+  "pages": 1,
+  "sha256": "7c898605603e9637c853d5314ece5362a206eb19987caa6bcdd72a09d0a863d7",
+  "text_layer": false
+ },
+ "hostile_content": [],
+ "non_claims": [],
+ "provenance": {
+  "author": "Owner 4 (rendered from the project's shared synthetic example)",
+  "class": "synthetic",
+  "gold_author": "Owner 5, from renderings",
+  "set": "development",
+  "statement": "labelled on the page as a synthetic test paper, not a publication"
+ },
+ "quote_locations": null,
+ "readings": [
+  {
+   "id": "r1",
+   "kind": "individual_measurement",
+   "pages": [
+    1
+   ],
+   "quote": "4.80",
+   "time": "0.25",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "value": "4.80",
+   "value_mg_per_L": "4.80"
+  },
+  {
+   "id": "r2",
+   "kind": "individual_measurement",
+   "pages": [
+    1
+   ],
+   "quote": "7.20",
+   "time": "0.5",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "value": "7.20",
+   "value_mg_per_L": "7.20"
+  },
+  {
+   "id": "r3",
+   "kind": "individual_measurement",
+   "pages": [
+    1
+   ],
+   "quote": "8.00",
+   "time": "1",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "value": "8.00",
+   "value_mg_per_L": "8.00"
+  },
+  {
+   "id": "r4",
+   "kind": "individual_measurement",
+   "pages": [
+    1
+   ],
+   "quote": "6.80",
+   "time": "2",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "value": "6.80",
+   "value_mg_per_L": "6.80"
+  },
+  {
+   "id": "r5",
+   "kind": "individual_measurement",
+   "pages": [
+    1
+   ],
+   "quote": "5.70",
+   "time": "4",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "value": "5.70",
+   "value_mg_per_L": "5.70"
+  }
+ ],
+ "renderings": {
+  "dpi": 110,
+  "pages": [
+   {
+    "page": 1,
+    "png_sha256": "c902d3ed8135a611a3a4b30619cac2ee561805a362ccf56150a24a4fbd810f3e"
+   }
+  ],
+  "tool": "evaluation/corpus/tools/render_pages.swift (Apple PDFKit)"
+ },
+ "schema": "drbean-paper-gold/v1"
+}

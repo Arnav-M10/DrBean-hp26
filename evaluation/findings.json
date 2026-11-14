@@ -1743,7 +1743,7 @@
       "expected": "the authentic quote is located (whitespace collapsed, Unicode-normalized on both sides) or only that citation is marked unresolved",
       "observed": "PaperProposalError paper_citation_quote_mismatch for the whole proposal; through the gateway the request is charged and the extraction lost (retry policy none)",
       "impact": "real PDF text layers wrap almost every sentence; one natural quote can waste a request of the 24-request session budget and the whole extraction (usefulness, not safety)",
-      "suggested_fix": "normalize whitespace and NFKC on both sides when matching, keep the original page span for display, and downgrade an unlocatable citation to unresolved with a blocking diagnostic instead of rejecting the proposal; agree with Owner 4 what the parser emits for line breaks and hyphenation",
+      "suggested_fix": "normalize whitespace and NFKC on both sides when matching, keep the original page span for display, and downgrade an unlocatable citation to unresolved with a blocking diagnostic instead of rejecting the proposal; agree with Owner 4 what the parser emits for line breaks and hyphenation; Owner 4's papers/citations.py _normalize (NFKC, minus sign, soft hyphen, whitespace, casefold) already does this for the citation-check route and could be shared",
       "evidence": {
         "preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)",
         "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"
@@ -1816,6 +1816,24 @@
           }
         }
       ]
+    },
+    {
+      "id": "F-PAPER-RENDER-MEMORY",
+      "severity": "P1",
+      "owner": "4 (papers worker; resource_policy with 2)",
+      "status": "open",
+      "title": "On macOS a page preview of a small PDF whose content inflates to gigabytes drives the PDF worker to multiple GiB: memory is bounded only by time",
+      "minimal_input": "a 4.2 MB PDF (under the 20 MiB cap) whose page-1 content stream FlateDecode-inflates to 4 GiB (hostile_pdfs._compressed_zeros(4 GiB) as the page's content stream)",
+      "command": "PR #36 preview + its proposed route patch: DRBEAN_HEAVY_RESOURCE_ATTACKS=1 .venv/bin/python -m pytest -q tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (watchdog samples the application's process tree every 50 ms and kills children above 1.5 GiB)",
+      "expected": "the preview is refused (resource_limit) or completes within the worker's 768 MiB memory bound, as on Linux where RLIMIT_AS enforces it",
+      "observed": "without the watchdog kill: the request returned 200 after the process tree peaked at 2440 MiB; with it: killed at 1549 MiB, then a 422 resource_limit. resource_policy reports address_space 'unavailable' on darwin, so only RLIMIT_CPU (12 s) and the 15 s wall clock bound the renderer; inspection stays bounded (pypdf caps decompression; 236 MiB peak)",
+      "impact": "one upload plus one page view can push the presentation Mac into memory pressure; a 20 MiB file can inflate about 1000x within the render window. Linux hosts are bounded",
+      "suggested_fix": "before rendering, inflate each page's content and image streams with a bounded decoder and refuse above a cap (resource_limit), and on platforms without RLIMIT_AS have the parent sample the worker's RSS and kill it above WORKER_MEMORY_BYTES",
+      "evidence": {
+        "preview": "7139c90 = 500ba3c + PR #36 081bbdc, plus f02e2a6 applying docs/proposals/owner2-paper-routes.patch (unreviewed by Owner 2) and an unlocked uv resolution of pypdf 7.1.0 / pypdfium2 5.15.2; labelled preview",
+        "library_probe": "inspect: 236 MiB peak; render: watchdog killed at 2228 MiB in 0.93 s",
+        "regression": "tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (opt-in; strict xfail on darwin)"
+      }
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main).",

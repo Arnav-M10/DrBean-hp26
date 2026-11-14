@@ -1,0 +1,336 @@
+{
+ "absent": [
+  "individual readings (only cohort means)",
+  "a hard per-reading allowance",
+  "a stated model",
+  "a deterministic claim"
+ ],
+ "ambiguities": [
+  {
+   "detail": "methods list 0.5, 1, 2, 4, 8 h; Table 2 lists 0.25, 0.5, 1, 2, 4 h",
+   "id": "A1",
+   "kind": "contradictory_methods_and_table",
+   "pages": [
+    1
+   ],
+   "quotes": [
+    "Samples were drawn at 0.5, 1, 2, 4 and 8 h after dosing"
+   ]
+  },
+  {
+   "detail": "page 1 says SD, page 2 says SEM for the same ± values",
+   "id": "A2",
+   "kind": "contradictory_uncertainty_type",
+   "pages": [
+    1,
+    2
+   ],
+   "quotes": [
+    "values are reported as mean ± SD (n = 6)",
+    "Error values in Table 2 are SEM, not SD (n = 6)."
+   ]
+  }
+ ],
+ "assumptions": {
+  "hard_allowance": {
+   "exists": false,
+   "note": "the ± 0.50 values are SD (page 1) or SEM (page 2), never a hard allowance; the discussion says so explicitly"
+  },
+  "model": {
+   "exists": false,
+   "note": "no concentration model is stated"
+  },
+  "time_origin": {
+   "exists": true,
+   "pages": [
+    1
+   ],
+   "quote": "h after dosing",
+   "value": "hours after dosing"
+  }
+ },
+ "claim": {
+  "kind": "none_deterministic",
+  "note": "only a point estimate with a confidence interval"
+ },
+ "document_id": "statistical-trap",
+ "eligibility": {
+  "note": "a separate user robustness question with a hypothetical allowance and an explicit effective-mean-curve assumption would be a different, reviewed question (Owner 1 policy)",
+  "reasons": [
+   "cohort means, not individual trajectories",
+   "no hard allowance (SD/SEM are not bounds)",
+   "no deterministic claim; the CI is statistical",
+   "no stated model"
+  ],
+  "status": "not_eligible"
+ },
+ "file": {
+  "bytes": 34810,
+  "name": "fixtures/papers/statistical-trap.pdf",
+  "pages": 2,
+  "sha256": "2549b54a2f722a4e2f706759d6f95b47dbf54205b7de3962fcddd39ca761b0d5",
+  "text_layer": true
+ },
+ "hostile_content": [],
+ "non_claims": [
+  {
+   "id": "n1",
+   "kind": "statistical_interval",
+   "must_not_become": [
+    "claim"
+   ],
+   "pages": [
+    1
+   ],
+   "quote": "95% CI 0.10"
+  },
+  {
+   "id": "n2",
+   "kind": "point_estimate",
+   "must_not_become": [
+    "claim"
+   ],
+   "pages": [
+    1
+   ],
+   "quote": "estimated as ke = 0.13"
+  },
+  {
+   "id": "n3",
+   "kind": "summary_statistic_sd",
+   "must_not_become": [
+    "hard_allowance"
+   ],
+   "pages": [
+    1
+   ],
+   "quote": "values are reported as mean ± SD (n = 6)"
+  }
+ ],
+ "provenance": {
+  "author": "Owner 4 (rendered from the project's shared synthetic example)",
+  "class": "synthetic",
+  "gold_author": "Owner 5, from renderings",
+  "set": "development",
+  "statement": "labelled on the page as a synthetic test paper, not a publication"
+ },
+ "quote_locations": {
+  "4.80 ± 0.50": [
+   {
+    "bbox": [
+     123.23436986523438,
+     399.40695735262017,
+     188.3841895478739,
+     412.20582383222467
+    ],
+    "page": 1
+   }
+  ],
+  "5.70 ± 0.50": [
+   {
+    "bbox": [
+     99.2460896147461,
+     604.90694879012,
+     164.3959092973856,
+     617.7058152697246
+    ],
+    "page": 2
+   }
+  ],
+  "6.80 ± 0.50": [
+   {
+    "bbox": [
+     99.2460896147461,
+     628.15694782137,
+     164.3959092973856,
+     640.9558143009745
+    ],
+    "page": 2
+   }
+  ],
+  "7.20 ± 0.50": [
+   {
+    "bbox": [
+     123.23436986523438,
+     376.90695829012014,
+     188.3841895478739,
+     389.70582476972464
+    ],
+    "page": 1
+   }
+  ],
+  "8.00 ± 0.50": [
+   {
+    "bbox": [
+     99.2460896147461,
+     650.65694688387,
+     164.3959092973856,
+     663.4558133634745
+    ],
+    "page": 2
+   }
+  ],
+  "95% CI 0.10": [
+   {
+    "bbox": [
+     365.6268379919875,
+     502.9889805367023,
+     434.27468014132853,
+     518.5071722832851
+    ],
+    "page": 1
+   }
+  ],
+  "Error values in Table 2 are SEM, not SD (n = 6).": [
+   {
+    "bbox": [
+     63.74999734375,
+     579.01070962913,
+     297.2964938395149,
+     590.0634824314884
+    ],
+    "page": 2
+   }
+  ],
+  "Samples were drawn at 0.5, 1, 2, 4 and 8 h after dosing": [
+   {
+    "bbox": [
+     63.74999734375,
+     579.4069498526201,
+     374.27481952540495,
+     592.2058163322246
+    ],
+    "page": 1
+   }
+  ],
+  "estimated as ke = 0.13": [
+   {
+    "bbox": [
+     205.7145222535612,
+     502.9889805367023,
+     333.75274801585033,
+     518.5071722832851
+    ],
+    "page": 1
+   }
+  ],
+  "h after dosing": [
+   {
+    "bbox": [
+     296.4805629966427,
+     579.4069498526201,
+     374.27481952540495,
+     592.2058163322246
+    ],
+    "page": 1
+   }
+  ],
+  "values are reported as mean ± SD (n = 6)": [
+   {
+    "bbox": [
+     283.9640689681632,
+     563.6569505088701,
+     518.0263085920092,
+     576.4558169884746
+    ],
+    "page": 1
+   }
+  ]
+ },
+ "readings": [
+  {
+   "id": "m1",
+   "kind": "cohort_mean",
+   "pages": [
+    1
+   ],
+   "quote": "4.80 ± 0.50",
+   "time": "0.25",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "unit_printed": "mg·L−1",
+   "value": "4.80",
+   "value_mg_per_L": "4.80"
+  },
+  {
+   "id": "m2",
+   "kind": "cohort_mean",
+   "pages": [
+    1
+   ],
+   "quote": "7.20 ± 0.50",
+   "time": "0.5",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "unit_printed": "mg·L−1",
+   "value": "7.20",
+   "value_mg_per_L": "7.20"
+  },
+  {
+   "id": "m3",
+   "kind": "cohort_mean",
+   "pages": [
+    2
+   ],
+   "quote": "8.00 ± 0.50",
+   "time": "1",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "unit_printed": "mg·L−1",
+   "value": "8.00",
+   "value_mg_per_L": "8.00"
+  },
+  {
+   "id": "m4",
+   "kind": "cohort_mean",
+   "pages": [
+    2
+   ],
+   "quote": "6.80 ± 0.50",
+   "time": "2",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "unit_printed": "mg·L−1",
+   "value": "6.80",
+   "value_mg_per_L": "6.80"
+  },
+  {
+   "id": "m5",
+   "kind": "cohort_mean",
+   "pages": [
+    2
+   ],
+   "quote": "5.70 ± 0.50",
+   "time": "4",
+   "time_unit": "h",
+   "unit": "mg/L",
+   "unit_printed": "mg·L−1",
+   "value": "5.70",
+   "value_mg_per_L": "5.70"
+  }
+ ],
+ "renderings": {
+  "dpi": 110,
+  "pages": [
+   {
+    "page": 1,
+    "png_sha256": "d9cea84ece4d1467ff4944f3d23259c821bd43b0bb777f2053d0352004831d28"
+   },
+   {
+    "page": 2,
+    "png_sha256": "6f199c8ec87c30791f04187bc413407fed6329b7b5a1525deca7f953b0d1576b"
+   }
+  ],
+  "tool": "evaluation/corpus/tools/render_pages.swift (Apple PDFKit)"
+ },
+ "schema": "drbean-paper-gold/v1",
+ "split_table": {
+  "header_split_over_two_rows": true,
+  "pages": [
+   1,
+   2
+  ],
+  "rows": 5,
+  "table": "Table 2"
+ }
+}

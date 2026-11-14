@@ -14,7 +14,8 @@
     "tests/integration/test_paper_trust_boundaries.py::test_page_citations_must_point_at_real_page_content"
    ],
    "library_level_on_previews": [
-    "tests/integration/test_paper_proposal_validation.py (corrupted citations refused; F-PAPER-CITATION-SUBSTRING, F-PAPER-EXPONENT-FLATTENING strict xfail) - runs where the paper-proposal validator exists (PR #35 preview)"
+    "tests/integration/test_paper_proposal_validation.py (corrupted citations refused; F-PAPER-CITATION-SUBSTRING, F-PAPER-EXPONENT-FLATTENING strict xfail) - runs where the paper-proposal validator exists (PR #35 preview)",
+    "tests/integration/test_paper_trust_boundaries.py::test_citation_checks_locate_words_and_never_claim_verification (route-level occurrence / wrong page / not found / too short; honest labels) - PR #36 preview: pass"
    ]
   },
   {
@@ -56,6 +57,9 @@
    ],
    "pending": [
     "tests/integration/test_paper_trust_boundaries.py::test_paper_identity_disclosure_and_review_binding"
+   ],
+   "library_level_on_previews": [
+    "tests/integration/test_paper_trust_boundaries.py::test_papers_are_workspace_scoped_and_keys_bind_content - PR #36 preview: pass"
    ]
   },
   {
@@ -114,7 +118,13 @@
    "pending": [
     "tests/integration/test_paper_trust_boundaries.py::test_paper_route_bounds_hostile_resources"
    ],
-   "assets": "evaluation/drbean_eval/hostile_pdfs.py (19 assets + 10 hostile filenames, generated at test time)"
+   "assets": "evaluation/drbean_eval/hostile_pdfs.py (19 assets + 10 hostile filenames, generated at test time)",
+   "library_level_on_previews": [
+    "tests/integration/test_paper_trust_boundaries.py::test_paper_route_bounds_hostile_resources (19 assets; refused with named codes or admitted with active content reported; bounded; no 5xx) - PR #36 preview: pass",
+    "tests/integration/test_paper_trust_boundaries.py::test_paper_upload_names_are_inert (10 hostile names) - PR #36 preview: pass",
+    "tests/integration/test_paper_trust_boundaries.py::test_page_selections_are_bounded_and_bind_their_bytes - PR #36 preview: pass",
+    "tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (opt-in) - PR #36 preview on macOS: F-PAPER-RENDER-MEMORY (P1)"
+   ]
   },
   {
    "id": 9,
@@ -145,6 +155,7 @@
   }
  ],
  "previews": {
-  "pr35": "preview f413922 = c51bbae + PR #35 c952c35: test_gemini_gateway_attacks 20/20 pass; test_paper_proposal_validation 10 pass + 6 strict xfail (F-PAPER-CITATION-SUBSTRING P1, F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT, F-PAPER-EXPONENT-FLATTENING)"
+  "pr35": "preview f413922 = c51bbae + PR #35 c952c35: test_gemini_gateway_attacks 20/20 pass; test_paper_proposal_validation 10 pass + 6 strict xfail (F-PAPER-CITATION-SUBSTRING P1, F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT, F-PAPER-EXPONENT-FLATTENING)",
+  "pr36": "preview 7139c90 = 500ba3c + PR #36 081bbdc, plus Owner 2's unreviewed route patch and an unlocked pypdf/pypdfium2 resolution: Owner 4's 36 paper tests pass on macOS; my paper-route attacks pass (5); hostile assets bounded (<= 327 MiB, < 0.3 s each) except the opt-in 4 GiB inflate render: F-PAPER-RENDER-MEMORY (P1)"
  }
 }
