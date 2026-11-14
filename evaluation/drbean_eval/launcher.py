@@ -148,11 +148,17 @@ class LocalStack:
         for name, value in stack_env.items():
             if not isinstance(name, str) or not isinstance(value, str):
                 raise StackError("stack environment entries must be strings")
-            if _CREDENTIAL_NAME.search(name):
+            provider_setting = name == "GEMINI_MODEL" or name.startswith("BEAN_GEMINI_")
+            if provider_setting:
+                # Model names and gate flags are not secrets, but they only belong in tests that prove
+                # configuration alone cannot dispatch.
+                if not allow_dummy or not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", value):
+                    raise StackError(f"refusing provider setting {name} outside a dummy-configuration test")
+            elif _CREDENTIAL_NAME.search(name):
                 if not allow_dummy or not DUMMY_VALUE.match(value):
                     raise StackError(f"refusing credential-shaped variable {name}: the offline lane accepts only "
                                      "explicit DRBEAN-DUMMY-... values in dummy-configuration tests")
-            elif not _PASSTHROUGH.match(name) and name not in ("GEMINI_MODEL",):
+            elif not _PASSTHROUGH.match(name):
                 raise StackError(f"refusing unrecognized stack variable {name}")
             checked[name] = value
         return checked

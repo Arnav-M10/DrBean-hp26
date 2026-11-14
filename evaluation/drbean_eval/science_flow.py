@@ -873,45 +873,65 @@ def scenario_cancel_restart(flow: Flow, packet: dict, stack) -> dict:
     # B. Running cancellation through the API.
     running = _approved_run(flow, packet, workspace, "cx-running")
     observed = _wait_running(flow, running["id"])
+    live_before = _live_science_children(stack, flow, running["id"]) if observed else []
     if observed:
-        stack.snapshot_descendants()
         flow.client.post(f"/runs/{running['id']}/cancel", label="cx-cancel-running")
         done = flow.poll(f"/runs/{running['id']}", timeout=60)
         stack.snapshot_descendants()
         checks.expect("running_cancel_terminal", done.get("state") in ("cancelled", "completed", "failed"),
                       f"state {done.get('state')}")
-        time.sleep(1.0)
-        leftover = [pid for pid in _science_children(stack) if _alive(pid)]
-        checks.expect("no_orphan_after_cancel", not leftover, f"science children still alive: {leftover}",
-                      finding="F-ORPHAN" if leftover else None)
+        observation["running_cancel_state"] = done.get("state")
     else:
         checks.add("running_cancel_terminal", "not_observed",
                    "the scientific job left the running state before cancellation could be issued")
+    if live_before:
+        time.sleep(1.0)
+        leftover = [pid for pid in live_before if _alive(pid)]
+        checks.expect("no_orphan_after_cancel", not leftover,
+                      f"{len(live_before)} live scientific child(ren) at cancel; still alive: {leftover}",
+                      finding="F-ORPHAN" if leftover else None)
+    else:
+        checks.add("no_orphan_after_cancel", "not_observed",
+                   "no live scientific child process existed at the cancellation point, so the orphan check "
+                   "would be vacuous (for example the child failed immediately)")
     # C. Worker killed mid-run, explicit recovery, no silent redispatch.
     third = _approved_run(flow, packet, workspace, "cx-restart")
+    restart_ids = ("no_orphan_after_worker_kill", "interrupted_not_redispatched", "interrupted_stays_interrupted")
     if _wait_running(flow, third["id"]):
-        stack.snapshot_descendants()
+        live_before = _live_science_children(stack, flow, third["id"])
         stack.kill("worker")
-        time.sleep(1.0)
-        survivors = [pid for pid in _science_children(stack) if _alive(pid)]
-        observation["children_alive_after_worker_kill"] = survivors
-        checks.expect("no_orphan_after_worker_kill", not survivors,
-                      f"science children alive after the worker was killed: {survivors}",
-                      finding="F-ORPHAN" if survivors else None)
-        recover = stack.start_worker("--recover")
-        recover.wait(timeout=60)
-        stack.start_worker()
-        after = flow.poll(f"/runs/{third['id']}", timeout=20)
-        checks.expect("interrupted_not_redispatched", after.get("state") == "interrupted",
-                      f"state after recovery {after.get('state')} (error {after.get('error_code')})")
-        time.sleep(2.0)
-        again = flow.client.get(f"/runs/{third['id']}")
-        checks.expect("interrupted_stays_interrupted", again.get("state") == "interrupted"
-                      and len(again.get("scenarios", [])) == len(after.get("scenarios", [])),
-                      f"state {again.get('state')}")
+        after_kill = flow.client.get(f"/runs/{third['id']}")
+        if after_kill.get("state") != "running":
+            for check_id in restart_ids:
+                checks.add(check_id, "not_observed", f"the run reached {after_kill.get('state')} before the worker "
+                           "was killed, so there was no in-flight work to interrupt")
+            stack.start_worker()
+        else:
+            time.sleep(1.0)
+            survivors = [pid for pid in live_before if _alive(pid)]
+            observation["children_alive_after_worker_kill"] = survivors
+            if live_before:
+                checks.expect("no_orphan_after_worker_kill", not survivors,
+                              f"{len(live_before)} live scientific child(ren) when the worker was killed; still "
+                              f"alive: {survivors}", finding="F-ORPHAN" if survivors else None)
+            else:
+                checks.add("no_orphan_after_worker_kill", "not_observed",
+                           "no live scientific child process existed when the worker was killed; check would be vacuous")
+            recover = stack.start_worker("--recover")
+            recover.wait(timeout=60)
+            stack.start_worker()
+            after = flow.poll(f"/runs/{third['id']}", timeout=20)
+            checks.expect("interrupted_not_redispatched", after.get("state") == "interrupted",
+                          f"state after recovery {after.get('state')} (error {after.get('error_code')})")
+            time.sleep(2.0)
+            again = flow.client.get(f"/runs/{third['id']}")
+            checks.expect("interrupted_stays_interrupted", again.get("state") == "interrupted"
+                          and len(again.get("scenarios", [])) == len(after.get("scenarios", [])),
+                          f"state {again.get('state')}")
     else:
-        checks.add("no_orphan_after_worker_kill", "not_observed",
-                   "the scientific job left the running state before the worker could be killed")
+        for check_id in restart_ids:
+            checks.add(check_id, "not_observed", "the scientific job left the running state before the worker "
+                       "could be killed")
     observation["queued_run"] = queued["id"]
     return {"checks": checks, "observation": observation}
 
@@ -946,6 +966,20 @@ def _wait_running(flow: Flow, run_id: str, timeout: float = 20.0) -> bool:
             return False
         time.sleep(0.05)
     return False
+
+
+def _live_science_children(stack, flow: Flow | None = None, run_id: str | None = None,
+                           timeout: float = 5.0) -> list[int]:
+    """Scientific children alive now; waits briefly because the API marks a scenario running before spawning."""
+    deadline = time.monotonic() + timeout
+    while True:
+        stack.snapshot_descendants()
+        live = [pid for pid in _science_children(stack) if _alive(pid)]
+        if live or time.monotonic() > deadline:
+            return live
+        if flow is not None and run_id and flow.client.get(f"/runs/{run_id}").get("state") in TERMINAL:
+            return []
+        time.sleep(0.05)
 
 
 def _science_children(stack) -> list[int]:
