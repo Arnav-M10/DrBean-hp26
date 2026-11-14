@@ -272,3 +272,27 @@ PR #63 remains draft and unmerged. Backend/model-adapter owners must establish
 the tool-shape failure offline before another live qualification is considered;
 Claude's actual independent acceptance remains outstanding. No application
 limits, scientific checks, consent or private-session boundaries were relaxed.
+
+## Offline CI recovery correction after the final live run
+
+The evidence-only push `8082f9e` passed 15 of 16 CI jobs. Its push backend job
+failed `test_recovery_of_safe_plan_proposal_batch_preserves_prepared_identity`
+with `research_model_outcome_unrecoverable`; the independent PR backend run and
+the local full suite passed. The failure was reproduced deterministically by
+holding the planning tool's checkpoint acknowledgement after its canonical plan
+was committed, while the preparation task lost its acknowledgement too.
+
+LangGraph reports one `tools` entry for each unfinished task. Two unfinished
+tools therefore produce `("tools", "tools")`; a completed sibling remains in
+`state.tasks` while only one entry remains in `state.next`. The continuation
+guard incorrectly required a singleton pending-node tuple. It now admits one
+or two pending tool tasks, bounded by the retained task count, with every node
+and task still required to be `tools`. Existing saved model-decision, allowed
+batch, unique call-ID, response, lease, scope and approval predicates remain.
+No pending model node can be resumed through this correction.
+
+The real SQLite worker regression now explicitly exercises both acknowledgement
+orders and verifies unchanged plan/proposal identities, one model call, no
+scientific child and unchanged tool admission. This is an offline recovery fix;
+it does not repair or reclassify the failed live `write_todos` response. No further
+live request was made, and PR #63 remains blocked on live qualification.

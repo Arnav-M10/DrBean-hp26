@@ -500,7 +500,11 @@ class ResearchCoordinator:
             # boundary's terminal guard writes END without admitting/calling a
             # model. Complete that guard so a later explicit action can advance.
             return await self._invoke(None)
-        if (state.next != ("tools",) or not 1 <= len(state.tasks) <= 2
+        # LangGraph lists each pending Send task, including duplicate node
+        # names. A safe batch can retain two unfinished tools, or one pending
+        # tool plus its completed sibling in state.tasks.
+        if (not 1 <= len(state.next) <= len(state.tasks) <= 2
+                or any(node != "tools" for node in state.next)
                 or any(task.name != "tools" for task in state.tasks)):
             # Without a committed tool decision the model output is not
             # reconstructible here. A completed physical request may have lost

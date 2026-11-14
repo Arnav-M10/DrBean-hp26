@@ -3,6 +3,7 @@
 The child-commit test queues actual canonical jobs but does not claim solver
 execution. The unknown-request case uses the existing substituted SDK fixture.
 """
+import asyncio
 import socket
 
 from langchain_core.messages import AIMessage
@@ -257,7 +258,12 @@ def test_completed_physical_response_without_checkpoint_is_not_requested_again(m
     assert worker.research.tick() == 0
 
 
-def test_recovery_of_safe_plan_proposal_batch_preserves_prepared_identity(authority, monkeypatch):
+@pytest.mark.parametrize("plan_acknowledged", [True, False])
+def test_recovery_of_safe_plan_proposal_batch_preserves_prepared_identity(authority, monkeypatch, plan_acknowledged):
+    from langchain_core.messages import ToolMessage
+    from bean_api.research_checkpoints import ResearchCheckpointer
+    from bean_api.research_coordinator import ResearchCoordinator
+
     service, session, settings, problem = authority
 
     class BatchedModel(CountingBackendModel):
@@ -277,13 +283,37 @@ def test_recovery_of_safe_plan_proposal_batch_preserves_prepared_identity(author
     runner = ResearchRunner(service.workflow, settings, "initial-worker", model_factory=lambda: model)
     action_id = queue(service, session)["action"]["id"]
     prepare = ApplicationResearchPorts.prepare_investigation
+    update_plan = ApplicationResearchPorts.update_plan
+    put_writes = ResearchCheckpointer.aput_writes
     release = runner.service.release
+    plan_ready, hold_plan = asyncio.Event(), asyncio.Event()
+
+    async def retain_plan_without_ack(ports, plan):
+        result = await update_plan(ports, plan)
+        if not plan_acknowledged:
+            # The canonical plan exists, but its tool task remains unfinished.
+            plan_ready.set()
+            await hold_plan.wait()
+        return result
+
+    async def observe_plan_ack(saver, config, writes, task_id, task_path=""):
+        await put_writes(saver, config, writes, task_id, task_path)
+        if plan_acknowledged and any(
+            channel == "messages" and any(isinstance(message, ToolMessage)
+                and message.tool_call_id == "batch-plan"
+                for message in (value if isinstance(value, list) else [value]))
+            for channel, value in writes
+        ):
+            plan_ready.set()
 
     async def lose_ack(ports):
         await prepare(ports)
+        await asyncio.wait_for(plan_ready.wait(), timeout=5)
         raise WorkerLoss("prepared scope committed before batch acknowledgement")
 
     monkeypatch.setattr(ApplicationResearchPorts, "prepare_investigation", lose_ack)
+    monkeypatch.setattr(ApplicationResearchPorts, "update_plan", retain_plan_without_ack)
+    monkeypatch.setattr(ResearchCheckpointer, "aput_writes", observe_plan_ack)
     monkeypatch.setattr(runner.service, "release", lambda *args, **kwargs: (_ for _ in ()).throw(WorkerLoss("worker lost before acknowledgement")))
     with pytest.raises(WorkerLoss):
         runner.tick()
@@ -293,16 +323,31 @@ def test_recovery_of_safe_plan_proposal_batch_preserves_prepared_identity(author
         prepared_id = conn.execute("SELECT plan_id FROM research_effects WHERE kind='investigation'").fetchone()[0]
         original_plan = conn.execute("SELECT plan_revision_id FROM research_sessions WHERE id=?", (session["id"],)).fetchone()[0]
     monkeypatch.setattr(ApplicationResearchPorts, "prepare_investigation", prepare)
+    monkeypatch.setattr(ApplicationResearchPorts, "update_plan", update_plan)
+    monkeypatch.setattr(ResearchCheckpointer, "aput_writes", put_writes)
     monkeypatch.setattr(runner.service, "release", release)
+    continuation = ResearchCoordinator.continue_pending
+    recovered = []
+
+    async def inspect_pending(graph):
+        state = await graph._snapshot()
+        recovered.append((state.next, tuple(task.name for task in state.tasks)))
+        return await continuation(graph)
+
+    monkeypatch.setattr(ResearchCoordinator, "continue_pending", inspect_pending)
     service.recover(force=True)
     reconcile(service, session["id"])
     assert runner.tick() == 1
+    pending = ("tools",) if plan_acknowledged else ("tools", "tools")
+    assert recovered == [(pending, ("tools", "tools"))]
     current = service.get("alice", session["id"])
     assert current["state"] == "waiting_review", current["action"]
     assert current["pending_review"]["id"] == prepared_id and current["plan"]["id"] == original_plan
     assert model.calls == 1 and current["usage"]["tool_calls"] == 2
     assert current["usage"]["child_count"] == 0
+    assert admitted(service, action_id) == before
     with service.store.read() as conn:
         assert conn.execute("SELECT count(*) FROM research_effects WHERE kind='investigation'").fetchone()[0] == 1
         assert conn.execute("SELECT count(*) FROM jobs").fetchone()[0] == 0
+        assert conn.execute("SELECT count(*) FROM provider_attempts").fetchone()[0] == 0
     assert runner.tick() == 0
