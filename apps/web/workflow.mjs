@@ -1,11 +1,11 @@
 import { setupSourceWorkflow } from './source-workflow.mjs'
 import { setupAssistantWorkflow } from './assistant-workflow.mjs'
-import { BeanApi, baselineAvailable, baselineExplanation, liveGeminiAvailable } from './api.mjs'
+import { ApiError, baselineAvailable, baselineExplanation } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 import { setupDesignWorkflow } from './design-workflow.mjs'
 import { designAvailable, designCandidates } from './design.mjs'
 import { interpretResult, keLine, concentrationChart, readable, toNumber, CANDIDATE_COLORS } from './result-view.mjs'
-import { bootstrapSharedSession } from './session.mjs'
+import { bootstrapSharedSession, readConnection } from './session.mjs'
 const byId = id => document.getElementById(id)
 function node(tag, text) { const n = document.createElement(tag); n.textContent = text; return n }
 function exactRecord(title, record) {
@@ -18,7 +18,7 @@ function save(bytes, name) {
 }
 export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChange = () => {}, onRender = () => {} } = {}) {
   let api, capabilities, workspace = '', plan, approval, run, report, frozen, inputs, busy = false, pollTimer
-  let connectionMode = 'local_owner'
+  let connectionMode = 'connecting'
   let connectionIdentity
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
@@ -47,7 +47,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   } })
   function reset() { sources.reset(); assistant.reset(); clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
   function button(parent, label, action, disabled = false) {
-    const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy
+    const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy || connectionMode !== 'browser_session'
     b.addEventListener('click', () => perform(action)); parent.append(b); return b
   }
   async function perform(action) {
@@ -55,15 +55,19 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     busy = true; byId('backend-error').hidden = true; render()
     try { await action() } catch (error) {
       byId('backend-error').textContent = error.message; byId('backend-error').hidden = false
-      if (!api) byId('connection-panel').open = true
+      if (error.status === 401 || ['unreachable', 'uncertain'].includes(error.kind)) connectionFailure(error)
+      else if (!api) byId('connection-panel').open = true
     } finally { busy = false; render() }
   }
-  async function workspaces(selectFirst = false) {
-    const list = await api.json('/workspaces')
-    if (selectFirst && !workspace && list.length) workspace = list[0].id
+  function renderWorkspaces(list) {
     const select = byId('workspace-select'); select.replaceChildren(node('option', 'Choose workspace')); select.firstChild.value = ''
     for (const item of list) { const o = node('option', item.name); o.value = item.id; select.append(o) }
     select.value = workspace
+  }
+  async function workspaces(selectFirst = false) {
+    const list = await readConnection(api, '/workspaces')
+    if (selectFirst && !workspace && list.length) workspace = list[0].id
+    renderWorkspaces(list)
   }
   async function refreshRun(id = byId('run-id').value.trim()) {
     const loaded = await api.json(`/runs/${encodeURIComponent(id)}`)
@@ -93,7 +97,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   }
   function renderReview() {
     const review = byId('backend-review'); review.replaceChildren(node('h2', 'Manual Counterdex check'))
-    if (!api) review.append(para('Investigation planning is unavailable until you connect. Connect to a Dr. Bean server at the top of this page; meanwhile you can still prepare and download your draft.', 'note wait'))
+    if (!api) review.append(para('Investigation planning is unavailable until your private workspace is ready. Check the connection status above; you can still prepare and download your draft.', 'note wait'))
     else if (!workspace) review.append(para('Choose or create a workspace in the connection panel at the top of this page.', 'note wait'))
     else if (!available()) review.append(para('This server cannot run the manual Counterdex check right now.', 'note wait'))
     review.append(node('h3', '1. Freeze these inputs'), para('Saves the measurements and claim on the server exactly as shown above and prepares a plan for one check. Nothing runs yet. No language model is used.'))
@@ -316,18 +320,20 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     if (run?.evidence?.length) reports.append(link('Go to evidence downloads', '#result'))
   }
   function render() {
-    Promise.resolve(onConnectionChange({ api, capabilities, workspaceId: workspace, mode: connectionMode, identityId: connectionIdentity, saveReviewedInputs })).catch(error => {
+    Promise.resolve(onConnectionChange({ api, capabilities, workspaceId: workspace, mode: api ? 'browser_session' : connectionMode, identityId: connectionIdentity, saveReviewedInputs })).catch(error => {
       byId('backend-error').textContent = error.message; byId('backend-error').hidden = false
     })
-    byId('workspace-controls').hidden = !api
-    for (const id of ['connect-form', 'new-workspace']) for (const el of byId(id).elements) el.disabled = busy
+    byId('workspace-controls').hidden = !api || connectionMode !== 'browser_session'
+    for (const el of byId('new-workspace').elements) el.disabled = busy || connectionMode !== 'browser_session'
+    byId('connection-retry').disabled = busy
+    byId('connection-start-new').disabled = busy
     byId('workspace-select').disabled = busy
     renderReview(); renderInvestigation(); renderResults(); renderNext(); renderReport()
     const sourcePanel = byId('backend-source-review'); sourcePanel.replaceChildren(); sources.render(sourcePanel)
     assistant.render(byId('backend-assistant'))
     clearTimeout(pollTimer)
     const pendingRun = run && ['queued', 'running', 'cancel_requested'].includes(run.state)
-    if (api && (pendingRun || designs.pending()) && !busy) {
+    if (api && connectionMode === 'browser_session' && (pendingRun || designs.pending()) && !busy) {
       const id = run?.id
       pollTimer = setTimeout(() => perform(async () => {
         if (pendingRun) await refreshRun(id)
@@ -337,24 +343,66 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     onRender()
   }
   function status() {
-    return { connected: Boolean(api), workspace, mode: connectionMode, busy, inputsCurrent: Boolean(currentInputs()), planned: Boolean(plan), planCurrent: Boolean(currentPlan()), approved: Boolean(approval && currentPlan()),
+    return { connected: Boolean(api) && connectionMode === 'browser_session', workspace, mode: connectionMode, busy, inputsCurrent: Boolean(currentInputs()), planned: Boolean(plan), planCurrent: Boolean(currentPlan()), approved: Boolean(approval && currentPlan()),
       run: run ? { id: run.id, state: run.state, evidence: run.evidence?.length ?? 0, tone: run.evidence?.[0] ? interpretResult(run.evidence[0].body.result).tone : null, pairReady: (run.evidence ?? []).some(e => designCandidates(e).length >= 2) } : null,
       designPending: Boolean(designs.pending()), report: Boolean(report) }
   }
-  byId('connect-form').addEventListener('submit', event => {
-    event.preventDefault(); perform(async () => {
-      const candidate = new BeanApi(byId('bearer').value); byId('bearer').value = ''
-      const caps = await candidate.json('/capabilities')
-      if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('Unsupported API contract or policy version.')
-      await candidate.json('/workspaces') // Authenticate before retaining the client.
-      api = candidate; capabilities = caps; connectionMode = 'local_owner'; connectionIdentity = 'local-owner:' + crypto.randomUUID(); workspace = ''; reset(); await workspaces()
-      byId('connection-status').textContent = `Connected. ${available() ? 'The Counterdex checker is available on this server.' : 'This server cannot run the checker right now; you can still review and save inputs.'} ${liveGeminiAvailable(capabilities) ? `Gemini (${capabilities.gemini.model}) is available for image reading and explanations, each only after your separate permission.` : 'Gemini is off, so no AI provider is called.'} Next, choose or create a workspace.`
-    })
-  })
-  byId('disconnect').addEventListener('click', () => {
-    api = capabilities = undefined; workspace = ''; reset(); byId('bearer').value = ''
-    byId('connection-status').textContent = 'Disconnected. Investigation planning is unavailable.'; render()
-  })
+  function connectionFailure(error) {
+    connectionMode = 'session_error'
+    const message = error.mayStartNew || error.code === 'session_storage_unavailable' ? error.message
+      : error.kind === 'uncertain' ? 'The last request may have been accepted. Retry connection to check access, then reconcile that same operation; nothing is resubmitted automatically.'
+      : error.status === 429 ? 'The server cannot open another private session right now. Retry later; earlier research is retained.'
+      : error.status === 404 ? 'Private access is unavailable on this server. Ask the server owner to check its setup, then retry.'
+      : error.kind === 'unreachable' || [502, 503, 504].includes(error.status) ? 'The server is unavailable or still starting. Retry connection when it is ready. Your draft stays in this tab.'
+      : error.status === 401 ? 'This session is no longer available. Retry connection to check the supported recovery options.'
+      : error.message || 'The private workspace could not be opened. Retry connection.'
+    byId('connection-status').textContent = message
+    byId('connection-retry').hidden = false
+    byId('connection-start-new').hidden = error.mayStartNew !== true
+    byId('connection-panel').open = true
+  }
+  async function connectPrivate(startNew = false) {
+    if (busy) return
+    busy = true; connectionMode = 'connecting'
+    byId('connection-status').textContent = 'Connecting to your private workspace…'
+    byId('backend-error').hidden = true
+    byId('connection-start-new').hidden = true
+    render()
+    try {
+      const shared = await bootstrapSharedSession(undefined, { startNew })
+      const identity = 'browser-session:' + shared.session.workspace_id
+      if (connectionIdentity && identity !== connectionIdentity && !startNew) {
+        throw new ApiError('session_recovery', 'The browser is now using a different private session. Choose Start a new private workspace to switch this tab. Previous research and pending operations will not be transferred.', { mayStartNew: true })
+      }
+      // Reuse the same transport on recovery: its frozen operation keys and
+      // the workflow's existing records must survive a transient read failure.
+      const sameIdentity = connectionIdentity === identity
+      const candidate = sameIdentity && api ? api : shared.api
+      const caps = await readConnection(candidate, '/capabilities')
+      if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('This server uses an unsupported application contract.')
+      const list = await readConnection(candidate, '/workspaces')
+      if (!Array.isArray(list) || !list.some(item => item.id === shared.session.workspace_id)) throw new Error('The private workspace could not be confirmed. Retry connection.')
+      const selected = sameIdentity && list.some(item => item.id === workspace) ? workspace : shared.session.workspace_id
+      if (!sameIdentity) reset()
+      api = candidate; capabilities = caps; workspace = selected; connectionIdentity = identity
+      candidate.setConnectionFailureHandler(error => {
+        // Child controllers share this transport. A late response from an old
+        // identity must not change the current connection or resubmit its work.
+        if (api !== candidate || connectionIdentity !== identity || connectionMode === 'connecting') return
+        connectionFailure(error)
+        render()
+      })
+      connectionMode = 'browser_session'; renderWorkspaces(list)
+      byId('connection-status').textContent = 'Ready. Your private workspace is open.'
+      byId('connection-retry').hidden = true
+      byId('connection-start-new').hidden = true
+      byId('connection-panel').open = false
+    } catch (error) {
+      connectionFailure(error)
+    } finally { busy = false; render() }
+  }
+  byId('connection-retry').addEventListener('click', () => connectPrivate())
+  byId('connection-start-new').addEventListener('click', () => connectPrivate(true))
   byId('workspace-select').addEventListener('change', () => { workspace = byId('workspace-select').value; reset(); render() })
   byId('new-workspace').addEventListener('submit', event => {
     event.preventDefault(); perform(async () => {
@@ -363,34 +411,8 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   })
   render.status = status
   render()
-  // GPT1's bootstrap is the only automatic-authentication boundary. It returns
-  // nonsecret metadata and a cookie transport; shared-demo is never a fallback.
-  ;(async () => {
-    let shared
-    try {
-      shared = await bootstrapSharedSession()
-      if (!shared) return // The local owner boundary alone returns 404.
-    } catch (error) {
-      connectionMode = 'session_error'; byId('connect-form').hidden = true
-      byId('connection-panel').open = true
-      byId('connection-panel').querySelector('summary').textContent = 'Private workspace connection'
-      byId('connection-panel').querySelector('p').textContent = 'The private browser session is unavailable. No owner credentials are requested here. Reload after the server is available.'
-      byId('connection-status').textContent = 'The private browser session could not be established. Reload after the server is available.'
-      byId('backend-error').textContent = error.message; byId('backend-error').hidden = false
-      render(); return
-    }
-    byId('connect-form').hidden = true
-    byId('connection-panel').querySelector('summary').textContent = 'Private workspace connection'
-    byId('connection-panel').querySelector('p').textContent = 'Your browser has a private workspace. Gemini uses the server owner’s configuration and shared application allowance. No access token or Gemini key is entered here.'
-    await perform(async () => {
-      const candidate = shared.api
-      const caps = await candidate.json('/capabilities')
-      if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('Unsupported shared server.')
-      api = candidate; capabilities = caps; connectionMode = 'browser_session'
-      connectionIdentity = 'browser-session:' + shared.session.workspace_id
-      workspace = shared.session.workspace_id; reset(); await workspaces()
-      byId('connection-status').textContent = 'Connected automatically to your private workspace. No access token is needed.'
-    })
-  })()
+  // The only automatic operation is private connection. Every scientific,
+  // consent and provider operation still needs its own existing explicit action.
+  void connectPrivate()
   return render
 }

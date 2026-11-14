@@ -41,21 +41,21 @@
     </nav>
 
     <main id="main" tabindex="-1">
-      <details id="connection-panel" class="connection"><summary>Connect to a Dr. Bean server</summary>
+      <details id="connection-panel" class="connection"><summary>Connecting to your private workspace…</summary>
         <div class="connection-body">
-          <p>Paste the researcher access token the server owner gave you. It stays in this tab's memory only and is cleared when you disconnect or close the tab. You never need a Gemini key.</p>
-          <form id="connect-form" class="inline-form">
-            <label class="stack">Researcher access token<input id="bearer" type="password" autocomplete="off" required></label>
-            <div class="actions"><button type="submit">Connect</button><button id="disconnect" type="button" class="secondary">Disconnect</button></div>
-          </form>
-          <p id="connection-status" role="status">Disconnected. Investigation planning is unavailable.</p>
+          <p>This browser opens a private workspace automatically. Saved work stays on the server; unsaved edits stay in this tab. Expired or cleared cookies and a new shared hostname cannot recover earlier private work.</p>
+          <p id="connection-status" role="status">Connecting to your private workspace…</p>
+          <div class="actions">
+            <button id="connection-retry" type="button" hidden>Retry connection</button>
+            <button id="connection-start-new" type="button" class="secondary" hidden>Start a new private workspace</button>
+          </div>
           <div id="workspace-controls" hidden>
             <label class="stack">Workspace<select id="workspace-select" aria-label="Workspace"></select></label>
             <form id="new-workspace" class="inline-form"><label class="stack">New workspace name<input id="workspace-name" type="text" maxlength="120" required></label><button>Create workspace</button></form>
           </div>
         </div>
       </details>
-      <p id="connection-summary-note" class="fine connection-note">Needed to save inputs, approve and run checks. You can prepare a draft without it.</p>
+      <p id="connection-summary-note" class="fine connection-note">You can prepare a draft while the private workspace opens. Connecting does not run an investigation.</p>
       <div id="backend-error" class="errors" role="alert" hidden></div>
 
       <!-- 1 · Start -->

@@ -359,7 +359,7 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
       for (const event of state.events) activity.append(element('li', `${event.timestamp} · ${event.event_type}: ${event.summary}`)); all.append(activity); root.append(all)
     }
     root.append(element('p', `Used ${s.usage.logical_turns} assistant turns, ${s.usage.tool_calls} tool calls and ${s.usage.child_count} checker jobs. Time spent waiting for you is not counted.`, 'meta'))
-    if (state.evidence.length) root.append(link('View checked results', '#result'), ' ', link('Next measurement and report', '#next'))
+    if (state.evidence.length) root.append(link('View results', '#result'), ' ', link('Next measurement and report', '#next'))
     for (const record of state.evidence) {
       const result = record.body.result ?? record.body, described = describeEvidence(record), card = element('section', '', 'callout'); card.style.borderLeftColor = 'var(--rule-strong)'
       card.append(element('h4', described.title), element('p', described.text))

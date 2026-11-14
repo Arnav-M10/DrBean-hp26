@@ -140,7 +140,14 @@ try {
   assert.ok(session.children.every(child => child.state === 'completed'))
   assert.equal(session.reports.length, 2)
   check('separate-design-approval-computes-design-and-accepts-evidence-bound-report')
-  const navigate = async name => page.locator('.steps').getByRole('link', { name }).click()
+  const navigate = async name => {
+    const link = page.locator('.steps').getByRole('link', { name })
+    const hash = await link.getAttribute('href'), previous = await page.evaluate(() => location.hash)
+    await link.click()
+    await page.waitForFunction(({ hash, changed }) => location.hash === hash
+      && !document.getElementById(hash.slice(1)).hidden
+      && (!changed || document.activeElement?.id === `${hash.slice(1)}-title`), { hash, changed: previous !== hash })
+  }
   await navigate(/^Next measurement/)
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#research-report').getByRole('button', { name: 'Download research report snapshot', exact: true }).last().click()])
   await download.saveAs(join(output, 'report.json'))
@@ -148,15 +155,17 @@ try {
   assert.equal(report.report_profile, 'research-report.v2')
   assert.equal(report.evidence.length, 2)
   assert.equal(report.native_evidence.length, 2)
-  const evidence = page.locator('#research-results, #research-next')
-  const nativeButtons = evidence.getByRole('button', { name: 'Download native evidence', exact: true })
-  const anchorButtons = evidence.getByRole('button', { name: 'Download independent replay anchors', exact: true })
   for (let index = 0; index < report.native_evidence.length; index++) {
     const entry = report.native_evidence[index]
     const record = report.evidence.find(item => item.id === entry.evidence_id)
     await navigate(record.kind === 'suggestion' ? /^Next measurement/ : /^Result/)
-    const [native] = await Promise.all([page.waitForEvent('download'), nativeButtons.nth(index).click()])
-    const [anchor] = await Promise.all([page.waitForEvent('download'), anchorButtons.nth(index).click()])
+    // Baseline and design evidence live on separate pages. Bind the visible
+    // card to its artifact instead of indexing a list whose hidden entries vary.
+    const evidence = page.locator(record.kind === 'suggestion' ? '#research-next' : '#research-results')
+    const card = evidence.locator('section.callout').filter({ hasText: entry.artifact.id })
+    assert.equal(await card.count(), 1, `One displayed card must bind artifact ${entry.artifact.id}`)
+    const [native] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Download native evidence', exact: true }).click()])
+    const [anchor] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Download independent replay anchors', exact: true }).click()])
     const nativePath = join(output, entry.native_filename), anchorPath = join(output, entry.anchor_filename)
     await native.saveAs(nativePath); await anchor.saveAs(anchorPath)
     assert.equal(createHash('sha256').update(await readFile(nativePath)).digest('hex'), entry.artifact.sha256)

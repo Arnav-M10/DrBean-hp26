@@ -19,6 +19,51 @@ test('a session transport explicitly sends same-origin cookies without a bearer 
   await local.json('/workspaces')
 })
 
+test('HTTP 401 notifies connection recovery without hiding the original refusal; 403 does not', async () => {
+  let status = 401, calls = 0
+  const observed = [], api = new BeanApi(null, async () => {
+    calls++
+    return new Response(JSON.stringify({ code: 'invalid_browser_session', message: 'Session expired.' }), { status })
+  }, { mode: 'browser_session' })
+  api.setConnectionFailureHandler(error => { observed.push(error); throw new Error('Observer failed') })
+  await assert.rejects(api.json('/research-sessions/session_one'), error =>
+    error === observed[0] && error instanceof ApiError && error.kind === 'rejected'
+      && error.status === 401 && error.code === 'invalid_browser_session')
+  assert.equal(calls, 1)
+  status = 403
+  await assert.rejects(api.json('/research-sessions/session_one'), error => error.status === 403)
+  assert.equal(observed.length, 1)
+  assert.equal(calls, 2)
+  assert.throws(() => api.setConnectionFailureHandler(null), /must be a function/)
+})
+
+test('connection notifications preserve uncertain mutation identity and never retry automatically', async () => {
+  const seen = [], observed = [], api = new BeanApi(null, async (url, options) => {
+    seen.push({ url, ...options })
+    if (seen.length === 1) throw new Error('Lost acknowledgement')
+    return new Response('{}')
+  }, { mode: 'browser_session' })
+  api.setConnectionFailureHandler(async error => { observed.push(error); throw new Error('Async observer failed') })
+  const body = { accepted: true, expected_plan_digest: 'a'.repeat(64) }
+  await assert.rejects(api.json('/plans/plan_one/approvals', body), error => error === observed[0] && error.kind === 'uncertain')
+  await Promise.resolve()
+  assert.equal(seen.length, 1)
+  await api.json('/plans/plan_one/approvals', body)
+  assert.equal(seen.length, 2)
+  assert.equal(observed.length, 1)
+  assert.equal(seen[0].headers['Idempotency-Key'], seen[1].headers['Idempotency-Key'])
+  assert.equal(seen[0].body, seen[1].body)
+})
+
+test('a failed connection read notifies once with its original unreachable error', async () => {
+  const observed = []; let calls = 0
+  const api = new BeanApi(null, async () => { calls++; throw new Error('Offline') }, { mode: 'browser_session' })
+  api.setConnectionFailureHandler(error => observed.push(error))
+  await assert.rejects(api.json('/workspaces'), error => error === observed[0] && error.kind === 'unreachable')
+  assert.equal(calls, 1)
+  assert.equal(observed.length, 1)
+})
+
 test('uncertain mutation retry retains its operation key and token never enters body or URL', async () => {
   const seen = []
   const api = new BeanApi('private-token', async (url, options) => {

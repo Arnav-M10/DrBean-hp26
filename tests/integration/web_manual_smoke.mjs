@@ -81,6 +81,9 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   await page.waitForSelector('#question:not([hidden])')
   const bounds = { aMin: '1', aMax: '12', keMin: '1/10', keMax: '0.3', kaMin: '1/2', kaMax: '2', targetMin: '0.10', targetMax: '17/100' }
   for (const [id, value] of Object.entries(bounds)) await page.fill(`#${id}`, value)
+  await page.fill('#experiment-id', 'offline_editor_synthetic')
+  await page.fill('#time-origin', 'Elapsed hours from the declared synthetic t=0')
+  await page.selectOption('#dataset-origin', 'synthetic')
 
   // A complete structured draft must not be blocked by a blank free-text goal.
   await page.fill('#allowanceOrigin', 'Team-chosen hard allowance of 0.50 mg/L for the synthetic example.')
@@ -91,6 +94,7 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   const review = await page.locator('#review-summary').textContent() // includes the collapsed exact-values disclosure
   check('review-shows-exact-values', review.includes('[1/10, 3/10]') && review.includes('[1/10, 17/100]'),
     'exact normalized bounds are shown in review')
+  await page.locator('#manual-path > summary').click()
   check('planning-honestly-unavailable', (await page.locator('#review').innerText()).includes('Investigation planning is unavailable'),
     'the page does not pretend a backend exists')
 

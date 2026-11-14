@@ -306,7 +306,7 @@ function updateChrome() {
     if (state) item.dataset.status = state; else delete item.dataset.status
     item.querySelector('.step-state').textContent = text
   }
-  setStep('start', status.connected ? 'done' : 'attention', status.connected ? (status.workspace ? 'Connected' : 'Choose a workspace') : 'Not connected')
+  setStep('start', status.connected ? 'done' : 'attention', status.connected ? 'Ready' : status.mode === 'session_error' ? 'Connection needs attention' : 'Connecting')
   setStep('inputs', status.approved ? 'done' : status.planned && status.planCurrent ? 'attention' : '',
     status.approved ? 'Approved' : status.planned && status.planCurrent ? 'Waiting for your approval' : status.inputsCurrent ? 'Inputs saved' : inputsReady ? 'Ready to review' : rows.some(row => row.time || row.concentration) ? 'In progress' : 'Not started')
   const run = status.run
@@ -320,15 +320,19 @@ function updateChrome() {
 
   const pill = byId('connection-pill')
   pill.dataset.state = status.connected ? 'on' : status.mode === 'session_error' ? 'error' : 'off'
-  pill.textContent = status.connected ? (status.mode === 'browser_session' ? 'Private workspace' : status.workspace ? 'Connected' : 'Connected, no workspace') : status.mode === 'session_error' ? 'Connection failed' : 'Not connected'
+  pill.textContent = status.connected ? 'Ready · Private workspace' : status.mode === 'session_error' ? 'Connection needs attention' : 'Connecting…'
   byId('connection-panel').dataset.state = status.connected && status.workspace ? 'on' : 'off'
   const summary = byId('connection-panel').querySelector('summary'), note = byId('connection-summary-note')
   if (status.connected && status.workspace) {
-    const name = byId('workspace-select').selectedOptions[0]?.textContent
-    summary.textContent = status.mode === 'browser_session' ? 'Connected to your private workspace' : `Connected to workspace “${name || status.workspace}”`
+    summary.textContent = 'Ready · Private workspace and connection details'
     note.textContent = 'Saved checks and research plans are stored in this workspace on the server.'
-  } else if (status.connected) { summary.textContent = 'Connected: choose a workspace'; note.textContent = 'Pick an existing workspace or create one to keep your work on the server.' }
-  else if (status.mode === 'session_error') note.textContent = 'The private session could not be established. Reload once the server is available.'
+  } else if (status.mode === 'session_error') {
+    summary.textContent = 'Connection needs attention'
+    note.textContent = 'Open the connection details to retry or review recovery options. Retrying never resubmits an investigation.'
+  } else {
+    summary.textContent = 'Connecting to your private workspace…'
+    note.textContent = 'You can prepare a draft while the private workspace opens. Connecting does not run an investigation.'
+  }
 
   const context = byId('study-context')
   const experiment = byId('experiment-id').value.trim()
@@ -340,7 +344,7 @@ function updateChrome() {
   const path = byId('investigation-path')
   const action = assistantReady && inputsReady
   path.replaceChildren(element('h2', 'Research with the assistant'),
-    element('p', !status.connected ? 'Connect to your study workspace to continue. You can still edit or download this draft.' : !status.workspace ? 'Choose a study workspace to continue.' : !assistantReady ? 'The assistant is unavailable in this workspace. Open the manual check below to use Counterdex directly.' : !inputsReady ? 'Finish the measurements and assumptions above before you continue.' : 'Save the reviewed inputs on Investigate, then explicitly ask the assistant to plan a check. You’ll approve the proposed operation separately.'))
+    element('p', !status.connected ? 'Your private workspace must be ready before you save research. Check the connection status above; you can still edit or download this draft.' : !status.workspace ? 'Choose a study workspace to continue.' : !assistantReady ? 'The assistant is unavailable in this workspace. Open the manual check below to use Counterdex directly.' : !inputsReady ? 'Finish the measurements and assumptions above before you continue.' : 'Save the reviewed inputs on Investigate, then explicitly ask the assistant to plan a check. You’ll approve the proposed operation separately.'))
   if (action) path.append(element('a', session ? 'Open research plan' : 'Research with the assistant', { href: '#investigations', class: 'button' }))
   byId('backend-results').hidden = agentFinding && !run
   byId('backend-next').hidden = Boolean(agentFinding && !run)
@@ -372,7 +376,7 @@ function renderResume(status) {
     items.push(item)
   }
   if (!items.length) {
-    const empty = element('p', status.connected ? 'No saved investigations in this workspace yet. To reopen an earlier check by its run identifier, go to ' : 'Connect to see investigations saved in your workspace. To reopen a check by its run identifier, go to ', { class: 'fine' })
+    const empty = element('p', status.connected ? 'No saved investigations in this workspace yet. To reopen an earlier check by its run identifier, go to ' : 'Your saved investigations appear when the private workspace is ready. To reopen a check by its run identifier, go to ', { class: 'fine' })
     empty.append(element('a', 'run history', { href: '#run-history' }), '.')
     items.push(empty)
   }

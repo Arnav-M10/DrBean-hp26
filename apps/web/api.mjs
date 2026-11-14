@@ -51,10 +51,20 @@ export class BeanApi {
   #token
   #mode
   #keys = new Map()
+  #connectionFailure = () => {}
   constructor(token, fetcher = globalThis.fetch.bind(globalThis), { mode = 'local_bearer' } = {}) {
     if (!['local_bearer', 'browser_session'].includes(mode)) throw new Error('Unsupported connection mode.')
     if (mode === 'browser_session' && token) throw new Error('Browser sessions cannot use bearer credentials.')
     this.#token = token; this.#mode = mode; this.fetcher = fetcher
+  }
+  setConnectionFailureHandler(handler) {
+    if (typeof handler !== 'function') throw new TypeError('A connection failure handler must be a function.')
+    this.#connectionFailure = handler
+  }
+  #notifyConnectionFailure(error) {
+    // Notification is presentation only. A broken observer cannot change the
+    // original request outcome or trigger a transport retry here.
+    try { Promise.resolve(this.#connectionFailure(error)).catch(() => {}) } catch { /* preserve the request error */ }
   }
   async request(path, body, mediaType = 'application/json', operationKey, extraHeaders = {}, { raw = false } = {}) {
     if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || path.includes('\\')) throw new Error('A local API path is required.')
@@ -85,16 +95,20 @@ export class BeanApi {
       })
     } catch {
       // Never resent automatically. The person decides; the same key is reused if they retry.
-      throw serialized === undefined
+      const error = serialized === undefined
         ? new ApiError('unreachable', 'No answer from the local backend. Nothing was changed. Check that it is running, then try again.')
         : new ApiError('uncertain', 'No answer arrived, so this request may or may not have been accepted. Trying again is safe: it repeats the same operation and cannot create a second one.')
+      this.#notifyConnectionFailure(error)
+      throw error
     }
     if (!response.ok) {
       let error = {}
       try { error = parseJson(await readBounded(response, 65536)) } catch { /* keep the status-only message */ }
       const fields = Array.isArray(error.field_paths) ? error.field_paths.slice(0, 50) : []
-      throw new ApiError('rejected', `${error.code || response.status}: ${error.message || 'The request was refused.'}${fields.length ? ` Fields: ${fields.join(', ')}.` : ''}${error.current_revision_id ? ` Current revision: ${error.current_revision_id}.` : ''}${error.request_id ? ` Request: ${error.request_id}.` : ''}`,
+      const refusal = new ApiError('rejected', `${error.code || response.status}: ${error.message || 'The request was refused.'}${fields.length ? ` Fields: ${fields.join(', ')}.` : ''}${error.current_revision_id ? ` Current revision: ${error.current_revision_id}.` : ''}${error.request_id ? ` Request: ${error.request_id}.` : ''}`,
         { status: response.status, code: error.code, fieldPaths: fields, currentRevisionId: error.current_revision_id, requestId: error.request_id })
+      if (response.status === 401) this.#notifyConnectionFailure(refusal)
+      throw refusal
     }
     return response
   }

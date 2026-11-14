@@ -10,9 +10,9 @@ From the repository root, `scripts/dev/setup.sh` once and then `scripts/dev/star
 node apps/web/serve.mjs
 ```
 
-Open `http://127.0.0.1:4173`. The proxy targets `127.0.0.1:8000` by default. A trusted local launch can set `BEAN_WEB_API_PORT` to a different loopback API port; browser requests cannot select another destination. The proxy rejects foreign hosts/origins and forwards neither cookies nor browser origin headers. This remains a local serving lane, not hosted authentication.
+Open the web address printed by the launcher. It automatically selects a private browser workspace using an HttpOnly cookie. Reloads and additional tabs reuse a valid session. Researchers do not enter access tokens or provider keys. Cookie expiry, clearing site data or changing the shared hostname cannot recover earlier private work; the UI offers explicit recovery or a new workspace without moving old records.
 
-Open **Server connection**, enter an authorized researcher access token, and choose or create a workspace. Credentials stay in memory and are cleared from the password field after connecting. They never enter URLs, downloads, cookies or browser storage. Reloading requires reconnecting. For teammates using the owner's one server and Gemini key, open its shared HTTPS link instead; see [Shared server](../../docs/shared-server.md). No per-person Gemini key is required.
+The launcher configures a separate private loopback proxy boundary. An operator running the web server alone must supply the matching local gateway file and exact origin to the API; otherwise private connection fails visibly. Direct API maintenance remains separate. For the optional shared HTTPS path, see [Shared server](../../docs/shared-server.md). Connection and navigation make no provider or scientific calls.
 
 ## Baseline workflow
 
