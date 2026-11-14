@@ -1,6 +1,6 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `4a0c616`, observed with harness `c6307df` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `070b697`, observed with harness `c6307df` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
@@ -53,11 +53,11 @@ Application code commit `4a0c616`, observed with harness `c6307df` on macOS 26.7
 | H-LANE-ENGINE-PRECONDITION | P2 | 5 (harness) | retested | Lane reports judged the engine precondition by the engine interpreter's installed copy, so checkouts without one (preview worktrees) were reported failed although the application ran the repository source |
 | F-PAPER-RENDER-MEMORY | P1 | B (PR #36 papers worker and resource policy; was Owners 4 and 2) | open | On macOS a page preview of a small PDF whose content inflates to gigabytes drives the PDF worker to multiple GiB: memory is bounded only by time |
 | F-PAPER-IDENTITY-CONTRACTS | P2 | B (canonical contracts; was Owner 2) with A | open | Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written |
-| F-SESSION-CAPACITY-EXHAUSTION | P2 | B (private browser sessions, shared gateway) | open | Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors |
+| F-SESSION-CAPACITY-EXHAUSTION | P2 | B (private browser sessions, shared gateway) | retested | Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors |
 | H-LAUNCHER-OPTIN-FORMAT | P3 | C (harness) | retested | The launcher opt-in doctor test assumed PR #36's opt-in file format and wording, so it failed against main's stricter launcher |
 | H-REPLAY-CLASS-RECORDED-MISMATCH | P3 | C (harness) | retested | The engine-control replay classifier called a recorded-result mismatch a scientific exclusion when the fresh verdict was itself an exclusion |
 | F-UPLOAD-LIMIT-MESSAGE | P3 | B (upload boundary and general-file admission) | open | An oversized research upload is refused with a generic message that names neither the size limit nor the other limits the file exceeds |
-| F-CI-BROWSER-CHECK-INTERMITTENT | P3 | B (apps/web/check-backend.mjs and CI wiring) | open | B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s |
+| F-CI-BROWSER-CHECK-INTERMITTENT | P3 | B (apps/web/check-backend.mjs and CI wiring) | fixed_pending_retest | B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -494,13 +494,14 @@ Application code commit `4a0c616`, observed with harness `c6307df` on macOS 26.7
 - **Observed:** PR #34: page_id, physical_page_number, source_sha256, text_reference, image_reference, parser_version; disclosure binds selected_page_manifest_digest. PR #35: page_id + page_sha256 per page; citation bbox = four integers within an admitted pixel width/height with top < bottom (top-left pixel space at an unstated render scale); page_manifest_digest and selected_page_subset_digest. PR #36: no page_id or page_sha256 (text_sha256 = hash of extracted text); boxes in PDF points with a bottom-left origin before /Rotate, plus render_box() to map to preview pixels at a given scale; digests manifest_sha256, selection_sha256, subset_sha256
 - **Evidence:** {"branches": {"pr34": "33dc7f4", "pr35": "c952c35", "pr36": "081bbdc"}}
 
-## F-SESSION-CAPACITY-EXHAUSTION (P2, owner B (private browser sessions, shared gateway), open)
+## F-SESSION-CAPACITY-EXHAUSTION (P2, owner B (private browser sessions, shared gateway), retested)
 
 - **Input:** trusted-gateway request to GET /api/bean/v1/shared-session without a cookie, repeated capacity times (default 4096), each followed by logout
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors (capacity 3 for speed; strict xfail)`
 - **Expected:** a new visitor can still start a private workspace once earlier sessions are logged out or expired, or anonymous issuance is rate-limited so it cannot exhaust capacity
 - **Observed:** after 3 bootstrap+logout cycles with browser_session_capacity=3 the next GET /shared-session returns 429 shared_session_capacity; BrowserSessions._capacity counts every row in browser_sessions including revoked ones, and apps/web/share-gateway.mjs has no request rate limit. The default capacity is 4096 and is not configurable from the environment
 - **Evidence:** {"candidate": "main 299a356 (application tree identical on the C branch)", "regression": "tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors"}
+- **Retest at main 070b697 (B's PR #41 merge, tested head 0cabe92); macOS 26.7 arm64:** Fixed by B: capacity now counts only active credentials (not revoked, not expired), and rotation no longer consumes a slot; issuance history and private work are retained. The strict xfail turned into XPASS(strict) on main. C promoted the probe to an ordinary assertion and added the expiry half the original probe did not exercise. Both variants (logout, expiry) pass on 070b697 and fail on the pre-fix sessions.py (scratch worktree at cfbedd9). Residual, not a lockout: anonymous issuance history still grows without a rate limit. Closed by retest. (evidence: {"tests": "tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors[logout|expiry]"})
 
 ## H-LAUNCHER-OPTIN-FORMAT (P3, owner C (harness), retested)
 
@@ -529,13 +530,14 @@ Application code commit `4a0c616`, observed with harness `c6307df` on macOS 26.7
 - **Observed:** 413 request_too_large 'Request exceeds the admitted byte limit.' for both papers, from the RequestBoundary middleware; the advertised capabilities state max_file_bytes 5242880 and max_pdf_pages 10. Nothing is truncated or analysed (honest). The merged UI pre-validates selection and shows a clear 5 MiB message, so only API callers see the generic text
 - **Evidence:** {"candidate": "PR #40 producer (author check: Claude authored PR #40; production maintenance is B's)", "measurements": "zolleral_26: 9.39 MiB, 12 pages; sokolowskial_25: 18.19 MiB, 11 pages (local only, not committed)"}
 
-## F-CI-BROWSER-CHECK-INTERMITTENT (P3, owner B (apps/web/check-backend.mjs and CI wiring), open)
+## F-CI-BROWSER-CHECK-INTERMITTENT (P3, owner B (apps/web/check-backend.mjs and CI wiring), fixed_pending_retest)
 
 - **Input:** CI job 'browser review, approved design and native replay' (node apps/web/check-backend.mjs, BEAN_AI_MODE=placeholder) on the application tree of main 299a356
 - **Command:** `GitHub Actions run 43599924443 (pull_request event, head d6d2792), job 132462300488`
 - **Expected:** the browser check passes deterministically on an unchanged tree, or its failure names the state the page was in
 - **Observed:** locator.click: Timeout 30000ms exceeded while waiting for getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }) at apps/web/check-backend.mjs:156. The same application tree passed in the other 6 runs: d6d2792 push, be3d18d push and PR, 8580d3e push and PR, and main 299a356 push. That is 1 failure in 7 runs. It also passed locally on bb503a7. The cause is not determined, because no screenshot or page state is captured on failure.
 - **Evidence:** {"failed_run": "43599924443 job 132462300488", "passing_runs_same_application_tree": ["43599921100", "43600308045", "43600313049", "43598913026", "43598918655", "43594992900"]}
+- **Retest at main 070b697:** B added a deterministic wait (button enabled or backend error visible) and failure diagnostics (screenshot, visible status text, last API response, credential redacted) to apps/web/check-backend.mjs. Main's merge CI browser job passed. C closes this after consecutive passing runs on the final merge. (evidence: {})
 
 ## Check-level finding ids (raised only when the check fails)
 
