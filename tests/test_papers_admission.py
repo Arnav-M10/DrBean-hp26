@@ -206,7 +206,9 @@ def test_rotated_page_transform_matches_the_renderer():
     writer = pypdf.PdfWriter()
     writer.add_blank_page(width=600, height=400)
     writer.pages[0].rotate(90)
-    buffer = io.BytesIO(); writer.write(buffer); raw = buffer.getvalue()
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    raw = buffer.getvalue()
     manifest = papers.inspect_paper(raw)["manifest"]
     preview = papers.render_page(raw, 1, scale=1.0)["preview"]
     assert (preview["width_px"], preview["height_px"]) == (400, 600)
