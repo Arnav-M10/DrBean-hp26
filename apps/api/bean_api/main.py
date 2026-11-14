@@ -31,6 +31,7 @@ from .source_materialization import SourceMaterializationService
 from .resource_policy import describe_policy
 from .runtime_status import read_status
 from .store import Store
+from .sessions import BrowserSessions, SessionError, clear_session_cookie
 from .workflow import DomainError, Workflow
 
 PREFIX = "/api/bean/v1"
@@ -94,6 +95,9 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
     app.state.settings, app.state.workflow, app.state.ledger = settings, workflow, ledger
     app.state.provider, app.state.adapter = provider, adapter
     app.state.controlled_source_proposer = controlled_source_proposer
+    app.state.sessions = BrowserSessions(store, gateway_file=settings.shared_gateway_file,
+                                        ttl_seconds=settings.browser_session_ttl_seconds,
+                                        max_sessions=settings.browser_session_capacity)
     app.add_middleware(RequestBoundary, max_json_bytes=settings.max_json_bytes, max_upload_bytes=settings.max_upload_bytes)
 
     @app.exception_handler(DomainError)
@@ -105,6 +109,26 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
     async def auth_error(request: Request, exc: AuthenticationError):
         return JSONResponse(error_body(request.state.request_id, exc.code, exc.message), status_code=exc.status,
                             headers={"WWW-Authenticate": "Bearer"} if exc.status == 401 else {})
+
+    @app.exception_handler(SessionError)
+    async def session_error(request: Request, exc: SessionError):
+        response = JSONResponse(error_body(request.state.request_id, exc.code, exc.message), status_code=exc.status,
+                                headers={"Cache-Control": "no-store"})
+        if exc.clear_cookie:
+            clear_session_cookie(response)
+        return response
+
+    @app.get(PREFIX + "/shared-session")
+    def shared_session(request: Request, response: Response):
+        return app.state.sessions.bootstrap(request, response)
+
+    @app.post(PREFIX + "/shared-session/rotate")
+    def rotate_shared_session(request: Request, response: Response):
+        return app.state.sessions.rotate(request, response)
+
+    @app.post(PREFIX + "/shared-session/logout")
+    def logout_shared_session(request: Request, response: Response):
+        return app.state.sessions.logout(request, response)
 
     @app.exception_handler(RequestValidationError)
     @app.exception_handler(ValidationError)
@@ -135,6 +159,7 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
         live_dispatch = bool(provider_capabilities.get("dispatch_enabled")) and provider_capabilities.get("execution_mode") == "live"
         return {"contract_version": "DB-SC-1", "policy_version": "GF-2", "storage": "local_sqlite",
                 "auth": "server_bearer", "manual_review": True,
+                "shared_access": app.state.sessions.capabilities(),
                 "source_intake": {"media_types": ["image/png", "image/jpeg"], "max_assets": 1,
                                   "max_bytes": 5242880, "max_pixels": 12000000, "max_fields": 50,
                                   "retention": "retain", "pdf": False,
