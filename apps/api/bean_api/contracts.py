@@ -265,8 +265,17 @@ class AgentProviderConsent(StrictModel):
     accepted: ExplicitTrue
 
 
+class FollowupScope(StrictModel):
+    """Immutable selected design and separately accepted observation lineage."""
+    design_job_id: Identifier
+    design_result_id: Identifier
+    design_result_digest: Digest
+    observation_proposal_id: Identifier
+    source_artifact_id: Identifier
+
+
 class PlanBody(StrictModel):
-    legacy_optional_fields = ("scientific_profile", "objective")
+    legacy_optional_fields = ("scientific_profile", "objective", "followup")
     schema_version: Literal["DB-SC-1"] = CONTRACT_VERSION
     problem_id: Identifier
     problem_digest: Digest
@@ -278,6 +287,7 @@ class PlanBody(StrictModel):
     parent_plan_id: Identifier | None = None
     scientific_profile: Literal["counterdex.v1"] | None = None
     objective: ResearchObjective | None = None
+    followup: FollowupScope | None = None
 
     @model_validator(mode="after")
     def bounded_scenarios(self) -> "PlanBody":
@@ -299,6 +309,9 @@ class PlanBody(StrictModel):
                 raise ValueError("The Counterdex profile requires an explicit reviewed research objective")
             if any(s.kind == "optional" and (not s.purpose or not s.eligible_baseline_outcomes) for s in self.scenarios):
                 raise ValueError("Every optional scientific scenario needs a reviewed purpose and baseline-outcome condition")
+        if self.followup is not None and (self.scientific_profile != "counterdex.v1"
+                or self.provider_disclosure.provider != "none" or len(self.scenarios) != 1):
+            raise ValueError("Follow-up checking requires one separately reviewed manual Counterdex scenario")
         return self
 
 
@@ -745,7 +758,7 @@ class DesignResult(StrictModel):
     future_hard_allowance: Rational | None = None
     artifacts: list[ArtifactReference] = Field(default_factory=list, max_length=16)
     verification_record: VerificationRecord | None = None
-    projection_version: Literal["bean-to-counterdex.v1"] | None = None
+    projection_version: Literal["bean-to-counterdex.v1", "DB-SC-1-to-groundwork-v1"] | None = None
     scientific_problem_digest: Digest | None = None
     scientific_design_digest: Digest | None = None
     native_suggestion_digest: Digest | None = None

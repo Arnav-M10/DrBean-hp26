@@ -21,14 +21,17 @@ const check = (id, ok, detail = '') => { checks.push({ id, passed: Boolean(ok), 
 
 const web = fileURLToPath(new URL('../../apps/web/', import.meta.url))
 const server = spawn(process.execPath, ['serve.mjs', '0'], { cwd: web, stdio: ['ignore', 'pipe', 'inherit'] })
+let browser
+try {
 const url = await new Promise((resolve, reject) => {
   server.stdout.on('data', chunk => { const m = /http:\/\/127\.0\.0\.1:\d+/.exec(String(chunk)); if (m) resolve(m[0]) })
+  server.on('error', reject)
   server.on('exit', code => reject(new Error(`serve.mjs exited with ${code}`)))
-  setTimeout(() => reject(new Error('serve.mjs did not start within 10 s')), 10000)
+  const timeout = setTimeout(() => reject(new Error('serve.mjs did not start within 10 s')), 10000)
+  timeout.unref()
 })
 
-const browser = await chromium.launch()
-try {
+browser = await chromium.launch()
   const context = await browser.newContext({ acceptDownloads: true })
   const page = await context.newPage()
   const external = []
@@ -92,8 +95,11 @@ try {
   check('no-page-errors', errors.length === 0, errors.join(' | '))
   check('no-credentials-in-browser-storage', await page.evaluate(() => localStorage.length + sessionStorage.length === 0) && (await context.cookies()).length === 0, 'no cookies or storage')
 } finally {
-  await browser.close()
-  server.kill()
+  try {
+    await browser?.close()
+  } finally {
+    server.kill()
+  }
 }
 const failed = checks.filter(item => !item.passed)
 console.log(JSON.stringify({ status: failed.length ? 'failed' : 'passed', passed: checks.length - failed.length, total: checks.length, checks }, null, 1))

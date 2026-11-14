@@ -108,11 +108,13 @@ def contracts_current():
 def node_check(script, unrun_code=3, extra_env=None):
     if not shutil.which("node"):
         return {"status": "unrun", "detail": "node is not installed"}
+    browser_env = {**ENV, **(extra_env or {})}
+    browser_env["NODE_PATH"] = os.path.join(REPO, "tests", "integration", "node_modules")
     probe = subprocess.run(["node", "-e", "require('playwright')"], cwd=os.path.join(REPO, "tests", "integration"),
-                           capture_output=True)
+                           env=browser_env, capture_output=True)
     if probe.returncode != 0:
         return {"status": "unrun", "detail": "playwright is not installed (npm install in tests/integration)"}
-    result = run(["node", script], env={**ENV, **(extra_env or {})}, timeout=300)
+    result = run(["node", script], env=browser_env, timeout=300)
     if result.get("exit_code") == unrun_code:
         result.update(status="unrun", detail="playwright is not installed")
     return result
@@ -169,6 +171,7 @@ def check_env():
     scratch = tempfile.mkdtemp(prefix="drbean-checks-")
     # Tests that look up "python3.11" must find the qualified engine runtime, not another interpreter.
     env["PATH"] = os.path.dirname(ENGINE_PY) + os.pathsep + env.get("PATH", "")
+    env["DRBEAN_SCIENCE_PYTHON"] = ENGINE_PY
     env.update(BEAN_DATABASE_PATH=os.path.join(scratch, "bean.sqlite3"), BEAN_BLOB_DIR=os.path.join(scratch, "sources"),
                BEAN_AUTH_FILE=os.path.join(scratch, "auth.json"), BEAN_ARTIFACT_DIR=os.path.join(scratch, "artifacts"))
     return env, scratch
@@ -213,8 +216,8 @@ def _collect(fast):
         "owner5_http_suite": owner5_suite(),
         "web_source_review_browser_check": {"status": "unrun", "detail": "no source/value review control exists "
                                                                          "in the web workspace yet"},
-        "web_design_followup_browser_check": {"status": "unrun", "detail": "no next-measurement or follow-up "
-                                                                           "control exists in the web workspace yet"},
+        "web_design_followup_browser_check": {"status": "unrun", "detail": "design is covered by the backend browser check; "
+                                                                           "follow-up browser coverage remains pending"},
     }
     skipped = {"status": "unrun", "detail": "skipped by --fast"}
     if fast:
