@@ -30,7 +30,11 @@ try {
       const animate = Element.prototype.animate
       Element.prototype.animate = function (frames, options) {
         window.motionCalls.push({ target: this.id || this.dataset.motionEvent || this.tagName, duration: options?.duration })
-        return animate.call(this, frames, options)
+        const animation = animate.call(this, frames, options)
+        if (window.motionHoldTarget === this.id) {
+          animation.pause(); window.motionHeld = animation; window.motionHoldTarget = null
+        }
+        return animation
       }
     })
     await page.route('**/*', route => {
@@ -82,17 +86,14 @@ try {
     await page.goForward(); await page.waitForFunction(() => document.activeElement.id === 'question-title')
     assert.equal(await page.locator('.page:not([hidden])').count(), 1)
     assert.equal(await page.evaluate(() => Boolean(document.activeElement.closest('[hidden]'))), false)
-    // Hold an actual page animation so a cancellation assertion cannot pass
-    // merely because its normal220ms duration elapsed before the next RPC.
-    const held = await page.evaluate(async () => {
-      const ready = new Promise(resolve => addEventListener('hashchange', () => requestAnimationFrame(() => requestAnimationFrame(() => {
-        const animation = document.getAnimations().find(item => item.effect?.target?.id === 'inputs')
-        if (animation) { animation.pause(); window.motionHeld = animation }
-        resolve(Boolean(animation))
-      })), { once: true }))
-      location.hash = 'inputs'; return ready
+    // Let the previous navigation's observer settle, then capture and pause the
+    // next actual animation at creation. Sampling after frames could miss its
+    // entire220ms lifetime or coalesce with the preceding rapid navigation.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    await page.evaluate(() => {
+      window.motionHeld = null; window.motionHoldTarget = 'inputs'; location.hash = 'inputs'
     })
-    assert.equal(held, true)
+    await page.waitForFunction(() => document.activeElement.id === 'inputs-title' && window.motionHeld?.effect?.target?.id === 'inputs' && window.motionHeld.playState === 'paused')
     // The live preference change cancels WAAPI as well as CSS motion.
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.waitForFunction(() => window.motionHeld?.playState === 'idle')
