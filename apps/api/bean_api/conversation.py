@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 from pydantic import BeforeValidator, Field, JsonValue, StringConstraints, field_validator, model_validator
 
 from .canonical import canonical_bytes
+from .ai_prompts import commentary_rejection
 from .contracts import (
     AssistantTurnRequest, Digest, ExplicitTrue, FieldDiagnostic, GroundedExplanation,
     Identifier, Rational, ShortText, StrictModel,
@@ -181,7 +182,7 @@ OUTCOME_STATEMENTS = {
     "inconclusive": "The investigation is inconclusive under its reviewed limits.",
     "unsupported": "The requested scientific capability is unavailable in this environment.",
     "failed": "This attempt did not establish a scientific result.",
-    "checked_pair_separation": "No future reading can fit both selected fixed candidates under the stated future hard allowance. Either or both candidates may fail.",
+    "checked_pair_separation": "No future reading can fit both selected fixed candidates at the selected reviewed time under the stated future hard allowance. This guarantee concerns that fixed pair and time; either or both candidates may fail.",
     "numerical_guidance": "This suggestion is numerical guidance, without checked pair separation.",
     "no_separation_established": "The evaluated times did not establish separation of the selected pair under the reviewed allowance.",
     "unavailable": "The requested suggestion is unavailable under the current capabilities or approved scope.",
@@ -194,7 +195,6 @@ FACT_KEYS = {
     "origin", "dataset_origin", "experiment_id", "time_origin", "baseline_search",
     "scientific_problem_digest", "scientific_design_digest",
 }
-NUMBERS = re.compile(r"(?<![A-Za-z_])[-+]?\d+(?:/\d+|\.\d+)?")
 
 
 def _domain(code: str, message: str, status: int = 422):
@@ -290,6 +290,16 @@ class ConversationService:
                 if len(json.dumps(value, ensure_ascii=False)) > 4000:
                     continue
                 facts.append({"id": f"{record['id']}:{key}", "record_id": record["id"], "field": key, "value": value})
+            # Observation origin remains relevant when the scientific evidence
+            # is mismatched or corrupt. Those failures cannot relabel a
+            # hypothetical/synthetic reading as physical acquisition.
+            origin = body.get("origin", body.get("dataset_origin"))
+            if origin == "hypothetical":
+                statements.append("These data include hypothetical observations; they must remain labeled hypothetical in follow-up work.")
+            elif origin == "synthetic":
+                statements.append("These observations are synthetic examples rather than acquired measurements.")
+            elif origin == "actual":
+                statements.append("The user declared these observations actual; the application has not independently authenticated physical acquisition.")
             binding = body.get("expected_binding")
             verification = body.get("verification")
             if binding == "mismatch":
@@ -307,13 +317,6 @@ class ConversationService:
                     statements.append("The suggestion has not satisfied the checked-separation replay and binding gates.")
                 elif value in OUTCOME_STATEMENTS:
                     statements.append(OUTCOME_STATEMENTS[value])
-            origin = body.get("origin", body.get("dataset_origin"))
-            if origin == "hypothetical":
-                statements.append("These data include hypothetical observations; they must remain labeled hypothetical in follow-up work.")
-            elif origin == "synthetic":
-                statements.append("These observations are synthetic examples rather than acquired measurements.")
-            elif origin == "actual":
-                statements.append("The user declared these observations actual; the application has not independently authenticated physical acquisition.")
             if binding == "matches":
                 for candidate in body.get("candidate_results", []):
                     candidate_id, status = candidate["candidate_id"], candidate["verification"]
@@ -446,7 +449,8 @@ class ConversationService:
             output = AssistantOutput.model_validate(result.value)
             self._validate_output(request, output, facts)
             commentary = output.explanation.text
-            suppression = self._unsupported_commentary(commentary, facts)
+            cited_ids = set(output.explanation.fact_ids)
+            suppression = self._unsupported_commentary(commentary, [fact for fact in facts if fact["id"] in cited_ids])
             proposal = self._proposal(request, output, records)
             self.workflow.create_record(actor, workspace_id, "provider_validation", {
                 "attempt_id": result.attempt_id, "turn_id": turn["id"],
@@ -511,23 +515,25 @@ class ConversationService:
             raise _domain("operation_scope_mismatch", "This turn is limited to an observation proposal.")
 
     def _unsupported_commentary(self, text: str, facts: list[dict]) -> str | None:
-        # Defensive rejection controls, explicitly not a semantic proof of arbitrary prose.
-        if re.search(r"(?:proves? (?:the (?:interval|claim)|truth)|identif(?:y|ies) the true|reference (?:curve|fit) is (?:the )?truth|disproved nature|guaranteed (?:true|correct)|ignore (?:the )?(?:approval|instructions))", text, re.I):
-            return "unsupported_claim"
-        allowed_numbers = set(NUMBERS.findall(json.dumps([f["value"] for f in facts])))
-        if set(NUMBERS.findall(text)) - allowed_numbers:
-            return "unsupported_numeric_claim"
-        return None
+        # This guard uses selected scientific values, never digits from IDs or
+        # unrelated facts. It remains a defensive check rather than a semantic
+        # proof of arbitrary prose; trusted fact cards keep their own authority.
+        return commentary_rejection(text, facts)
 
     def _proposal(self, request: AssistantTurnRequest, output: AssistantOutput, records: list[dict]) -> dict | None:
         if output.design_draft is None and output.observation_draft is None:
             return None
         diagnostics = [d.model_dump() for d in output.clarifications]
         def missing(path: str, message: str):
-            if not any(d["field_path"] == path for d in diagnostics):
+            if not any(d["field_path"] == path and d["blocking"] for d in diagnostics):
                 diagnostics.append({"code": "clarification_required", "field_path": path, "message": message, "blocking": True})
+        def reviewed_experiment(draft):
+            experiments = {record["body"]["experiment_id"] for record in records if record.get("kind") == "dataset"}
+            if draft.experiment_id and (not experiments or draft.experiment_id not in experiments):
+                missing("experiment_id", "The proposed experiment does not match a selected reviewed dataset. Select the intended experiment and review this interpretation.")
         if output.design_draft:
             draft = output.design_draft
+            reviewed_experiment(draft)
             if not request.run_id:
                 missing("historical_run_id", "Select the historical investigation that this proposed measurement will follow.")
             for field, message in {
@@ -542,14 +548,15 @@ class ConversationService:
                 if not getattr(draft, field):
                     missing(field, message)
             # Candidate identities must come from the selected result, never invented model vectors.
-            allowed_candidates = set()
-            for record in records:
-                allowed_candidates.update(self._scientific_body(record).get("candidate_ids", []))
-            if len(set(draft.candidate_ids)) != 2 or not set(draft.candidate_ids).issubset(allowed_candidates):
-                missing("candidate_ids", "Select two fixed candidates from the historical result before constructing a design plan.")
+            pair = set(draft.candidate_ids)
+            if len(pair) != 2 or not any(
+                pair.issubset(set(self._scientific_body(record).get("candidate_ids", []))) for record in records
+            ):
+                missing("candidate_ids", "Select two fixed candidates together from one historical result before constructing a design plan.")
             return {"kind": "design", "draft": draft.model_dump(), "diagnostics": diagnostics}
         draft = output.observation_draft
         assert draft is not None
+        reviewed_experiment(draft)
         for field, message in {
             "experiment_id": "Which experiment does this reading belong to?", "origin": "Is this an actual reading, transcription or hypothetical simulation?",
             "elapsed_time": "At what exact elapsed time was it obtained?", "concentration": "What exact concentration was read?",

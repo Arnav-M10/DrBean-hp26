@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 from bean_api.coordinator import CoordinatorScope, ScopedCallbacks, run_coordinator
+from bean_api.contracts import GroundedExplanation
 from bean_api.providers import AttemptContext, ProviderConfig
 import test_scientific_http as scientific_http
 
@@ -167,6 +168,67 @@ def test_reviewed_tool_allowlist_is_not_expanded():
     assert harness.executed == ["baseline"]
 
 
+def test_design_tool_is_omitted_when_its_actual_callback_is_absent():
+    from bean_api.coordinator import _Invocation, _make_graph
+
+    ledger, harness, model = Ledger(), ToolHarness("inconclusive"), EvidenceModel()
+    config = ProviderConfig(api_key="controlled", model=model.model_name,
+                            account_gate_passed=True, account_decision_id="test")
+    scope = CoordinatorScope("run", "plan", "problem", "baseline", kind="design",
+                             max_scientific_reservations=1, wall_seconds=120)
+    inv = _Invocation(config, ledger, AttemptContext("actor", "workspace", "op", "consent"),
+                      scope, harness.callbacks())
+    _, runtime = _make_graph(inv, model)
+    assert set(runtime["tool_inventory"]) == {"read_scoped_evidence", "return_grounded_explanation"}
+    assert ledger.attempts == [] and harness.executed == []
+
+
+def test_explicit_missing_design_tool_is_rejected_before_model_or_ledger_work():
+    from bean_api.coordinator import CoordinatorFailure
+
+    ledger, harness, model = Ledger(), ToolHarness("inconclusive"), EvidenceModel()
+    config = ProviderConfig(api_key="controlled", model=model.model_name,
+                            account_gate_passed=True, account_decision_id="test")
+    scope = CoordinatorScope("run", "plan", "problem", "baseline", kind="design",
+        max_scientific_reservations=1, wall_seconds=120,
+        permitted_tools=("execute_approved_design", "return_grounded_explanation"))
+    with pytest.raises(CoordinatorFailure, match="agent_tool_not_implemented"):
+        asyncio.run(run_coordinator(config, ledger, AttemptContext("actor", "workspace", "op", "consent"),
+                                   scope, harness.callbacks(), chat_model=model))
+    assert model.offered == [] and ledger.attempts == [] and harness.events == []
+
+
+def test_actual_controlled_design_callback_is_offered_and_executed_within_design_scope():
+    class DesignModel(EvidenceModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            if not any(isinstance(message, ToolMessage) for message in messages):
+                message = AIMessage(content="", tool_calls=[{"id": "design-call", "name": "execute_approved_design",
+                    "args": {}, "type": "tool_call"}])
+                return ChatResult(generations=[ChatGeneration(message=message)])
+            return super()._generate(messages, stop, run_manager, **kwargs)
+
+    ledger, harness, model, designs = Ledger(), ToolHarness("inconclusive"), DesignModel(), []
+    def execute_design():
+        designs.append("approved-design")
+        return {"id": "design-evidence", "problem_id": "problem", "design_tier": "no_separation_established",
+                "verification": "not_checked", "expected_binding": "matches"}
+    callbacks = harness.callbacks()
+    callbacks.execute_design = execute_design
+    config = ProviderConfig(api_key="controlled", model=model.model_name,
+                            account_gate_passed=True, account_decision_id="test")
+    scope = CoordinatorScope("run", "plan", "problem", "baseline", kind="design",
+                             max_scientific_reservations=1, wall_seconds=120)
+    result = asyncio.run(run_coordinator(config, ledger, AttemptContext("actor", "workspace", "op", "consent"),
+                                        scope, callbacks, chat_model=model))
+    assert result.status == "completed", result.error_code
+    assert set(result.runtime["tool_inventory"]) == {
+        "read_scoped_evidence", "return_grounded_explanation", "execute_approved_design"}
+    assert designs == ["approved-design"] and harness.executed == []
+    assert result.scientific_reservations == 1
+    assert result.explanation["fact_ids"] == ["design-evidence"]
+    assert len(ledger.attempts) == result.model_turns == 2
+
+
 def test_wrong_problem_evidence_cannot_become_an_explanation():
     harness, ledger = ToolHarness("certified_counterexample"), Ledger()
     original = harness.execute
@@ -211,6 +273,87 @@ def test_known_interval_overstatement_and_unsupported_numbers_are_rejected():
         _validate_explanation(GroundedExplanation(fact_ids=["fact"], text="My interval is proven now.", next_action="stop"), facts)
     with pytest.raises(CoordinatorFailure, match="unsupported_number"):
         _validate_explanation(GroundedExplanation(fact_ids=["fact"], text="The value is 1.", next_action="stop"), facts)
+
+
+@pytest.mark.parametrize("metadata", [
+    {"id": "evidence-999"}, {"candidate_ids": ["candidate-999"]},
+    {"scientific_problem_digest": "999"}, {"sha256": "999"},
+    {"reason_code": "result-999", "notes": "The source mentions 999."},
+    {"schema_version": "999", "999": "A field name is not a quantity."},
+])
+def test_identifier_digest_version_and_free_prose_cannot_authorize_a_scientific_number(metadata):
+    from bean_api.coordinator import CoordinatorFailure, _validate_explanation
+
+    facts = {"cited": {"problem_id": "problem", **metadata}}
+    with pytest.raises(CoordinatorFailure, match="explanation_unsupported_number"):
+        _validate_explanation(GroundedExplanation(fact_ids=["cited"],
+            text="The future hard allowance is 999.", next_action="stop"), facts)
+
+
+def test_uncited_scientific_fact_cannot_authorize_a_number():
+    from bean_api.coordinator import CoordinatorFailure, _validate_explanation
+
+    facts = {"cited": {"selected_time": "8/1"}, "uncited": {"future_hard_allowance": "999/1"}}
+    with pytest.raises(CoordinatorFailure, match="explanation_unsupported_number"):
+        _validate_explanation(GroundedExplanation(fact_ids=["cited"],
+            text="The future hard allowance is 999.", next_action="stop"), facts)
+    with pytest.raises(CoordinatorFailure, match="explanation_unknown_fact"):
+        _validate_explanation(GroundedExplanation(fact_ids=["missing"],
+            text="Review the result.", next_action="stop"), facts)
+
+
+@pytest.mark.parametrize("text", [
+    "This is globally optimal experimental design.", "All alternative parameter values have been eliminated.",
+    "All outside candidates are excluded.", "The true model has been found.", "The interval is proven.",
+    "The search proves your interval.", "No counterexample found proves the interval.",
+    "The reference curve is truth.", "This proves truth.",
+])
+def test_unconditional_scientific_overclaims_are_rejected(text):
+    from bean_api.coordinator import CoordinatorFailure, _validate_explanation
+
+    with pytest.raises(CoordinatorFailure, match="explanation_unsupported_claim"):
+        _validate_explanation(GroundedExplanation(fact_ids=["cited"], text=text, next_action="stop"),
+                              {"cited": {"scientific_outcome": "no_counterexample_found"}})
+
+
+@pytest.mark.parametrize("text", [
+    "The interval is not proven.", "The search does not prove the interval.",
+    "Compatibility does not identify the true model.", "The true model remains unknown.",
+    "This result does not establish global optimality.",
+    "No claim that all alternatives are eliminated is supported.",
+])
+def test_scoped_scientific_caveats_are_preserved(text):
+    from bean_api.coordinator import _validate_explanation
+
+    _validate_explanation(GroundedExplanation(fact_ids=["cited"], text=text, next_action="stop"),
+                          {"cited": {"scientific_outcome": "no_counterexample_found"}})
+
+
+@pytest.mark.parametrize("text", [
+    "The prospective hard allowance is 0.2.", "The prospective hard allowance is 2/10.",
+    "The prospective hard allowance is 2e-1.", "The prospective hard allowance is 0.2mg/L.",
+])
+def test_cited_scientific_quantities_accept_exact_equivalent_spellings(text):
+    from bean_api.coordinator import _validate_explanation
+
+    _validate_explanation(GroundedExplanation(fact_ids=["cited"], text=text, next_action="stop"),
+                          {"cited": {"future_hard_allowance": "1/5"}})
+
+
+def test_numeric_policy_uses_ranges_parameter_vectors_selected_options_and_search_counters():
+    from bean_api.ai_prompts import commentary_rejection
+
+    facts = [{"target": {"lower": "1/10", "upper": "17/100"},
+              "candidates": [{"id": "candidate-999", "parameter_vector": {"ke": "3/25"}}],
+              "selected_option": {"time": "8/1", "exact_margin": "1/5"},
+              "baseline_search": {"evaluated_count": 3, "settings": {"ka_points": 7}, "reason": "999"}}]
+    assert commentary_rejection("The interval is [0.10, 0.17]; the candidate rate is 0.12.", facts) is None
+    assert commentary_rejection("At elapsed time 8h, the margin is 0.2mg/L.", facts) is None
+    assert commentary_rejection("The search evaluated 3 assignments using 7 rate grid points.", facts) is None
+    assert commentary_rejection("The margin is 999mg/L.", facts) == "unsupported_numeric_claim"
+    assert commentary_rejection("The selected time is 999h.", facts) == "unsupported_numeric_claim"
+    assert commentary_rejection("The selected time is 999.", facts) == "unsupported_numeric_claim"
+    assert commentary_rejection("Opaque evidence a123b and candidate-999 retain their original IDs.", facts) is None
 
 
 @pytest.mark.parametrize("module", [None, "langchain_google_genai.chat_models", "langchain_openai.chat_models", "langchain_anthropic.chat_models"])

@@ -26,6 +26,7 @@ from typing import Any, Callable, Literal
 
 from .contracts import GroundedExplanation
 from .canonical import canonical_bytes
+from .ai_prompts import commentary_rejection
 
 from .providers import (
     AttemptContext, AttemptLedger, ProviderConfig, ProviderFailure, SYSTEM_INSTRUCTION,
@@ -165,19 +166,11 @@ def _validate_explanation(value: GroundedExplanation, facts: dict[str, dict[str,
         raise CoordinatorFailure("explanation_missing_facts")
     if any(ref not in facts for ref in value.fact_ids) or len(set(value.fact_ids)) != len(value.fact_ids):
         raise CoordinatorFailure("explanation_unknown_fact")
-    # These explicit controls catch known bad claims; they are not a semantic
-    # proof of free-form prose. The UI must separately render trusted fact cards.
     prose = value.text.lower()
-    forbidden = ("proves the interval", "proves your interval", "the true parameter", "identifies the true",
-                 "disproved nature", "guaranteed accurate", "proves the model is correct", "interval is proven", "interval is proved")
-    if any(fragment in prose for fragment in forbidden):
-        raise CoordinatorFailure("explanation_unsupported_claim")
-    text_facts = json.dumps([facts[ref] for ref in value.fact_ids], ensure_ascii=False)
-    number_pattern = r"(?<![\w/])-?\d+(?:\.\d+|/\d+)?(?![\w/])"
-    allowed_numbers = set(re.findall(number_pattern, text_facts))
-    for number in re.findall(number_pattern, value.text):
-        if number not in allowed_numbers:
-            raise CoordinatorFailure("explanation_unsupported_number")
+    rejection = commentary_rejection(value.text, [facts[ref] for ref in value.fact_ids])
+    if rejection:
+        raise CoordinatorFailure("explanation_unsupported_claim" if rejection == "unsupported_claim"
+                                 else "explanation_unsupported_number")
     if any(facts[ref].get("expected_binding") == "mismatch" for ref in value.fact_ids):
         if any(word in prose for word in ("certified", "verified", "proves")):
             raise CoordinatorFailure("explanation_binding_mismatch")
@@ -432,7 +425,8 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
 
     functions = [read_scoped_evidence, return_grounded_explanation]
     if inv.scope.kind == "design":
-        functions += [execute_approved_design]
+        if inv.callbacks.execute_design is not None:
+            functions.append(execute_approved_design)
     else:
         functions += [execute_approved_scenario, record_allowed_skip]
         if inv.callbacks.prepare_design_proposal is not None:

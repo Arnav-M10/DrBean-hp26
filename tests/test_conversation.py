@@ -398,3 +398,178 @@ def test_many_candidate_summaries_preserve_provenance_within_response_bounds():
     assert any("investigation is inconclusive" in statement for statement in statements)
     assert "Additional candidate-specific results" in statements[-1]
     assert sum(len(f["value"]) for f in facts if f["field"] == "candidate_results") == 32
+
+
+def test_checked_separation_statement_is_conditional_on_the_selected_time_pair_and_allowance(setup):
+    workflow, workspace = setup
+    suggestion = bound_suggestion(workflow, workspace, "b" * 64)
+    response = asyncio.run(ConversationService(workflow, FakeProvider(output())).submit(
+        "alice", workspace, request(suggestion_id=suggestion["id"]), "turn1"))
+    statement, = [s for s in response["body"]["critical_statements"] if s.startswith("No future reading can fit both")]
+    assert "selected fixed candidates at the selected reviewed time" in statement
+    assert "under the stated future hard allowance" in statement
+    assert "that fixed pair and time" in statement
+    facts = {f["field"]: f["value"] for f in response["body"]["facts"]}
+    assert facts["candidate_ids"] == ["candidate_a", "candidate_b"]
+    assert facts["selected_time"] == "6/1"
+    assert facts["future_hard_allowance"] == "1/5"
+
+
+@pytest.mark.parametrize("failure", ["problem_binding", "native_integrity"])
+def test_hypothetical_origin_remains_visible_when_scientific_evidence_is_rejected(setup, failure):
+    from bean_api.contracts import DesignResult
+    workflow, workspace = setup
+    original = bound_suggestion(workflow, workspace, "b" * 64)
+    body = {**original["body"], "design_tier": "unavailable", "verification": "invalid", "replay": "failed",
+            "selected_time": None, "candidate_results": [{"candidate_id": "candidate_a", "verification": "valid",
+                "outside_closed_claim": False, "is_counterexample": False}],
+            "native_replay": {"dataset_origin": "hypothetical", "integrity": "passed", "recorded_result_matches": True}}
+    body["verification_record"] = {**body["verification_record"], "verification": "invalid"}
+    if failure == "problem_binding":
+        body["verification_record"].update(expected_binding="mismatch", observed_problem_digest="c" * 64)
+    else:
+        body["native_replay"].update(integrity="failed", recorded_result_matches=False)
+    rejected = workflow.create_record("alice", workspace, "suggestion", DesignResult.model_validate(body).model_dump(), "rejected")
+    response = asyncio.run(ConversationService(workflow, FakeProvider(output())).submit(
+        "alice", workspace, request(suggestion_id=rejected["id"]), "turn1"))
+    statements = response["body"]["critical_statements"]
+    assert any("hypothetical observations" in statement for statement in statements)
+    expected_warning = "expected binding mismatches" if failure == "problem_binding" else "No checked scientific conclusion"
+    assert any(expected_warning in statement for statement in statements)
+    assert not any("No future reading can fit both" in statement or "candidate_a remains compatible" in statement for statement in statements)
+    assert any(f["field"] == "dataset_origin" and f["value"] == "hypothetical" for f in response["body"]["facts"])
+    assert response["body"]["execution_approved"] is False
+
+
+def complete_design_draft(**changes):
+    return {"experiment_id": "experiment_synthetic", "elapsed_time_confirmed": True, "feasible_times": ["8/1"],
+            "future_hard_allowance": "1/5", "allowance_unit": "mg/L", "hard_bound_confirmed": True,
+            "availability_confirmed": True, "candidate_ids": ["candidate_a", "candidate_b"], **changes}
+
+
+@pytest.mark.parametrize("operation", ["interpret_design", "interpret_observation"])
+def test_draft_experiment_mismatch_requires_review_without_changing_the_proposal(setup, operation):
+    from test_workflow import completed_pair
+    workflow, workspace = setup
+    _, _, _, _, run = completed_pair(setup)
+    if operation == "interpret_design":
+        draft = {"design_draft": complete_design_draft(experiment_id="different_experiment")}
+    else:
+        draft = {"observation_draft": {"experiment_id": "different_experiment", "origin": "actual", "elapsed_time": "8/1",
+            "concentration": "17/5", "hard_allowance": "1/5", "time_unit": "h", "concentration_unit": "mg/L",
+            "source_description": "User-declared acquired reading", "same_experiment_confirmed": True}}
+    provider = FakeProvider(output(**draft, clarifications=[{
+        "code": "model_note", "field_path": "experiment_id", "message": "Model-supplied note", "blocking": False}]))
+    response = asyncio.run(ConversationService(workflow, provider).submit(
+        "alice", workspace, request(operation=operation, run_id=run["id"]), "turn1"))
+    proposal = response["body"]["proposal"]["body"]
+    assert proposal["draft"]["experiment_id"] == "different_experiment"
+    assert any(d["field_path"] == "experiment_id" and d["blocking"] for d in proposal["diagnostics"])
+    assert response["body"]["next_action"] == "clarify"
+    assert len(workflow.list_records("alice", workspace, "dataset")) == 1
+    assert workflow.list_records("alice", workspace, "design_plan") == []
+
+
+def test_design_pair_cannot_be_assembled_across_different_problem_results(setup):
+    from bean_api.contracts import PlanBody
+    from test_workflow import create_problem, dataset_body, numerical_pair, prepared
+    workflow, workspace = setup
+    old_dataset, old_problem, _, _ = prepared(setup)
+    dataset = workflow.create_dataset("alice", workspace, dataset_body(old_dataset["id"]), "revised-dataset")
+    problem = create_problem(workflow, workspace, dataset, "revised-problem")
+    plan = workflow.create_plan("alice", workspace, PlanBody(
+        problem_id=problem["id"], problem_digest=problem["digest"], dataset_id=dataset["id"], scenarios=[
+            {"id": "baseline", "kind": "baseline", "label": "Reviewed baseline", "problem_id": problem["id"], "problem_digest": problem["digest"]},
+            {"id": "comparison", "kind": "optional", "label": "Reviewed prior revision", "problem_id": old_problem["id"], "problem_digest": old_problem["digest"]},
+        ]).model_dump(), "comparison-plan")
+    approval = workflow.approve_plan("alice", plan["id"], problem["id"], plan["digest"], "comparison-approval")
+    run = workflow.start_run("alice", plan["id"], approval["id"], "comparison-run")
+    workflow.mark_running("alice", run["id"], "test-worker")
+    for scenario, scenario_problem in (("baseline", problem), ("comparison", old_problem)):
+        evidence = numerical_pair(scenario_problem)
+        if scenario == "comparison":
+            for candidate, identity in zip(evidence["candidates"], ("candidate_c", "candidate_d"), strict=True):
+                candidate["id"] = identity
+        workflow.reserve_scenario("alice", run["id"], scenario)
+        workflow.complete_scenario("alice", run["id"], scenario, evidence)
+    workflow.finish_run("alice", run["id"])
+    provider = FakeProvider(output(design_draft=complete_design_draft(candidate_ids=["candidate_a", "candidate_c"])))
+    response = asyncio.run(ConversationService(workflow, provider).submit(
+        "alice", workspace, request(operation="interpret_design", run_id=run["id"]), "turn1"))
+    proposal = response["body"]["proposal"]["body"]
+    assert proposal["draft"]["candidate_ids"] == ["candidate_a", "candidate_c"]
+    assert any(d["field_path"] == "candidate_ids" and d["blocking"] for d in proposal["diagnostics"])
+    assert workflow.list_records("alice", workspace, "design_plan") == []
+
+
+def test_design_pair_and_experiment_from_the_same_reviewed_result_remain_usable(setup):
+    from test_workflow import completed_pair
+    workflow, workspace = setup
+    _, _, _, _, run = completed_pair(setup)
+    provider = FakeProvider(output(design_draft=complete_design_draft()))
+    provider.output["explanation"]["next_action"] = "review_design"
+    response = asyncio.run(ConversationService(workflow, provider).submit(
+        "alice", workspace, request(operation="interpret_design", run_id=run["id"]), "turn1"))
+    assert response["body"]["proposal"]["body"]["diagnostics"] == []
+    assert response["body"]["next_action"] == "review_design"
+    assert response["body"]["execution_approved"] is False
+
+
+@pytest.mark.parametrize("field,changes", [
+    ("candidate_ids", {"candidate_ids": ["candidate_a23", "candidate_b"]}),
+    ("scientific_problem_digest", {"scientific_problem_digest": "a123b" + "a" * 59}),
+])
+def test_identifier_and_digest_digits_cannot_ground_a_numerical_claim(setup, field, changes):
+    workflow, workspace = setup
+    suggestion = bound_suggestion(workflow, workspace, "b" * 64, **changes)
+    provider = FakeProvider(output("The margin is 23."))
+    provider.output["explanation"]["fact_ids"] = [f"{suggestion['id']}:{field}"]
+    response = asyncio.run(ConversationService(workflow, provider).submit(
+        "alice", workspace, request(suggestion_id=suggestion["id"]), "turn1"))
+    assert response["body"]["commentary_suppression_reason"] == "unsupported_numeric_claim"
+    assert response["body"]["model_commentary"] is None
+
+
+def test_uncited_scientific_fact_cannot_ground_a_numerical_claim(setup):
+    workflow, workspace = setup
+    suggestion = bound_suggestion(workflow, workspace, "b" * 64)
+    provider = FakeProvider(output("The future hard allowance is 1/5."))
+    provider.output["explanation"]["fact_ids"] = [f"{suggestion['id']}:selected_time"]
+    response = asyncio.run(ConversationService(workflow, provider).submit(
+        "alice", workspace, request(suggestion_id=suggestion["id"]), "turn1"))
+    assert response["body"]["commentary_suppression_reason"] == "unsupported_numeric_claim"
+    assert any(f["field"] == "future_hard_allowance" and f["value"] == "1/5" for f in response["body"]["facts"])
+
+
+@pytest.mark.parametrize("quantity", ["0.2 mg/L", "0.2mg/L"])
+def test_equivalent_decimal_is_grounded_by_its_cited_exact_rational(setup, quantity):
+    workflow, workspace = setup
+    suggestion = bound_suggestion(workflow, workspace, "b" * 64)
+    provider = FakeProvider(output(f"The reviewed future hard allowance is {quantity}."))
+    provider.output["explanation"]["fact_ids"] = [f"{suggestion['id']}:future_hard_allowance"]
+    response = asyncio.run(ConversationService(workflow, provider).submit(
+        "alice", workspace, request(suggestion_id=suggestion["id"]), "turn1"))
+    assert response["body"]["model_commentary"] == provider.output["explanation"]["text"]
+    assert response["body"]["commentary_status"] == "unverified_model_commentary"
+
+
+@pytest.mark.parametrize("prose", ["The margin is 999mg/L.", "The selected time is 999h."])
+def test_attached_units_do_not_hide_unsupported_numeric_claims(setup, prose):
+    workflow, workspace = setup
+    response = asyncio.run(ConversationService(workflow, FakeProvider(output(prose))).submit(
+        "alice", workspace, request(), "turn1"))
+    assert response["body"]["commentary_suppression_reason"] == "unsupported_numeric_claim"
+    assert response["body"]["model_commentary"] is None
+
+
+@pytest.mark.parametrize("prose", [
+    "The interval is proven.", "This is globally optimal experimental design.",
+    "All alternative parameter values have been eliminated.",
+])
+def test_known_universal_or_global_design_overclaims_are_suppressed(setup, prose):
+    workflow, workspace = setup
+    response = asyncio.run(ConversationService(workflow, FakeProvider(output(prose))).submit(
+        "alice", workspace, request(), "turn1"))
+    assert response["body"]["commentary_suppression_reason"] == "unsupported_claim"
+    assert response["body"]["model_commentary"] is None
+    assert response["body"]["critical_statements"]
