@@ -79,3 +79,53 @@ egress/provider-client attempts and no inherited credentials. One existing
 opt-in test read its own synthetic fixture, not an owner credential.
 `1649820e70fd8169ce2ac20a5a432e10ef6a88b1` identifies the reviewed backend;
 backend files were unchanged throughout that run.
+
+## Owner 3 connection handoff
+
+The user confirmed their teammate is actively implementing
+`03_Researcher_Guided_Journey.md`. Their workflow/index/app files remain untouched
+on this branch. Integrate these small hooks in that owner's connection block:
+
+- Remove the token form from the initial HTML, including obsolete form listeners.
+  Initial status is Connecting; successful automatic connection closes the
+  troubleshooting disclosure. Ready requires valid capabilities and membership
+  in the returned workspace.
+- Initial entry and explicit `#connection-retry` call
+  `bootstrapSharedSession()`. It uses current-session reads before issuance;
+  no caller should add a retry loop around it.
+- When the caught error has `mayStartNew === true`, expose
+  `#connection-start-new` labelled Start a new private workspace. Only that
+  explicit click passes `{startNew:true}` as the second argument. Explain that
+  this does not recover or transfer expired/cleared-session research.
+- `#connection-status` carries Connecting, Ready or the specific recovery error.
+  Preserve the existing onConnectionChange callback's private workspace identity,
+  same-identity API instance and frozen operation IDs. Read failures never resubmit
+  science/consent/model requests or discard pending-operation reconciliation.
+- Owner 3 retains app chrome, navigation and remaining structure; Owner 4 may
+  refine labels without changing these semantics.
+
+The new `tests/integration/automatic-access-browser.mjs` is the runnable combined
+acceptance test. It currently fails at missing `#connection-retry`, after four
+passed groups in the retained initial run. Later recovery/privacy/science cases
+are implemented but not claimed as executed. It is not registered as a passing
+CI gate until the controls land.
+
+Reproduction with the repository's locked backend runtime, source-matching
+CPython 3.11 engine, and pinned Playwright:
+
+```sh
+node --test apps/web/*.test.mjs
+.venv/bin/python -m unittest scripts/dev/test_launcher.py scripts/dev/test_share.py
+BEAN_AI_MODE=placeholder BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python" \
+  PATH="$PWD/.venv-engine/bin:$PATH" .venv/bin/python -m pytest -q tests --ignore=tests/integration
+PLAYWRIGHT_MODULE="$PWD/tests/integration/node_modules/playwright" \
+  BEAN_AUTOMATIC_ACCESS_EVIDENCE_DIR=/tmp/drbean-access-acceptance \
+  node tests/integration/automatic-access-browser.mjs
+```
+
+The browser runner supplies a temporary store, private fixture configuration,
+nonstandard ports, restricted HTTPS harness and egress guard. It verifies engine
+source equality before dispatch. Existing ordinary science runners remain
+`apps/web/check-backend.mjs` (also with `BEAN_TEST_FOLLOWUP_ORIGIN=actual`) and
+`apps/web/check-research.mjs`; editor/general smoke remain in ordinary CI.
+No external HTTPS tunnel or live provider qualification is claimed.
