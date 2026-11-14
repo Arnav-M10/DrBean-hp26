@@ -1,12 +1,16 @@
 """Offline qualification-only extension admission; no provider configuration."""
 import builtins
 import copy
+import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 
-from evaluation.live import operator_grant
+spec = importlib.util.spec_from_file_location(
+    "qualification_operator_grant", Path(__file__).resolve().parents[1] / "evaluation/live/operator_grant.py")
+operator_grant = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(operator_grant)
 
 
 def historical_budget():
