@@ -139,11 +139,14 @@ def test_legacy_documented_live_switch_with_dummy_values_still_cannot_dispatch(s
 
 @pytest.mark.real_stack
 def test_placeholder_mode_is_explicit_in_capabilities(module_stack):
-    gemini = reviewer(module_stack).raw("GET", "/capabilities", authenticated=False).json()["gemini"]
-    mode = gemini.get("mode") or gemini.get("provider_mode") or gemini.get("execution_mode")
-    assert mode in {"placeholder", "disabled", "controlled_placeholder", "offline_placeholder"}, (
-        f"capabilities.gemini declares no explicit placeholder/disabled mode (got {mode!r}); finding F-PLACEHOLDER-MODE "
-        "(Owner 3): the default must be an explicit disabled/placeholder mode, not merely 'not configured'")
+    capabilities = reviewer(module_stack).raw("GET", "/capabilities", authenticated=False).json()
+    gemini = capabilities["gemini"]
+    mode = capabilities.get("ai_mode") or gemini.get("mode") or gemini.get("provider_mode")
+    assert isinstance(mode, str) and ("placeholder" in mode or "disabled" in mode), (
+        f"capabilities declare no explicit placeholder/disabled AI mode (got {mode!r}); finding F-PLACEHOLDER-MODE: "
+        "the default must be an explicit disabled/placeholder mode, not merely 'not configured'")
+    assert gemini.get("dispatch_enabled") is not True
+    assert gemini.get("verified_in_environment") is False
 
 
 def test_guard_spies_refuse_client_construction_but_allow_sdk_types():

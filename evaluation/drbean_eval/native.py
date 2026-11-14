@@ -33,7 +33,8 @@ GUARD_FILE = os.path.join(HERE, "guard", "sitecustomize.py")
 ANCHOR_KEYS = {
     "problem_digest": ("scientific_problem_digest", "scientific_projection_digest", "projection_digest",
                        "science_problem_digest", "expected_scientific_problem_digest", "counterdex_problem_digest"),
-    "suggestion_digest": ("suggestion_digest", "expected_suggestion_digest", "scientific_suggestion_digest"),
+    "suggestion_digest": ("native_suggestion_digest", "suggestion_digest", "expected_suggestion_digest",
+                          "scientific_suggestion_digest"),
     "design_digest": ("scientific_design_digest", "design_digest", "expected_design_digest"),
 }
 

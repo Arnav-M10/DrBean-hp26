@@ -32,6 +32,19 @@ from .http_client import ApiClient, ApiFailure
 TERMINAL = {"completed", "cancelled", "failed", "interrupted"}
 REQUIRED = "required"
 INFO = "informational"
+SCIENTIFIC_PROFILE = "counterdex.v1"
+# The harness-authored, reviewed research objective for the synthetic packets (Owner 2's strict profile).
+OBJECTIVE = {"version": "research-objective.v1",
+             "question": "Do these reviewed synthetic measurements admit a compatible ke outside the closed claim, "
+                         "and which reviewed future reading could distinguish a selected pair?",
+             "success_criterion": "Return scoped exact evidence with native bytes and fresh replay, or an explicit "
+                                  "unavailable reason. Never a claim that the interval is proven."}
+KNOWN_OUTCOMES = {"certified_counterexample", "numerical_candidate", "no_counterexample_found", "inconclusive",
+                  "unsupported", "failed"}
+# Reason code -> finding id, so a blocked baseline names its actual cause and owner.
+REASON_FINDINGS = {"groundwork_adapter_not_installed": "F-ADAPTER-SELECTION",
+                   "baseline_producer_unavailable": "F-BASELINE-DISCOVERY",
+                   "scientific_runtime_missing": "F-RUNTIME-MISSING"}
 
 
 def F(text) -> Fraction:
@@ -156,6 +169,8 @@ class Flow:
                      "scenarios": [{"id": "baseline", "problem_id": problem["id"], "problem_digest": problem["digest"],
                                     "kind": "baseline", "label": "Reviewed baseline investigation"}]}
         props, required = self.schema_properties("PlanBody")
+        if "scientific_profile" in props:  # Owner 2's strict Counterdex route needs profile + reviewed objective
+            plan_body.update(scientific_profile=SCIENTIFIC_PROFILE, objective=OBJECTIVE)
         unknown_required = sorted(required - set(plan_body) - {"permitted_tools", "budget", "provider_disclosure",
                                                                "parent_plan_id"})
         if unknown_required:
@@ -204,17 +219,17 @@ class Flow:
                    "allow_construction": bool(review.get("allow_construction")),
                    "allow_continuation": bool(review.get("allow_continuation"))}
         props, required = self.schema_properties("DesignRequestBody")
-        optional_map = {"maximum_horizon": ("max_horizon", "maximum_horizon", "horizon"),
-                        "allowance_origin": ("future_allowance_origin", "allowance_origin"),
-                        "allowance_description": ("future_allowance_description", "allowance_description"),
-                        "requested_tier": ("requested_tier", "scientific_tier")}
-        for key, names in optional_map.items():
-            for name in names:
-                if name in props and key in review:
-                    request[name] = review[key]
-                    break
-        if "requested_tier" in [n for n in props] and "requested_tier" not in request:
-            request["requested_tier"] = "checked_pair_separation"
+        if "scientific_profile" in props:  # every reviewed scope field is explicit; nothing is inherited
+            sources = []
+            for candidate in pair:
+                for artifact_id in candidate.get("artifact_ids") or []:
+                    if artifact_id not in sources:
+                        sources.append(artifact_id)
+            request.update(scientific_profile=SCIENTIFIC_PROFILE, requested_tier="checked_pair_separation",
+                           allowance_origin={"kind": review.get("allowance_origin", "hypothetical"),
+                                             "description": review.get("allowance_description",
+                                                                       "Reviewed future hard allowance")},
+                           maximum_horizon=review["maximum_horizon"], source_artifact_ids=sources[:2])
         missing = sorted(required - set(request) - {"budget", "schema_version", "observable"})
         if missing:
             return {"blocked": f"DesignRequestBody requires fields the reviewed packet does not define: {missing}",
@@ -253,9 +268,17 @@ class Flow:
                                                                               response.headers)}
                 if kind["class"] == "native_packet":
                     result["data"] = response.data
+                    anchor_records = []
+                    anchor = self.client.raw("GET", f"/artifacts/{reference['id']}/anchor")
+                    result["anchor_route_status"] = anchor.status
+                    if anchor.status == 200:  # the separate, authenticated application anchor (Owner 2)
+                        name = f"{label}-anchor-{reference['id']}"
+                        self.save_record(name, anchor.json())
+                        result["anchor_record"] = anchor.json()
+                        anchor_records.append(name)
                     self.native_saved.append({"artifact_id": reference["id"], "path": saved["path"],
                                               "sha256": saved["sha256"], "reference": reference,
-                                              "label": label, "anchor_records": []})
+                                              "label": label, "anchor_records": anchor_records})
                     return result
                 self.other_bytes[f"download:{label}:{reference['id']}"] = saved
                 last = result
@@ -268,7 +291,7 @@ class Flow:
         reports = []
         natives = [d for d in downloads if d["classification"]["class"] == "native_packet"]
         for item in self.native_saved:  # the qualifier re-extracts anchors from exactly these saved records
-            if any(d["saved"]["path"] == item["path"] for d in natives):
+            if any(d["saved"]["path"] == item["path"] for d in natives) and not item["anchor_records"]:
                 item["anchor_records"] = list(anchor_records or [])
         if not downloads:
             checks.add(f"{prefix}_native_bytes_downloadable", "blocked",
@@ -286,14 +309,18 @@ class Flow:
         if not self.science_python:
             checks.add(f"{prefix}_fresh_native_replay", "blocked", "no CPython 3.11 replay interpreter configured")
             return reports
-        if not anchors.get("problem_digest") or not anchors.get("suggestion_digest"):
-            checks.add(f"{prefix}_anchor_from_authenticated_record", "blocked",
-                       f"authenticated records expose anchors {sorted(anchors)}; replay needs problem and "
-                       "suggestion anchors obtained from the expected-run record, not from the bundle",
-                       finding="F-ANCHOR-RECORD")
-            return reports
-        checks.add(f"{prefix}_anchor_from_authenticated_record", "passed", f"anchors {sorted(anchors)}")
         for item in natives:
+            item_anchors = native.anchors_from_record(item["anchor_record"]) if item.get("anchor_record") else anchors
+            source = "artifact anchor route" if item.get("anchor_record") else "evidence record fields"
+            if not item_anchors.get("problem_digest") or not item_anchors.get("suggestion_digest"):
+                checks.add(f"{prefix}_anchor_from_authenticated_record", "blocked",
+                           f"authenticated records expose anchors {sorted(item_anchors)} ({source}); replay needs "
+                           "problem and suggestion anchors from the expected-run record, not from the bundle",
+                           finding="F-ANCHOR-RECORD")
+                continue
+            checks.add(f"{prefix}_anchor_from_authenticated_record", "passed",
+                       f"anchors {sorted(item_anchors)} from the {source}")
+            anchors = item_anchors
             report = native.replay(self.science_python, self.package_dir, item["data"], anchors,
                                    guard_log=self.guard_log)
             reports.append({"artifact_id": item["reference"]["id"], **report})
@@ -323,14 +350,29 @@ def result_of(evidence_record: dict) -> dict:
     return ((evidence_record or {}).get("body") or {}).get("result") or {}
 
 
+def complete_vector(candidate: dict) -> bool:
+    from .contract import is_canonical_rational
+    vector = candidate.get("parameter_vector")
+    return (isinstance(candidate.get("id"), str) and bool(candidate.get("id")) and isinstance(vector, dict)
+            and all(is_canonical_rational(vector.get(k)) for k in ("A", "ke", "ka")))
+
+
+def in_domain(vector: dict, domain: dict) -> bool:
+    try:
+        values = {k: F(vector[k]) for k in ("A", "ke", "ka")}
+        inside = all(F(domain[k]["lower"]) <= values[k] <= F(domain[k]["upper"]) for k in ("A", "ke", "ka"))
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return False
+    return inside and values["ke"] < values["ka"]
+
+
 def classify_candidates(result: dict, target: dict) -> tuple[list[dict], list[dict]]:
     inside, outside = [], []
     for candidate in result.get("candidates") or []:
-        vector = candidate.get("parameter_vector") or {}
-        try:
-            out = kinetics.outside_closed_claim(F(vector["ke"]), F(target["lower"]), F(target["upper"]))
-        except (KeyError, ValueError, ZeroDivisionError):
-            continue
+        if not complete_vector(candidate):
+            continue  # already a failed candidate_records_complete check; never classified
+        vector = candidate["parameter_vector"]
+        out = kinetics.outside_closed_claim(F(vector["ke"]), F(target["lower"]), F(target["upper"]))
         (outside if out else inside).append(candidate)
     return inside, outside
 
@@ -342,7 +384,12 @@ def check_baseline(checks: Checks, base: dict, packet: dict, *, known_positive: 
         checks.add("baseline_created", "blocked", base["blocked"], finding="F-SCHEMA-DRIFT")
         return info
     run = base["run"]
-    checks.expect("baseline_run_terminal", run.get("state") in TERMINAL, f"state {run.get('state')}")
+    if run.get("state") not in TERMINAL:  # a stalled job is a timed-out observation, not a scientific failure
+        checks.add("baseline_run_terminal", "not_observed",
+                   f"still {run.get('state')} at the polling deadline (timed out); last scenarios "
+                   f"{[s.get('state') for s in run.get('scenarios', [])]}")
+        return info
+    checks.add("baseline_run_terminal", "passed", f"state {run.get('state')}")
     checks.expect("single_baseline_reservation",
                   sum(1 for s in run.get("scenarios", []) if s.get("scenario_id") == "baseline") == 1,
                   f"{len(run.get('scenarios', []))} scenario rows")
@@ -372,14 +419,25 @@ def check_baseline(checks: Checks, base: dict, packet: dict, *, known_positive: 
     vectors = [json.dumps(c.get("parameter_vector"), sort_keys=True) for c in candidates]
     checks.expect("candidate_ids_and_vectors_distinct", len(set(ids)) == len(ids) and len(set(vectors)) == len(vectors),
                   f"ids {ids}")
+    incomplete = [c.get("id") for c in candidates if not complete_vector(c)]
+    checks.expect("candidate_records_complete", not incomplete,  # never drop an inconvenient record silently
+                  f"candidates with missing id or non-canonical A/ke/ka: {incomplete}")
+    domain = (packet.get("problem") or {}).get("domain") or base["problem"]["body"].get("domain")
+    outside_domain = [c.get("id") for c in candidates if complete_vector(c) and not in_domain(c["parameter_vector"], domain)]
+    checks.expect("candidates_within_admitted_domain", not outside_domain,
+                  f"candidates outside the reviewed A/ke/ka domain or violating ke < ka: {outside_domain}")
     outcome, verification = result.get("scientific_outcome"), result.get("verification")
     info.update(outcome=outcome, verification=verification)
-    if outcome == "unsupported" or (result.get("reason_code") or "").endswith("not_installed"):
-        checks.add("real_scientific_adapter_selected", "failed",
-                   f"ordinary startup returned scientific_outcome={outcome}, reason {result.get('reason_code')}",
-                   finding="F-ADAPTER-SELECTION")
+    if outcome not in KNOWN_OUTCOMES:
+        checks.add("scientific_outcome_recognized", "failed", f"unrecognized scientific_outcome {outcome!r}")
         return info
-    checks.add("real_scientific_adapter_selected", "passed", f"outcome {outcome}, verification {verification}")
+    reason = result.get("reason_code") or ""
+    if outcome == "unsupported" or reason.endswith("not_installed"):
+        checks.add("real_baseline_discovery_available", "failed",
+                   f"ordinary startup returned scientific_outcome={outcome}, reason {reason}",
+                   finding=REASON_FINDINGS.get(reason, "F-ADAPTER-SELECTION"))
+        return info
+    checks.add("real_baseline_discovery_available", "passed", f"outcome {outcome}, verification {verification}")
     if outcome == "certified_counterexample":
         checks.expect("certified_requires_valid_matching_evidence",
                       verification == "valid" and result.get("expected_binding") == "matches" and bool(candidates),
@@ -395,10 +453,11 @@ def check_baseline(checks: Checks, base: dict, packet: dict, *, known_positive: 
                       bool(valid_outside) and outcome == "certified_counterexample",
                       f"{len(outside)} outside candidate(s), {len(valid_outside)} freshly checked valid; "
                       f"outcome {outcome}", finding=None if valid_outside else "F-HERO-NO-WITNESS")
-    for candidate in valid_outside:
-        checks.expect(f"independent_oracle_agrees_{candidate['id']}", oracle.get(candidate["id"]) != "excluded",
-                      f"independent decimal oracle says {oracle.get(candidate['id'])} for a checker-valid candidate",
-                      level=INFO)
+    for candidate in candidates:
+        if candidate.get("verification") == "valid":  # a contradiction here would be a false checked success
+            checks.expect(f"independent_oracle_agrees_{candidate['id']}", oracle.get(candidate["id"]) != "excluded",
+                          f"independent 80-digit oracle says {oracle.get(candidate['id'])} for a checker-valid "
+                          "candidate", finding=None if oracle.get(candidate["id"]) != "excluded" else "F-FALSE-CHECKED")
     if outcome == "no_counterexample_found":
         checks.expect("no_counterexample_is_not_proof",
                       verification != "valid" or not any("prove" in str(v).lower() for v in result.values()),
@@ -408,8 +467,11 @@ def check_baseline(checks: Checks, base: dict, packet: dict, *, known_positive: 
 
 def _worker_finding(run: dict) -> str | None:
     codes = {run.get("error_code"), *[s.get("reason_code") for s in run.get("scenarios", [])]}
+    for code, finding in REASON_FINDINGS.items():
+        if code in codes:
+            return finding
     if "scientific_worker_failed" in codes:
-        return "F-PLATFORM-RLIMIT"
+        return "F-SCIENCE-WORKER"
     if "worker_failed" in codes:
         return "F-WORKER"
     return None
@@ -436,6 +498,10 @@ def check_design(checks: Checks, design: dict, pair: list[dict], base: dict, *, 
     checks.expect(f"{prefix}_separate_approval_scope", design["approval"].get("scope") == "design"
                   and design["approval"]["id"] != base["approval"]["id"],
                   f"approval scope {design['approval'].get('scope')}")
+    if job.get("state") not in TERMINAL:
+        checks.add(f"{prefix}_completed", "not_observed", f"design job still {job.get('state')} at the polling "
+                   "deadline (timed out)")
+        return {}
     if job.get("state") != "completed" or not suggestion:
         checks.add(f"{prefix}_completed", "failed", f"design job {job.get('state')} error {job.get('error_code')}",
                    finding=_worker_finding(job) or "F-DESIGN-JOB")
@@ -1057,12 +1123,14 @@ def scenario_zero_dispatch(flow: Flow, stack) -> dict:
     checks.expect("capabilities_claim_no_live_qualification", gemini.get("verified_in_environment") is False
                   and (capabilities.get("deepagents") or {}).get("verified_in_environment") is False,
                   "gemini/deepagents verified_in_environment must stay false offline")
-    mode = gemini.get("mode") or gemini.get("provider_mode") or gemini.get("execution_mode")
-    checks.add("explicit_placeholder_mode_reported",
-               "passed" if mode in ("placeholder", "disabled", "controlled_placeholder", "offline_placeholder")
-               else "blocked", f"capabilities.gemini mode {mode!r}", level=INFO,
-               finding=None if mode else "F-PLACEHOLDER-MODE")
+    mode = capabilities.get("ai_mode") or gemini.get("mode") or gemini.get("provider_mode")
+    explicit = (isinstance(mode, str) and ("placeholder" in mode or "disabled" in mode)
+                and gemini.get("dispatch_enabled") is not True)
+    checks.add("explicit_placeholder_mode_reported", "passed" if explicit else "failed",
+               f"capabilities.ai_mode {capabilities.get('ai_mode')!r}, gemini.dispatch_enabled "
+               f"{gemini.get('dispatch_enabled')!r}", finding=None if explicit else "F-PLACEHOLDER-MODE")
     return {"checks": checks, "observation": {"guarded_processes": len(installed), "workspaces": len(ledgers),
+                                              "ai_mode": capabilities.get("ai_mode"),
                                               "gemini_capability": {k: gemini.get(k) for k in (
                                                   "configured", "account_gate_passed", "verified_in_environment",
-                                                  "unavailable_reason", "mode")}}}
+                                                  "unavailable_reason", "dispatch_enabled", "live_qualification")}}}

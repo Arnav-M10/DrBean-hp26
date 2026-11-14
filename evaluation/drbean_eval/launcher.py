@@ -136,6 +136,11 @@ class LocalStack:
         self.guard_log = os.path.join(self.workdir, "egress-guard.jsonl")
         self.database = os.path.join(self.workdir, "state", "bean.sqlite3")
         self.blob_dir = os.path.join(self.workdir, "state", "sources")
+        self.artifact_dir = os.path.join(self.workdir, "state", "artifacts")
+        try:  # Owner 2's declared runtime selection: an absolute, operator-chosen CPython 3.11
+            self.counterdex_python = science_python()
+        except StackError:
+            self.counterdex_python = None
         self.processes: dict[str, subprocess.Popen] = {}
         self.seen_descendants: dict[int, dict] = {}
         self.events: list[dict] = []
@@ -175,6 +180,7 @@ class LocalStack:
             "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1",
             "DRBEAN_EGRESS_GUARD_LOG": self.guard_log,
             "BEAN_DATABASE_PATH": self.database, "BEAN_BLOB_DIR": self.blob_dir,
+            "BEAN_ARTIFACT_DIR": self.artifact_dir, "BEAN_SCIENCE_ADAPTER": "counterdex",
             "BEAN_AUTH_FILE": os.path.join(self.workdir, "state", "no-auth-file.json"),
             "BEAN_AUTH_TOKENS_JSON": json.dumps(self.tokens),
             "BEAN_ALLOWED_ORIGINS": self.base_url,
@@ -182,8 +188,19 @@ class LocalStack:
             "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost",
             "LANGSMITH_TRACING": "false", "LANGCHAIN_TRACING_V2": "false",
         }
+        if self.counterdex_python:
+            env["BEAN_COUNTERDEX_PYTHON"] = self.counterdex_python
         env.update(self.extra_env)
         return env
+
+    def startup_path(self) -> dict:
+        """Exactly which ordinary entry points this harness exercised (until Owner 4's launcher is qualified)."""
+        return {"launcher": "evaluation harness isolated launch (Owner 4 launcher not yet used)",
+                "api": "python -m uvicorn bean_api.main:create_app --factory --host 127.0.0.1",
+                "worker": "python -m bean_api.worker", "pythonpath": ["evaluation guard", "apps/api"],
+                "science_adapter": self.environment().get("BEAN_SCIENCE_ADAPTER"),
+                "counterdex_python_configured": bool(self.counterdex_python),
+                "state": "fresh temporary SQLite, sources and artifacts; in-memory bearer tokens"}
 
     # -- lifecycle ---------------------------------------------------------
     def _spawn(self, name: str, argv: list[str]) -> subprocess.Popen:
@@ -270,10 +287,15 @@ class LocalStack:
                             "process_alive": bool(worker and worker.poll() is None),
                             "holds_sqlite_worker_lock": self.worker_holds_lock()}
         try:
-            science = self.capabilities().get("science") or {}
-            ready = bool(science.get("implemented") and science.get("configured")
-                         and science.get("verified_in_environment"))
-            result["science"] = {"ready": ready, "reported": science}
+            capabilities = self.capabilities()
+            science = capabilities.get("science") or {}
+            runtime = bool(science.get("implemented") and science.get("configured")
+                           and science.get("available", science.get("verified_in_environment")))
+            discovery = science.get("baseline_discovery")
+            result["science"] = {"ready": bool(runtime and discovery is not False), "runtime_available": runtime,
+                                 "baseline_discovery": discovery, "native_replay": science.get("native_replay"),
+                                 "reason": science.get("reason"), "reported": science}
+            result["ai_mode"] = capabilities.get("ai_mode")
         except (urllib.error.URLError, OSError, ValueError) as error:
             result["science"] = {"ready": False, "error": f"{type(error).__name__}"}
         return result
