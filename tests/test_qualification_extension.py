@@ -26,6 +26,16 @@ def historical_budget():
             "qualification_extensions": [copy.deepcopy(operator_grant.QUALIFICATION_EXTENSION_POLICY)]}
 
 
+def after_first_extension():
+    budget = historical_budget()
+    budget["grants"].append({"research_session_id": "first-extension", "physical_requests": 6,
+                             "qualification_extension": operator_grant.QUALIFICATION_EXTENSION_POLICY["id"]})
+    budget["physical_requests_used"]["first-extension"] = 2
+    budget["sprint_physical_requests_total"] = 10
+    budget["qualification_extensions"].append(copy.deepcopy(operator_grant.REPAIRED_QUALIFICATION_EXTENSION_POLICY))
+    return budget
+
+
 def test_default_ceiling_stays_twelve_even_with_an_authorization_receipt():
     budget = historical_budget()
     assert operator_grant.check_grant(budget, 2) == {"sprint_granted_total": 12, "ceiling": 12}
@@ -109,7 +119,8 @@ def test_refusal_happens_before_any_application_import_or_store_creation(tmp_pat
     assert not (tmp_path / "never-created.sqlite3").exists()
 
 
-def test_authorized_extension_tags_one_real_operator_grant_without_mutating_history(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("repaired", [False, True])
+def test_authorized_extension_tags_one_real_operator_grant_without_mutating_history(tmp_path, monkeypatch, capsys, repaired):
     from bean_api.research import ResearchService
     from bean_api.store import Store
     from bean_api.workflow import Workflow
@@ -119,16 +130,17 @@ def test_authorized_extension_tags_one_real_operator_grant_without_mutating_hist
     workspace = workflow.create_workspace("fixture-actor", "No-provider allocation regression")["id"]
     service = ResearchService(workflow, live_enabled=True)
     session = service.create("fixture-actor", workspace, {"objective": "Inspect a bounded workflow", "mode": "live"}, "create")
-    history = historical_budget()
+    history = after_first_extension() if repaired else historical_budget()
     budget_path = tmp_path / "budget.json"
     budget_path.write_text(json.dumps(history))
     monkeypatch.setattr(operator_grant, "BUDGET", budget_path)
-    policy_id = operator_grant.QUALIFICATION_EXTENSION_POLICY["id"]
+    policy = operator_grant.REPAIRED_QUALIFICATION_EXTENSION_POLICY if repaired else operator_grant.QUALIFICATION_EXTENSION_POLICY
+    policy_id = policy["id"]
     monkeypatch.setenv("LIVE_QUALIFICATION_EXTENSION", policy_id)
     arguments = [str(db), session["id"], "6", "64000", "3072", "offline-regression"]
     assert operator_grant.main(arguments) == 0
     returned = json.loads(capsys.readouterr().out)
-    assert returned["qualification_extension"] == policy_id and returned["sprint_granted_total"] == 16
+    assert returned["qualification_extension"] == policy_id and returned["sprint_granted_total"] == policy["ceiling"]
     retained = json.loads(budget_path.read_text())
     assert retained["grants"][:-1] == history["grants"]
     assert {key: value for key, value in retained.items() if key != "grants"} == {
@@ -146,9 +158,79 @@ def test_authorized_extension_tags_one_real_operator_grant_without_mutating_hist
         assert conn.execute("SELECT count(*) FROM entities WHERE kind='research_provider_allocation'").fetchone()[0] == 1
 
 
-def test_committed_authorization_receipt_matches_the_explicit_policy():
+def test_committed_authorization_receipts_match_the_explicit_policies():
     # Public receipt only; this test never reads configuration or credentials.
     budget = json.loads((Path(__file__).resolve().parents[1] / "evaluation/results/sprint/live-budget.json").read_text())
-    policy = operator_grant.QUALIFICATION_EXTENSION_POLICY
-    receipt = budget["qualification_extensions"][0]
-    assert {key: receipt[key] for key in policy} == policy
+    receipts = {receipt["id"]: receipt for receipt in budget["qualification_extensions"]}
+    for policy_id, policy in operator_grant.QUALIFICATION_EXTENSION_POLICIES.items():
+        assert {key: receipts[policy_id][key] for key in policy} == policy
+
+
+def test_second_explicit_receipt_grants_at_most_six_without_reusing_the_first_policy():
+    budget = after_first_extension()
+    before = copy.deepcopy(budget)
+    policy_id = operator_grant.REPAIRED_QUALIFICATION_EXTENSION_POLICY["id"]
+    assert operator_grant.check_grant(budget, 6, policy_id) == {
+        "sprint_granted_total": 22, "ceiling": 22, "qualification_extension": policy_id}
+    assert budget == before
+    with pytest.raises(SystemExit, match="already been used"):
+        operator_grant.check_grant(budget, 1, operator_grant.QUALIFICATION_EXTENSION_POLICY["id"])
+    with pytest.raises(SystemExit, match="exceed"):
+        operator_grant.check_grant(budget, 1)
+    with pytest.raises(SystemExit, match="at most six"):
+        operator_grant.check_grant(budget, 7, policy_id)
+
+
+def test_adding_the_known_second_receipt_does_not_change_first_policy_admission():
+    budget = historical_budget()
+    budget["qualification_extensions"].append(copy.deepcopy(operator_grant.REPAIRED_QUALIFICATION_EXTENSION_POLICY))
+    assert operator_grant.check_grant(budget, 6, operator_grant.QUALIFICATION_EXTENSION_POLICY["id"])["ceiling"] == 16
+
+
+@pytest.mark.parametrize("index,key,value", [(1, "previous_ceiling", 12), (1, "ceiling", 23),
+    (1, "max_new_requests", 7), (1, "max_runs", True), (1, "max_runs", 2), (1, "actor", "another-caller"),
+    (1, "authorization", "unrecorded"), (1, "id", "another-authorization"), (0, "authorization", "changed-first")])
+def test_second_extension_rejects_tampering_with_either_receipt(index, key, value):
+    budget = after_first_extension()
+    budget["qualification_extensions"][index][key] = value
+    with pytest.raises(SystemExit, match="receipt"):
+        operator_grant.check_grant(budget, 6, operator_grant.REPAIRED_QUALIFICATION_EXTENSION_POLICY["id"])
+
+
+@pytest.mark.parametrize("change", ["missing_first_receipt", "missing_second_receipt", "duplicate_receipt",
+    "missing_first_grant", "duplicate_first_grant", "first_grant_not_six", "first_attempts_not_two",
+    "first_grant_released", "wrong_granted", "reset_used", "prior_second_grant", "released_second_grant"])
+def test_second_extension_requires_retained_first_run_and_cannot_be_reused(change):
+    budget = after_first_extension()
+    second_id = operator_grant.REPAIRED_QUALIFICATION_EXTENSION_POLICY["id"]
+    if change == "missing_first_receipt":
+        budget["qualification_extensions"].pop(0)
+    elif change == "missing_second_receipt":
+        budget["qualification_extensions"].pop()
+    elif change == "duplicate_receipt":
+        budget["qualification_extensions"].append(copy.deepcopy(budget["qualification_extensions"][-1]))
+    elif change == "missing_first_grant":
+        budget["grants"][-1].pop("qualification_extension")
+    elif change == "duplicate_first_grant":
+        budget["grants"][-1]["physical_requests"] = 3
+        budget["grants"].append(copy.deepcopy(budget["grants"][-1]))
+    elif change == "first_grant_not_six":
+        budget["grants"][-1]["physical_requests"] = 5
+        budget["grants"][0]["physical_requests"] += 1
+    elif change == "first_attempts_not_two":
+        budget["physical_requests_used"]["first-extension"] = 1
+        budget["physical_requests_used"]["first"] += 1
+    elif change == "first_grant_released":
+        budget["released"].append({"research_session_id": "first-extension", "physical_requests": 6})
+        budget["grants"][0]["physical_requests"] += 6
+    elif change == "wrong_granted":
+        budget["grants"][0]["physical_requests"] += 1
+    elif change == "reset_used":
+        budget["sprint_physical_requests_total"] = 8
+    else:
+        budget["grants"].append({"research_session_id": "second-extension", "physical_requests": 6,
+                                 "qualification_extension": second_id})
+        if change == "released_second_grant":
+            budget["released"].append({"research_session_id": "second-extension", "physical_requests": 6})
+    with pytest.raises(SystemExit):
+        operator_grant.check_grant(budget, 6, second_id)

@@ -8,7 +8,8 @@ product's own.
 
 It also enforces the default sprint ceiling of 12. A separately recorded,
 explicitly selected qualification extension permits one additional grant of
-at most six requests, with an overall ceiling of 16. Grants bound the
+at most six requests. The first has an overall ceiling of 16; the separately
+authorized repaired-run extension has a ceiling of 22. Grants bound the
 physical requests that can be dispatched, and failed or uncertain attempts are
 charged against them, so the ceiling holds for attempts too.
 
@@ -32,6 +33,14 @@ QUALIFICATION_EXTENSION_POLICY = {
     "max_new_requests": 6, "max_runs": 1, "actor": "root",
     "authorization": "User replied 'idk do wtv is best' to the explicit additional maximum of 6 requests, ceiling 16, and caller choice.",
 }
+REPAIRED_QUALIFICATION_EXTENSION_POLICY = {
+    "id": "user-repaired-followthrough-2026-11-14", "previous_ceiling": 16, "ceiling": 22,
+    "max_new_requests": 6, "max_runs": 1, "actor": "root",
+    "authorization": "User replied 'idk upto u whatevers best' to the explicit fresh run of at most 6 requests, qualification ceiling 22, and merge only if it passes.",
+}
+QUALIFICATION_EXTENSION_POLICIES = {
+    policy["id"]: policy for policy in (QUALIFICATION_EXTENSION_POLICY, REPAIRED_QUALIFICATION_EXTENSION_POLICY)
+}
 # One canonical sprint ledger, wherever the harness runs (LIVE_BUDGET_FILE overrides the default).
 BUDGET = Path(os.environ.get("LIVE_BUDGET_FILE") or Path(__file__).resolve().parents[1] / "results" / "sprint" / "live-budget.json")
 
@@ -52,21 +61,46 @@ def check_grant(budget: dict, physical: int, extension: str | None = None) -> di
         raise SystemExit("Refusing: malformed qualification release history.")
     ceiling = SPRINT_CEILING
     if extension is not None:
-        policy = QUALIFICATION_EXTENSION_POLICY
+        policy = QUALIFICATION_EXTENSION_POLICIES.get(extension) if isinstance(extension, str) else None
         receipts = budget.get("qualification_extensions")
-        if (extension != policy["id"] or type(receipts) is not list or len(receipts) != 1
-                or type(receipts[0]) is not dict or any(
-                    type(receipts[0].get(key)) is not type(value) or receipts[0][key] != value
-                    for key, value in policy.items())):
+        if policy is None or type(receipts) is not list or not receipts:
             raise SystemExit("Refusing: the exact qualification authorization receipt and opt-in are required.")
+        known_receipts = set()
+        for receipt in receipts:
+            receipt_id = receipt.get("id") if type(receipt) is dict else None
+            known_policy = QUALIFICATION_EXTENSION_POLICIES.get(receipt_id) if isinstance(receipt_id, str) else None
+            if known_policy is None or receipt_id in known_receipts or any(
+                    type(receipt.get(key)) is not type(value) or receipt[key] != value
+                    for key, value in known_policy.items()):
+                raise SystemExit("Refusing: duplicate, unknown or altered qualification authorization receipt.")
+            known_receipts.add(receipt_id)
+        if extension not in known_receipts:
+            raise SystemExit("Refusing: the exact qualification authorization receipt and opt-in are required.")
+        tagged = [grant for grant in grants if "qualification_extension" in grant]
+        if any(not isinstance(grant["qualification_extension"], str)
+               or grant["qualification_extension"] not in known_receipts for grant in tagged):
+            raise SystemExit("Refusing: a historical qualification grant lacks its exact authorization receipt.")
         # Even a released or failed extension run consumes the one-run policy.
-        if any("qualification_extension" in grant for grant in grants):
+        if any(grant["qualification_extension"] == extension for grant in tagged):
             raise SystemExit("Refusing: the single qualification extension grant has already been used.")
         used = budget.get("physical_requests_used")
-        if (granted != 10 or type(used) is not dict or any(type(count) is not int or count < 0 for count in used.values())
-                or sum(used.values()) != 8 or type(budget.get("sprint_physical_requests_total")) is not int
-                or budget["sprint_physical_requests_total"] != 8):
-            raise SystemExit("Refusing: retain the historical ten effective grants and eight physical attempts.")
+        expected_granted, expected_used = (10, 8) if extension == QUALIFICATION_EXTENSION_POLICY["id"] else (16, 10)
+        if (granted != expected_granted or type(used) is not dict
+                or any(type(count) is not int or count < 0 for count in used.values())
+                or sum(used.values()) != expected_used or type(budget.get("sprint_physical_requests_total")) is not int
+                or budget["sprint_physical_requests_total"] != expected_used):
+            raise SystemExit("Refusing: retain all historical effective grants and physical attempts for this authorization.")
+        if extension == QUALIFICATION_EXTENSION_POLICY["id"]:
+            if tagged:
+                raise SystemExit("Refusing: the first qualification extension cannot follow another extension.")
+        else:
+            first_id = QUALIFICATION_EXTENSION_POLICY["id"]
+            prior = [grant for grant in tagged if grant["qualification_extension"] == first_id]
+            if (first_id not in known_receipts or len(prior) != 1 or prior[0]["physical_requests"] != 6
+                    or not isinstance(prior[0].get("research_session_id"), str)
+                    or used.get(prior[0]["research_session_id"]) != 2
+                    or any(row.get("research_session_id") == prior[0]["research_session_id"] for row in released)):
+                raise SystemExit("Refusing: retain the unreleased first six-request grant and its two actual attempts.")
         if physical > policy["max_new_requests"]:
             raise SystemExit("Refusing: this qualification extension permits at most six new requests.")
         ceiling = policy["ceiling"]
