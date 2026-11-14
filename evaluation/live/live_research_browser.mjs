@@ -35,7 +35,8 @@ const python = resolve(root, '.venv/bin/python'), engine = resolve(root, '.venv-
 const apiPort = await freePort(), webPort = await freePort(), base = `http://127.0.0.1:${webPort}`
 const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', DRBEAN_VAR_DIR: scratch, BEAN_AUTH_FILE: join(scratch, 'auth.json'),
   BEAN_DEV_API_PORT: String(apiPort), BEAN_DEV_WEB_PORT: String(webPort), BEAN_RESEARCH_MODE: 'live',
-  PYTHONPATH: join(root, 'apps/api'), LANGSMITH_TRACING: 'false' }
+  PYTHONPATH: join(root, 'apps/api'), LANGSMITH_TRACING: 'false',
+  LIVE_BUDGET_FILE: process.env.LIVE_BUDGET_FILE || join(root, 'evaluation/results/sprint/live-budget.json') }
 const record = { schema_version: 'c-sprint-live-run.v1', lane: CASE === 'dry-run' ? 'live_gemini (dry run, zero requests)' : 'live_gemini',
   case: CASE, harness_commit: commit, application_tree: appDiff ? `differs from origin/main: ${appDiff.split('\n').length} files` : `identical to origin/main ${appBase}`, grant: GRANT, started_at: new Date().toISOString(), checks: [], observations: {} }
 let browser, context, page, launched = false
@@ -190,10 +191,10 @@ try {
 
   // Provider ledger, events and evidence: public fields only.
   const attempts = list(await api(`/workspaces/${workspace}/provider-attempts`))
-  record.observations.attempts = attempts.map(item => ({ id: item.id, state: item.state, provider: item.provider, model: item.model,
-    operation: item.metadata?.operation, execution_mode: item.metadata?.execution_mode ?? item.execution_mode,
-    usage: item.usage ?? item.metadata?.usage ?? null, error_code: item.error_code ?? item.metadata?.error_code ?? null,
-    created_at: item.created_at }))
+  // Whole attempt records: ids, states, budgets, prompt hashes and provider-reported usage; never prompts or keys.
+  record.observations.attempts = attempts
+  record.observations.provider_usage = (await api(`/research-sessions/${session.id}`)).provider_usage ?? null
+  record.observations.model_tool_calls = JSON.parse(await run(python, ['evaluation/live/extract_tool_calls.py', join(scratch, 'bean.sqlite3'), session.id], env, 30000))
   const events = (await api(`/research-sessions/${session.id}/events?after=-1`)).items
   record.observations.events = events.map(event => ({ type: event.event_type, summary: event.summary, references: event.reference_ids,
     execution_mode: event.execution_mode ?? event.body?.execution_mode ?? null }))

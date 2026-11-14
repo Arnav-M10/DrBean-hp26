@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 from pathlib import Path
 import sys
 
 SPRINT_CEILING = 12
-BUDGET = Path(__file__).resolve().parents[1] / "results" / "sprint" / "live-budget.json"
+# One canonical sprint ledger, wherever the harness runs (LIVE_BUDGET_FILE overrides the default).
+BUDGET = Path(os.environ.get("LIVE_BUDGET_FILE") or Path(__file__).resolve().parents[1] / "results" / "sprint" / "live-budget.json")
 
 
 def main(argv: list[str]) -> int:
