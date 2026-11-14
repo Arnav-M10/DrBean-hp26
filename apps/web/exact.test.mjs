@@ -62,10 +62,11 @@ test("counts exact distinct included times without dropping duplicate observatio
   assert.equal(rows.length, 4);
 });
 
-test("allows zero time and signed concentrations while reporting negative time", () => {
+test("allows zero time while rejecting negative concentration and time", () => {
   const rows = parseMeasurementsCsv("time,concentration,epsilon\n0,-1,1\n1,3,1\n2,2,1\n-1,2,1");
   assert.deepEqual(validateMeasurements(rows), {
-    errors: [{ index: 3, field: "time", message: "Enter a nonnegative elapsed time." }],
+    errors: [{ index: 0, field: "concentration", message: "Enter a nonnegative concentration." },
+      { index: 3, field: "time", message: "Enter a nonnegative elapsed time." }],
     distinctTimes: 3,
   });
 });
