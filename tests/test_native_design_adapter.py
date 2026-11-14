@@ -85,13 +85,14 @@ def test_computed_pair_design_preserves_approved_grid_history_and_fresh_replay(n
     assert fresh["fresh_checked"]["selected_time"] == result["selected_time"]
 
 
-@pytest.mark.parametrize("allowance,construction,tier,replay", [
-    ("100/1", True, "no_separation_established", "passed"),
-    ("1/5", False, "numerical_guidance", "unsupported"),
+@pytest.mark.parametrize("allowance,construction,continuation,tier,replay", [
+    ("100/1", True, True, "no_separation_established", "passed"),
+    ("1/5", False, False, "numerical_guidance", "unsupported"),
+    ("1/5", True, False, "numerical_guidance", "unsupported"),
 ])
-def test_checked_design_retains_no_separation_and_numerical_fallback(native_design_history, allowance, construction, tier, replay):
+def test_checked_design_retains_no_separation_and_numerical_fallback(native_design_history, allowance, construction, continuation, tier, replay):
     adapter, history, request = deepcopy(native_design_history)
-    request.update(future_hard_allowance=allowance, allow_construction=construction, allow_continuation=construction)
+    request.update(future_hard_allowance=allowance, allow_construction=construction, allow_continuation=continuation)
     history["expected_request_digest"] = semantic_digest("design-request", request)
     result = adapter.design(request, history)
     assert "worker_error" not in result, result
@@ -106,6 +107,24 @@ def test_checked_design_retains_no_separation_and_numerical_fallback(native_desi
     artifact, content, _, _ = decode(result)
     fresh = adapter.replay_native(content, expected=artifact["anchor"])
     assert fresh["integrity"] == "passed" and fresh["replay"] == replay
+
+
+def test_reversed_approved_pair_preserves_vectors_and_allows_canonical_checker_order(native_design_history):
+    adapter, history, request = deepcopy(native_design_history)
+    request["candidate_ids"].reverse()
+    request["candidate_vectors"].reverse()
+    history["expected_request_digest"] = semantic_digest("design-request", request)
+    result = adapter.design(request, history)
+    assert "worker_error" not in result, result
+    DesignResult.model_validate({k: v for k, v in result.items() if not k.startswith("_")})
+    assert result["design_tier"] == "checked_pair_separation" and result["replay"] == "passed"
+    assert result["candidate_ids"] == request["candidate_ids"]
+    assert [item["candidate_id"] for item in result["candidate_results"]] == sorted(request["candidate_ids"])
+    artifact, content, packet, scientific = decode(result)
+    assert [item["id"] for item in scientific["design"]["candidates"]] == request["candidate_ids"]
+    assert [item["parameters"] for item in scientific["design"]["candidates"]] == request["candidate_vectors"]
+    assert packet["binding"]["request"] == request
+    assert adapter.replay_native(content, expected=artifact["anchor"])["replay"] == "passed"
 
 
 @pytest.mark.parametrize("field", ["expected_request_digest", "source_artifact_ids", "requested_tier"])

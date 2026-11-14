@@ -100,7 +100,10 @@ def _faithful_result(result, science, request):
                 "options": options, "algorithm": CHECKED_POLICY if verified else NUMERICAL_POLICY,
                 "candidate_ids": request["candidate_ids"], "future_hard_allowance": request["future_hard_allowance"],
                 "candidate_results": fresh.get("candidate_results", [])}
-    _require(all(result.get(key) == value for key, value in expected.items()),
+    # The public DTO deliberately omits empty additive fields to preserve older
+    # immutable record bytes. Absence means no candidate facts, not a mismatch.
+    _require(all(result.get(key, [] if key == "candidate_results" else None) == value
+                 for key, value in expected.items()),
              "Published design facts must match the retained fresh replay and approved grid order.")
 
 
@@ -205,8 +208,14 @@ def _design_result_checked(result):
     rows = checked.get("rows", [])
     options = result.get("options", [])
     indexed = {row["time"]: row for row in rows}
+    # The checker sorts compatibility facts by ID; the reviewed design retains
+    # the researcher's selected order. Bind facts to unique IDs without treating
+    # either ordering as permission to swap the corresponding parameter vectors.
+    checked_ids = [item["candidate_id"] for item in checked.get("candidate_results", [])]
+    approved_ids = result.get("candidate_ids", [])
     return (len(indexed) == len(rows) == len(options)
-            and [item["candidate_id"] for item in checked.get("candidate_results", [])] == result.get("candidate_ids")
+            and len(checked_ids) == len(approved_ids) == len(set(approved_ids)) == 2
+            and set(checked_ids) == set(approved_ids)
             and all(option["time"] in indexed
                     and option["state"] == indexed[option["time"]]["status"]
                     and option.get("exact_margin") == indexed[option["time"]].get("margin")

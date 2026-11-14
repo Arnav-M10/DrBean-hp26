@@ -12,10 +12,11 @@ import json
 import pytest
 
 from bean_api.main import PREFIX
+from bean_api.contracts import PlanBody
 from bean_api.worker import Worker
 import test_baseline_workflow as baseline
 import test_scientific_http as scientific_http
-from test_scientific_http import post, prepare_approved_history
+from test_scientific_http import ROOT, post, prepare_approved_history
 
 scientific_client = scientific_http.scientific_client
 replay_python = baseline.replay_python
@@ -146,6 +147,9 @@ def test_actual_pair_design_requires_separate_approval_and_replays_downloaded_li
 def test_revised_design_needs_new_approval_and_preserves_honest_no_separation(computed_history, replay_python, tmp_path):
     history, client = computed_history, computed_history["client"]
     original_request = design_request(history)
+    # Pair order is reviewed scope; checker result ordering cannot change it.
+    original_request["candidate_ids"].reverse()
+    original_request["candidate_vectors"].reverse()
     plan = propose(history, original_request, "initial-design")
     _, approval, original, original_bytes, original_anchors = approve_start_and_download(history, plan, "initial")
     revised_request = design_request(history, times=["6/1", "8/1"], allowance="100/1")
@@ -180,4 +184,60 @@ def test_revised_design_needs_new_approval_and_preserves_honest_no_separation(co
     response = client.post(PREFIX + f"/runs/{history['run']['id']}/design-proposals", json=numerical,
                            headers={"Idempotency-Key": "unsupported-native-tier"})
     assert response.status_code == 422
+    assert_preserved_history(history)
+
+
+def test_independent_hero_without_extension_exports_honest_numerical_design(scientific_client, replay_python, tmp_path):
+    """Independent evaluator inputs/permissions exercise numerical fallback.
+
+    Future times exceed history, but extension is not approved. Reuse only the
+    evaluator's measurement inputs and review, never its candidate oracles.
+    """
+    client = scientific_client
+    packet = json.loads((ROOT / "evaluation/cases/science/hero-v1.json").read_text())
+    workspace = post(client, "/workspaces", {"name": "Independent hero input regression"}, "hero-workspace")["id"]
+    dataset = post(client, f"/workspaces/{workspace}/datasets", packet["dataset"], "hero-dataset")
+    problem = post(client, f"/workspaces/{workspace}/problems", {
+        **packet["problem"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]}, "hero-problem")
+    body = PlanBody(problem_id=problem["id"], problem_digest=problem["digest"], dataset_id=dataset["id"],
+        scientific_profile="counterdex.v1", objective={"question": "Challenge the reviewed synthetic interval.",
+        "success_criterion": "Retain exact checked evidence or an explicit unresolved outcome."},
+        scenarios=[{"id": "baseline", "kind": "baseline", "label": "Independent hero synthetic inputs",
+                    "problem_id": problem["id"], "problem_digest": problem["digest"]}]).model_dump(mode="json")
+    plan = post(client, f"/workspaces/{workspace}/plans", {
+        "expected_current_revision_id": problem["id"], "plan": body}, "hero-plan")
+    approval = post(client, f"/plans/{plan['id']}/approvals", {
+        "expected_current_revision_id": problem["id"], "expected_plan_digest": plan["digest"],
+        "accepted": True}, "hero-approval")
+    run = post(client, f"/plans/{plan['id']}/runs", {
+        "approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "hero-run")
+    result, baseline_bytes, baseline_anchors, _ = baseline.execute_and_download(client, run)
+    finished = client.get(PREFIX + f"/runs/{run['id']}").json()
+    evidence = client.get(PREFIX + f"/records/{finished['scenarios'][0]['result_id']}").json()
+    history = {"client": client, "workspace": workspace, "dataset": dataset, "problem": problem,
+        "approval": approval, "run": run, "result": result, "content": baseline_bytes,
+        "anchors": baseline_anchors, "evidence": evidence}
+    lower, upper = (Fraction(problem["body"]["target"][side]) for side in ("lower", "upper"))
+    pair = sorted(result["candidates"], key=lambda candidate:
+                  not lower <= Fraction(candidate["parameter_vector"]["ke"]) <= upper)
+    assert len(pair) == 2
+    assert lower <= Fraction(pair[0]["parameter_vector"]["ke"]) <= upper
+    assert not lower <= Fraction(pair[1]["parameter_vector"]["ke"]) <= upper
+    review = packet["design_review"]
+    request = {**design_request(history, times=review["feasible_times"], allowance=review["future_hard_allowance"]),
+        "candidate_ids": [candidate["id"] for candidate in pair],
+        "candidate_vectors": [candidate["parameter_vector"] for candidate in pair],
+        "allow_construction": review["allow_construction"], "allow_continuation": review["allow_continuation"],
+        "maximum_horizon": review["maximum_horizon"],
+        "allowance_origin": {"kind": review["allowance_origin"], "description": review["allowance_description"]}}
+    assert request["allow_construction"] is True and request["allow_continuation"] is False
+    design = propose(history, request, "hero-design")
+    _, _, result, content, anchors = approve_start_and_download(history, design, "hero-design")
+    assert result["design_tier"] == "numerical_guidance"
+    assert result["verification"] == "not_checked" and result["replay"] == "unsupported"
+    assert all(option["exact_margin"] is None for option in result["options"])
+    process, fresh = baseline.replay_cli(replay_python, tmp_path, content, anchors)
+    assert process.returncode == 0, fresh
+    assert fresh["integrity"] == "passed" and fresh["expected_binding"] == "matches"
+    assert fresh["verification"] == "not_checked" and fresh["replay"] == "unsupported"
     assert_preserved_history(history)

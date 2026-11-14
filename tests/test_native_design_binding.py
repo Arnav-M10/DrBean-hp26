@@ -14,7 +14,7 @@ import shutil
 import pytest
 
 from bean_api.canonical import semantic_digest
-from bean_api.contracts import DesignRequestBody
+from bean_api.contracts import DesignRequestBody, DesignResult
 from bean_api.counterdex_adapter import CounterdexAdapter
 from bean_api.design_evidence import (design_result_checked, expected_design_anchor,
                                      validate_design_packet)
@@ -45,10 +45,12 @@ def native_designs():
                 "expected_problem_digest": problem["digest"], "result": baseline["result"],
                 "arrived_after_cancel": False}
     contexts = {}
-    for name, allowance, construct in (("checked", "1/5", True), ("wide", "3/5", True), ("numerical", "1/5", False)):
+    for name, allowance, construct in (("checked", "1/5", True), ("wide", "3/5", True),
+                                       ("numerical", "1/5", False), ("reversed", "1/5", True)):
+        selected = list(reversed(candidates)) if name == "reversed" else candidates
         request = DesignRequestBody.model_validate({"historical_run_id": "binding_baseline", "scenario_id": "baseline",
             "problem_id": problem["id"], "problem_digest": problem["digest"],
-            "candidate_ids": [c["id"] for c in candidates], "candidate_vectors": [c["parameter_vector"] for c in candidates],
+            "candidate_ids": [c["id"] for c in selected], "candidate_vectors": [c["parameter_vector"] for c in selected],
             "feasible_times": ["8/1", "6/1"], "future_hard_allowance": allowance,
             "scientific_profile": "counterdex.v1", "requested_tier": "checked_pair_separation",
             "allowance_origin": {"kind": "reviewed_hard_bound", "description": "Explicit synthetic future allowance"},
@@ -90,6 +92,31 @@ def test_actual_design_states_keep_faithful_scope_and_replay(native_designs, nam
     assert context["result"]["design_tier"] == tier
     assert design_result_checked(context["result"]) is checked
     assert [row["time"] for row in context["result"]["options"]] == ["8/1", "6/1"]
+
+
+def test_reversed_approved_pair_keeps_vectors_and_accepts_checker_id_order(native_designs):
+    original, reversed_pair = native_designs["checked"], native_designs["reversed"]
+    validate_design_packet(**reversed_pair)
+    assert design_result_checked(reversed_pair["result"])
+    assert reversed_pair["result"]["candidate_ids"] == list(reversed(original["result"]["candidate_ids"]))
+    assert reversed_pair["request"]["candidate_vectors"] == list(reversed(original["request"]["candidate_vectors"]))
+    assert reversed_pair["result"]["candidate_results"] == original["result"]["candidate_results"]
+    assert reversed_pair["result"]["options"] == original["result"]["options"]
+    assert reversed_pair["result"]["selected_time"] == original["result"]["selected_time"]
+    assert reversed_pair["anchor"]["app_request_digest"] != original["anchor"]["app_request_digest"]
+    assert reversed_pair["anchor"]["design_digest"] != original["anchor"]["design_digest"]
+    assert reversed_pair["historical_artifact"] == original["historical_artifact"]
+
+
+def test_serialized_numerical_result_preserves_empty_candidate_facts(native_designs):
+    context = deepcopy(native_designs["numerical"])
+    assert context["result"]["candidate_results"] == []
+    context["result"] = DesignResult.model_validate(context["result"]).model_dump(mode="json")
+    assert "candidate_results" not in context["result"]
+    validate_design_packet(**context)
+    assert not design_result_checked(context["result"])
+    assert context["result"]["verification"] == "not_checked"
+    assert context["result"]["replay"] == "unsupported"
 
 
 def test_expected_anchor_rejects_changed_reviewed_request(native_designs):
