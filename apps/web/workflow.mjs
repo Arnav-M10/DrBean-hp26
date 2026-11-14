@@ -22,6 +22,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   let connectionIdentity
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
+  const currentInputs = () => inputs && frozen === fingerprint()
   async function saveReviewedInputs() {
     if (!api || !workspace) throw new Error('Connect to a private workspace first.')
     if (inputs && frozen === fingerprint()) return inputs
@@ -31,11 +32,14 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     const dataset = await client.json(`/workspaces/${scope}/datasets`, datasetPayload)
     const problem = await client.json(`/workspaces/${scope}/problems`, problemBody(draft, dataset))
     if (client !== api || scope !== workspace) throw new Error('The private workspace connection changed while saving inputs. Reopen the original workspace to inspect the saved records.')
-    inputs = { dataset, problem }; frozen = snapshot
+    if (snapshot !== fingerprint()) throw new Error('The draft changed while saving. Review the current draft before continuing.')
+    inputs = { dataset, problem }; frozen = snapshot; plan = approval = undefined
     return inputs
   }
   const available = () => baselineAvailable(capabilities)
-  const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save, openRun: async id => { await refreshRun(id); location.hash = 'investigations' } })
+  const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save, openRun: async id => {
+    await refreshRun(id); byId('manual-investigations').open = true; location.hash = 'investigations'
+  } })
   const assistant = setupAssistantWorkflow({ context: () => ({ api, workspace, run, busy, capabilities }), button, node, exactRecord })
   const sources = setupSourceWorkflow({ context: () => ({ api, workspace, busy, capabilities }), applyReviewedFields, getDraft, button, node, exactRecord, useInputs: async materialized => {
     const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(materialized.problem, getDraft().question.goal))
@@ -88,14 +92,17 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     return list
   }
   function renderReview() {
-    const review = byId('backend-review'); review.replaceChildren(node('h2', 'Save, approve and start the check'))
+    const review = byId('backend-review'); review.replaceChildren(node('h2', 'Manual Counterdex check'))
     if (!api) review.append(para('Investigation planning is unavailable until you connect. Connect to a Dr. Bean server at the top of this page; meanwhile you can still prepare and download your draft.', 'note wait'))
     else if (!workspace) review.append(para('Choose or create a workspace in the connection panel at the top of this page.', 'note wait'))
-    else if (!available()) review.append(para(`You can save and approve a plan, but this server cannot run the check right now: ${capabilities?.science?.reason || 'the configured runtime does not offer baseline discovery'}.`, 'note wait'))
+    else if (!available()) review.append(para('This server cannot run the manual Counterdex check right now.', 'note wait'))
     review.append(node('h3', '1. Freeze these inputs'), para('Saves the measurements and claim on the server exactly as shown above and prepares a plan for one check. Nothing runs yet. No language model is used.'))
     button(review, 'Save inputs and prepare plan', async () => {
+      const goal = getDraft().question.goal, snapshot = fingerprint()
       const reviewed = await saveReviewedInputs()
-      plan = await api.json(`/workspaces/${workspace}/plans`, planRequest(reviewed.problem, getDraft().question.goal)); approval = undefined
+      const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(reviewed.problem, goal))
+      if (!currentInputs() || snapshot !== fingerprint()) throw new Error('The draft changed while preparing this plan. Review the current inputs and prepare a new plan.')
+      plan = prepared; approval = undefined
     }, !api || !workspace)
     if (!plan) return
     if (!currentPlan()) review.append(para('Draft changed since this plan was saved. Choose Save inputs and prepare plan again before approving.', 'note wait'))
@@ -125,14 +132,15 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
       if (!available() || !currentPlan() || !approval) throw new Error('Available baseline discovery and current explicit approval are required.')
       run = await api.json(`/plans/${plan.id}/runs`, { approval_id: approval.id, expected_plan_digest: plan.digest })
       byId('run-id').value = run.id
+      byId('manual-investigations').open = true
       report = undefined; location.hash = 'investigations'
     }, !available() || !approval || !currentPlan() || Boolean(run && run.plan_id === plan.id))
     if (run && run.plan_id === plan.id) review.append(para('', 'fine'), link('This check has started. Follow it on Investigate.', '#investigations'))
   }
   function renderInvestigation() {
     const investigations = byId('backend-investigations'), previousId = byId('run-id')?.value || run?.id || ''
-    investigations.replaceChildren(node('h2', 'Approved check'))
-    if (!run) investigations.append(para('Nothing is running. Approve a check on the Review step, or reopen a saved one below.', 'note'))
+    investigations.replaceChildren(node('h2', 'Current or reopened check'))
+    if (!run) investigations.append(para('Open a saved check below, or prepare a manual check from Review inputs.', 'note'))
     else {
       const [kind, label] = RUN_STATES[run.state] ?? ['off', run.state]
       const head = node('div', ''); head.className = 'actions'; head.append(chip(kind, label), para(run.plan_id === plan?.id ? 'The check you approved on Review' : 'A reopened check', 'meta'))
@@ -329,7 +337,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     onRender()
   }
   function status() {
-    return { connected: Boolean(api), workspace, mode: connectionMode, busy, planned: Boolean(plan), planCurrent: Boolean(currentPlan()), approved: Boolean(approval && currentPlan()),
+    return { connected: Boolean(api), workspace, mode: connectionMode, busy, inputsCurrent: Boolean(currentInputs()), planned: Boolean(plan), planCurrent: Boolean(currentPlan()), approved: Boolean(approval && currentPlan()),
       run: run ? { id: run.id, state: run.state, evidence: run.evidence?.length ?? 0, tone: run.evidence?.[0] ? interpretResult(run.evidence[0].body.result).tone : null, pairReady: (run.evidence ?? []).some(e => designCandidates(e).length >= 2) } : null,
       designPending: Boolean(designs.pending()), report: Boolean(report) }
   }

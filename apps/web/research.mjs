@@ -1,11 +1,23 @@
 import { parseExact } from './exact.mjs'
 import { interpretResult } from './result-view.mjs'
 import { designExplanation } from './design.mjs'
+import { investigationObjective } from './manual.mjs'
+import { studyContextErrors, validateQuestion } from './question.mjs'
+import { validateMeasurements } from './exact.mjs'
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/
 const SHA = /^[a-f0-9]{64}$/
 const ACTIVE = new Set(['queued', 'running', 'waiting_child'])
 const clone = value => JSON.parse(JSON.stringify(value))
+
+function draftObjective(draft) {
+  const goal = draft.question.goal.trim()
+  if (goal) return goal
+  const { exact } = validateQuestion(draft.question)
+  return exact.targetMin && exact.targetMax
+    ? investigationObjective({ body: { target: { lower: exact.targetMin, upper: exact.targetMax } } }).question
+    : ''
+}
 
 export function researchSnapshot(value, workspace) {
   if (!value || value.schema_version !== 'DB-RESEARCH-1' || !ID.test(value.id) || value.workspace_id !== workspace
@@ -95,9 +107,10 @@ export class ResearchController {
     let inputs, body
     try {
       const draft = clone(this.getDraft()), constraints = designConstraints(this.state.form), sources = clone(this.getSources())
-      if (!draft.question.goal.trim()) throw new Error('Enter your research question in Question before starting.')
+      if (!draftObjective(draft)) throw new Error('Complete the claimed elimination-rate range before saving the research question.')
       inputs = await connection.saveReviewedInputs()
-      body = { objective: draft.question.goal.trim(), problem_id: inputs.problem.id, expected_problem_digest: inputs.problem.digest,
+      if (this.state.acceptedDraft !== JSON.stringify(this.getDraft())) throw new Error('Review the changed draft before continuing.')
+      body = { objective: investigationObjective(inputs.problem, draft.question.goal).question, problem_id: inputs.problem.id, expected_problem_digest: inputs.problem.digest,
         source_ids: this.state.form.attachSources ? sources.map(asset => asset.id) : [], mode: this.configuredMode(), design_constraints: constraints }
     } catch (error) { if (generation === this.generation) this.state.error = error.message }
     if (generation !== this.generation) return
@@ -170,13 +183,14 @@ const EVENT_LABELS = {
   cancel_requested: 'Stop requested', reconciled: 'Recovered after interruption', terminal: 'Finished',
 }
 
-export function setupResearch({ root, getDraft, getSources, getSourceQuestion, onChange = () => {} }) {
+export function setupResearch({ root, results, next, report, getDraft, getSources, getSourceQuestion, onChange = () => {} }) {
   const element = (tag, text = '', className = '') => { const item = document.createElement(tag); item.textContent = text; if (className) item.className = className; return item }
   const chip = ([kind, text]) => element('span', text, `state ${kind}`)
   const controller = new ResearchController({ getDraft, getSources, getSourceQuestion, changed: () => { render(); onChange() } })
-  let timer
+  let timer, renderedDraft
   const save = (bytes, name) => { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/json' })); const a = element('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }
   const action = async callback => { try { await callback() } catch (error) { controller.state.error = error.message; render() } }
+  const link = (text, href) => { const a = element('a', text, 'button secondary'); a.href = href; return a }
   function button(parent, title, callback, disabled = false, className = '') { const item = element('button', title, className); item.type = 'button'; item.disabled = disabled || controller.state.busy; item.addEventListener('click', () => action(callback)); parent.append(item); return item }
   function details(parent, title, value, className = '') { const item = element('details', '', className); item.append(element('summary', title), element('pre', JSON.stringify(value, null, 2))); parent.append(item); return item }
   function field(parent, title, key, options = null) {
@@ -206,12 +220,17 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
   function render() {
     clearTimeout(timer); if (!root) return
     const state = controller.state, connection = controller.connection, s = state.snapshot, caps = connection.capabilities?.deepagents
+    for (const destination of [results, next, report]) destination.replaceChildren()
     root.replaceChildren(element('h2', 'Research plan with the assistant'))
     root.append(element('p', 'The research assistant keeps a step-by-step plan, proposes each scientific operation and stops for your approval before it runs. It is built with LangChain Deep Agents. Every mathematical result still comes from the Counterdex checker, never from the assistant.'))
-    if (!connection.api || !connection.workspaceId) { root.append(element('p', 'Connect to a private workspace to keep a research question and plan.', 'note')); return }
+    if (!connection.api || !connection.workspaceId) {
+      renderedDraft = JSON.stringify(getDraft())
+      root.append(element('p', 'Connect to a private workspace to keep a research question and plan.', 'note'))
+      return
+    }
     if (state.error) { const error = element('p', state.error, 'errors'); error.setAttribute('role', 'alert'); root.append(error) }
     const enabled = Boolean(caps?.dispatch_enabled)
-    if (!enabled) root.append(element('p', `The assistant cannot take new steps on this server: ${caps?.unavailable_reason || 'no coordinator is configured'}. Saved plans and their evidence can still be opened. The approved check works without it.`, 'note wait'))
+    if (!enabled) root.append(element('p', 'The assistant is unavailable on this server. You can reopen saved research or run Counterdex directly.', 'note wait'), link('Go to manual check', '#manual'))
     else root.append(element('p', caps.execution_mode === 'live' ? `Assistant model: Gemini ${connection.capabilities.gemini?.model || ''}, metered separately and limited to capacity the server operator allocates. Saving your inputs does not call the model.` : 'Assistant model: a local controlled policy run through Deep Agents. It makes no external model requests; the checker computes every result.', 'fine'))
     if (state.pending) {
       const box = element('div', '', 'callout'); root.append(box)
@@ -221,17 +240,24 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
     if (!s) {
       const start = element('section'); root.append(start)
       start.append(element('h3', 'Start a research plan'))
-      const goal = getDraft().question.goal.trim()
-      start.append(element('p', goal ? `Question: “${goal}”` : 'Add a question first: write it in Claim and assumptions under “Your question in your own words.”', goal ? '' : 'note wait'))
+      const draft = getDraft(), goal = draftObjective(draft)
+      renderedDraft = JSON.stringify(draft)
+      const measurementsReady = !validateMeasurements(draft.rows).errors.length
+      const questionReady = !validateQuestion(draft.question).errors.length && !studyContextErrors(draft.context).length
+      start.append(element('p', goal ? `Question: “${goal}”` : 'Set the claimed elimination-rate range to define the question.', goal ? '' : 'note wait'))
       start.append(element('p', 'The plan uses the measurements and claim from Check inputs. Saving them here does not run anything.', 'fine'))
-      if (controller.getSources().length) {
+      if (enabled && controller.getSources().length) {
         start.append(element('p', 'You can also keep the files selected under “Ask about a paper or data file” as context. They will not become measurements or approve any computation.'))
         button(start, 'Save selected files and research question', () => controller.createFromSources(), Boolean(state.pending), 'secondary')
       }
-      constraints(start)
-      if (controller.getSources().length) checkbox(start, 'Attach selected general files as context only; they do not populate or certify these measurements.', Boolean(state.form.attachSources), value => { state.form.attachSources = value; controller.persist() })
-      checkbox(start, 'I reviewed the exact measurement values, units, time origin, hard allowances, parameter bounds and question assumptions.', state.dataAccepted, value => { state.dataAccepted = value; state.acceptedDraft = value ? JSON.stringify(getDraft()) : '' })
-      button(start, 'Save reviewed inputs and research question', () => controller.create(), Boolean(state.pending))
+      if (enabled && (!measurementsReady || !questionReady)) start.append(link(measurementsReady ? 'Complete claim and assumptions' : 'Review measurements', measurementsReady ? '#question' : '#inputs'))
+      if (enabled && measurementsReady && questionReady) {
+        constraints(start)
+        if (controller.getSources().length) checkbox(start, 'Attach selected general files as context only; they do not populate or certify these measurements.', Boolean(state.form.attachSources), value => { state.form.attachSources = value; controller.persist() })
+        checkbox(start, 'I reviewed the exact measurement values, units, time origin, hard allowances, parameter bounds and question assumptions.', state.dataAccepted, value => { state.dataAccepted = value; state.acceptedDraft = value ? JSON.stringify(getDraft()) : '' })
+        button(start, 'Save reviewed inputs and research question', () => controller.create(), Boolean(state.pending))
+        start.append(link('See the input summary', '#review'))
+      }
       if (state.history.length) {
         start.append(element('h3', 'Saved research plans'))
         for (const previous of state.history) button(start, `Reopen: ${previous.objective.slice(0, 120)}`, () => controller.refresh(previous.id), false, 'secondary')
@@ -258,11 +284,20 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
       root.append(turn)
       turn.append(element('h3', review.kind === 'design_plan' ? 'Review the separate pair-design operation' : review.body.followup ? 'Review the separate original-candidate recheck' : 'Review the investigation operation'))
       turn.append(element('p', review.kind === 'design_plan' ? 'The assistant proposes comparing measurement times for two candidates and stopped. Nothing runs until you approve. Approving the earlier check did not approve this.' : 'The assistant proposed this operation and stopped. Nothing runs until you approve. Accepting your inputs earlier did not approve it.'))
+      if (review.kind === 'design_plan') {
+        const request = review.body.request
+        turn.append(element('p', `Compare ${request.candidate_ids.join(' and ')} at ${request.feasible_times.join(', ')} hours with a future allowance of ±${request.future_hard_allowance} mg/L and a maximum horizon of ${request.maximum_horizon} hours.`))
+      } else if (review.body.objective?.question) turn.append(element('p', review.body.objective.question))
+      const budget = review.body.budget
+      if (budget) turn.append(element('p', `Time limit: ${budget.wall_seconds} seconds.`, 'fine'))
       details(turn, 'Exactly what would run: scope, tools and limits', review.body, 'technical')
       const key = `${review.id}:${review.digest}`
-      checkbox(turn, 'I approve only this frozen scientific scope and its limits.', state.reviewAccepted === key, value => { state.reviewAccepted = value ? key : ''; render() })
+      checkbox(turn, 'I approve only this frozen scientific scope and its limits.', state.reviewAccepted === key, value => {
+        state.reviewAccepted = value ? key : ''
+        approve.disabled = !enabled || Boolean(state.pending) || !value
+      })
       const row = element('div', '', 'actions'); turn.append(row)
-      button(row, 'Approve exact operation and continue', () => controller.decide('approve'), Boolean(state.pending) || state.reviewAccepted !== key)
+      const approve = button(row, 'Approve exact operation and continue', () => controller.decide('approve'), !enabled || Boolean(state.pending) || state.reviewAccepted !== key)
       button(row, 'Reject operation', () => controller.decide('reject'), Boolean(state.pending), 'danger')
     } else if (review && s.state === 'waiting_observation' && observing) {
       root.append(turn)
@@ -277,6 +312,7 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
     } else if (review?.kind === 'research_clarification') {
       root.append(turn)
       turn.append(element('h3', 'The assistant needs more information'), element('p', review.body.reason)); field(turn, 'Your answer', 'answer'); constraints(turn)
+      if (review.body.fields?.some(name => /design|constraint|time|allowance|horizon/.test(name))) turn.querySelector('details').open = true
       checkbox(turn, 'Use the measurements and claim from Check inputs for this answer.', Boolean(state.form.useReviewedModel), value => { state.form.useReviewedModel = value; state.dataAccepted = false; controller.persist() })
       checkbox(turn, 'I reviewed this answer and any new measurement constraints.', state.dataAccepted, value => { state.dataAccepted = value; state.acceptedDraft = value ? JSON.stringify(getDraft()) : '' })
       button(turn, 'Accept clarified input and continue planning', () => controller.adopt(), Boolean(state.pending))
@@ -287,7 +323,10 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
     } else if (s.state === 'completed' && s.reports.length && !s.children.some(child => child.kind === 'design_job')) {
       root.append(turn)
       turn.append(element('h3', 'Plan the next measurement'), element('p', 'The investigation report is saved. The assistant can propose comparing measurement times next. That does not approve anything: the exact pair, times and allowance come back to you for a separate review.'))
-      button(turn, 'Plan next step for separate review', () => controller.advance(), blocked)
+      const planNext = () => controller.advance()
+      button(turn, 'Plan next step for separate review', planNext, blocked)
+      next.append(element('h2', 'Compare feasible measurement times'), element('p', 'The assistant can propose a comparison based on the saved investigation. You’ll review the exact pair and approve the comparison separately.'))
+      button(next, 'Plan next step for separate review', async () => { location.hash = 'investigations'; await planNext() }, blocked)
     } else if (s.state === 'needs_reconciliation') {
       root.append(turn)
       turn.append(element('h3', 'Recover the interrupted step'), element('p', 'The last step stopped unexpectedly. Completed evidence and usage are kept. This assistant has not been qualified to continue automatically after a restart.'))
@@ -320,10 +359,15 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
       for (const event of state.events) activity.append(element('li', `${event.timestamp} · ${event.event_type}: ${event.summary}`)); all.append(activity); root.append(all)
     }
     root.append(element('p', `Used ${s.usage.logical_turns} assistant turns, ${s.usage.tool_calls} tool calls and ${s.usage.child_count} checker jobs. Time spent waiting for you is not counted.`, 'meta'))
-    if (state.evidence.length) root.append(element('h3', 'Evidence returned to the plan'))
+    if (state.evidence.length) root.append(link('View checked results', '#result'), ' ', link('Next measurement and report', '#next'))
     for (const record of state.evidence) {
       const result = record.body.result ?? record.body, described = describeEvidence(record), card = element('section', '', 'callout'); card.style.borderLeftColor = 'var(--rule-strong)'
       card.append(element('h4', described.title), element('p', described.text))
+      if (!result.design_tier) {
+        const meaning = interpretResult(result)
+        if (meaning.uncertain) card.append(element('p', meaning.uncertain, 'fine'))
+        card.append(element('p', `Reviewed question: ${s.objective}`, 'fine'))
+      }
       for (const candidate of result.candidate_results ?? []) card.append(element('p', `${candidate.candidate_id}: ${{ valid: 'still fits', invalid: 'ruled out' }[candidate.verification] || 'unresolved'}. ${candidate.reason_code || ''}`, 'fine'))
       const row = element('div', '', 'actions'); card.append(row)
       for (const ref of result.artifacts ?? []) {
@@ -332,9 +376,11 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
       }
       const tech = details(card, 'Technical details', { verification: result.verification, expected_binding: result.expected_binding || result.verification_record?.expected_binding, replay: result.replay, candidates: result.candidates, candidate_ids: result.candidate_ids, candidate_results: result.candidate_results, options: result.options, selected_time: result.selected_time, future_hard_allowance: result.future_hard_allowance }, 'technical')
       for (const ref of result.artifacts ?? []) tech.append(element('pre', `python3.11 -m counterdex replay-native dr-bean-${ref.id}.native.json --anchors dr-bean-${ref.id}.anchors.json`))
-      root.append(card)
+      ;(result.design_tier ? next : results).append(card)
     }
-    for (const report of s.reports) button(root, 'Download research report snapshot', async () => { const data = await connection.api.download(`/reports/${report}/download`); save(data.bytes, `dr-bean-${report}.json`) }, false, 'secondary')
+    if (state.evidence.some(record => !(record.body.result ?? record.body).design_tier)) results.append(link('Next measurement and report', '#next'))
+    if (s.pending_review?.kind === 'design_plan') next.append(link('Review the proposed comparison', '#investigations'))
+    for (const id of s.reports) button(report, 'Download research report snapshot', async () => { const data = await connection.api.download(`/reports/${id}/download`); save(data.bytes, `dr-bean-${id}.json`) }, false, 'secondary')
     details(root, 'Exact inputs this plan was created with', s.reviewed_context, 'technical')
     const controls = element('div', '', 'actions'); root.append(controls)
     button(controls, 'Refresh saved state', () => controller.refresh(), false, 'secondary')
@@ -343,5 +389,8 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
     if (ACTIVE.has(s.state) && !state.busy && !state.pending) timer = setTimeout(() => action(() => controller.refresh()), 1500)
   }
   render()
-  return { controller, connectionChanged: connection => controller.connect(connection), sourceContextChanged: () => { if (!controller.state.snapshot) render() } }
+  return { controller, connectionChanged: async connection => {
+    await controller.connect(connection)
+    if (!controller.state.snapshot && renderedDraft !== JSON.stringify(getDraft())) render()
+  }, sourceContextChanged: () => { if (!controller.state.snapshot) render() } }
 }

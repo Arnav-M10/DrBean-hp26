@@ -102,6 +102,8 @@ try {
   await page.click('#question-form button[type=submit]')
 
   async function prepareApproveAndRun(expectCounterexample = true, prepared = false) {
+    const manual = page.locator('#manual-path')
+    if (await manual.getAttribute('open') === null) await manual.getByText('Run a manual check without the assistant', { exact: true }).click()
     if (!prepared) await page.getByRole('button', { name: 'Save inputs and prepare plan' }).click()
     await page.waitForSelector('#approve-scope')
     assert.equal(await page.getByRole('button', { name: 'Approve reviewed plan' }).isDisabled(), true)
