@@ -30,7 +30,7 @@ from .contracts import DesignResult, ScientificResult
 from .conversation import ConversationService
 from .coordinator import CoordinatorFailure, _await
 from .research_coordinator import (
-    GRAPH_VERSION, PORT_VERSION, ResearchContext, _bounded, create_research_coordinator,
+    GRAPH_VERSION, PORT_VERSION, ResearchContext, _bounded, _references, create_research_coordinator,
 )
 from .workflow import DomainError, _digest as entity_digest
 
@@ -193,8 +193,19 @@ class _CanonicalPorts:
         await self.check_authority()
         await _await(self.backend.admit_tool(name))
 
-    async def record_plan(self, todos: list[dict[str, str]], plan_digest: str) -> Any:
+    async def record_plan(self, todos: list[dict[str, str]], plan_digest: str,
+                          evidence: dict[str, list[str]] | None = None) -> Any:
+        """Project agent todos into B's plan revision.
+
+        A completed todo becomes a completed step only when the graph read
+        canonical, in-scope evidence for it; that step cites the evidence IDs.
+        Any other completion stays a pending agent proposal. Planning status
+        never creates, completes or verifies a scientific job.
+        """
         if hashlib.sha256(canonical_bytes(todos)).hexdigest() != plan_digest:
+            raise CoordinatorFailure("research_plan_invalid")
+        evidence = evidence or {}
+        if not isinstance(evidence, dict) or set(evidence) - {t["content"] for t in todos if t["status"] == "completed"}:
             raise CoordinatorFailure("research_plan_invalid")
         steps = []
         for todo in todos:
@@ -203,10 +214,16 @@ class _CanonicalPorts:
                 raise CoordinatorFailure("research_plan_title_limit")
             step_id = "step_" + hashlib.sha256(canonical_bytes(
                 [self.context.research_session_id, title])).hexdigest()[:32]
-            steps.append({"id": step_id, "title": title,
-                "status": "pending" if todo["status"] == "completed" else todo["status"],
-                "dependencies": [], "reference_ids": [],
-                "reason": "Agent-proposed completion; canonical execution remains authoritative."
+            cited = list(evidence.get(title) or []) if todo["status"] == "completed" else []
+            if cited:
+                _references(cited)
+                self._scoped(cited)
+            status = todo["status"] if todo["status"] != "completed" or cited else "pending"
+            steps.append({"id": step_id, "title": title, "status": status,
+                "dependencies": [], "reference_ids": cited,
+                "reason": "Completed by the assistant after it read the cited checked evidence; that evidence "
+                          "keeps its own verification status." if cited else
+                "Agent-proposed completion; canonical execution remains authoritative."
                 if todo["status"] == "completed" else "Agent-proposed research step."})
         if len({step["id"] for step in steps}) != len(steps):
             raise CoordinatorFailure("research_plan_duplicate_step")

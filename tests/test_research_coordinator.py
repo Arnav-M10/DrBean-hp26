@@ -110,8 +110,8 @@ class Ports:
             raise CoordinatorFailure("durable_action_budget_exhausted")
         self.turns.append((action_id, turn))
 
-    def record_plan(self, todos, plan_digest):
-        self.plans.append({"todos": todos, "digest": plan_digest})
+    def record_plan(self, todos, plan_digest, evidence=None):
+        self.plans.append({"todos": todos, "digest": plan_digest, "evidence": evidence})
 
     def admit_tool(self, name):
         self.tool_admissions.append(name)

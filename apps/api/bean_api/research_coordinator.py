@@ -26,8 +26,12 @@ from .coordinator import CoordinatorFailure, _await, _require_controlled_model, 
 
 GRAPH_VERSION = "research-graph.v1"
 POLICY_VERSION = "research-tools.v1"
-PROMPT_VERSION = "research-prompt.v3"
+# v4: bounded, deterministic model views that keep every identity and binding:
+# investigation evidence (_model_fact), finished children (_child_view) and
+# dataset rows (_rows_table). Checkpoints written under v3 are refused, as before.
+PROMPT_VERSION = "research-prompt.v4"
 PORT_VERSION = "research-ports.v1"
+FACT_VIEW_VERSION = "agent-evidence-view.v1"
 TOOLS = frozenset({"write_todos", "prepare_scientific_proposal", "run_scientific_operation",
                    "read_research_evidence", "request_clarification", "publish_research_report"})
 
@@ -104,7 +108,8 @@ class ResearchPorts(Protocol):
     def check_authority(self) -> Any: ...
     def admit_model_turn(self, action_id: str, turn: int) -> Any: ...
     def admit_tool(self, name: str) -> Any: ...
-    def record_plan(self, todos: list[dict[str, str]], plan_digest: str) -> Any: ...
+    def record_plan(self, todos: list[dict[str, str]], plan_digest: str,
+                    evidence: dict[str, list[str]] | None = None) -> Any: ...
     def prepare_proposal(self, kind: str, reference_ids: list[str]) -> Any: ...
     def read_review(self, proposal_id: str) -> Any: ...
     def execute_or_reconcile(self, proposal_id: str, proposal_digest: str, review_id: str, review_digest: str,
@@ -131,20 +136,51 @@ def _references(values: list[str]) -> None:
         raise CoordinatorFailure("research_references_invalid")
 
 
+def _rows_table(rows: Any) -> Any:
+    """Lossless table layout for reviewed rows that all have the same fields.
+
+    Every row, including excluded rows, and every value stay exact; values shared
+    by all rows are stated once. Anything irregular is returned unchanged.
+    """
+    if (not isinstance(rows, list) or len(rows) < 2 or not all(isinstance(row, dict) for row in rows)
+            or any(set(row) != set(rows[0]) for row in rows)):
+        return copy.deepcopy(rows)
+    def encode(value: Any) -> str:
+        # JSON text equality keeps 1/true/"1" distinct, unlike Python ==.
+        return json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+    try:
+        keys = sorted(rows[0])
+        same = {key: copy.deepcopy(rows[0][key]) for key in keys
+                if all(encode(row[key]) == encode(rows[0][key]) for row in rows)}
+    except (TypeError, ValueError):
+        return copy.deepcopy(rows)
+    columns = [key for key in keys if key not in same]
+    return {"row_count": len(rows), "same_in_every_row": same, "columns": columns,
+            "values": [[copy.deepcopy(row[key]) for key in columns] for row in rows]}
+
+
 def _model_context(context: dict[str, Any]) -> dict[str, Any]:
     """Omit storage metadata and deduplicate identical problem envelopes only.
 
-    Every record body, row, allowance, assumption, identity and digest remains.
-    The authority/checkpoint binding still uses the complete original context.
+    Every record body, row, allowance, assumption, identity and digest remains;
+    dataset rows use the lossless table layout of ``_rows_table``. The
+    authority/checkpoint binding still uses the complete original context.
     This is a deterministic projection, never model-backed summarization.
     """
+    def body(record: dict[str, Any]) -> Any:
+        value = record["body"]
+        if record.get("kind") == "dataset" and isinstance(value, dict) and "rows" in value:
+            return {key: _rows_table(item) if key == "rows" else copy.deepcopy(item) for key, item in value.items()}
+        return copy.deepcopy(value)
+
     def project(value: Any) -> Any:
         if isinstance(value, list):
             return [project(item) for item in value]
         if not isinstance(value, dict):
             return value
         storage_record = all(key in value for key in ("id", "digest", "kind", "body"))
-        return {key: copy.deepcopy(item) if storage_record and key == "body" else project(item)
+        return {key: body(value) if storage_record and key == "body" else project(item)
                 for key, item in value.items()
                 if not storage_record or key not in {"created_at", "created_by", "workspace_id"}}
 
@@ -153,6 +189,131 @@ def _model_context(context: dict[str, Any]) -> dict[str, Any]:
         result["current_problem"] = {"id": result["problem"]["id"], "digest": result["problem"]["digest"],
                                      "same_as": "problem"}
     return result
+
+
+_FACT_DUPLICATES = {"candidate_ids", "candidate_results", "workspace_id"}
+_RECORD_DUPLICATES = {"artifact_id", "artifact_sha256", "verification", "expected_binding", "expected_problem_digest",
+                      "observed_problem_digest", "expected_scientific_problem_digest",
+                      "observed_scientific_problem_digest"}
+_ANCHOR_DUPLICATES = {"artifact_sha256", "problem_digest", "projection_digest", "run_id", "scenario_id"}
+
+
+def _model_fact(fact: dict[str, Any]) -> dict[str, Any]:
+    """Bounded model view of one validated investigation fact; never an authority.
+
+    The complete fact remains the report validator's input, and native bytes stay
+    behind authenticated downloads bound by the artifact digest. The view keeps
+    every identity, binding digest, outcome and replay axis, candidate vector,
+    per-candidate result, search scope and checker proposition. It removes only
+    repeated copies of the same IDs/digests inside candidate, verification and
+    replay records after checking that each copy is identical. Any disagreement,
+    or a fact that is not the expected investigation shape, returns the complete
+    fact unchanged, so a discrepancy is never hidden from the model.
+    """
+    try:
+        if fact.get("fact_projection") != "agent-evidence.v1" or fact.get("kind") != "evidence":
+            return fact
+        candidates, artifacts, record = fact["candidates"], fact["artifacts"], fact["verification_record"]
+        results = {item["candidate_id"]: item for item in fact["candidate_results"]}
+        ids = [candidate["id"] for candidate in candidates]
+        artifact_ids = [artifact["id"] for artifact in artifacts]
+        replay = fact.get("native_replay")
+        anchors = replay.get("anchors") if isinstance(replay, dict) else None
+        consistent = (
+            len(artifacts) == 1 and len(ids) == len(set(ids)) == len(results) == len(fact["candidate_results"])
+            and set(results) == set(ids) and fact.get("candidate_ids", ids) == ids
+            and all(c.get("problem_id") == fact["problem_id"] and c.get("problem_digest") == fact["problem_digest"]
+                    and c.get("artifact_ids") == artifact_ids and results[c["id"]].get("verification") == c["verification"]
+                    and not (set(c) & set(results[c["id"]])) - {"verification"} for c in candidates)
+            and record["artifact_id"] == artifacts[0]["id"] and record["artifact_sha256"] == artifacts[0]["sha256"]
+            and record["verification"] == fact["verification"] and record["expected_binding"] == fact["expected_binding"]
+            and record["expected_problem_digest"] == record["observed_problem_digest"] == fact["problem_digest"]
+            and (record["expected_scientific_problem_digest"] == record["observed_scientific_problem_digest"]
+                 == fact["scientific_problem_digest"])
+            and (replay is None or (isinstance(replay, dict) and isinstance(anchors, dict)
+                 and replay.get("dataset_origin") == fact.get("dataset_origin")
+                 and all(anchors.get(key) == expected for key, expected in (
+                     ("artifact_sha256", artifacts[0]["sha256"]), ("problem_digest", fact["problem_digest"]),
+                     ("projection_digest", fact["scientific_problem_digest"]), ("run_id", fact["run_id"]),
+                     ("scenario_id", fact["scenario_id"]))))))
+        if not consistent:
+            return fact
+        view = {key: copy.deepcopy(value) for key, value in fact.items() if key not in _FACT_DUPLICATES
+                and key not in {"candidates", "verification_record", "native_replay"}}
+        view["fact_view"] = FACT_VIEW_VERSION
+        view["candidates"] = [{**{key: copy.deepcopy(value) for key, value in c.items()
+                                  if key not in {"problem_id", "problem_digest", "artifact_ids"}},
+                               **{key: copy.deepcopy(value) for key, value in results[c["id"]].items()
+                                  if key not in {"candidate_id", "verification"}}} for c in candidates]
+        view["verification_record"] = {key: value for key, value in record.items() if key not in _RECORD_DUPLICATES}
+        if replay is not None:
+            view["native_replay"] = {key: copy.deepcopy(value) for key, value in replay.items()
+                                     if key not in {"anchors", "dataset_origin"}}
+            view["native_replay"]["anchors"] = {key: value for key, value in anchors.items()
+                                                if key not in _ANCHOR_DUPLICATES}
+        return view
+    except (KeyError, TypeError, AttributeError):
+        return fact
+
+
+def _child_view(result: dict[str, Any], *, proposal_id: str, proposal_digest: str, review_digest: str,
+                input_digest: str) -> dict[str, Any]:
+    """Model view of a finished child result without verified repeated bindings.
+
+    Removes only copies the model already holds or the session already binds:
+    the review scope when it is exactly this proposal/digest/input, the review
+    digest it sent, and a ``waiting`` flag that is false for every finished
+    state. Every other field, including any unexpected one, stays unchanged.
+    """
+    view = copy.deepcopy(result)
+    if view.get("scope") == {"plan_id": proposal_id, "plan_digest": proposal_digest, "input_digest": input_digest}:
+        del view["scope"]
+    if view.get("review_digest") == review_digest:
+        del view["review_digest"]
+    if view.get("waiting") is False:
+        del view["waiting"]
+    return view
+
+
+def _plan_evidence(messages: list[Any]) -> dict[str, list[str]]:
+    """Bind todos the agent marks completed to canonical evidence it actually read.
+
+    A deterministic replay of the retained thread, so interrupted or reconstructed
+    nodes reach the same answer. Evidence IDs come only from successful
+    read_research_evidence results whose returned id equals the requested id. A todo
+    that first becomes completed after such reads is bound to the evidence read since
+    the previous plan update that no earlier step already cites. Completion without a
+    read stays unbound and therefore remains an agent proposal.
+    """
+    calls: dict[str, dict[str, Any]] = {}
+    bound: dict[str, list[str]] = {}
+    unbound: list[str] = []
+    for message in messages:
+        if isinstance(message, AIMessage):
+            for call in message.tool_calls:
+                calls[call["id"]] = call
+                todos = call["args"].get("todos") if call["name"] == "write_todos" else None
+                if not isinstance(todos, list):
+                    continue
+                newly = [todo["content"] for todo in todos if isinstance(todo, dict) and todo.get("status") == "completed"
+                         and isinstance(todo.get("content"), str) and todo["content"] not in bound]
+                for content in newly:
+                    bound[content] = list(unbound)
+                if newly:
+                    unbound.clear()
+        elif isinstance(message, ToolMessage) and message.status != "error":
+            call = calls.get(message.tool_call_id)
+            if call is None or call["name"] != "read_research_evidence":
+                continue
+            try:
+                value = json.loads(message.content)
+            except (TypeError, ValueError):
+                continue
+            reference = call["args"].get("evidence_id")
+            if (isinstance(value, dict) and isinstance(reference, str) and value.get("id") == reference
+                    and reference not in unbound and not any(reference in refs for refs in bound.values())):
+                unbound.append(reference)
+    return bound
 
 
 def _review(value: Any, proposal_id: str) -> dict[str, Any]:
@@ -458,20 +619,24 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
                 raise CoordinatorFailure("research_child_binding_invalid")
             await authority()
             if result["state"] not in {"pending", "running"}:
-                return result
+                return _child_view(result, proposal_id=proposal_id, proposal_digest=proposal_digest,
+                                   review_digest=review_digest, input_digest=context.input_digest)
             expected_job = result["job_id"]
             interrupt({"kind": "canonical_scientific_child", "proposal_id": proposal_id,
                        "proposal_digest": proposal_digest, "review_id": review_id,
                        "review_digest": review_digest, "job_id": expected_job})
             await authority()
 
-    async def read_research_evidence(evidence_id: str) -> dict[str, Any]:
-        """Read scoped immutable evidence without scientific execution."""
+    async def complete_fact(evidence_id: str) -> dict[str, Any]:
         _references([evidence_id])
         fact = _safe_fact(await _await(ports.read_evidence(evidence_id)))
         if fact["id"] != evidence_id:
             raise CoordinatorFailure("research_evidence_binding_invalid")
         return fact
+
+    async def read_research_evidence(evidence_id: str) -> dict[str, Any]:
+        """Read scoped immutable evidence without scientific execution."""
+        return _model_fact(await complete_fact(evidence_id))
 
     def terminal(kind: str, record: Any, runtime: ToolRuntime) -> Command:
         record = _bounded(record, 8000)
@@ -492,7 +657,8 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
             runtime: ToolRuntime) -> Command:
         """Publish an evidence-bound report and proposed next action."""
         _references(evidence_ids)
-        facts = {ref: await read_research_evidence(ref) for ref in evidence_ids}
+        # Validate commentary against the complete bounded facts, not the view.
+        facts = {ref: await complete_fact(ref) for ref in evidence_ids}
         explanation = GroundedExplanation(fact_ids=evidence_ids, text=text, next_action=next_action)
         _validate_explanation(explanation, facts)
         return terminal("report", await _await(ports.publish_report(evidence_ids, {
@@ -562,7 +728,11 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
                         raise CoordinatorFailure("research_completed_step_removed")
                 # This callback records proposed planning status, not job status.
                 # It must deduplicate action + digest across interrupted nodes.
-                await _await(ports.record_plan(copy.deepcopy(todos), hashlib.sha256(canonical_bytes(todos)).hexdigest()))
+                # Completion counts only with evidence this thread actually read.
+                evidence = _plan_evidence(request.state.get("messages") or [])
+                await _await(ports.record_plan(copy.deepcopy(todos), hashlib.sha256(canonical_bytes(todos)).hexdigest(),
+                                               {todo["content"]: evidence.get(todo["content"], []) for todo in todos
+                                                if todo["status"] == "completed"}))
             else:
                 try:
                     schema = request.tool.tool_call_schema
