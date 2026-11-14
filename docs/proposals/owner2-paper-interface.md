@@ -19,7 +19,7 @@ PyMuPDF was rejected (AGPL). Neither package executes document scripts, attachme
 
 ## 2. Limits (application choices, not provider limits)
 
-20 MiB per paper; 50 physical pages; 8 selected pages per model batch; 20,000 text characters per page and 400,000 per paper; 4 MP per rendered preview, scale at most 3 px/pt. Worker: 25 s CPU and 768 MiB address space for inspection (Linux), 30 s wall, 24 MiB output, environment `{PATH, LANG}` only, own process session. Measured on the four fixtures: inspection 0.2–0.4 s, preview 0.3 s.
+20 MiB per paper; 50 physical pages; 8 selected pages per model batch; 20,000 text characters per page and 400,000 per paper; 4 MP per rendered preview, scale at most 3 px/pt. Worker: 25 s CPU and 768 MiB address space for inspection (Linux), 30 s wall, 24 MiB output, environment `{PATH, LANG}` only, own process session. Measured once on the four fixtures (Linux x86_64, this container, warm disk): inspection 0.15–0.24 s, one preview 0.21–0.32 s per call, including process start.
 
 `RequestBoundary` needs a separate paper cap (the patch adds `max_paper_bytes`, applied only to `Content-Type: application/pdf`) so the 5 MiB image cap is unchanged and the body still stops buffering at the cap.
 
