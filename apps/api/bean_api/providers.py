@@ -1,10 +1,10 @@
-"""Bounded offline provider boundaries and controlled source previews.
+"""Bounded Gemini transport, offline fixtures and source previews.
 
 Inspected interfaces: googleapis/python-genai (google-genai 3.3.0),
 https://ai.google.dev/gemini-api/docs/structured-output and image-understanding.
-Only an explicitly injected controlled transport may execute requests in this
-release. Credentials and historical account decisions cannot enable live SDK
-construction. Controlled attempts are simulations, never live qualification.
+Live transport requires explicit mode and atomic session-ledger admission.
+Default startup remains disabled; credentials alone cannot enable dispatch.
+Controlled attempts are simulations, never live qualification.
 No provider key, prompt, source bytes, raw exception or model reasoning enters logs.
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ from typing import Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-Operation = Literal["intake", "explanation", "design_proposal", "observation_proposal", "coordinator"]
+Operation = Literal["intake", "explanation", "design_proposal", "observation_proposal", "coordinator", "paper_understanding", "agent"]
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -43,17 +43,23 @@ class ProviderConfig:
     max_output_tokens: int = 2_048
     image_token_upper_bound: int | None = None
     request_timeout_seconds: int = 30
+    mode: Literal["disabled", "controlled", "live"] = "disabled"
+
+    def __post_init__(self):
+        if self.mode not in {"disabled", "controlled", "live"}:
+            raise ProviderFailure("provider_mode_invalid")
 
     def check_ready(self) -> None:
         if not self.api_key or not self.model:
             raise ProviderFailure("provider_not_configured")
         if not self.account_gate_passed or not self.account_decision_id:
             raise ProviderFailure("provider_account_gate_unmet")
-        if not 1 <= self.max_input_tokens <= 64_000 or not 1 <= self.max_output_tokens <= 16_000:
+        if (type(self.max_input_tokens) is not int or type(self.max_output_tokens) is not int
+                or not 1 <= self.max_input_tokens <= 64_000 or not 1 <= self.max_output_tokens <= 16_000):
             raise ProviderFailure("provider_budget_invalid")
-        if not 1 <= self.request_timeout_seconds <= 60:
+        if type(self.request_timeout_seconds) is not int or not 1 <= self.request_timeout_seconds <= 60:
             raise ProviderFailure("provider_budget_invalid")
-        if self.image_token_upper_bound is not None and self.image_token_upper_bound <= 0:
+        if self.image_token_upper_bound is not None and (type(self.image_token_upper_bound) is not int or self.image_token_upper_bound <= 0):
             raise ProviderFailure("provider_budget_invalid")
 
 
@@ -87,8 +93,10 @@ class ProviderResult:
     model: str
     usage: dict[str, int | None] | None
     finish_reason: str | None
-    execution_mode: Literal["controlled", "unqualified"] = "unqualified"
+    execution_mode: Literal["controlled", "unqualified", "live"] = "unqualified"
     simulated_usage: dict[str, int | None] | None = None
+    provider_request_id: str | None = None
+    model_version: str | None = None
 
 
 def _hosted_sdk_object(value: Any) -> bool:
@@ -186,6 +194,8 @@ class GeminiProvider:
         self._transport_provenance = "not_observed"
 
     def capabilities(self) -> dict[str, Any]:
+        if self.config.mode in {"controlled", "live"}:
+            return MeteredGeminiGateway(self.config, self.ledger).capabilities()
         controlled = self._client_factory is not None and not _hosted_sdk_object(self._client_factory)
         try:
             self.config.check_ready()
@@ -205,8 +215,11 @@ class GeminiProvider:
                 "transport_provenance": self._transport_provenance}
 
     async def generate(self, operation: Operation, prompt: str, schema: type[T], *,
-                       context: AttemptContext, image_bytes: bytes | None = None,
+                       context: AttemptContext | SessionCallContext, image_bytes: bytes | None = None,
                        mime_type: str | None = None) -> ProviderResult:
+        if self.config.mode == "live" or isinstance(context, SessionCallContext):
+            return await MeteredGeminiGateway(self.config, self.ledger, client_factory=self._client_factory).generate(
+                operation, prompt, schema, context=context, image_bytes=image_bytes, mime_type=mime_type)
         if operation not in {"intake", "explanation", "design_proposal", "observation_proposal"}:
             raise ProviderFailure("provider_operation_unsupported")
         self.config.check_ready()
@@ -316,6 +329,322 @@ class GeminiProvider:
                     pass  # Cleanup failure cannot cause a hidden retry or alter scientific data.
 
 
+@dataclass(frozen=True)
+class SessionCallContext:
+    """Internal server references; Owner 2 resolves authority at reservation."""
+    actor_id: str
+    workspace_id: str
+    operation_id: str
+    consent_id: str
+    research_session_id: str
+    action_id: str
+    model: str
+    review_revision_id: str | None = None
+    source_digests: tuple[str, ...] = ()
+    selected_page_manifest_digest: str | None = None
+    selected_page_ids: tuple[str, ...] = ()
+    parent_action_id: str | None = None
+    specialist_id: str | None = None
+
+    def checked_dict(self) -> dict[str, Any]:
+        if type(self.source_digests) is not tuple or type(self.selected_page_ids) is not tuple:
+            raise ProviderFailure("provider_context_invalid")
+        result = asdict(self)
+        for name in ("actor_id", "workspace_id", "operation_id", "consent_id", "research_session_id", "action_id", "model",
+                     "review_revision_id", "parent_action_id", "specialist_id"):
+            value = result[name]
+            if value is None and name in {"review_revision_id", "parent_action_id", "specialist_id"}:
+                continue
+            if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", value):
+                raise ProviderFailure("provider_context_invalid")
+        if len(self.source_digests) > 10 or any(not isinstance(d, str) or not re.fullmatch(r"[a-f0-9]{64}", d) for d in self.source_digests):
+            raise ProviderFailure("provider_context_invalid")
+        if self.selected_page_manifest_digest is not None and (not isinstance(self.selected_page_manifest_digest, str)
+                or not re.fullmatch(r"[a-f0-9]{64}", self.selected_page_manifest_digest)):
+            raise ProviderFailure("provider_context_invalid")
+        if (len(self.selected_page_ids) > 8 or len(set(self.selected_page_ids)) != len(self.selected_page_ids)
+                or any(not isinstance(p, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", p) for p in self.selected_page_ids)
+                or bool(self.selected_page_ids) != bool(self.selected_page_manifest_digest)
+                or bool(self.parent_action_id) != bool(self.specialist_id)):
+            raise ProviderFailure("provider_context_invalid")
+        return result
+
+
+@dataclass(frozen=True)
+class GeminiExchange:
+    value: Any
+    attempt_id: str
+    usage: dict[str, int | None] | None
+    execution_mode: str
+    provider_request_id: str | None
+    model_version: str | None
+    simulated_usage: dict[str, int | None] | None = None
+
+
+def _strict_usage(raw: Any) -> dict[str, int | None] | None:
+    if raw is None:
+        return None
+    names = ("prompt_token_count", "candidates_token_count", "total_token_count", "thoughts_token_count")
+    values = [raw.get(n) if isinstance(raw, dict) else getattr(raw, n, None) for n in names]
+    if any(v is not None and (type(v) is not int or not 0 <= v <= 2**53 - 1) for v in values):
+        raise ProviderFailure("provider_usage_invalid")
+    incoming, outgoing, total, thoughts = values
+    known = sum(v for v in (incoming, outgoing, thoughts) if v is not None)
+    if total is not None and total < known:
+        raise ProviderFailure("provider_usage_invalid")
+    if not any(v is not None for v in values):
+        return None
+    return dict(zip(("input_tokens", "output_tokens", "total_tokens", "thought_tokens"), values))
+
+
+class MeteredGeminiGateway:
+    """One physical SDK request, shared by extraction and LangChain callers.
+
+    No session store or independent allowance lives here. The current main
+    ledger deliberately cannot admit live calls until Owner 2 adds atomic
+    research-session/consent/action accounting under this capability contract.
+    """
+    def __init__(self, config: ProviderConfig, ledger: AttemptLedger, *, client_factory: Any = None):
+        self.config, self.ledger = config, ledger
+        self._client_factory = client_factory
+
+    def capabilities(self) -> dict[str, Any]:
+        return {"provider": "gemini", "execution_mode": self.config.mode,
+                "configured": bool(self.config.api_key and self.config.model),
+                "session_accounting_ready": getattr(self.ledger, "session_accounting_version", None) == "research-session.v1",
+                "dispatch_enabled": False, "dispatch_requires": "atomic_per_request_admission",
+                "reachable": None, "live_qualification": "not_run", "sdk_version": package_version("google-genai")}
+
+    async def dispatch(self, *, operation: str, contents: list, context: SessionCallContext, validator: Any,
+                       tools: list | None = None, system_instruction: str | None = None,
+                       response_schema: dict | None = None, text_budget_bytes: int = 0,
+                       output_tokens: int | None = None) -> GeminiExchange:
+        import hashlib
+        mode = self.config.mode
+        if mode == "disabled":
+            raise ProviderFailure("provider_dispatch_disabled")
+        if mode not in {"controlled", "live"}:
+            raise ProviderFailure("provider_mode_invalid")
+        if not isinstance(context, SessionCallContext):
+            raise ProviderFailure("provider_context_invalid")
+        checked = context.checked_dict()
+        if not self.config.model or context.model != self.config.model:
+            raise ProviderFailure("provider_model_mismatch")
+        if operation not in {"intake", "explanation", "design_proposal", "observation_proposal", "paper_understanding", "agent"}:
+            raise ProviderFailure("provider_operation_unsupported")
+        if mode == "live":
+            self.config.check_ready()
+            if getattr(self.ledger, "session_accounting_version", None) != "research-session.v1":
+                raise ProviderFailure("provider_session_accounting_unavailable")
+        else:
+            from .ledger import ProviderLedger
+            if isinstance(self.ledger, ProviderLedger):
+                raise ProviderFailure("provider_controlled_ledger_required")
+            if self._client_factory is None or _hosted_sdk_object(self._client_factory):
+                raise ProviderFailure("provider_controlled_transport_required")
+        if (type(text_budget_bytes) is not int or not 0 <= text_budget_bytes <= 48_000
+                or type(self.config.max_input_tokens) is not int or not 1 <= self.config.max_input_tokens <= 64_000
+                or type(self.config.max_output_tokens) is not int or not 1 <= self.config.max_output_tokens <= 16_000
+                or type(self.config.request_timeout_seconds) is not int or not 1 <= self.config.request_timeout_seconds <= 60):
+            raise ProviderFailure("provider_budget_invalid")
+        profiles = {"agent": 512, "explanation": 768, "design_proposal": 1024,
+                    "observation_proposal": 1024, "intake": 2048, "paper_understanding": 2048}
+        cap = min(self.config.max_output_tokens, profiles[operation]) if output_tokens is None else output_tokens
+        if type(cap) is not int or not 1 <= cap <= self.config.max_output_tokens:
+            raise ProviderFailure("provider_budget_invalid")
+        if response_schema is not None and tools:
+            raise ProviderFailure("provider_output_mode_conflict")
+        from google.genai import types
+        if not isinstance(contents, list) or not 1 <= len(contents) <= 64 or not callable(validator):
+            raise ProviderFailure("provider_context_invalid")
+        try:
+            bounded = []
+            text_size = media_size = media_count = 0
+            for content in contents:
+                content = types.Content.model_validate(content)
+                if content.role not in {"user", "model"} or not content.parts or len(content.parts) > 32:
+                    raise ProviderFailure("provider_context_invalid")
+                for part in content.parts:
+                    fields = part.model_dump(exclude_none=True)
+                    if set(fields) - {"text", "thought", "thought_signature", "inline_data", "function_call", "function_response"}:
+                        raise ProviderFailure("provider_part_unsupported")
+                    if part.inline_data is not None:
+                        raw, mime = part.inline_data.data, part.inline_data.mime_type
+                        if not isinstance(raw, bytes) or mime not in {"image/png", "image/jpeg", "application/pdf"}:
+                            raise ProviderFailure("provider_media_unsupported")
+                        media_count += 1
+                        media_size += len(raw)
+                        if hashlib.sha256(raw).hexdigest() not in context.source_digests:
+                            raise ProviderFailure("provider_source_binding_mismatch")
+                        if mime == "application/pdf" and not context.selected_page_manifest_digest:
+                            raise ProviderFailure("provider_page_disclosure_required")
+                    else:
+                        text_size += len(part.model_dump_json(exclude_none=True).encode())
+                bounded.append(content)
+            if media_count > 8 or media_size > 20 * 1024 * 1024 or text_size > 48_000:
+                raise ProviderFailure("provider_context_limit")
+            if media_count and (type(self.config.image_token_upper_bound) is not int or self.config.image_token_upper_bound <= 0):
+                raise ProviderFailure("provider_image_budget_unknown")
+            typed_tools = []
+            for tool in tools or []:
+                tool = types.Tool.model_validate(tool)
+                if set(tool.model_dump(exclude_none=True)) != {"function_declarations"} or not tool.function_declarations:
+                    raise ProviderFailure("provider_tool_unsupported")
+                typed_tools.append(tool)
+            if len(typed_tools) > 16 or sum(len(t.function_declarations) for t in typed_tools) > 16:
+                raise ProviderFailure("provider_context_limit")
+            schema_bytes = len(json.dumps(response_schema or {}, allow_nan=False).encode())
+            tool_bytes = sum(len(t.model_dump_json(exclude_none=True).encode()) for t in typed_tools)
+            if system_instruction is not None and (not isinstance(system_instruction, str) or len(system_instruction.encode()) > 8000):
+                raise ProviderFailure("provider_context_limit")
+            reservation = 1024 + max(text_size, text_budget_bytes) + schema_bytes + tool_bytes + len((system_instruction or "").encode())
+            reservation += media_count * (self.config.image_token_upper_bound or 0)
+        except (TypeError, ValueError, OverflowError):
+            raise ProviderFailure("provider_context_invalid") from None
+        if reservation > self.config.max_input_tokens:
+            raise ProviderFailure("provider_context_budget_exhausted")
+        # Record fingerprints, not source text or native model thought parts.
+        digest = hashlib.sha256(json.dumps({"contents": [c.model_dump(mode="json", exclude_none=True) for c in bounded],
+            "system": system_instruction or SYSTEM_INSTRUCTION, "schema": response_schema,
+            "tools": [t.model_dump(mode="json", exclude_none=True) for t in typed_tools]},
+            sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        metadata = {"provider": "gemini" if mode == "live" else "controlled_local", "model": self.config.model,
+                    "operation": operation, "operation_class": "generation", "execution_mode": mode,
+                    "prompt_sha256": digest, "schema_version": "gemini-gateway.v1", "retry_policy": "none",
+                    "output_budget_profile": "gemini-operation-budgets.v1",
+                    "transport_provenance": "google_genai_sdk" if self._client_factory is None else "trusted_test_transport",
+                    "reserved_input_tokens": reservation, "reserved_output_tokens": cap}
+        if mode == "controlled":
+            metadata.update(provider="controlled_local", actual_model_tokens=0, external_provider_calls=0)
+        try:
+            attempt_id = self.ledger.begin_attempt(checked, metadata)
+        except ProviderFailure:
+            raise
+        except Exception as exc:
+            from .ledger import LedgerBudgetExceeded
+            raise ProviderFailure("provider_budget_exhausted" if isinstance(exc, LedgerBudgetExceeded)
+                                  else "provider_admission_failed") from None
+        if not isinstance(attempt_id, str) or not attempt_id or len(attempt_id) > 128:
+            raise ProviderFailure("provider_admission_failed")
+        client = None
+        usage = None
+        dispatched = False
+        started = time.monotonic()
+        try:
+            factory = self._client_factory
+            if factory is None:
+                from google import genai
+                factory = genai.Client
+            client = factory(api_key=self.config.api_key if mode == "live" and self._client_factory is None else "nonsecret-controlled-placeholder",
+                             vertexai=False, http_options=types.HttpOptions(api_version="v1beta",
+                                base_url="https://generativelanguage.googleapis.com", timeout=self.config.request_timeout_seconds * 1000,
+                                retry_options=types.HttpRetryOptions(attempts=1)))
+            if mode == "controlled" and _hosted_sdk_object(client):
+                raise ProviderFailure("provider_dispatch_disabled")
+            default_instruction = SYSTEM_INSTRUCTION if response_schema is not None else SYSTEM_INSTRUCTION.replace(
+                "Return only the supplied response schema.", "Use only the declared tools for action selection; do not execute them.")
+            request_config = types.GenerateContentConfig(system_instruction=system_instruction or default_instruction,
+                max_output_tokens=cap, candidate_count=1,
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True))
+            if typed_tools:
+                request_config.tools = typed_tools
+            if response_schema is not None:
+                request_config.response_mime_type = "application/json"
+                request_config.response_json_schema = response_schema
+            async with asyncio.timeout(self.config.request_timeout_seconds):
+                dispatched = True
+                response = await client.aio.models.generate_content(model=self.config.model, contents=bounded, config=request_config)
+                usage = _strict_usage(getattr(response, "usage_metadata", None))
+                reason = _finish_reason(response)
+                if reason != "STOP":
+                    raise ProviderFailure("provider_refused" if reason in {"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"}
+                                          else "provider_output_truncated" if reason == "MAX_TOKENS" else "provider_finish_reason_invalid")
+                if usage and ((usage["input_tokens"] or 0) > reservation
+                              or sum(usage[k] or 0 for k in ("output_tokens", "thought_tokens")) > cap
+                              or (usage["total_tokens"] or 0) > reservation + cap):
+                    raise ProviderFailure("provider_usage_exceeded_reservation")
+                observed = getattr(response, "model_version", None)
+                if isinstance(observed, str) and not (observed == self.config.model or observed.startswith(self.config.model + "-")):
+                    raise ProviderFailure("provider_model_version_mismatch")
+                value = validator(response)
+            request_id = _request_id(response) if mode == "live" else None
+            version = getattr(response, "model_version", None)
+            version = version if isinstance(version, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", version) else None
+            outcome = {"status": "validated" if usage is not None else "unknown_outcome", "code": "response_validated_usage_known" if usage is not None else "provider_usage_unknown",
+                       "usage": usage if mode == "live" else None, "simulated_usage": usage if mode == "controlled" else None,
+                       "provider_request_id": request_id, "observed_model_version": version,
+                       "finished_at": utc_now(), "duration_ms": int((time.monotonic() - started) * 1000)}
+            self.ledger.finish_attempt(attempt_id, outcome)
+            return GeminiExchange(value, attempt_id, usage if mode == "live" else None, mode, request_id, version,
+                                  usage if mode == "controlled" else None)
+        except BaseException as exc:
+            code = "provider_cancelled_unknown_outcome" if isinstance(exc, asyncio.CancelledError) else (
+                exc.code if isinstance(exc, ProviderFailure) else classify_failure(exc)[0])
+            try:
+                self.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome" if dispatched and usage is None else "failed",
+                    "code": code, "usage": usage if mode == "live" else None, "finished_at": utc_now(),
+                    "duration_ms": int((time.monotonic() - started) * 1000)})
+            except Exception:
+                pass  # A reserved/uncertain attempt is not retried or refunded.
+            if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
+                raise
+            raise ProviderFailure(code, False, attempt_id) from None
+        finally:
+            if client is not None:
+                try:
+                    await client.aio.aclose()
+                except Exception:
+                    pass
+
+    async def understand_paper(self, paper_context: Any, *, context: SessionCallContext,
+                               subset_bytes: bytes | None = None):
+        """Prepare an unaccepted proposal; no parser, store, review or science."""
+        if self.config.mode == "disabled":
+            raise ProviderFailure("provider_dispatch_disabled")
+        from .ai_prompts import (PaperContext, PaperProposal, PaperProposalError,
+                                 paper_proposal_prompt, validate_paper_proposal)
+        try:
+            admitted = PaperContext.model_validate(paper_context)
+        except (TypeError, ValueError):
+            raise ProviderFailure("paper_context_invalid") from None
+        if (not isinstance(context, SessionCallContext)
+                or admitted.paper_sha256 not in context.source_digests
+                or admitted.page_manifest_digest != context.selected_page_manifest_digest
+                or tuple(admitted.selected_page_ids) != context.selected_page_ids):
+            raise ProviderFailure("provider_source_binding_mismatch")
+        from google.genai import types
+        try:
+            prompt = paper_proposal_prompt(admitted)
+        except PaperProposalError as exc:
+            raise ProviderFailure(exc.code) from None
+        parts = [types.Part.from_text(text=prompt)]
+        if subset_bytes is not None:
+            parts.append(types.Part.from_bytes(data=subset_bytes, mime_type="application/pdf"))
+
+        def validate(response):
+            parsed = _parse_response(response.text, PaperProposal)
+            try:
+                return validate_paper_proposal(parsed, admitted)
+            except PaperProposalError as exc:
+                raise ProviderFailure(exc.code) from None
+
+        return await self.dispatch(operation="paper_understanding", context=context,
+            contents=[types.Content(role="user", parts=parts)], validator=validate,
+            response_schema=PaperProposal.model_json_schema(mode="validation"))
+
+    async def generate(self, operation: str, prompt: str, schema: type[T], *, context: SessionCallContext,
+                       image_bytes: bytes | None = None, mime_type: str | None = None) -> ProviderResult:
+        from google.genai import types
+        parts = [types.Part.from_text(text=prompt)]
+        if image_bytes is not None:
+            parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
+        result = await self.dispatch(operation=operation, contents=[types.Content(role="user", parts=parts)], context=context,
+            response_schema=schema.model_json_schema(), validator=lambda response: _parse_response(response.text, schema))
+        return ProviderResult(result.value, result.attempt_id, self.config.model or "", result.usage, "STOP", execution_mode=result.execution_mode,
+                              simulated_usage=result.simulated_usage, provider_request_id=result.provider_request_id,
+                              model_version=result.model_version)
+
+
 class ControlledSourceProposer:
     """Internal authored preview, deliberately not an IntakeService provider.
 
@@ -324,7 +653,7 @@ class ControlledSourceProposer:
     Existing candidate/locator validation is reused, with manually authored
     fields explicitly wrapped as controlled examples. No `.generate` adapter,
     review operation, persistence, approval or provider ledger is supplied here.
-    Owner 2 must admit controlled provenance before ordinary intake can use it.
+    The ordinary intake service owns review/materialization; standalone preparation does not perform them.
     """
 
     schema_version = "controlled-source-preview.v1"
