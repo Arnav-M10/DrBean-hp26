@@ -248,6 +248,29 @@ try {
   await page.waitForFunction(() => document.querySelector('#backend-design').textContent.includes('Design tier: checked_pair_separation'))
   assert.equal((await api(`/design-jobs/${noSeparation.finished.id}`)).state, 'completed')
 
+  await page.fill('#followup-value', '3.4')
+  await page.fill('#followup-reason', 'Hypothetical browser regression reading chosen to inspect the original pair')
+  await page.getByRole('button', { name: 'Prepare hypothetical observation', exact: true }).click()
+  await page.getByRole('button', { name: 'Accept reviewed hypothetical observation', exact: true }).click()
+  await page.getByRole('button', { name: 'Prepare follow-up investigation plan', exact: true }).click()
+  await page.locator('#followup-approve-scope').check()
+  await page.getByRole('button', { name: 'Approve reviewed follow-up', exact: true }).click()
+  await page.getByRole('button', { name: 'Queue approved follow-up', exact: true }).click()
+  await page.waitForFunction(() => /Follow-up run run_/.test(document.querySelector('#followup-review').textContent))
+  const followupId = (await page.locator('#followup-review').textContent()).match(/Follow-up run (run_[a-zA-Z0-9]+)/)[1]
+  let followupRun
+  for (let attempt = 0; attempt < 150; attempt++) {
+    followupRun = await api(`/runs/${followupId}`)
+    if (!['queued', 'running', 'cancel_requested'].includes(followupRun.state)) break
+    await page.waitForTimeout(1000)
+  }
+  assert.equal(followupRun.state, 'completed', JSON.stringify(followupRun))
+  const followupEvidence = await api(`/records/${followupRun.scenarios[0].result_id}`)
+  assert.equal(followupEvidence.body.result.candidate_results.length, 2)
+  assert.equal(followupEvidence.body.result.native_replay.operation, 'review')
+  assert.equal(followupEvidence.body.result.native_replay.dataset_origin, 'hypothetical')
+  assert.equal((await api(`/records/${positive.suggestion.id}`)).digest, positive.suggestion.digest)
+
   // A changed observation must create new reviewed identities and actual computation.
   await page.getByRole('link', { name: 'Inputs', exact: true }).click()
   await page.getByRole('textbox', { name: 'Row 1, concentration', exact: true }).fill('4.85')
