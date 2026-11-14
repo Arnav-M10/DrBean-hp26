@@ -73,7 +73,12 @@ def counts(application) -> dict[str, int]:
         return {"provider_attempts": count("SELECT count(*) FROM provider_attempts"),
                 "jobs": count("SELECT count(*) FROM jobs"),
                 "approvals": count("SELECT count(*) FROM approvals"),
-                "controlled_attempts": count("SELECT count(*) FROM entities WHERE kind='controlled_attempt'")}
+                "controlled_attempts": count("SELECT count(*) FROM entities WHERE kind='controlled_attempt'"),
+                # DB-RESEARCH-1 tables (an absent table counts 0): a queued action precedes any model turn, effects
+                # bind scientific children and attempt bindings record model admissions.
+                "research_actions": count("SELECT count(*) FROM research_actions"),
+                "research_effects": count("SELECT count(*) FROM research_effects"),
+                "research_attempt_bindings": count("SELECT count(*) FROM research_attempt_bindings")}
 
 
 def client(application, token) -> TestClient:
@@ -162,4 +167,21 @@ def test_decisions_refuse_forged_reviews_raw_commands_and_actor_selection(app, b
     before = counts(app)
     response = alice.post(route(found, "decisions", session), json=body, headers={"Idempotency-Key": "c-decision"})
     assert 400 <= response.status_code < 500, response.status_code
+    assert counts(app) == before
+
+
+def test_advance_while_research_dispatch_is_disabled_is_refused_honestly(app):
+    """Honest failure state (Gate 4) and LOOP-08: while capabilities report research dispatch disabled, an explicit
+    advance is refused with the published unavailable reason and queues no action, child or model admission."""
+    found = require_routes(app)
+    alice = client(app, ALICE)
+    research = alice.get(PREFIX + "/capabilities").json().get("deepagents") or {}
+    if research.get("dispatch_enabled") is not False:
+        pytest.skip("research dispatch is enabled or unreported in this build; the loop probes cover advance")
+    _, session, record = session_for(app, alice)
+    before = counts(app)
+    response = alice.post(route(found, "advance", session), json={"expected_revision": record.get("revision", 0)},
+                          headers={"Idempotency-Key": "c-advance"})
+    assert response.status_code == 503, response.text
+    assert research.get("unavailable_reason") and research["unavailable_reason"] in response.text, response.text
     assert counts(app) == before

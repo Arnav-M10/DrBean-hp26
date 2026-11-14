@@ -24,6 +24,7 @@ import json
 import math
 import os
 import re
+import subprocess
 import threading
 import time
 from fractions import Fraction
@@ -166,7 +167,8 @@ class Flow:
         return body
 
     def design_request(self, run: dict, problem: dict, pair: list[dict], review: dict, *,
-                       feasible_times: list[str] | None = None, allowance: str | None = None) -> dict:
+                       feasible_times: list[str] | None = None, allowance: str | None = None,
+                       tier: str = "checked_pair_separation") -> dict:
         request = {"schema_version": "DB-SC-1", "historical_run_id": run["id"], "scenario_id": "baseline",
                    "problem_id": problem["id"], "problem_digest": problem["digest"],
                    "candidate_ids": [c["id"] for c in pair],
@@ -180,7 +182,7 @@ class Flow:
         if "scientific_profile" in props:  # every reviewed scope field is explicit; nothing is inherited
             # v2 contract: the server resolves the mandatory baseline history from immutable evidence; prospective
             # reuse is unsupported, so the reviewed request never names artifacts here (see the reuse probe).
-            request.update(scientific_profile=SCIENTIFIC_PROFILE, requested_tier="checked_pair_separation",
+            request.update(scientific_profile=SCIENTIFIC_PROFILE, requested_tier=tier,
                            allowance_origin={"kind": review.get("allowance_origin", "hypothetical"),
                                              "description": review.get("allowance_description",
                                                                        "Reviewed future hard allowance")},
@@ -252,10 +254,10 @@ class Flow:
 
     # -- design ------------------------------------------------------------
     def design(self, base: dict, pair: list[dict], *, feasible_times: list[str], allowance: str, label: str,
-               review: dict) -> dict:
+               review: dict, tier: str = "checked_pair_separation") -> dict:
         run, problem = base["run"], base["problem"]
         request = self.design_request(run, problem, pair, review, feasible_times=feasible_times,
-                                      allowance=allowance)
+                                      allowance=allowance, tier=tier)
         if review.get("_omit_sources") and "source_artifact_ids" in request:
             request["source_artifact_ids"] = []
         props, required = self.schema_properties("DesignRequestBody")
@@ -1012,6 +1014,17 @@ def scenario_design_authority(flow: Flow, packet: dict) -> dict:
     checks.expect("no_separation_design_tier_matches_oracle", predicted is not None and wide_info.get("tier") == predicted,
                   f"application {wide_info.get('tier')}, independent oracle {predicted} (margins "
                   f"{ {t: round(float(m), 6) for t, m in margins.items()} } at allowance {wide_allowance})")
+    # SCI-05: the UI's own label for this no-separation record never reads as checked separation.
+    wide_body = (wide.get("suggestion") or {}).get("body") or {}
+    wide_label = _design_label(flow, wide_body) if wide_body else None
+    if wide_label is None:
+        checks.add("no_separation_ui_label_is_not_checked", "not_observed", "Node, the web design module or the "
+                   "design record is unavailable", level=INFO)
+    else:
+        checks.expect("no_separation_ui_label_is_not_checked", CHECKED_LABEL not in wide_label
+                      and (wide_body.get("design_tier") != "no_separation_established"
+                           or "no separating time was established" in wide_label.lower()),
+                      f"tier {wide_body.get('design_tier')}; label {wide_label!r}")
     wide_replay = []
     if wide.get("suggestion"):
         refs = (wide["suggestion"].get("body") or {}).get("artifacts") or []
@@ -1232,6 +1245,149 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
     check_original_unchanged(checks, flow, hero, "original_evidence_unchanged_after_followups")
     return {"checks": checks, "observation": {"branches": branches, "design_was_isolation_probe": isolation,
                                               "design_bound_scope_offered": native_scope}}
+
+
+SKIP_REASONS = {"not_relevant", "sufficient_evidence", "budget_preserved", "capability_unavailable"}
+CHECKED_LABEL = "freshly checked positive separation"
+
+
+def scenario_non_positive_meanings(flow: Flow, packet: dict) -> dict:
+    """SCI-02: a bounded search without an outside witness and a skipped comparison keep their own recorded meanings.
+
+    The reviewed claim is widened to the whole admitted ke domain, so no compatible candidate can lie outside it and
+    the bounded search can only end without a witness. A separately reviewed optional comparison is listed; the manual
+    lane records it as skipped instead of running it. Neither may read as a proved or verified claim. The third
+    meaning, an infrastructure interruption, is checked by scenario_cancel_restart
+    (interrupted_run_records_no_scientific_outcome).
+    """
+    checks = Checks()
+    client = flow.client
+    workspace = client.post("/workspaces", {"name": "Dr. Bean evaluation non-positive meanings"}, label="np-ws")["id"]
+    flow.workspaces.append(workspace)
+    dataset = client.post(f"/workspaces/{workspace}/datasets", packet["dataset"], label="np-dataset")
+    binding = {"dataset_id": dataset["id"], "dataset_digest": dataset["digest"]}
+    comparison = client.post(f"/workspaces/{workspace}/problems", {**packet["problem"], **binding},
+                             label="np-comparison-problem")
+    parameter = packet["problem"]["target"]["parameter"]
+    domain = packet["problem"]["domain"][parameter]
+    wide = {**packet["problem"]["target"], "lower": domain["lower"], "upper": domain["upper"]}
+    problem = client.post(f"/workspaces/{workspace}/problems", {**packet["problem"], "target": wide, **binding},
+                          label="np-problem")
+    body = flow.plan_body(problem, dataset, "Reviewed baseline: claim widened to the whole admitted domain")
+    body["scenarios"].append({
+        "id": "comparison", "problem_id": comparison["id"], "problem_digest": comparison["digest"], "kind": "optional",
+        "label": "Reviewed original-range comparison",
+        "purpose": "Compare the separately reviewed original claim range if the baseline finds no outside witness.",
+        "eligible_baseline_outcomes": ["no_counterexample_found", "inconclusive"]})
+    plan = client.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"], "plan": body},
+                       label="np-plan")
+    approval = client.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
+                           "expected_current_revision_id": problem["id"], "accepted": True}, label="np-approval")
+    run = client.post(f"/plans/{plan['id']}/runs", {"approval_id": approval["id"],
+                      "expected_plan_digest": plan["digest"]}, label="np-start")
+    finished = flow.poll(f"/runs/{run['id']}")
+    flow.jobs_executed.add(run["id"])
+    children = {c.get("scenario_id"): c for c in finished.get("scenarios", [])}
+    base_child, skipped = children.get("baseline") or {}, children.get("comparison") or {}
+    evidence = client.get(f"/records/{base_child['result_id']}") if base_child.get("result_id") else None
+    summary = client.get(f"/records/{finished['result_id']}") if finished.get("result_id") else None
+    for name, record in (("dataset", dataset), ("problem", problem), ("plan", plan), ("run", finished),
+                         ("evidence", evidence), ("run-summary", summary)):
+        if record:
+            flow.save_record(f"np-{name}", record)
+    result = result_of(evidence) if evidence else {}
+    outcome = result.get("scientific_outcome")
+    flagged = [c.get("candidate_id") for c in result.get("candidate_results") or [] if c.get("is_counterexample")]
+    attempted = (result.get("baseline_search") or {}).get("attempted_count")
+    wording = _overclaims(result) + _overclaims(summary or {})
+    checks.expect("no_candidate_found_is_not_a_proof",
+                  finished.get("state") == "completed" and outcome == "no_counterexample_found" and not flagged
+                  and not wording and (summary is None or _scientific_outcomes(summary) in ([], [outcome])),
+                  f"run {finished.get('state')}, outcome {outcome}, counterexample flags {flagged}, bounded search "
+                  f"attempts {attempted}, overclaiming wording {wording}")
+    checks.expect("skipped_comparison_is_recorded_as_skipped",
+                  skipped.get("state") == "skipped" and skipped.get("reason_code") in SKIP_REASONS
+                  and not skipped.get("result_id") and not _scientific_outcomes(skipped),
+                  f"comparison state {skipped.get('state')}, reason {skipped.get('reason_code')}, result "
+                  f"{skipped.get('result_id')}")
+    checks.expect("no_candidate_and_skip_are_distinct_records",
+                  (base_child.get("state"), outcome) != (skipped.get("state"), skipped.get("reason_code"))
+                  and base_child.get("state") == "completed" and skipped.get("state") == "skipped",
+                  f"baseline ({base_child.get('state')}, {outcome}); comparison ({skipped.get('state')}, "
+                  f"{skipped.get('reason_code')})")
+    return {"checks": checks, "observation": {"workspace_id": workspace, "run_id": run["id"], "outcome": outcome,
+                                              "comparison": {k: skipped.get(k) for k in ("state", "reason_code")},
+                                              "bounded_search_attempts": attempted}}
+
+
+def _design_label(flow: Flow, record: dict) -> str | None:
+    """The UI's own label for a design record (apps/web/design.mjs designExplanation), or None without Node."""
+    module = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(flow.package_dir))), "apps", "web",
+                          "design.mjs")
+    script = ("import { designExplanation } from " + json.dumps("file://" + module) + ";"
+              "process.stdout.write(designExplanation(JSON.parse(process.argv[1])))")
+    try:
+        done = subprocess.run(["node", "--input-type=module", "-e", script, json.dumps(record)], capture_output=True,
+                              text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def scenario_numerical_guidance_records(flow: Flow, packet: dict) -> dict:
+    """SCI-05 through the application: a requested numerical-guidance design keeps every approved option, its record,
+    replay and UI label never read as checked separation, and a forged tier field cannot buy the checked label."""
+    checks = Checks()
+    hero = flow.cache.get("hero")
+    if not hero or hero.get("blocked") or not hero.get("evidence"):
+        checks.add("guidance_prerequisites", "blocked", "needs the hero baseline run", finding="F-HERO-NO-PAIR")
+        return {"checks": checks, "observation": {}}
+    pair = choose_pair(check_baseline(Checks(), hero, packet, known_positive=False))
+    if not pair:
+        checks.add("guidance_prerequisites", "blocked", "the hero baseline offered no pair", finding="F-HERO-NO-PAIR")
+        return {"checks": checks, "observation": {}}
+    review = packet["design_review"]
+    design = flow.design(hero, pair, feasible_times=review["feasible_times"], allowance=review["future_hard_allowance"],
+                         label="guidance", review=review, tier="numerical_guidance")
+    suggestion = design.get("suggestion") or {}
+    body = suggestion.get("body") or {}
+    options = {o.get("time"): o for o in body.get("options") or []}
+    checks.expect("guidance_record_is_numerical_guidance",
+                  (design.get("job") or {}).get("state") == "completed" and body.get("design_tier") == "numerical_guidance"
+                  and body.get("verification") != "valid",
+                  f"job {(design.get('job') or {}).get('state')}, tier {body.get('design_tier')}, verification "
+                  f"{body.get('verification')}, replay {body.get('replay')}, selected {body.get('selected_time')}")
+    approved = {F(t) for t in review["feasible_times"]}
+    checks.expect("guidance_keeps_every_approved_option_without_checked_margins",
+                  {F(t) for t in options} == approved and all(o.get("exact_margin") is None for o in options.values()),
+                  f"options {sorted(options)}, approved {review['feasible_times']}, exact margins "
+                  f"{[o.get('exact_margin') for o in options.values()]}")
+    downloads = [flow.download(ref, "guidance") for ref in body.get("artifacts") or []]
+    reports = flow.replay_checks(checks, downloads, native.anchors_from_record(suggestion), "guidance_packet",
+                                 ["guidance-suggestion"], expect_checked=False)
+    checks.expect("guidance_replay_never_passes_as_checked",
+                  bool(reports) and all(r.get("replay") != "passed" and r.get("verification") != "valid"
+                                        for r in reports),
+                  f"replays {[{k: r.get(k) for k in ('status', 'replay', 'verification', 'reason_code')} for r in reports]}")
+    report = flow.client.post(f"/runs/{hero['run']['id']}/reports", label="guidance-report")
+    flow.save_record("guidance-report", report)
+    embedded = [item.get("suggestion") for item in (report.get("body") or {}).get("designs") or []
+                if (item.get("suggestion") or {}).get("id") == suggestion.get("id")]
+    checks.expect("guidance_report_embeds_the_unchanged_record",
+                  len(embedded) == 1 and json.dumps(embedded[0], sort_keys=True) == json.dumps(suggestion, sort_keys=True),
+                  f"{len(embedded)} report copies of the guidance design; identical to the authenticated record: "
+                  f"{bool(embedded) and json.dumps(embedded[0], sort_keys=True) == json.dumps(suggestion, sort_keys=True)}")
+    label = _design_label(flow, body)
+    forged = _design_label(flow, {**body, "design_tier": "checked_pair_separation"})
+    if label is None or forged is None:
+        checks.add("guidance_ui_label_is_not_checked", "not_observed", "Node or the web design module is unavailable",
+                   level=INFO)
+    else:
+        checks.expect("guidance_ui_label_is_not_checked",
+                      CHECKED_LABEL not in label and "numerical guidance" in label.lower() and CHECKED_LABEL not in forged,
+                      f"label {label!r}; with a forged checked tier field {forged!r}")
+    return {"checks": checks, "observation": {"design_tier": body.get("design_tier"), "options": sorted(options),
+                                              "label": label}}
 
 
 def _unresolved_branch(flow: Flow, hero_design: dict | None, target: dict) -> dict | None:
@@ -1571,7 +1727,8 @@ def _cancel_running_and_restart(flow, packet, stack, workspace, checks, observat
                    "would be vacuous (for example the child failed immediately)")
     # C. Worker killed mid-run, explicit recovery, no silent redispatch.
     third = _approved_run(flow, packet, workspace, "cx-restart")
-    restart_ids = ("no_orphan_after_worker_kill", "interrupted_not_redispatched", "interrupted_stays_interrupted")
+    restart_ids = ("no_orphan_after_worker_kill", "interrupted_not_redispatched", "interrupted_stays_interrupted",
+                   "interrupted_run_records_no_scientific_outcome")
     if _wait_running(flow, third["id"]):
         live_before = _live_science_children(stack, flow, third["id"])
         stack.kill("worker")
@@ -1598,6 +1755,14 @@ def _cancel_running_and_restart(flow, packet, stack, workspace, checks, observat
             after = flow.poll(f"/runs/{third['id']}", timeout=20)
             checks.expect("interrupted_not_redispatched", after.get("state") == "interrupted",
                           f"state after recovery {after.get('state')} (error {after.get('error_code')})")
+            # SCI-02: an infrastructure interruption keeps its own meaning: an error code, no evidence and no
+            # scientific outcome, never an inconclusive or no-counterexample result.
+            results = [c.get("result_id") for c in after.get("scenarios", []) if c.get("result_id")]
+            checks.expect("interrupted_run_records_no_scientific_outcome",
+                          after.get("state") == "interrupted" and bool(after.get("error_code")) and not results
+                          and not after.get("result_id") and not _scientific_outcomes(after),
+                          f"state {after.get('state')}, error {after.get('error_code')}, scenario results {results}, "
+                          f"run result {after.get('result_id')}, outcomes {_scientific_outcomes(after)}")
             time.sleep(2.0)
             again = flow.client.get(f"/runs/{third['id']}")
             checks.expect("interrupted_stays_interrupted", again.get("state") == "interrupted"
@@ -1609,6 +1774,16 @@ def _cancel_running_and_restart(flow, packet, stack, workspace, checks, observat
                        "could be killed")
     observation["queued_run"] = queued["id"]
     return {"checks": checks, "observation": observation}
+
+
+def _scientific_outcomes(value) -> list:
+    """Every non-empty scientific_outcome value anywhere in a record."""
+    if isinstance(value, dict):
+        own = [item for key, item in value.items() if key == "scientific_outcome" and item]
+        return own + [found for item in value.values() for found in _scientific_outcomes(item)]
+    if isinstance(value, list):
+        return [found for item in value for found in _scientific_outcomes(item)]
+    return []
 
 
 def _approved_run(flow: Flow, packet: dict, workspace: str, label: str) -> dict:
