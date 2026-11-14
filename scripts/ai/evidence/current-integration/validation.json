@@ -1,0 +1,75 @@
+{
+  "tested_sha": "a9b786e47d0d8c79e07fde67d4b8353d6099c8b7",
+  "base_main": "2d2993d1a264d0128a0ea4af8f02010b263016ad",
+  "source_component_sha": "cbc9fd4ebc468eeb0242b187379ab6c4e769ff4d",
+  "explanation_component_sha": "010e724994c6383e491659351b1636379f056084",
+  "authoritative_owner2_sha": "897623fbdcd916db63070764b08a8c797992dca5",
+  "owner2_runtime_sha": "42f92b1b07f52f4336cc4449928bc781e30ae0fe",
+  "owner4_http_consumption_sha": "31a8ed3c9b66ed721cf2f37179ab3fe62ebe0d09",
+  "candidate_branch": "codex/ai-integration-candidate",
+  "backend": {
+    "passed": 704,
+    "skipped": 0,
+    "seconds": 142.2,
+    "command": "PATH=<prepared-python311>:$PATH BEAN_COUNTERDEX_PYTHON=<counterdex-runtime-python> BEAN_COUNTERDEX_REPLAY_PYTHON=<counterdex-runtime-python> <backend-python> /tmp/drbean-offline-tests.py -q tests --ignore=tests/integration",
+    "runner_source": "\"\"\"Test runner denying socket connections in parent and spawned workers.\"\"\"\nimport socket\nimport sys\n\ndef deny_connect(*args, **kwargs):\n    raise AssertionError(\"Network dispatch forbidden during offline checks\")\n\nsocket.socket.connect = deny_connect\nsocket.socket.connect_ex = deny_connect\n\nif __name__ == \"__main__\":\n    import pytest\n    raise SystemExit(pytest.main(sys.argv[1:]))\n",
+    "scope": "socket.connect/connect_ex denied in the pytest process; separately installed science runtime runs actual Counterdex"
+  },
+  "independent_ai": {
+    "passed": 38,
+    "command": "<backend-python> -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py",
+    "independent_expectations_edited": false
+  },
+  "reported_attacks": {
+    "refused": 14,
+    "supported_positive": "six authentic same-record checked-design facts accepted through actual HTTP/native science; split gates and uncited known bad native state refused"
+  },
+  "unchanged_claude_file": {
+    "reference": "896bfe0395151e147b91795bd1a0e84a91bea9f5",
+    "passed": 22,
+    "failed": 1,
+    "reason": "Original checked-design positive lacks verification/binding/replay/tier facts; owned genuine positive and missing-gate negative are both retained. Independent fixture adoption remains with Claude.",
+    "runxfail": true
+  },
+  "preflight": {
+    "passed": true,
+    "external_dispatch_attempts": 0,
+    "observation_scope": "socket.connect/connect_ex in this preflight process"
+  },
+  "runtime": {
+    "backend_python": "3.12.14",
+    "science_python": "3.11.18",
+    "counterdex": "0.3.0",
+    "deepagents": "0.7.38"
+  },
+  "schema": {
+    "candidate": "a9b786e47d0d8c79e07fde67d4b8353d6099c8b7",
+    "authoritative_source_head": "897623fbdcd916db63070764b08a8c797992dca5",
+    "contract_files_checked": 52,
+    "differences_from_owner2": [],
+    "deterministic_export": true,
+    "input_context": "server-captured current_dataset_id and current_problem_id; request unchanged"
+  },
+  "prior_cohorts": [
+    {
+      "sha": "2b71cf8e6005f8e3c3e9c3607826a8fed73881c1",
+      "passed": 695,
+      "failed": 1,
+      "reason": "An owned accounting fixture used unrecognized narration. Only its scripted sentence changed to a neutral template; accounting predicates and production policy were preserved."
+    },
+    {
+      "sha": "83030fc772407a2166e98ee440872a0906f9efd1",
+      "passed": 696,
+      "failed": 0,
+      "scope": "Before adopting newer authoritative Owner2 input_context protection."
+    }
+  ],
+  "contract": "shared/contracts/SOURCE_HANDOFF.md from Owner2 PR29; four existing additive controlled schemas; server-owned input_context response; normal review/materialization; separate approvals",
+  "independent_coordination": "https://github.com/Arnav-M10/DrBean-hp26/pull/22#issuecomment-6873251943",
+  "source_coordination": "https://github.com/Arnav-M10/DrBean-hp26/pull/20#issuecomment-6873513045",
+  "provider_calls": 0,
+  "credentials_inspected": false,
+  "live_qualification": "not_run",
+  "browser_qualification": "Owner4/Owner1 reported separately; no browser/evaluator implementation changed or local browser qualification claimed here",
+  "text_log_processing": "Trailing whitespace normalized; non-whitespace log contents and all counts/assertions preserved."
+}
