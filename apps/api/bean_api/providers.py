@@ -50,9 +50,9 @@ class ProviderConfig:
             raise ProviderFailure("provider_mode_invalid")
 
     def check_ready(self) -> None:
-        if not self.api_key or not self.model:
+        if not self.model or (self.mode != "controlled" and not self.api_key):
             raise ProviderFailure("provider_not_configured")
-        if not self.account_gate_passed or not self.account_decision_id:
+        if self.mode != "controlled" and (not self.account_gate_passed or not self.account_decision_id):
             raise ProviderFailure("provider_account_gate_unmet")
         if (type(self.max_input_tokens) is not int or type(self.max_output_tokens) is not int
                 or not 1 <= self.max_input_tokens <= 64_000 or not 1 <= self.max_output_tokens <= 16_000):
@@ -343,6 +343,7 @@ class SessionCallContext:
     source_digests: tuple[str, ...] = ()
     selected_page_manifest_digest: str | None = None
     selected_page_ids: tuple[str, ...] = ()
+    selected_page_subset_digest: str | None = None
     parent_action_id: str | None = None
     specialist_id: str | None = None
 
@@ -359,12 +360,15 @@ class SessionCallContext:
                 raise ProviderFailure("provider_context_invalid")
         if len(self.source_digests) > 10 or any(not isinstance(d, str) or not re.fullmatch(r"[a-f0-9]{64}", d) for d in self.source_digests):
             raise ProviderFailure("provider_context_invalid")
-        if self.selected_page_manifest_digest is not None and (not isinstance(self.selected_page_manifest_digest, str)
-                or not re.fullmatch(r"[a-f0-9]{64}", self.selected_page_manifest_digest)):
-            raise ProviderFailure("provider_context_invalid")
-        if (len(self.selected_page_ids) > 8 or len(set(self.selected_page_ids)) != len(self.selected_page_ids)
+        for digest in (self.selected_page_manifest_digest, self.selected_page_subset_digest):
+            if digest is not None and (not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest)):
+                raise ProviderFailure("provider_context_invalid")
+        if (len(self.selected_page_ids) > 8
                 or any(not isinstance(p, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", p) for p in self.selected_page_ids)
+                or len(set(self.selected_page_ids)) != len(self.selected_page_ids)
                 or bool(self.selected_page_ids) != bool(self.selected_page_manifest_digest)
+                or (self.selected_page_subset_digest is not None and (
+                    not self.selected_page_manifest_digest or self.selected_page_subset_digest not in self.source_digests))
                 or bool(self.parent_action_id) != bool(self.specialist_id)):
             raise ProviderFailure("provider_context_invalid")
         return result
@@ -395,6 +399,46 @@ def _strict_usage(raw: Any) -> dict[str, int | None] | None:
     if not any(v is not None for v in values):
         return None
     return dict(zip(("input_tokens", "output_tokens", "total_tokens", "thought_tokens"), values))
+
+
+async def _close_gateway_transport(client: Any) -> None:
+    """Close the unused sync pool and give async cleanup one second of grace.
+
+    Pinned SDK sync close is local: only its async pool was used for requests.
+    Injected Python remains trusted; arbitrary synchronous code is not sandboxed.
+    Further caller cancellations cannot orphan the owned async cleanup task.
+    """
+    close = getattr(client, "close", None)
+    if close is not None:
+        try:
+            close()
+        except Exception:
+            pass
+    try:
+        cleanup = asyncio.create_task(client.aio.aclose())
+    except Exception:
+        return
+
+    def consume(task):
+        try:
+            task.result()
+        except (Exception, asyncio.CancelledError):
+            pass
+
+    cleanup.add_done_callback(consume)
+    deadline = asyncio.get_running_loop().time() + 1.0
+    interrupted = False
+    while not cleanup.done():
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            cleanup.cancel()
+            break
+        try:
+            await asyncio.wait({cleanup}, timeout=remaining)
+        except asyncio.CancelledError:
+            interrupted = True
+    if interrupted:
+        raise asyncio.CancelledError
 
 
 class MeteredGeminiGateway:
@@ -449,8 +493,9 @@ class MeteredGeminiGateway:
             raise ProviderFailure("provider_budget_invalid")
         profiles = {"agent": 512, "explanation": 768, "design_proposal": 1024,
                     "observation_proposal": 1024, "intake": 2048, "paper_understanding": 2048}
-        cap = min(self.config.max_output_tokens, profiles[operation]) if output_tokens is None else output_tokens
-        if type(cap) is not int or not 1 <= cap <= self.config.max_output_tokens:
+        operation_cap = min(self.config.max_output_tokens, profiles[operation])
+        cap = operation_cap if output_tokens is None else output_tokens
+        if type(cap) is not int or not 1 <= cap <= operation_cap:
             raise ProviderFailure("provider_budget_invalid")
         if response_schema is not None and tools:
             raise ProviderFailure("provider_output_mode_conflict")
@@ -468,9 +513,12 @@ class MeteredGeminiGateway:
                     fields = part.model_dump(exclude_none=True)
                     if set(fields) - {"text", "thought", "thought_signature", "inline_data", "function_call", "function_response"}:
                         raise ProviderFailure("provider_part_unsupported")
+                    if sum(getattr(part, key) is not None for key in
+                           ("text", "inline_data", "function_call", "function_response")) != 1:
+                        raise ProviderFailure("provider_part_unsupported")
                     if part.inline_data is not None:
                         raw, mime = part.inline_data.data, part.inline_data.mime_type
-                        if not isinstance(raw, bytes) or mime not in {"image/png", "image/jpeg", "application/pdf"}:
+                        if not isinstance(raw, bytes) or not raw or mime not in {"image/png", "image/jpeg", "application/pdf"}:
                             raise ProviderFailure("provider_media_unsupported")
                         media_count += 1
                         media_size += len(raw)
@@ -478,6 +526,9 @@ class MeteredGeminiGateway:
                             raise ProviderFailure("provider_source_binding_mismatch")
                         if mime == "application/pdf" and not context.selected_page_manifest_digest:
                             raise ProviderFailure("provider_page_disclosure_required")
+                        if mime == "application/pdf" and hashlib.sha256(raw).hexdigest() != context.selected_page_subset_digest:
+                            raise ProviderFailure("provider_page_subset_binding_required")
+                        text_size += len(part.model_copy(update={"inline_data": None}).model_dump_json(exclude_none=True).encode())
                     else:
                         text_size += len(part.model_dump_json(exclude_none=True).encode())
                 bounded.append(content)
@@ -497,7 +548,10 @@ class MeteredGeminiGateway:
             tool_bytes = sum(len(t.model_dump_json(exclude_none=True).encode()) for t in typed_tools)
             if system_instruction is not None and (not isinstance(system_instruction, str) or len(system_instruction.encode()) > 8000):
                 raise ProviderFailure("provider_context_limit")
-            reservation = 1024 + max(text_size, text_budget_bytes) + schema_bytes + tool_bytes + len((system_instruction or "").encode())
+            default_instruction = SYSTEM_INSTRUCTION if response_schema is not None else SYSTEM_INSTRUCTION.replace(
+                "Return only the supplied response schema.", "Use only the declared tools for action selection; do not execute them.")
+            effective_instruction = default_instruction if system_instruction is None else system_instruction
+            reservation = 1024 + max(text_size, text_budget_bytes) + schema_bytes + tool_bytes + len(effective_instruction.encode())
             reservation += media_count * (self.config.image_token_upper_bound or 0)
         except (TypeError, ValueError, OverflowError):
             raise ProviderFailure("provider_context_invalid") from None
@@ -505,7 +559,7 @@ class MeteredGeminiGateway:
             raise ProviderFailure("provider_context_budget_exhausted")
         # Record fingerprints, not source text or native model thought parts.
         digest = hashlib.sha256(json.dumps({"contents": [c.model_dump(mode="json", exclude_none=True) for c in bounded],
-            "system": system_instruction or SYSTEM_INSTRUCTION, "schema": response_schema,
+            "system": effective_instruction, "schema": response_schema,
             "tools": [t.model_dump(mode="json", exclude_none=True) for t in typed_tools]},
             sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
         metadata = {"provider": "gemini" if mode == "live" else "controlled_local", "model": self.config.model,
@@ -541,9 +595,7 @@ class MeteredGeminiGateway:
                                 retry_options=types.HttpRetryOptions(attempts=1)))
             if mode == "controlled" and _hosted_sdk_object(client):
                 raise ProviderFailure("provider_dispatch_disabled")
-            default_instruction = SYSTEM_INSTRUCTION if response_schema is not None else SYSTEM_INSTRUCTION.replace(
-                "Return only the supplied response schema.", "Use only the declared tools for action selection; do not execute them.")
-            request_config = types.GenerateContentConfig(system_instruction=system_instruction or default_instruction,
+            request_config = types.GenerateContentConfig(system_instruction=effective_instruction,
                 max_output_tokens=cap, candidate_count=1,
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True))
             if typed_tools:
@@ -591,10 +643,7 @@ class MeteredGeminiGateway:
             raise ProviderFailure(code, False, attempt_id) from None
         finally:
             if client is not None:
-                try:
-                    await client.aio.aclose()
-                except Exception:
-                    pass
+                await _close_gateway_transport(client)
 
     async def understand_paper(self, paper_context: Any, *, context: SessionCallContext,
                                subset_bytes: bytes | None = None):
@@ -619,6 +668,12 @@ class MeteredGeminiGateway:
             raise ProviderFailure(exc.code) from None
         parts = [types.Part.from_text(text=prompt)]
         if subset_bytes is not None:
+            # The server ledger must attest that this derived digest contains
+            # exactly the selected physical pages; generic disclosure is not enough.
+            if (not isinstance(subset_bytes, bytes)
+                    or (hashlib.sha256(subset_bytes).hexdigest() == admitted.paper_sha256
+                        and len(admitted.selected_page_ids) != admitted.total_pages)):
+                raise ProviderFailure("provider_page_subset_binding_required")
             parts.append(types.Part.from_bytes(data=subset_bytes, mime_type="application/pdf"))
 
         def validate(response):

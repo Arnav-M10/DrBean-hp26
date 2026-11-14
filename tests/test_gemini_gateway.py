@@ -188,7 +188,8 @@ def test_pdf_requires_disclosed_subset_and_bound_media_reservation():
     with pytest.raises(ProviderFailure, match="provider_page_disclosure_required"):
         generate(gateway, ctx(source_digests=(digest,)), image_bytes=raw, mime_type="application/pdf")
     assert not ledger.attempts
-    disclosed = ctx(source_digests=(digest,), selected_page_manifest_digest="a"*64, selected_page_ids=("page1",))
+    disclosed = ctx(source_digests=(digest,), selected_page_manifest_digest="a"*64,
+                    selected_page_ids=("page1",), selected_page_subset_digest=digest)
     generate(gateway, disclosed, image_bytes=raw, mime_type="application/pdf")
     assert len(ledger.attempts) == 1
     with pytest.raises(ProviderFailure, match="provider_source_binding_mismatch"):
@@ -277,3 +278,146 @@ def test_operation_specific_output_reservations_preserve_lower_configured_caps()
     wire2, ledger2 = WireFixture([response()]), AdmittedLedger(1)
     generate(MeteredGeminiGateway(cfg(max_output_tokens=32), ledger2, client_factory=wire2.factory))
     assert ledger2.attempts[0]["metadata"]["reserved_output_tokens"] == 32
+
+
+def test_explicit_controlled_mode_needs_no_key_or_account_decision():
+    config = ProviderConfig(mode="controlled", model="model")
+    config.check_ready()
+    wire, ledger = WireFixture([response()]), AdmittedLedger(1)
+    result = generate(MeteredGeminiGateway(config, ledger, client_factory=wire.factory))
+    assert result.execution_mode == "controlled" and result.usage is None
+    assert result.simulated_usage["total_tokens"] == 15
+    assert ledger.attempts[0]["metadata"]["external_provider_calls"] == 0
+
+
+@pytest.mark.parametrize("extra", ["text", "function_call", "thought_signature"])
+def test_media_cannot_hide_another_payload_or_unbounded_metadata(extra):
+    raw = b"admitted-image"
+    wire, ledger = WireFixture([response()]), AdmittedLedger(1)
+    part = types.Part.from_bytes(data=raw, mime_type="image/png")
+    if extra == "text":
+        part.text = "x" * 60_000
+    elif extra == "function_call":
+        part.function_call = types.FunctionCall(name="tool", args={"value": "x" * 60_000})
+    else:
+        part.thought_signature = b"x" * 60_000
+    gateway = MeteredGeminiGateway(cfg(image_token_upper_bound=100), ledger, client_factory=wire.factory)
+    with pytest.raises(ProviderFailure):
+        asyncio.run(gateway.dispatch(operation="agent", contents=[types.Content(role="user", parts=[part])],
+            context=ctx(source_digests=(hashlib.sha256(raw).hexdigest(),)), validator=lambda x:x))
+    assert not wire.calls and not ledger.attempts
+
+
+def test_pdf_needs_specific_server_attested_subset_digest():
+    raw = b"admitted selected-page PDF"
+    digest = hashlib.sha256(raw).hexdigest()
+    wire, ledger = WireFixture([response()]), AdmittedLedger(1)
+    context = ctx(source_digests=(digest,), selected_page_manifest_digest="a"*64, selected_page_ids=("page1",))
+    gateway = MeteredGeminiGateway(cfg(image_token_upper_bound=100), ledger, client_factory=wire.factory)
+    with pytest.raises(ProviderFailure, match="provider_page_subset_binding_required"):
+        generate(gateway, context, image_bytes=raw, mime_type="application/pdf")
+    assert not wire.calls and not ledger.attempts
+
+
+def test_narrowed_paper_cannot_send_full_original_pdf_as_subset():
+    from test_gemini_papers import retained_context
+    paper = retained_context()
+    raw = b"full original paper PDF"
+    digest = hashlib.sha256(raw).hexdigest()
+    paper["paper_sha256"] = digest
+    context = ctx(source_digests=(digest,), selected_page_manifest_digest=paper["page_manifest_digest"],
+                  selected_page_ids=tuple(paper["selected_page_ids"]), selected_page_subset_digest=digest)
+    wire, ledger = WireFixture([]), AdmittedLedger(1)
+    gateway = MeteredGeminiGateway(cfg(image_token_upper_bound=100), ledger, client_factory=wire.factory)
+    with pytest.raises(ProviderFailure, match="provider_page_subset_binding_required"):
+        asyncio.run(gateway.understand_paper(paper, context=context, subset_bytes=raw))
+    assert not wire.calls and not ledger.attempts
+
+
+def test_paper_response_binding_is_frozen_before_await():
+    from bean_api.ai_prompts import PaperContext
+    from test_gemini_papers import retained_context, proposal
+    paper = PaperContext.model_validate(retained_context())
+    answer = response(text=json.dumps(proposal(paper.model_dump())))
+    wire, ledger = WireFixture([answer]), AdmittedLedger(1)
+    original = wire.generate
+    async def mutate(**kwargs):
+        paper.pages.clear()
+        paper.selected_page_ids.clear()
+        return await original(**kwargs)
+    wire.generate = mutate
+    context = ctx(source_digests=(paper.paper_sha256,), selected_page_manifest_digest=paper.page_manifest_digest,
+                  selected_page_ids=tuple(paper.selected_page_ids))
+    result = asyncio.run(MeteredGeminiGateway(cfg(), ledger, client_factory=wire.factory).understand_paper(paper, context=context))
+    assert result.value.selected_page_ids == list(context.selected_page_ids)
+    assert result.value.findings[0].candidate_exact == "26/5"
+
+
+def test_prompt_fingerprint_matches_actual_tool_turn_instruction():
+    wire, ledger = WireFixture([response()]), AdmittedLedger(1)
+    gateway = MeteredGeminiGateway(cfg(), ledger, client_factory=wire.factory)
+    asyncio.run(gateway.dispatch(operation="agent", context=ctx(),
+        contents=[types.Content(role="user", parts=[types.Part(text="Choose an approved tool.")])], validator=lambda x:x))
+    sent = wire.calls[0]
+    fingerprint = hashlib.sha256(json.dumps({
+        "contents": [c.model_dump(mode="json", exclude_none=True) for c in sent["contents"]],
+        "system": sent["config"].system_instruction, "schema": None, "tools": [],
+    }, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    assert ledger.attempts[0]["metadata"]["prompt_sha256"] == fingerprint
+
+
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_hanging_cleanup_is_bounded_and_sync_pool_is_closed(cancelled):
+    wire, ledger = WireFixture([asyncio.CancelledError() if cancelled else response()]), AdmittedLedger(1)
+    sync_closed = []
+    async def hanging_close():
+        wire.closed += 1
+        await asyncio.Event().wait()
+    original_factory = wire.factory
+    def factory(**kwargs):
+        client = original_factory(**kwargs)
+        client.close = lambda: sync_closed.append(True)
+        client.aio.aclose = hanging_close
+        return client
+    async def scenario():
+        started = asyncio.get_running_loop().time()
+        try:
+            result = await MeteredGeminiGateway(cfg(), ledger, client_factory=factory).generate(
+                "explanation", "Explain evidence.", Answer, context=ctx())
+            assert not cancelled and result.value.value == "reviewed"
+        except asyncio.CancelledError:
+            assert cancelled
+        assert asyncio.get_running_loop().time() - started < 2.0
+    asyncio.run(scenario())
+    assert sync_closed == [True] and wire.closed == 1 and len(wire.calls) == 1
+
+
+def test_second_cancellation_does_not_abandon_owned_cleanup():
+    wire, ledger = WireFixture([asyncio.CancelledError()]), AdmittedLedger(1)
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def close():
+        entered.set()
+        await release.wait()
+        wire.closed += 1
+    wire.close = close
+    async def scenario():
+        task = asyncio.create_task(MeteredGeminiGateway(cfg(), ledger, client_factory=wire.factory).generate(
+            "explanation", "Explain evidence.", Answer, context=ctx()))
+        await entered.wait()
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    asyncio.run(scenario())
+    assert wire.closed == len(wire.calls) == 1
+
+
+def test_per_call_output_cannot_raise_operation_profile():
+    wire, ledger = WireFixture([]), AdmittedLedger(1)
+    with pytest.raises(ProviderFailure, match="provider_budget_invalid"):
+        asyncio.run(MeteredGeminiGateway(cfg(), ledger, client_factory=wire.factory).dispatch(
+            operation="agent", contents=[types.Content(role="user", parts=[types.Part(text="choose")])],
+            context=ctx(), validator=lambda x:x, output_tokens=513))
+    assert not wire.calls and not ledger.attempts

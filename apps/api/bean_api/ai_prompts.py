@@ -525,6 +525,10 @@ _STATISTICAL_UNCERTAINTY = re.compile(
     r"\b(?:SD|SE|CI)\b|\b(?:standard deviation|standard error|confidence interval|error bars?)\b", re.I)
 _HARD_BOUND_ASSERTION = re.compile(
     r"\b(?:hard (?:bound|allowance)|deterministic (?:bound|allowance)|maximum absolute error)\b", re.I)
+_NEGATED_HARD_BOUND = re.compile(
+    r"\b(?:no|without)\s+(?:(?:a|any)\s+)?(?:hard (?:bound|allowance)|deterministic (?:bound|allowance)|maximum absolute error)\b"
+    r"|\b(?:hard (?:bound|allowance)|deterministic (?:bound|allowance)|maximum absolute error)\s+"
+    r"(?:is|was|has been|can be|could be)\s+(?:not|never)\b", re.I)
 
 
 def _paper_context(value: PaperContext | dict) -> PaperContext:
@@ -658,8 +662,11 @@ def validate_paper_proposal(value: PaperProposal | dict, context: PaperContext |
                     or finding.candidate_exact is None or (not quotes and not visual_location)
                     or finding.extraction_method not in {"quoted_text", "table_transcription"}
                     or not _HARD_BOUND_ASSERTION.search(source_text)
+                    or _NEGATED_HARD_BOUND.search(source_text + " " + retained_context)
                     or _STATISTICAL_UNCERTAINTY.search(source_text + " " + retained_context)):
                 raise PaperProposalError("paper_hard_allowance_unjustified")
+            diagnostic("hard_allowance_requires_modeling_review", finding.finding_id,
+                       "A reported bound remains a proposed source claim; the scientific owner must assess its meaning before any scientific mapping.")
         if statistical:
             diagnostic("statistical_uncertainty_requires_modeling_choice", finding.finding_id,
                        "Statistical uncertainty does not automatically define deterministic hard bounds or a universal parameter claim.")

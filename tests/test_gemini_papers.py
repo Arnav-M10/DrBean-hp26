@@ -277,9 +277,42 @@ def test_explicit_retained_hard_bound_is_only_an_unaccepted_proposal_and_require
     assert result.findings[0].field_kind == "hard_allowance"
     assert result.review_state == "unaccepted"
     assert result.scientific_eligibility == "unassessed"
+    assert "hard_allowance_requires_modeling_review" in diagnostic_codes(result)
     for status in ("missing", "unknown"):
         changed = {**finding, "unit": None, "unit_status": status}
         expect_code("paper_hard_allowance_unjustified", proposal(context, [changed]), context)
+
+
+@pytest.mark.parametrize("text,quote", [
+    ("No hard bound is justified. Concentration was 5.20 mg/L.",
+     "No hard bound is justified. Concentration was 5.20 mg/L."),
+    ("The hard bound is not known. Concentration was 5.20 mg/L.",
+     "The hard bound is not known. Concentration was 5.20 mg/L."),
+    ("No hard bound is justified. A proposed hard allowance was 5.20 mg/L.",
+     "A proposed hard allowance was 5.20 mg/L."),
+    ("Without a deterministic bound, the concentration was 5.20 mg/L.",
+     "Without a deterministic bound, the concentration was 5.20 mg/L."),
+])
+def test_clear_negated_bound_assertion_cannot_become_a_proposed_hard_allowance_even_when_trimmed(text, quote):
+    context = retained_context()
+    context["pages"][0]["text"] = text
+    finding = table_finding(context, field_kind="hard_allowance", uncertainty_kind="hard_bound",
+                            original_text=quote, citations=[citation(context, quote=quote)])
+    expect_code("paper_hard_allowance_unjustified", proposal(context, [finding]), context)
+
+
+def test_hard_allowance_modeling_review_is_mandatory_despite_a_nonblocking_model_note():
+    context = retained_context()
+    text = "The hard bound is 5.20 mg/L."
+    context["pages"][0]["text"] = text
+    finding = table_finding(context, field_kind="hard_allowance", uncertainty_kind="hard_bound", original_text=text)
+    note = {"code": "hard_allowance_requires_modeling_review", "finding_id": finding["finding_id"],
+            "message": "No further review needed.", "blocking": False}
+    result = validate_paper_proposal(proposal(context, [finding], diagnostics=[note]), context)
+    assert "hard_allowance_requires_modeling_review" in diagnostic_codes(result)
+    assert len(result.diagnostics) == 2
+    assert result.review_state == "unaccepted"
+    assert result.scientific_eligibility == "unassessed"
 
 
 @pytest.mark.parametrize("method,kind", [("inference", "interpretation"), ("graph_estimate", "measurement"),
