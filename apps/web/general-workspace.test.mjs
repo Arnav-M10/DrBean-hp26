@@ -123,11 +123,11 @@ test('budget preflight and unavailable analysis do not call a provider', async (
   }
 })
 
-test('malformed source bindings, PDFs over ten pages, and inconsistent page numbering refuse admission', async () => {
+test('malformed source bindings, PDFs over twenty pages, and inconsistent page numbering refuse admission', async () => {
   const f = await fixture()
   assert.throws(() => validateResearchAsset({ ...f.asset, sha256: '0'.repeat(64) }, { sha256: f.asset.sha256 }), /match/)
   assert.throws(() => validateResearchAsset({ ...f.asset, pages: [{ ...f.asset.pages[0], page_index: 1 }] }), /page identities/)
-  assert.throws(() => validateResearchAsset({ ...f.asset, pages: Array(11).fill(f.asset.pages[0]) }), /page list/)
+  assert.throws(() => validateResearchAsset({ ...f.asset, pages: Array(21).fill(f.asset.pages[0]) }), /page list/)
 })
 
 test('citation source/page/bbox and fake mathematical badge are rejected', async () => {
@@ -229,4 +229,22 @@ test('missing source on reload does not discard an uncertain request or saved ev
   assert.equal(restored.state.history[0].id, f.result.id)
   restored.editQuestion('A smaller scope')
   assert.match(f.storage.getItem(restored.key()), new RegExp(operationId))
+})
+
+test('paper profile v2: PDFs up to 25 MiB, other files 5 MiB, 50 MiB combined, bounded by what the server advertises', () => {
+  const MiB = 1024 * 1024
+  const server = { general_research: { ...capabilities.general_research, max_pdf_bytes: 25 * MiB, max_total_bytes: 50 * MiB, max_pdf_pages: 20 } }
+  const limits = generalCapabilities(server)
+  assert.equal(limits.maxPdfBytes, 25 * MiB)
+  assert.equal(limits.maxFileBytes, 5 * MiB)
+  assert.equal(limits.maxPdfPages, 20)
+  const file = (name, type, size) => ({ name, type, size })
+  validateFileSelection([], [file('paper.pdf', 'application/pdf', 18 * MiB)], limits)
+  assert.throws(() => validateFileSelection([], [file('paper.pdf', 'application/pdf', 25 * MiB + 1)], limits), /PDFs must be nonempty and at most 25 MiB/)
+  assert.throws(() => validateFileSelection([], [file('table.csv', 'text/csv', 6 * MiB)], limits), /at most 5 MiB/)
+  assert.throws(() => validateFileSelection([{ byte_size: 40 * MiB }], [file('paper.pdf', 'application/pdf', 11 * MiB)], limits), /50 MiB combined/)
+  // An older server that advertises no PDF bound keeps PDFs at its ordinary file bound.
+  assert.equal(generalCapabilities(capabilities).maxPdfBytes, 5242880)
+  // A server cannot raise the client ceilings.
+  assert.equal(generalCapabilities({ general_research: { ...server.general_research, max_pdf_bytes: 100 * MiB, max_pdf_pages: 99 } }).maxPdfBytes, 25 * MiB)
 })

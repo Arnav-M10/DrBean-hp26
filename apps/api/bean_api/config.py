@@ -16,7 +16,10 @@ class Settings:
     auth_tokens: dict[str, str] = field(default_factory=dict, repr=False)
     allowed_origins: tuple[str, ...] = ("http://localhost:8000", "http://127.0.0.1:8000")
     max_json_bytes: int = 262_144
+    # Raw-body ceilings at the HTTP boundary. Only the research-file route admits a paper
+    # (paper profile v2, 25 MiB PDFs); every other raw upload, such as lab-sheet images, keeps 5 MiB.
     max_upload_bytes: int = 5 * 1024 * 1024
+    max_research_upload_bytes: int = 25 * 1024 * 1024
     artifact_dir: str = "var/artifacts"
     science_adapter: str = "counterdex"
     counterdex_python: str = "python3.11"

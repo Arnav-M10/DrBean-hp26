@@ -21,8 +21,11 @@ def error_body(request_id: str, code: str, message: str, *, field_paths: list[st
 
 
 class RequestBoundary:
-    def __init__(self, app, max_json_bytes: int = 262_144, max_upload_bytes: int = 5 * 1024 * 1024):
+    def __init__(self, app, max_json_bytes: int = 262_144, max_upload_bytes: int = 5 * 1024 * 1024,
+                 max_research_upload_bytes: int = 25 * 1024 * 1024):
         self.app, self.max_json_bytes, self.max_upload_bytes = app, max_json_bytes, max_upload_bytes
+        # Only the research-file route may receive a paper; its admission still enforces each kind's bound.
+        self.max_research_upload_bytes = max_research_upload_bytes
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -33,7 +36,7 @@ class RequestBoundary:
         content_type = headers.get(b"content-type", b"").split(b";")[0].lower()
         raw_upload = scope.get("method") == "POST" and RAW_UPLOAD_PATH.fullmatch(scope.get("path", "")) is not None
         is_json = content_type == b"application/json" and not raw_upload
-        limit = self.max_json_bytes if is_json else self.max_upload_bytes
+        limit = self.max_json_bytes if is_json else self.max_research_upload_bytes if raw_upload else self.max_upload_bytes
 
         async def wrapped_send(message):
             if message["type"] == "http.response.start":

@@ -183,8 +183,8 @@ def main():
     if not isinstance(command, dict) or command.get("operation") != "inspect":
         raise Refused("invalid_command")
     R.apply_limits(cpu_seconds=L.WORKER_CPU_SECONDS["pdf"], memory_bytes=L.WORKER_MEMORY_BYTES, open_files=64)
-    data = sys.stdin.buffer.read(L.MAX_ASSET_BYTES + 1)
-    if len(data) > L.MAX_ASSET_BYTES:
+    data = sys.stdin.buffer.read(L.MAX_PDF_BYTES + 1)
+    if len(data) > L.MAX_PDF_BYTES:
         raise Refused("source_too_large")
     result = inspect(data)
     sys.stdout.write(json.dumps(result, ensure_ascii=True, separators=(",", ":")))

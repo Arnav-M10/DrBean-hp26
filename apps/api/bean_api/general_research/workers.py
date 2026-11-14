@@ -38,7 +38,7 @@ MESSAGES = {
     "image_pixel_limit": f"The image exceeds {L.MAX_IMAGE_PIXELS:,} pixels or {L.MAX_IMAGE_SIDE_PX} pixels per side.",
     "animated_image_unsupported": "Animated or multi-frame images are not supported.",
     "image_mode_unsupported": "The image color mode is not supported.",
-    "source_too_large": f"Each file must be at most {L.MAX_ASSET_BYTES // L.MiB} MiB.",
+    "source_too_large": f"Each PDF must be at most {L.MAX_PDF_BYTES // L.MiB} MiB and each other file at most {L.MAX_ASSET_BYTES // L.MiB} MiB.",
     "worker_timeout": "Parsing the file exceeded its time limit.",
     "worker_memory_limit": "Parsing the file exceeded its memory limit.",
     "worker_output_limit": "Parsing the file produced more output than admitted.",

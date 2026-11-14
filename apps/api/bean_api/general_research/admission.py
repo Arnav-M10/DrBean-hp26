@@ -136,8 +136,10 @@ def _text_page(text: str) -> dict:
 def parse(raw: bytes, media_type: str) -> Parsed:
     if not raw:
         raise Refusal("empty_file", "The file is empty.")
-    if len(raw) > L.MAX_ASSET_BYTES:
-        raise Refusal("file_too_large", f"Each file must be at most {L.MAX_ASSET_BYTES // L.MiB} MiB.", 413)
+    limit = L.MAX_PDF_BYTES if media_type == "application/pdf" else L.MAX_ASSET_BYTES
+    if len(raw) > limit:
+        raise Refusal("file_too_large", f"Each PDF must be at most {L.MAX_PDF_BYTES // L.MiB} MiB and each other file "
+                      f"at most {L.MAX_ASSET_BYTES // L.MiB} MiB.", 413)
     observed = _signature(raw)
     binary = media_type in ("image/png", "image/jpeg", "application/pdf")
     if binary and observed != media_type:

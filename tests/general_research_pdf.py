@@ -1,7 +1,7 @@
 """Test-only deterministic PDF writer and hostile PDF builders (standard library only).
 
 Copied from the Owner 5 evaluation harness (evaluation/drbean_eval/pdfwrite.py and hostile_pdfs.py), with
-page rotation added and limits adapted to general research admission (5 MiB, 10 pages).
+page rotation added and limits adapted to general research admission (paper profile v2: 25 MiB PDFs, 20 pages).
 
 Native-text pages use the standard Type 1 fonts with WinAnsiEncoding, so no font is embedded. Output is
 byte-for-byte reproducible because there are no timestamps or random ids, which lets sealed files be committed
@@ -189,9 +189,9 @@ ASSETS = {
                                           "reconstruction from the object stream are both safe)"),
     "password-protected": ("reject_safely", "standard security handler (RC4 40-bit) with a user password; text "
                                             "cannot be read without it and must not be guessed"),
-    "pages-11": ("page_cap", "11 pages, one more than the 10-page admission cap"),
+    "pages-over-cap": ("page_cap", "one page more than the PDF admission page cap"),
     "pages-2000": ("page_cap", "2000 tiny pages in a small file; the cap must apply before per-page work"),
-    "oversize-6mib": ("reject_before_parse", "6 MiB file (above the 5 MiB cap) padded with an unreferenced stream"),
+    "oversize-pdf": ("reject_before_parse", "1 MiB above the PDF byte cap, padded with an unreferenced stream"),
     "inflate-bomb": ("bounded", "one content stream that inflates from about 128 KiB to 128 MiB"),
     "image-dimension-bomb": ("bounded", "image XObject declaring 60000 x 60000 RGB pixels with a tiny stream"),
     "image-inflate-bomb": ("bounded", "12000 x 12000 grayscale image (144 MB raw) compressed to well under 1 MiB"),
@@ -332,13 +332,16 @@ def build(name: str) -> bytes:
         return body[:cut] + b"xref\n0 9\nnot an xref table at all\ntrailer\n<< /Size 9 >>\nstartxref\n999999999\n%%EOF\n"
     if name == "password-protected":
         return encrypted_pdf()[0]
-    if name == "pages-11":
-        return _simple("Eleven pages", pages=11).to_bytes()
+    if name == "pages-over-cap":
+        from bean_api.general_research import limits as L
+        return _simple("One page over the cap", pages=L.MAX_PDF_PAGES + 1).to_bytes()
     if name == "pages-2000":
         return _simple("Two thousand pages", pages=2000, text="p").to_bytes()
-    if name == "oversize-6mib":
+    if name == "oversize-pdf":
+        from bean_api.general_research import limits as L
+        size = L.MAX_PDF_BYTES + MiB
         doc = _simple("Oversize probe")
-        doc.add_object(b"<< /Length %d >>\nstream\n%s\nendstream" % (6 * MiB, b"0" * (6 * MiB)))
+        doc.add_object(b"<< /Length %d >>\nstream\n%s\nendstream" % (size, b"0" * size))
         return doc.to_bytes()
     if name == "inflate-bomb":
         bomb = _compressed_zeros(128 * MiB)
