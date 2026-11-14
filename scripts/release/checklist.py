@@ -110,7 +110,7 @@ def node_check(script, unrun_code=3, extra_env=None):
         return {"status": "unrun", "detail": "node is not installed"}
     browser_env = {**ENV, **(extra_env or {})}
     browser_env["NODE_PATH"] = os.path.join(REPO, "tests", "integration", "node_modules")
-    probe = subprocess.run(["node", "-e", "require('playwright')"], cwd=os.path.join(REPO, "tests", "integration"),
+    probe = subprocess.run(["node", "-e", "require(process.env.PLAYWRIGHT_MODULE || 'playwright')"], cwd=os.path.join(REPO, "tests", "integration"),
                            env=browser_env, capture_output=True)
     if probe.returncode != 0:
         return {"status": "unrun", "detail": "playwright is not installed (npm install in tests/integration)"}
@@ -121,7 +121,7 @@ def node_check(script, unrun_code=3, extra_env=None):
 
 
 def stack_smoke():
-    result = run([sys.executable, "scripts/release/stack_smoke.py", "--record"], env=dict(os.environ), timeout=400)
+    result = run([sys.executable, "scripts/release/stack_smoke.py", "--record"], env=launcher.child_env(), timeout=400)
     path = os.path.join(REPO, "docs", "release-evidence", "stack-smoke.json")
     if result.get("status") == "unrun" or not os.path.exists(path):
         return {name: {"status": "unrun", "detail": result.get("detail", "")} for name in
@@ -152,7 +152,7 @@ def stack_smoke():
 
 def ordinary_user_science_boundary():
     """Backend scientific process boundary as an unprivileged user who already owns many processes."""
-    result = run([sys.executable, "scripts/release/user_conditions_check.py"], env=dict(os.environ), timeout=400)
+    result = run([sys.executable, "scripts/release/user_conditions_check.py"], env=launcher.child_env(), timeout=400)
     try:
         report = json.loads(result.get("output", "").strip().splitlines()[-1])
     except (ValueError, IndexError):

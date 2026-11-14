@@ -59,10 +59,23 @@ class BudgetLedger:
 
     # -- storage ---------------------------------------------------------
     def _events(self) -> list[dict]:
+        """Every event, or BudgetStop if any line is unreadable: a corrupt ledger fails closed, bytes preserved."""
         if not os.path.exists(self.path):
             return []
-        with open(self.path, encoding="utf-8") as handle:
-            return [json.loads(line) for line in handle if line.strip()]
+        events = []
+        with open(self.path, encoding="utf-8", errors="strict") as handle:
+            for number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    raise BudgetStop(f"ledger line {number} is not valid JSON; the file is preserved unchanged and "
+                                     "needs an explicit recovery record before any reservation") from None
+                if not isinstance(event, dict) or "event" not in event:
+                    raise BudgetStop(f"ledger line {number} is not a ledger event; recovery required")
+                events.append(event)
+        return events
 
     def _append(self, handle, event: dict) -> dict:
         event = {"at": _now(), **event}
@@ -112,6 +125,11 @@ class BudgetLedger:
             "unreconciled": sorted(k for k, v in reservations.items()
                                    if v["status"] in ("reserved", "unknown_acceptance")),
             "overruns": sorted(k for k, v in reservations.items() if v.get("overrun")),
+            "conflicting_request_ids": sorted(
+                rid for rid in {v.get("provider_request_id") for v in reservations.values()
+                                if v["status"] == "reconciled" and v.get("provider_request_id")}
+                if sum(1 for v in reservations.values() if v.get("provider_request_id") == rid
+                       and v["status"] == "reconciled") > 1),
             "exceeded": sorted(k for k in used if caps and used[k] > caps[k]),
         }
 

@@ -1,0 +1,34 @@
+...............F.....................                                    [100%]
+=================================== FAILURES ===================================
+_ test_exaggerated_controlled_explanation_is_suppressed_and_records_unchanged[The true parameter is ke = 0.074 per hour.-unsupported_numeric_claim] _
+
+make_app = <function make_app.<locals>.make at 0x7f5ad4d8b7e0>
+text = 'The true parameter is ke = 0.074 per hour.'
+reason = 'unsupported_numeric_claim'
+
+    @pytest.mark.parametrize("text, reason", [
+        ("This proves the interval is correct.", "unsupported_claim"),
+        ("The true parameter is ke = 0.074 per hour.", "unsupported_numeric_claim"),
+    ])
+    def test_exaggerated_controlled_explanation_is_suppressed_and_records_unchanged(make_app, text, reason):
+        client, provider = make_app({})
+        workspace, dataset, problem = problem_workspace(client)
+        provider.responses["explanation"] = lambda prompt: {"explanation": {
+            "fact_ids": [facts_from(prompt)[0]["id"]], "text": text, "next_action": "stop"}}
+        before = counts(client)
+        response = turn(client, workspace, "explain", "Explain the reviewed claim.", 0, key="t1", problem_id=problem["id"])
+        assert response.status_code == 201, response.text
+        body = response.json()["body"]
+>       assert body["commentary_status"] == "suppressed" and body["commentary_suppression_reason"] == reason
+E       AssertionError: assert ('suppressed' == 'suppressed'
+E         
+E           suppressed and 'unsupported_claim' == 'unsupported_numeric_claim'
+E         
+E         - unsupported_numeric_claim
+E         ?             --------
+E         + unsupported_claim)
+
+tests/integration/test_ai_boundaries.py:328: AssertionError
+=========================== short test summary info ============================
+FAILED tests/integration/test_ai_boundaries.py::test_exaggerated_controlled_explanation_is_suppressed_and_records_unchanged[The true parameter is ke = 0.074 per hour.-unsupported_numeric_claim]
+1 failed, 36 passed in 12.23s

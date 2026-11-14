@@ -44,10 +44,10 @@ def native_design_history():
         problem_id=history["problem"]["id"], problem_digest=history["problem"]["digest"],
         candidate_ids=[candidate["id"] for candidate in public["candidates"]],
         candidate_vectors=[candidate["parameter_vector"] for candidate in public["candidates"]],
-        feasible_times=["8/1", "6/1"], future_hard_allowance="1/5", maximum_horizon="8/1",
+        feasible_times=["8/1", "6/1"], future_hard_allowance="1/5", maximum_horizon="10/1",
         scientific_profile="counterdex.v1", requested_tier="checked_pair_separation",
         allowance_origin={"kind": "hypothetical", "description": "Explicit synthetic precision for a separately reviewed design"},
-        allow_construction=True, allow_continuation=True, source_artifact_ids=[artifact["id"]]).model_dump(mode="json")
+        allow_construction=True, allow_continuation=True, source_artifact_ids=[]).model_dump(mode="json")
     history["expected_request_digest"] = semantic_digest("design-request", request)
     return adapter, history, request
 
@@ -73,6 +73,10 @@ def test_computed_pair_design_preserves_approved_grid_history_and_fresh_replay(n
     assert all(Fraction(option["exact_margin"]) > 0 for option in result["options"])
     artifact, content, packet, scientific = decode(result)
     assert packet["binding"]["request"] == request
+    assert packet["binding"]["mapping_policy"] == "DB-SC-1-design-to-groundwork-v2"
+    assert scientific["design"]["allowance_origin"] == request["allowance_origin"]
+    assert scientific["design"]["horizon_policy"]["maximum_horizon"] == "10/1"
+    assert request.get("source_artifact_ids", []) == []
     assert packet["history"] == history["historical_artifact"]
     assert packet["binding"]["historical_evidence"] == history["evidence"]["body"]
     assert scientific["workflow"] == history["workflow"]
@@ -133,10 +137,61 @@ def test_native_design_does_not_replace_reviewed_scope(native_design_history, fi
     if field == "expected_request_digest":
         history[field] = "0" * 64
     else:
-        request[field] = [] if field == "source_artifact_ids" else "numerical_guidance"
+        request[field] = [history["historical_artifact"]["id"]] if field == "source_artifact_ids" else "unsupported_tier"
         history["expected_request_digest"] = semantic_digest("design-request", request)
     result = adapter.design(request, history)
-    assert result["worker_error"] in {"binding_mismatch", "incomplete_export", "unsupported_design_tier"}
+    assert result["worker_error"] in {"binding_mismatch", "unsupported_artifact_reuse", "unsupported_design_tier"}
+
+
+def test_native_design_rejects_prospective_reuse_before_any_child_computation(native_design_history, monkeypatch):
+    adapter, history, request = deepcopy(native_design_history)
+    request["source_artifact_ids"] = [history["historical_artifact"]["id"]]
+    history["expected_request_digest"] = semantic_digest("design-request", request)
+    monkeypatch.setattr(adapter, "_run", lambda *_: pytest.fail("Unsupported reuse must be rejected before dispatch"))
+    assert adapter.design(request, history) == {"worker_error": "unsupported_artifact_reuse"}
+
+
+def test_explicit_numerical_request_keeps_tier_provenance_horizon_and_zero_pair_budget(native_design_history):
+    adapter, history, request = deepcopy(native_design_history)
+    request.update(requested_tier="numerical_guidance", allow_construction=False, allow_continuation=False)
+    request["budget"].update(fixed_vector_constructions=0, pair_verifications=0)
+    history["expected_request_digest"] = semantic_digest("design-request", request)
+    result = adapter.design(request, history)
+    assert "worker_error" not in result, result
+    DesignResult.model_validate({k: v for k, v in result.items() if not k.startswith("_")})
+    _, content, packet, scientific = decode(result)
+    assert result["design_tier"] == "numerical_guidance"
+    assert result["verification"] == "not_checked" and result["replay"] == "unsupported"
+    assert packet["binding"]["request"] == request
+    assert scientific["design"]["requested_tier"] == "numerical_guidance"
+    assert scientific["design"]["horizon_policy"]["maximum_horizon"] == "10/1"
+    assert scientific["design"]["allowance_origin"] == request["allowance_origin"]
+    assert scientific["report"]["checked"]["construction_attempts"] == 0
+    assert scientific["report"]["checked"]["pair_verification_passes"] == 0
+    assert adapter.replay_native(content, expected=result["_native_artifacts"][0]["anchor"])["integrity"] == "passed"
+
+
+def test_genuine_legacy_native_request_keeps_its_original_mapping(native_design_history):
+    adapter, history, request = deepcopy(native_design_history)
+    for field in ("scientific_profile", "requested_tier", "maximum_horizon", "allowance_origin"):
+        request.pop(field)
+    history["expected_request_digest"] = semantic_digest("design-request", request)
+    result = adapter.design(request, history)
+    assert "worker_error" not in result, result
+    _, _, packet, scientific = decode(result)
+    assert packet["binding"]["mapping_policy"] == "DB-SC-1-to-groundwork-v1"
+    assert scientific["design"]["horizon_policy"]["maximum_horizon"] == "8/1"
+    assert scientific["design"]["allowance_origin"]["kind"] == "reviewed_hard_bound"
+    assert result["design_tier"] == "checked_pair_separation" and result["replay"] == "passed"
+
+
+def test_capabilities_report_observed_runtime_and_admitted_operations(native_design_history):
+    adapter, _, _ = native_design_history
+    capabilities = adapter.capabilities()
+    assert capabilities["adapter_version"] == capabilities["runtime"]["adapter_version"] == "0.3.0"
+    assert capabilities["native_recheck"] is True
+    assert capabilities["native_followup"]["hypothetical_only"] is False
+    assert capabilities["native_design_requested_tiers"] == ["numerical_guidance", "checked_pair_separation"]
 
 
 @pytest.fixture(scope="module")

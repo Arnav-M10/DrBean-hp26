@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 let chromium
 try {
-  ({ chromium } = createRequire(import.meta.url)('playwright'))
+  ({ chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright'))
 } catch {
   console.log(JSON.stringify({ status: 'unrun', reason: 'playwright is not installed (npm install in tests/integration)' }))
   process.exit(3)
@@ -31,14 +31,14 @@ const url = await new Promise((resolve, reject) => {
   timeout.unref()
 })
 
-browser = await chromium.launch()
+browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath() })
   const context = await browser.newContext({ acceptDownloads: true })
   const page = await context.newPage()
   const external = []
   const errors = []
   page.on('request', request => { if (!request.url().startsWith(url) && !/^(blob|data):/.test(request.url())) external.push(request.url()) })
   page.on('pageerror', error => errors.push(String(error)))
-  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+  page.on('console', message => { if (message.type() === 'error') errors.push(`${message.text()} ${message.location().url}`) })
   await page.goto(url)
 
   // Invalid input: a non-number must block progress with a linked, focused error.

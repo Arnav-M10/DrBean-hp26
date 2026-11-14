@@ -1,0 +1,71 @@
+{
+  "schema": "drbean.ai.validation.v1",
+  "tested_code_commit": "d47a7c02e136f5042be6356858e548a0840ae4cd",
+  "integrated_base": "80f95a454ec95248690c6aeee1652886741340fc",
+  "backend_python": "3.12.14",
+  "scientific_python": "3.11.18",
+  "external_model_dispatch": "disabled",
+  "live_gemini_qualification": "not_run",
+  "source_sha256": {
+    "apps/api/bean_api/providers.py": "d1c6c562edf82628ae4261aa556907e605183568e8f889367812721c73fe67b6",
+    "apps/api/bean_api/coordinator.py": "517f38df0ea0d8df8ef05dfa76a1f7b7c13d89f63436a69f6dc63074dc9e1d03",
+    "apps/api/bean_api/conversation.py": "e7e19bbe54501f9ae6583ea04fff1a302653a5f51c40a9d30aed8f0e4b833a92",
+    "apps/api/bean_api/ai_prompts.py": "2328cba1cdd9cf94d260aee95cb00689941754c199b221da7e51b3eec893ef6f",
+    "scripts/ai/source_preview.py": "0e6e7eadec91cb46bb32563a2998b8f7958ba1a14cd6f8ed9e1bd88f8a21c9e9",
+    "scripts/ai/fixtures/source-previews.v1.json": "ab30230f7e7c01de8ae19c4a932b78749bb4a60addb80c94b956d552084074b2"
+  },
+  "checks": [
+    {
+      "command": "pytest -q tests --ignore=tests/integration",
+      "runner": "file-backed socket-deny wrapper",
+      "passed": 486,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "evidence": "backend-tests.txt"
+    },
+    {
+      "command": "pytest -q --runxfail tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py",
+      "passed": 37,
+      "failed": 0,
+      "exit_code": 0,
+      "guard": "unchanged Workstream 5 egress guard",
+      "evidence": "independent-ai-tests.txt"
+    },
+    {
+      "command": "python scripts/ai/probe.py",
+      "exit_code": 0,
+      "external_dispatch_attempts": 0,
+      "evidence_level": "controlled graph with controlled tools",
+      "evidence": "offline-preflight.json"
+    },
+    {
+      "command": "python scripts/ai/source_preview.py",
+      "exit_code": 0,
+      "external_dispatch_attempts": 0,
+      "evidence_level": "controlled development source preview; ordinary review integration unavailable",
+      "evidence": "controlled-source-preview.json"
+    },
+    {
+      "command": "ruff check (owned source/tests/scripts); git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "historical_attempt": {
+    "code_before_fix": "1600abcf2e606a2cf7d4f78e529803c9c1f0b315",
+    "backend_passed": 484,
+    "independent_passed": 36,
+    "independent_failed": 1,
+    "reason": "Suppression remained effective; production reason priority changed. Numeric-first classification restored and both rejection checks retained.",
+    "evidence": "classification-before-fix.txt"
+  },
+  "limitations": [
+    "Two independent strict xfail markers describe fixed defects; --runxfail executes their unchanged assertions normally. Owner 5 must retire them.",
+    "Source previews are manual authored development controls with pending independent review; no Gemini extraction accuracy is qualified.",
+    "AI-1 application completion needs Owner 2 controlled provenance/config/review materialization contracts.",
+    "Controlled conversation DTOs, horizon/allowance provenance and arbitrary suggestion-to-run lookup remain Owner 2 seams.",
+    "Current authenticated follow-up context supports the backend-admitted hypothetical selected-time/allowance path only.",
+    "Known-word and cited-number safeguards do not prove arbitrary prose semantics.",
+    "Not a complete release qualification, Mac qualification, actual-observation qualification or live-provider observation."
+  ]
+}

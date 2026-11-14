@@ -1,19 +1,21 @@
 # Backend integration handoff
 
 The browser-baseline milestone is merged in PR #6 (`1f75bdc`). This next design
-milestone reuses Owner 1's Counterdex 0.2.0 producer. Ordinary investigations run
+milestone uses the Counterdex 0.3.0 producer. Ordinary investigations run
 bounded numerical search followed by exact checking of frozen candidates and
 fresh native replay. The browser submits the strict reviewed plan, records
 explicit approval, displays actual baseline results and downloads native bytes
 plus separate replay anchors. No stored regression candidates are substituted.
-The current progress and observed validation are in `docs/workstreams/02-backend.md`.
+Backend milestones are recorded in `docs/workstreams/02-backend.md`; the current
+integration repair and its validation are in `docs/workstreams/01-science.md`.
 
 Separately approved design now consumes the actual discovered pair and original
 baseline bytes through the application-bound native bridge. Design packets embed
 that original history for offline replay. The older fixed-pair design/replay path
-remains covered by explicitly seeded internal controls. Reviewed hypothetical
-follow-up plans now select native fixed-candidate review of the original design
-pair. An ordinary investigation still performs bounded discovery.
+remains covered by explicitly seeded internal controls. Accepted observation
+proposals now select native proposal-bound `recheck` of the original design
+pair. Archived `review` packets retain their original validation rules. An
+ordinary investigation still performs bounded discovery.
 
 ## Runtime and default mode
 
@@ -62,15 +64,17 @@ to trusted in-process tests. Those deepagents executions persist
 Owner 3's ordinary controlled intake/agent development path and prompt seam still
 need coordination. Gemini live qualification remains `not_run`.
 
-The platform policy retains wall, input/output, image/pixel and applicable CPU,
-file/process limits. Linux applies `RLIMIT_AS`; Darwin reports it unavailable.
+The platform policy retains wall, input/output, image/pixel and applicable CPU
+and open-file limits. Linux applies `RLIMIT_AS`; Darwin reports it unavailable.
 Decoder setup failures return infrastructure errors instead of malformed-image
 errors. Scientific termination kills the owned process group, including its
-3.11 interpreter. The scientific child uses a 256-process per-user guard because
-Linux counts browser threads against that same user-wide ceiling; it is not a
-per-job quota. Stricter inherited hard limits are preserved. Linux was exercised
-here; the actual Mac must still be checked
-by the release owner. Darwin behavior has simulated platform regression coverage.
+3.11 interpreter. `process-guards-v3` preserves the inherited `RLIMIT_NPROC`
+soft and hard limits on Linux and Darwin: that ceiling counts the user's
+processes/threads and cannot enforce a quota on one job. Policy reports disclose
+that a per-job process-count quota is unavailable. The actual Mac baseline and
+nested engine launch are exercised; Linux inheritance has injected platform
+coverage. This does not establish Linux host qualification or worker-loss
+recovery, which remain separate release checks.
 
 ## Authenticated HTTP walkthrough
 
@@ -131,12 +135,14 @@ For design from a computed baseline, `POST /runs/{run_id}/design-proposals`
 requires the exact scenario, immutable problem digest, candidate IDs/vectors,
 `scientific_profile: counterdex.v1`, requested tier, feasible times, positive
 future hard allowance, allowance origin/description, maximum horizon, source
-artifact IDs and construction/continuation permissions. The current native
-mapping admits `requested_tier: checked_pair_separation` only; numerical-only
-requests are explicitly rejected rather than silently upgraded. Actual output
-can still be numerical guidance, no separation or unavailable. Supply exactly
-the original baseline artifact ID and two distinct compatible candidate vectors
-returned by that baseline. A single outside witness cannot enable pair design.
+artifact IDs and construction/continuation permissions. The native mapping
+preserves `requested_tier`, admitting `numerical_guidance` and
+`checked_pair_separation`. Actual output can still be numerical guidance, no
+separation or unavailable. Supply `source_artifact_ids: []` and two distinct
+compatible candidate vectors returned by the baseline. The server resolves the
+mandatory baseline bytes separately from the selected immutable evidence;
+prospective artifact reuse is unsupported and nonempty reuse IDs are rejected.
+A single outside witness cannot enable pair design.
 Checked execution needs
 two allowed pair-verification passes (initial check and independent fresh
 replay). Review and approve the resulting design plan separately, then start
@@ -150,9 +156,11 @@ margin when checked. An incomplete grid cannot become a whole-grid optimum.
 The worker supplies the frozen request digest, original historical evidence,
 native bytes and separately retained anchors, plus its own job/approval IDs.
 The engine reconstructs the pair's prospective certificates only with the
-reviewed construction permission. Its mapped maximum horizon is the largest
-needed historical or grid time, bounded by the reviewed application cap. The
-parent enforces remaining wall time without rewriting the approved request.
+reviewed construction permission. Mapping `DB-SC-1-design-to-groundwork-v2`
+preserves the exact reviewed maximum horizon, complete allowance origin,
+requested tier and approved grid order. The horizon must cover all historical
+and proposed times. The parent enforces remaining wall time without rewriting
+the approved request.
 `tests/test_native_design_workflow.py` exercises positive separation, coarse
 allowance with checked no-separation, approval/retry/isolation and independent
 replay using actual baseline output.
@@ -163,7 +171,7 @@ envelope; `/anchor?download=true` downloads only the replay anchor object.
 For new baseline and design packets, replay outside the server with the matching engine:
 
 ```sh
-/tmp/counterdex-engine/bin/python -I -m counterdex replay-native evidence.native.json --anchors evidence.anchors.json
+"$BEAN_COUNTERDEX_PYTHON" -I -m counterdex replay-native evidence.native.json --anchors evidence.anchors.json
 ```
 
 Baseline anchors name raw SHA, dataset/application problem/scientific projection
@@ -198,15 +206,21 @@ it does not prove the original interval or eliminate all other candidates.
 
 ### Reviewed fixed-pair follow-up (manual HTTP)
 
-Consumer DB-SC-1 / GF-2 uses producer `counterdex.bridge.v1` operation `review`
-and mapping `DB-SC-1-to-groundwork-v1`. Reuse IDs returned by the ordinary routes:
+Consumer DB-SC-1 / GF-2 uses producer `counterdex.bridge.v1` operation `recheck`
+and binding profile `counterdex.followup-binding.v1`. The worker supplies the
+complete normalized observation proposal (`id`, `digest`, `body`) alongside
+the original design bytes and separate anchors. Reuse IDs returned by the
+ordinary routes:
 
 1. Complete baseline and separately approved design. Retain the design job,
    immutable design-result record, and its single artifact reference.
 2. `POST /workspaces/{workspace_id}/observation-proposals` with the original
-   dataset/experiment, `origin: "hypothetical"`, a new included row, exact time,
-   concentration and hard allowance, source description, change reason and
-   nonempty `generating_choices`. Use the checked selected time and allowance.
+   dataset/experiment, origin (`actual`, `transcription`, or `hypothetical`), a
+   new included row, exact time, concentration and hard allowance, source
+   description and change reason. Hypothetical proposals also require nonempty
+   `generating_choices`. The proposal may declare its own time and allowance;
+   it need not match the selected design time. Source assets are unsupported in
+   this manual path.
 3. `POST /observation-proposals/{proposal_id}/review` with `accepted: true`,
    proposal digest and parent dataset ID. This returns a new dataset; it does
    not authorize scientific work. The original dataset must still be current.
@@ -229,23 +243,30 @@ and mapping `DB-SC-1-to-groundwork-v1`. Reuse IDs returned by the ordinary route
    design approvals do not authorize this plan.
 6. Retrieve scenario evidence and download its native artifact and separate
    anchor through the ordinary artifact routes. The packet has operation
-   `review` and embeds the exact design (and its baseline). Replay with the
+   `recheck` and embeds the full accepted proposal and exact design (and its
+   baseline). Replay with the
    independently installed engine:
-   `/tmp/counterdex-engine/bin/python -I -m counterdex replay-native evidence.native.json --anchors evidence.anchors.json`.
+   `"$BEAN_COUNTERDEX_PYTHON" -I -m counterdex replay-native evidence.native.json --anchors evidence.anchors.json`.
 
 `candidate_results` records compatible, excluded or unresolved status for the
 original IDs/vectors and names violating observation IDs. `baseline_search` is
-absent: no new candidates were searched. A successful review can have valid
+absent: no new candidates were searched. A successful recheck can have valid
 verification and replay while both individual candidates are excluded. That
 does not establish global model inconsistency or prove the reviewed interval.
 Reports retain the observation proposal/review and original design lineage.
 
-Current engine admission is deliberately narrow: one hypothetical row, no source
-asset, checked-separation parent, unchanged historical rows and model, selected
-time and reviewed allowance. Unsupported actual or off-design observations are
-rejected before approval; the backend never relabels them. Owner 1 must extend
-`native_packet.validate_followup`, bridge admission and replay to support actual
-acquisition provenance, changed sampling time/allowance, or sequential readings.
+This application flow admits one appended observation, no source asset, an
+original freshly checked design parent, unchanged historical rows/model/domain/claim and new
+dataset/problem identities. It retains conservative aggregate provenance: an
+existing hypothetical dataset or a hypothetical new row yields hypothetical
+history; otherwise the original dataset origin is preserved. Checked parents
+with no separation established are also eligible; numerical-only or unqualified
+parents are rejected. Candidate vectors remain frozen. The proposal digest,
+accepted review, materialized row, parent
+bytes, application mapping and replay anchors are independently checked before
+publication. Repeated rechecks and baseline-parent follow-up UI flows are outside
+this slice. Legacy `review` still requires its original hypothetical row at the
+selected time and allowance.
 Owner 4 can connect browser controls to this same HTTP flow; no new frontend
 client or evaluator-specific route is supplied. See
 `tests/test_native_followup_workflow.py` for the executable returned-ID flow.
@@ -271,6 +292,44 @@ For evaluator locator conversion, production `rows[0].time` maps to corpus
 conversion. Use `admission-golden.json` for trailing-newline rationals, JSON
 negative zero, depth, digit and byte caps; do not relax server admission to
 match a different evaluator oracle.
+
+## Worker loss and explicit restart recovery
+
+Scientific execution owns a distinct process group. A separate bounded-lifetime
+guard watches a pipe held only by the supervising worker: losing the worker
+closes the pipe and terminates that scientific group, including its native
+runtime descendants. The guard is ready before adapter dispatch. The existing
+parent deadline/cancellation cleanup still applies, and child exit cleans its
+own group. Recovery does not discover or kill unrelated processes.
+
+After stopping the API and confirming the old worker is gone, run the existing
+worker CLI against the same configured SQLite and artifact directories:
+
+```sh
+.venv/bin/python -m bean_api.worker --recover
+.venv/bin/python -m bean_api.worker
+```
+
+The worker lock prevents another worker from owning the same lane. Recovery is
+explicit and idempotent. Its JSON `jobs` count includes all reconciled jobs;
+`queued_cancellations` counts never-started cancellations acknowledged as
+`cancelled`. Started work becomes `interrupted` / `worker_restart`; unfinished
+scenario reservations become interrupted. Untouched queued jobs remain queued.
+Reserved provider attempts remain conservatively `unknown_outcome`; reservations
+are not refunded. No in-flight scientific or provider request is redispatched.
+
+Reopen the existing `/runs/{id}` or `/design-jobs/{id}`. Retrying start with its
+accepted approval returns that original job, including interrupted/cancelled
+state. Existing completed scenario evidence, native downloads and separately
+retained replay anchors stay available even if no parent summary was committed.
+To intentionally compute again, create a new reviewed plan (with appropriate
+`parent_plan_id`) and obtain fresh approval. Recovery grants no new authority.
+
+Backend acceptance: `tests/test_science_parent_loss.py` kills live supervisors
+and verifies the owned group stops; `tests/test_restart_evidence.py` kills a
+worker after actual evidence publication, runs CLI recovery, reopens the API and
+independently replays unchanged downloaded bytes. These observations distinguish
+terminated zombie entries from executing scientific computation.
 
 ## Verification commands
 

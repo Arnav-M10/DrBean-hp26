@@ -1,0 +1,55 @@
+{
+  "schema": "drbean.ai.validation.v1",
+  "tested_code_commit": "986dfe180f9adaecc616709fcf6983997d711461",
+  "integrated_base": "9cc90e0d623720cd782db6e7f7356aeabdb8e91d",
+  "backend_python": "3.12.14",
+  "scientific_python": "3.11.18",
+  "external_model_dispatch": "disabled",
+  "live_gemini_qualification": "not_run",
+  "source_sha256": {
+    "apps/api/bean_api/providers.py": "0bb50ad42971e51fe330ea87a59a43d0c24615fd6f05b50df7a14221c661d50b",
+    "apps/api/bean_api/coordinator.py": "8d618f6d2f682a61bb4a7bd02a48421c52832f38bfad8a4716b6a504cd1e16a4",
+    "apps/api/bean_api/conversation.py": "7c9fad3368c2cc5362f04bccece019250dec37ccb1ba234103cc7c3de4cb4430",
+    "scripts/ai/probe.py": "81af23354bd5b0d5e7022b30611339c82b1ca09432cdb01bb2f1dd1668506ea5"
+  },
+  "checks": [
+    {
+      "command": "pytest -q tests --ignore=tests/integration",
+      "runner": "file-backed socket-deny wrapper",
+      "passed": 327,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "evidence": "backend-tests.txt"
+    },
+    {
+      "command": "pytest -q --runxfail tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py",
+      "guard": "existing Workstream 5 egress guard",
+      "passed": 37,
+      "failed": 0,
+      "exit_code": 0,
+      "note": "Two fixed-defect tests retain strict xfail decorators; --runxfail executes their unchanged assertions normally.",
+      "evidence": "independent-ai-tests.txt"
+    },
+    {
+      "command": "python scripts/ai/probe.py",
+      "exit_code": 0,
+      "external_dispatch_attempts": 0,
+      "observation_scope": "socket.connect/connect_ex in preflight process",
+      "evidence_level": "controlled graph with controlled tools",
+      "evidence": "offline-preflight.json"
+    },
+    {
+      "command": "ruff check (owned modules, focused tests, offline preflight)",
+      "exit_code": 0
+    }
+  ],
+  "release_limitations": [
+    "Broader integration run before context fix: 367 passed, 4 failed, 1 teardown error; one owned context failure is now fixed and retested.",
+    "Independent full-loop checks still need Owner 2/5 triage: worker-kill orphan assertion, native packet classification/design replay, selected-pair follow-up and stale revision behavior.",
+    "After that run the reported remaining PIDs were zombies, not live computations; kill/teardown assertions remain unresolved.",
+    "Normal pytest reports two XPASS(strict) failures until Owner 5 retires the fixed-defect markers.",
+    "Controlled intake/conversation provenance and design-draft horizon need authoritative backend contracts.",
+    "This is not complete product release qualification or live Gemini evidence."
+  ]
+}

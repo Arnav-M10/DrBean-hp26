@@ -1,0 +1,155 @@
+................................F.F..FE................................. [ 19%]
+........................................................................ [ 38%]
+....................................................F................... [ 57%]
+........................................................................ [ 77%]
+........................................................................ [ 96%]
+............                                                             [100%]
+==================================== ERRORS ====================================
+_ ERROR at teardown of test_hypothetical_followups_give_candidate_specific_feedback _
+
+    @pytest.fixture(scope="module")
+    def module_stack():
+        stack = launcher.LocalStack(str(REPO)).start()
+        yield stack
+        report = stack.stop()
+        stack.cleanup()
+>       assert not report["orphans"], f"processes outlived teardown: {report['orphans']}"
+E       AssertionError: processes outlived teardown: [{'pid': 3845, 'ppid': 3824, 'pgid': 3824, 'command': '/workspace/DrBean-ai/.venv/bin/python -B -c from multiprocessing.resource_tracker import main;main(9)'}, {'pid': 3860, 'ppid': 3855, 'pgid': 3855, 'command': '/workspace/DrBean-ai/.venv/bin/python -B -c from multiprocessing.resource_tracker import main;main(9)'}, {'pid': 3872, 'ppid': 3855, 'pgid': 3872, 'command': '/workspace/DrBean-ai/.venv/bin/python -B -c from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=10, pipe_handle=12) --multiprocessing-fork'}, {'pid': 3891, 'ppid': 3878, 'pgid': 3878, 'command': '/workspace/DrBean-ai/.venv/bin/python -B -c from multiprocessing.resource_tracker import main;main(9)'}]
+E       assert not [{'command': '/workspace/DrBean-ai/.venv/bin/python -B -c from multiprocessing.resource_tracker import main;main(9)', .../bin/python -B -c from multiprocessing.resource_tracker import main;main(9)', 'pgid': 3878, 'pid': 3891, 'ppid': 3878}]
+
+tests/integration/conftest.py:66: AssertionError
+=================================== FAILURES ===================================
+______________ test_queued_cancel_restart_recovery_and_no_orphans ______________
+
+module_stack = <drbean_eval.launcher.LocalStack object at 0x7f7551f9ee70>
+flow = <drbean_eval.science_flow.Flow object at 0x7f7551f9dd00>
+
+    @pytest.mark.real_stack
+    def test_queued_cancel_restart_recovery_and_no_orphans(module_stack, flow):
+>       require(sf.scenario_cancel_restart(flow, HERO, module_stack))
+
+tests/integration/test_http_lifecycle_and_science.py:70: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+outcome = {'checks': <drbean_eval.science_flow.Checks object at 0x7f7551f9ee40>, 'observation': {'children_alive_after_worker_kill': [3872], 'queued_run': 'run_cfe3b7316f9543f2974814676bedb69c', 'running_cancel_state': 'cancelled'}}
+
+    def require(outcome: dict) -> None:
+        checks = outcome["checks"]
+        bad = [c for c in checks.items if c["level"] == "required" and c["outcome"] != "passed"]
+>       assert not bad, "\n".join(f"{c['outcome'].upper()} {c['id']} [{c.get('finding', '-')}]: {c['detail']}"
+                                  for c in bad)
+E       AssertionError: FAILED no_orphan_after_worker_kill [F-ORPHAN]: 1 live scientific child(ren) when the worker was killed; still alive: [3872]
+E       assert not [{'detail': '1 live scientific child(ren) when the worker was killed; still alive: [3872]', 'finding': 'F-ORPHAN', 'id': 'no_orphan_after_worker_kill', 'level': 'required', ...}]
+
+tests/integration/test_http_lifecycle_and_science.py:32: AssertionError
+______ test_hero_full_loop_real_science_design_download_and_native_replay ______
+
+flow = <drbean_eval.science_flow.Flow object at 0x7f7551f9e420>
+
+    @pytest.mark.real_stack
+    @pytest.mark.real_science
+    def test_hero_full_loop_real_science_design_download_and_native_replay(flow):
+>       require(sf.scenario_hero(flow, HERO))
+
+tests/integration/test_http_lifecycle_and_science.py:117: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+outcome = {'base': {'approval': {'actor_id': 'eval-reviewer', 'created_at': '2026-11-14T04:12:56.976Z', 'expected_revision_id': ...igest'], 'artifact_id': 'native_artifact_d4c1e270d92b48719cf518c2f3d6e521', 'error': None, 'exit_code': 0, ...}], ...}}
+
+    def require(outcome: dict) -> None:
+        checks = outcome["checks"]
+        bad = [c for c in checks.items if c["level"] == "required" and c["outcome"] != "passed"]
+>       assert not bad, "\n".join(f"{c['outcome'].upper()} {c['id']} [{c.get('finding', '-')}]: {c['detail']}"
+                                  for c in bad)
+E       AssertionError: BLOCKED baseline_native_bytes_downloadable [F-NATIVE-BYTES]: referenced artifacts are not downloadable as native packets (['unavailable']); routes tried [{'route': '/artifacts/{id}', 'status': 200}, {'route': '/artifacts/{id}/content', 'status': 404}]
+E         BLOCKED design_checked_tier [F-DESIGN-TIER]: design tier numerical_guidance, reason invalid_input
+E         FAILED design_packet_fresh_native_replay [-]: status failed, integrity passed, binding matches, error None
+E       assert not [{'detail': "referenced artifacts are not downloadable as native packets (['unavailable']); routes tried [{'route': '/...ed, binding matches, error None', 'id': 'design_packet_fresh_native_replay', 'level': 'required', 'outcome': 'failed'}]
+
+tests/integration/test_http_lifecycle_and_science.py:32: AssertionError
+_________ test_hypothetical_followups_give_candidate_specific_feedback _________
+
+flow = <drbean_eval.science_flow.Flow object at 0x7f7551ea3470>
+
+    @pytest.mark.real_stack
+    @pytest.mark.real_science
+    def test_hypothetical_followups_give_candidate_specific_feedback(flow):
+        sf.scenario_hero(flow, HERO)
+>       require(sf.scenario_followup(flow, HERO))
+
+tests/integration/test_http_lifecycle_and_science.py:137: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+outcome = {'checks': <drbean_eval.science_flow.Checks object at 0x7f7551f9f050>, 'observation': {'branches': [{'application_per_...b5f0bd053742863816': 'excluded', 'search-6355582fc69f4a36a526654e': 'compatible'}, ...}], 'selected_time_used': '8/1'}}
+
+    def require(outcome: dict) -> None:
+        checks = outcome["checks"]
+        bad = [c for c in checks.items if c["level"] == "required" and c["outcome"] != "passed"]
+>       assert not bad, "\n".join(f"{c['outcome'].upper()} {c['id']} [{c.get('finding', '-')}]: {c['detail']}"
+                                  for c in bad)
+E       AssertionError: BLOCKED reading-3.4_per_candidate_outcome [F-FOLLOWUP-FEEDBACK]: follow-up run completed exposes no candidate-specific result for the prior pair (independent oracle expects {'search-6355582fc69f4a36a526654e': 'compatible', 'search-062c33b5f0bd053742863816': 'excluded'})
+E         FAILED reading-4.57_lineage [-]: review refused 409 stale_revision
+E         FAILED reading-4.0_lineage [-]: review refused 409 stale_revision
+E       assert not [{'detail': "follow-up run completed exposes no candidate-specific result for the prior pair (independent oracle expec...{'detail': 'review refused 409 stale_revision', 'id': 'reading-4.0_lineage', 'level': 'required', 'outcome': 'failed'}]
+
+tests/integration/test_http_lifecycle_and_science.py:32: AssertionError
+_ test_controlled_graph_runs_http_approved_counterdex_and_replays_bound_native_bytes _
+
+scientific_client = <starlette.testclient.TestClient object at 0x7f75535bfc80>
+
+    def test_controlled_graph_runs_http_approved_counterdex_and_replays_bound_native_bytes(scientific_client):
+        """Controlled orchestration with real science, never live Gemini reasoning."""
+        import base64
+        import hashlib
+    
+        from bean_api.contracts import PlanBody
+        from bean_api.main import PREFIX
+        from bean_api.worker import Worker
+        from test_counterdex_adapter import reviewed_history
+        from test_scientific_http import post
+    
+        client, history = scientific_client, reviewed_history()
+        workspace = post(client, "/workspaces", {"name": "Controlled agent real-science acceptance"}, "workspace")["id"]
+        dataset = post(client, f"/workspaces/{workspace}/datasets", history["dataset"]["body"], "dataset")
+        problem = post(client, f"/workspaces/{workspace}/problems", {
+            **history["problem"]["body"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]}, "problem")
+        model = EvidenceModel()
+        disclosure = {"provider": "gemini", "model": model.model_name,
+                      "source_asset_ids": [], "context_fields": ["problem", "dataset"]}
+        consent = post(client, f"/workspaces/{workspace}/provider-consents", {
+            **disclosure, "problem_id": problem["id"], "accepted": True}, "controlled-consent")
+        body = PlanBody(problem_id=problem["id"], problem_digest=problem["digest"], dataset_id=dataset["id"],
+            scientific_profile="counterdex.v1", objective={
+                "question": "Which checked outside witness remains compatible with the reviewed synthetic data?",
+                "success_criterion": "Retain real native evidence with controlled commentary and zero provider dispatch."},
+            scenarios=[{"id": "baseline", "kind": "baseline", "label": "Real bounded discovery",
+                        "problem_id": problem["id"], "problem_digest": problem["digest"]}],
+            provider_disclosure={**disclosure, "permission_id": consent["id"]}).model_dump(mode="json")
+        plan = post(client, f"/workspaces/{workspace}/plans", {
+            "expected_current_revision_id": problem["id"], "plan": body}, "plan")
+        approval = post(client, f"/plans/{plan['id']}/approvals", {
+            "expected_current_revision_id": problem["id"], "expected_plan_digest": plan["digest"],
+            "accepted": True}, "approval")
+        run = post(client, f"/plans/{plan['id']}/runs", {
+            "approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "run")
+        config = ProviderConfig(api_key="nonsecret-controlled-placeholder", model=model.model_name,
+                                account_gate_passed=True, account_decision_id="controlled-local-test-policy")
+        worker = Worker(client.app.state.workflow, settings=client.app.state.settings,
+                        adapter=client.app.state.adapter, provider_config=config, controlled_model=model)
+        assert worker.tick() == 1
+        finished = client.get(PREFIX + f"/runs/{run['id']}").json()
+>       assert finished["state"] == "completed", finished
+E       AssertionError: {'actor_id': 'alice', 'approval_id': 'approval_d12a298473ff4d6d8b762c614179744f', 'created_at': '2026-11-14T04:13:44.859Z', 'error_code': 'agent_context_budget_exhausted', ...}
+E       assert 'failed' == 'completed'
+E         
+E         - completed
+E         + failed
+
+tests/test_coordinator.py:409: AssertionError
+=========================== short test summary info ============================
+ERROR tests/integration/test_http_lifecycle_and_science.py::test_hypothetical_followups_give_candidate_specific_feedback
+FAILED tests/integration/test_http_lifecycle_and_science.py::test_queued_cancel_restart_recovery_and_no_orphans
+FAILED tests/integration/test_http_lifecycle_and_science.py::test_hero_full_loop_real_science_design_download_and_native_replay
+FAILED tests/integration/test_http_lifecycle_and_science.py::test_hypothetical_followups_give_candidate_specific_feedback
+FAILED tests/test_coordinator.py::test_controlled_graph_runs_http_approved_counterdex_and_replays_bound_native_bytes
+4 failed, 367 passed, 1 error in 74.68s (0:01:14)

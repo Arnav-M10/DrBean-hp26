@@ -82,8 +82,11 @@ def classify(data: bytes) -> dict:
                 "note": "an application record envelope is not a native replay packet"}
     schema = value.get("schema_version") if isinstance(value, dict) else None
     if isinstance(schema, str) and schema.startswith("groundwork."):
-        return {"class": "native_packet", "schema_version": schema,
+        return {"class": "native_packet", "profile": "suggestion_bundle", "schema_version": schema,
                 "top_level_keys": sorted(value)[:40]}
+    if isinstance(schema, str) and schema.startswith("counterdex.application-bundle."):
+        return {"class": "native_packet", "profile": "application_bundle", "schema_version": schema,
+                "operation": value.get("operation"), "top_level_keys": sorted(value)[:40]}
     return {"class": "unrecognized_json", "top_level_keys": sorted(value)[:40] if isinstance(value, dict) else None}
 
 
@@ -110,14 +113,22 @@ def anchors_from_record(*records: dict) -> dict:
 
 
 def replay(science_python: str, package_dir: str, data: bytes, anchors: dict, *,
-           guard_log: str | None = None, timeout: float = 120.0) -> dict:
-    """Fresh replay of downloaded bytes against separately supplied anchors."""
+           guard_log: str | None = None, timeout: float = 120.0, application_anchor: dict | None = None) -> dict:
+    """Fresh replay of downloaded bytes against separately supplied anchors.
+
+    A ``counterdex.application-bundle`` packet is replayed with ``counterdex replay-native`` and the complete
+    application anchor returned by the authenticated anchor route (never one read from the packet itself).
+    """
     with tempfile.TemporaryDirectory(prefix="drbean-replay-") as work:
         bundle = os.path.join(work, "bundle.json")
         with open(bundle, "wb") as handle:
             handle.write(data)
-        argv = [science_python, "-I", "-c", _BOOTSTRAP, "replay", bundle]
-        clean = {k: v for k, v in anchors.items() if k in ("problem_digest", "suggestion_digest") and v}
+        if classify(data).get("profile") == "application_bundle":
+            argv = [science_python, "-I", "-c", _BOOTSTRAP, "replay-native", bundle]
+            clean = dict(application_anchor or {})
+        else:
+            argv = [science_python, "-I", "-c", _BOOTSTRAP, "replay", bundle]
+            clean = {k: v for k, v in anchors.items() if k in ("problem_digest", "suggestion_digest") and v}
         if clean:
             anchor_path = os.path.join(work, "anchors.json")
             with open(anchor_path, "w", encoding="utf-8") as handle:

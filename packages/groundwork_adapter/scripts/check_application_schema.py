@@ -8,6 +8,7 @@ This reads local JSON only and makes no provider or network calls.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -20,14 +21,15 @@ def main() -> int:
     root = Path(__file__).resolve().parents[3]
     sys.path.insert(0, str(root / "apps" / "api"))
     try:
-        from bean_api.canonical import semantic_digest
-        from bean_api.contracts import DatasetBody, DesignRequestBody, DesignResult, ProblemBody, ScientificResult
+        from bean_api.canonical import canonical_bytes, semantic_digest
+        from bean_api.contracts import (DatasetBody, DesignRequestBody, DesignResult,
+                                       ObservationProposalBody, ProblemBody, ScientificResult)
     except ImportError as error:
         parser.exit(2, f"Run this command in the prepared API environment; missing dependency: {error.name}\n")
     if not args.fixtures.is_dir():
         parser.error("--fixtures must name an existing directory")
     counts = {"requests": 0, "results": 0, "error_responses": 0}
-    admitted = {"investigate", "design", "review"}
+    admitted = {"investigate", "design", "review", "recheck"}
 
     def normalized(model, value, location):
         actual = model.model_validate(value).model_dump(mode="json")
@@ -53,6 +55,11 @@ def main() -> int:
                 normalized(DesignRequestBody, request["request"], f"{path.name}/request")
                 if request["expected_request_digest"] != semantic_digest("design-request", request["request"]):
                     raise ValueError(f"{path.name}: expected design request identity differs from its body")
+            if operation == "recheck":
+                proposal = request["observation_proposal"]
+                normalized(ObservationProposalBody, proposal["body"], f"{path.name}/observation_proposal")
+                if proposal["digest"] != hashlib.sha256(canonical_bytes(proposal["body"])).hexdigest():
+                    raise ValueError(f"{path.name}: observation proposal identity differs from its body")
             requests[path.resolve()] = operation
             counts["requests"] += 1
         for path in sorted(args.fixtures.rglob("*.response.json")):
@@ -73,7 +80,7 @@ def main() -> int:
             normalized(model, response["result"], f"{path.name}/result")
             counts["results"] += 1
         if not counts["requests"]:
-            raise ValueError("No investigation, design or review request fixtures were found")
+            raise ValueError("No investigation, design or follow-up request fixtures were found")
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f"Authoritative application schema check failed: {error}", file=sys.stderr)
         return 1

@@ -12,6 +12,7 @@ from .errors import AdapterError
 from .exact import (MAX_JSON_DEPTH, MAX_JSON_NODES, MAX_STRUCTURAL_INTEGER,
                     _preflight, _validate_tree, artifact_digest, strict_json_loads)
 from .identity import VERSION, implementation_identity
+from .followup import project_followup
 from .models import counter, fields, normalize_problem
 from .native_packet import ANCHOR_FIELDS, packet_anchors, packet_bytes, replay_packet, validate_followup
 from .replay_baseline import decode_artifact
@@ -70,11 +71,23 @@ def _artifact(content: bytes) -> dict:
             "media_type": "application/vnd.counterdex.native+json", "bytes_base64": base64.b64encode(content).decode("ascii")}
 
 
-def _verification(ref, app_problem, verification, proposition):
+def _verification(ref, app_problem, verification, proposition, scientific_problem_digest):
     return {"checker_name": "counterdex", "checker_version": VERSION, "artifact_id": ref["id"],
             "artifact_sha256": ref["sha256"], "proposition": proposition,
             "verification": verification, "expected_binding": "matches",
-            "expected_problem_digest": app_problem["digest"], "observed_problem_digest": app_problem["digest"]}
+            "expected_problem_digest": app_problem["digest"], "observed_problem_digest": app_problem["digest"],
+            "expected_scientific_problem_digest": scientific_problem_digest,
+            "observed_scientific_problem_digest": scientific_problem_digest}
+
+
+def _candidate_results(results):
+    """Project the API's existing concise per-vector result fields."""
+    return [{"candidate_id": item["candidate_id"], "verification": item["verification"],
+             "reason_code": item.get("reason_code"),
+             "violating_observation_ids": item.get("violating_observation_ids", []),
+             "unresolved_observation_ids": item.get("unresolved_observation_ids", []),
+             "outside_closed_claim": item["outside_closed_claim"],
+             "is_counterexample": item["is_counterexample"]} for item in results]
 
 
 def _baseline_result(projection, scientific, fresh, ref):
@@ -85,12 +98,15 @@ def _baseline_result(projection, scientific, fresh, ref):
     return {"scientific_outcome": outcome["scientific_outcome"], "verification": verification,
         "expected_binding": "matches", "replay": fresh["replay"], "reason_code": outcome["reason_code"],
         "problem_id": app["id"], "problem_digest": app["digest"],
+        "scientific_problem_digest": projection["projection_digest"],
+        **({"candidate_results": _candidate_results(checked)} if checked else {}), "native_replay": fresh,
         "candidates": [{"id": c["candidate_id"], "parameter_vector": c["parameters"],
             "problem_id": app["id"], "problem_digest": app["digest"], "observable": "concentration",
             "checked_horizon": scientific["report"]["checked"]["historical_horizon"],
             "verification": c["verification"], "artifact_ids": [ref["id"]]} for c in checked],
         "artifacts": [ref], "verification_record": _verification(ref, app, verification,
-            "Exact enclosure recomputation checks these selected fixed vectors against every included hard bound and the closed claim; no search completeness is asserted.") if checked else None}
+            "Exact enclosure recomputation checks these selected fixed vectors against every included hard bound and the closed claim; no search completeness is asserted.",
+            projection["projection_digest"]) if checked else None}
 
 
 def _design_result(projection, mapping, scientific, fresh, ref):
@@ -108,9 +124,15 @@ def _design_result(projection, mapping, scientific, fresh, ref):
         "options": restore_approved_grid(options, mapping["approved_grid_order"]),
         "algorithm": scientific["design"]["checked_policy"] if valid else scientific["design"]["numerical_policy"],
         "candidate_ids": [c["id"] for c in scientific["design"]["candidates"]],
+        "scientific_problem_digest": projection["projection_digest"],
+        "scientific_design_digest": mapping["design_digest"],
+        "native_suggestion_digest": scientific["suggestion_digest"],
+        **({"candidate_results": _candidate_results(fresh["candidate_results"])} if fresh.get("candidate_results") else {}),
+        "native_replay": fresh,
         "future_hard_allowance": scientific["design"]["future_allowance"], "artifacts": [ref],
         "verification_record": _verification(ref, projection["binding"]["problem"], fresh["verification"],
-            "Fresh selected-pair compatibility and exact finite-grid margins under the separately reviewed future allowance.")}
+            "Fresh selected-pair compatibility and exact finite-grid margins under the separately reviewed future allowance.",
+            projection["projection_digest"])}
 
 
 def _limits(value):
@@ -149,6 +171,8 @@ def dispatch(request: dict) -> dict:
         fields(request, common | scientific_fields | execution_fields | {"request", "expected_request_digest", "historical_evidence", "historical_artifact"}, "request")
     elif operation == "review":
         fields(request, common | scientific_fields | execution_fields | {"scenario_id", "limits", "historical_artifact"}, "request")
+    elif operation == "recheck":
+        fields(request, common | scientific_fields | execution_fields | {"scenario_id", "limits", "historical_artifact", "observation_proposal"}, "request")
     else:
         raise AdapterError("invalid_input", "Unknown bridge operation.")
     projection = project_application(request["problem"], request["dataset"])
@@ -161,7 +185,7 @@ def dispatch(request: dict) -> dict:
     else:
         wall, maximum = _limits(request["limits"])
     context = ExecutionContext(wall)
-    if operation in ("design", "review"):
+    if operation in ("design", "review", "recheck"):
         history = fields(request["historical_artifact"], {"id", "sha256", "bytes_base64", "anchors"}, "historical_artifact")
         history_bytes = decode_artifact(history["bytes_base64"], history["sha256"])
         historical_packet = strict_json_loads(history_bytes)
@@ -172,6 +196,10 @@ def dispatch(request: dict) -> dict:
             raise AdapterError("incomplete_export", "Design requires a freshly replayed actual baseline.")
         mapping = project_design(request["request"], expected_request_digest=request["expected_request_digest"],
             projection=projection, historical_evidence=request["historical_evidence"], native_candidate_results=historical_fresh["candidate_results"])
+        if (mapping["design"]["requested_tier"] == "checked_pair_separation"
+                and mapping["design"]["limits"]["max_pair_verifications"] == 1):
+            raise AdapterError("invalid_input", "The bridge requires two authorized pair passes for construction checking and fresh replay.",
+                               ("request/budget/pair_verifications",))
         scenario = request["request"]["scenario_id"]
         native = create_suggestion(projection["problem"], mapping["design"], expected_problem_digest=projection["projection_digest"],
             expected_design_digest=mapping["design_digest"], workflow=request["workflow"], context=context)
@@ -195,11 +223,17 @@ def dispatch(request: dict) -> dict:
             frozen = normalize_candidates(normalize_problem(projection["problem"]), payloads)
             validate_followup(projection["binding"], historical_packet,
                 {"operation": "fixed_candidate_review", "candidates": payloads})
+        if operation == "recheck":
+            from .historical import normalize_candidates
+            source = strict_json_loads(decode_artifact(historical_packet["scientific"]["bytes_base64"], historical_packet["scientific"]["sha256"]))
+            mapping = project_followup(projection, observation_proposal=request["observation_proposal"],
+                parent_packet=historical_packet, parent_scientific=source, parent_replay=historical_fresh)
+            frozen = normalize_candidates(normalize_problem(projection["problem"]), mapping["candidates"])
         scenario = request["scenario_id"]
         native = create_baseline(projection["problem"], expected_problem_digest=projection["projection_digest"],
             scenario_id=scenario, workflow=request["workflow"], settings=settings, context=context,
             max_bundle_bytes=maximum, frozen_candidates=frozen)
-        binding = projection["binding"]
+        binding = mapping["binding"] if operation == "recheck" else projection["binding"]
     packet = packet_bytes(operation, binding, native, run_id=request["run_id"], scenario_id=scenario, history=history, maximum=maximum)
     anchors = packet_anchors(packet)
     fresh = replay_packet(packet, expected=anchors, context=context)

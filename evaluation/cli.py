@@ -66,7 +66,36 @@ def selftest() -> dict:
     return counts
 
 
+def _guard_harness_process() -> str:
+    """Load the egress guard into this CLI process; returns the log path (shared with control subprocesses)."""
+    import tempfile
+    from drbean_eval.guard import sitecustomize as guard
+    log = os.environ.get("DRBEAN_EGRESS_GUARD_LOG") or os.path.join(tempfile.gettempdir(),
+                                                                     f"drbean-cli-guard-{os.getpid()}.jsonl")
+    guard.install(log)
+    return log
+
+
+def _harness_attempts(log: str) -> list[dict]:
+    if not log or not os.path.exists(log):
+        return []
+    with open(log, encoding="utf-8") as handle:
+        events = [json.loads(line) for line in handle if line.strip()]
+    return [e for e in events if e.get("kind") in ("egress_blocked", "provider_client_blocked")]
+
+
 def main(argv=None) -> int:
+    guard_log = _guard_harness_process()
+    code = _main(argv, guard_log)
+    attempts = _harness_attempts(guard_log)
+    if attempts:  # an external-model attempt by the harness itself is a P0, even though the guard blocked it
+        print(f"P0: the evaluation harness attempted {len(attempts)} external connection(s): "
+              f"{sorted({a.get('host') or a.get('client') for a in attempts})}")
+        return 4
+    return code
+
+
+def _main(argv, guard_log) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("verify")
@@ -80,6 +109,11 @@ def main(argv=None) -> int:
     run.add_argument("--results", default=RESULTS)
     run.add_argument("--stack-env", action="append", default=[], metavar="BEAN_NAME=VALUE",
                      help="non-credential BEAN_* setting passed to the launched test stack (repeatable)")
+    run.add_argument("--app-repo", help="preview another checkout (e.g. a teammate worktree) as the application "
+                     "under test; recorded as preview evidence, never acceptance; requires --results")
+    run.add_argument("--diagnostic", action="append", default=[], choices=("relax_nproc", "science_barrier"),
+                     help="DIAGNOSTIC: relax one named product guard to observe downstream behaviour; never "
+                          "acceptance; requires --results")
     controls = sub.add_parser("controls")
     controls.add_argument("--results", default=RESULTS)
     gate = sub.add_parser("gate")
@@ -129,8 +163,14 @@ def main(argv=None) -> int:
         return 0
     if args.command == "run":
         stack_env = dict(item.split("=", 1) for item in args.stack_env if "=" in item)
-        records = runner.run_lane(args.lane, make_subject(args.subject, REPO, stack_env), ROOT, args.results, REPO,
-                                  args.only, LEDGER)
+        if (args.app_repo or args.diagnostic or args.subject == "http-owner4-launcher") and \
+                os.path.abspath(args.results) == os.path.abspath(RESULTS):
+            print("refused: previews, diagnostics and the Owner 4 launch path must write to a separate --results "
+                  "directory (for example evaluation/results/preview); they never mix into the release history")
+            return 1
+        subject = make_subject(args.subject, REPO, stack_env, app_repo=args.app_repo,
+                               diagnostic_overrides=tuple(args.diagnostic))
+        records = runner.run_lane(args.lane, subject, ROOT, args.results, REPO, args.only, LEDGER)
         tally = {}
         for record in records:
             tally[record["status"]] = tally.get(record["status"], 0) + 1
@@ -138,7 +178,7 @@ def main(argv=None) -> int:
         print(f"{args.lane}: {len(records)} attempt(s) recorded: {tally}")
         return 0 if all(r["status"] == "passed" for r in records) else 2
     if args.command == "controls":
-        return run_controls(args.results)
+        return run_controls(args.results, guard_log)
     if args.command in ("gate", "inventory"):
         state = runner.git_state(REPO)
         result = gates.compute(ROOT, args.results, state["commit"], state["dirty"],
@@ -172,6 +212,11 @@ def main(argv=None) -> int:
                 for item in f.get("retests", []):
                     lines.append(f"- **Retest at {item['at_commit']}:** {item['result']} "
                                  f"(evidence: {json.dumps(item.get('evidence', {}), sort_keys=True)})")
+        catalog = data.get("check_catalog") or {}
+        if catalog.get("ids"):
+            lines += ["", "## Check-level finding ids (raised only when the check fails)", "", catalog["note"], "",
+                      "| ID | Owner | Raised when |", "|---|---|---|"]
+            lines += [f"| {key} | {item['owner']} | {item['meaning']} |" for key, item in sorted(catalog["ids"].items())]
         with open(os.path.join(ROOT, "FINDINGS.md"), "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines) + "\n")
         print("wrote evaluation/FINDINGS.md")
@@ -199,10 +244,11 @@ def main(argv=None) -> int:
     return 1
 
 
-def run_controls(results_dir: str) -> int:
+def run_controls(results_dir: str, guard_log: str | None = None) -> int:
     """Engine-level native controls in fresh CPython 3.11 processes; appended to controls.jsonl."""
     from datetime import datetime, timezone
     from drbean_eval import engine_controls, launcher
+    engine_controls.GUARD_LOG = guard_log
     state = runner.git_state(REPO)
     try:
         python = launcher.science_python()

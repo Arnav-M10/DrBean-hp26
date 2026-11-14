@@ -11,7 +11,7 @@ import pytest
 from drbean_support import REPO, launcher, load_packet, other_actor, reviewer
 from drbean_eval import science_flow as sf
 
-HERO = load_packet("hero-v1")
+HERO = load_packet("hero-v2")
 CHANGED = load_packet("changed-input-v1")
 
 
@@ -66,8 +66,22 @@ def test_cross_workspace_records_are_invisible_and_unusable(module_stack):
 
 
 @pytest.mark.real_stack
-def test_queued_cancel_restart_recovery_and_no_orphans(module_stack, flow):
-    require(sf.scenario_cancel_restart(flow, HERO, module_stack))
+@pytest.mark.parametrize("diagnostics", [(), ("science_barrier",)], ids=["actual_workload", "diagnostic_barrier"])
+def test_queued_cancel_restart_recovery_and_no_orphans(stack_factory, tmp_path, diagnostics):
+    """Observe actual sustained work and, separately, the declared diagnostic barrier.
+
+    The normal case uses admitted synthetic replicates without overriding any guard.
+    The diagnostic holds a child after setsid/limits and never counts as an ordinary lane run.
+    Both retain the same live-child observation and product cancel/kill/recovery assertions.
+    """
+    stack = stack_factory(diagnostic_overrides=diagnostics)
+    try:
+        python = launcher.science_python()
+    except launcher.StackError:
+        python = None
+    flow = sf.Flow(reviewer(stack), other_actor(stack), str(tmp_path), science_python=python,
+                   package_dir=str(REPO / "packages" / "groundwork_adapter"), guard_log=stack.guard_log)
+    require(sf.scenario_cancel_restart(flow, HERO, stack))
 
 
 @pytest.mark.real_stack
