@@ -1,0 +1,49 @@
+{
+  "integrated_main": "37d8f6f6010e2fe8be3e55323bd6cc18f9112760",
+  "integration_commit": "440d93f397e71585063d30521b77c170f31bdba2",
+  "metadata_followup_commit": "e4c3c20f8a2795abef2f40fa3e4eb754031bba79",
+  "science_runtime": {
+    "python": "3.11.18",
+    "counterdex": "0.3.0",
+    "installed_from": "packages/groundwork_adapter",
+    "installation": "UV_CACHE_DIR=/tmp/drbean-uv-cache uv pip install --offline --python /tmp/drbean-counterdex-runtime/bin/python --no-deps ./packages/groundwork_adapter"
+  },
+  "backend": {
+    "passed": 589,
+    "skipped": 0,
+    "evidence": "integrated-backend-tests.txt",
+    "command": "PATH=<prepared-python311>:$PATH BEAN_COUNTERDEX_PYTHON=<counterdex-runtime-python> BEAN_COUNTERDEX_REPLAY_PYTHON=<counterdex-runtime-python> .venv/bin/python /tmp/drbean-offline-tests.py -q tests --ignore=tests/integration"
+  },
+  "independent_ai": {
+    "passed": 38,
+    "xfail_override": false,
+    "evidence": "integrated-independent-ai-tests.txt",
+    "command": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py",
+    "upstream_expected_failure_markers_retired": true
+  },
+  "metadata_followup": {
+    "change": "Internal standalone preview metadata now requires_intake_service, rather than incorrectly claiming a pending contract. Application availability remains deployment-specific.",
+    "passed": 71,
+    "evidence": "integrated-preview-metadata-tests.txt"
+  },
+  "schema_compatibility": {
+    "integrated_main": "37d8f6f6010e2fe8be3e55323bd6cc18f9112760",
+    "legacy_files_checked": 46,
+    "changed_legacy_files": [],
+    "deterministic_export": true
+  },
+  "preflight": {
+    "passed": true,
+    "external_dispatch_attempts": 0,
+    "observation_scope": "socket.connect/connect_ex in this preflight process"
+  },
+  "ruff": "All checks passed!",
+  "git_diff_check": true,
+  "prior_diagnostic": {
+    "evidence": "mixed-runtime-diagnostic.txt",
+    "result": "1 failed, 185 passed",
+    "reason": "The dedicated runtime was transitioned from0.2.0 to0.3.0 during this exploratory cohort; native generation and replay therefore had different source versions. Superseded by the full frozen0.3.0 run and final71-test source/provider gate. No assertion was weakened."
+  },
+  "live_qualification": "not_run",
+  "release_qualification": "not_claimed"
+}

@@ -537,6 +537,90 @@ class IntakeRequest(StrictModel):
         return self
 
 
+class ControlledIntakeRequest(StrictModel):
+    """Local fixture preparation, with no consent to hosted inference."""
+    execution_mode: Literal["controlled"]
+    source_id: Identifier
+    expected_source_digest: Digest
+    current_revision_id: Identifier | None = None
+    existing_values: dict[str, str] = Field(default_factory=dict, max_length=50)
+    notes: Annotated[str, StringConstraints(max_length=4000)] = ""
+
+    @model_validator(mode="after")
+    def bounded_controlled_context(self) -> "ControlledIntakeRequest":
+        if any(len(key) > 256 or len(value) > 1000 for key, value in self.existing_values.items()):
+            raise ValueError("Existing field context exceeds the admitted limit")
+        if len(self.notes) + sum(len(key) + len(value) for key, value in self.existing_values.items()) > 12000:
+            raise ValueError("Controlled intake context exceeds its bounded text budget")
+        return self
+
+
+class ControlledIntakeField(IntakeField):
+    """A fixture-authored candidate, never Gemini transcription."""
+    method: Literal["controlled_fixture"]
+    grounding: Literal["unreviewed_visual"] = "unreviewed_visual"
+
+
+class ControlledIntakeProvenance(StrictModel):
+    local_attempt_id: Identifier
+    preview_schema_version: Literal["controlled-source-preview.v1"]
+    prompt_version: Literal["controlled-source-proposal.v1"]
+    prompt_digest: Digest
+    context_digest: Digest
+    fixture_id: Identifier | None
+    fixture_digest: Digest | None
+    fixture_version: Literal["controlled-source-fixtures.v1"]
+    fixture_review_status: Literal["pending_independent_owner_review"]
+    lookup_method: Literal["frozen_fixture_lookup"]
+    source_metadata: SourceAssetMetadata
+
+    @model_validator(mode="after")
+    def synthetic_fixture_provenance(self) -> "ControlledIntakeProvenance":
+        if self.source_metadata.origin != "synthetic":
+            raise ValueError("Controlled development sources must remain synthetic")
+        if (self.fixture_id is None) != (self.fixture_digest is None):
+            raise ValueError("A known fixture requires both its identity and digest")
+        return self
+
+
+class ControlledIntakeConflict(StrictModel):
+    field_path: Annotated[str, StringConstraints(min_length=1, max_length=256)]
+    existing_value: Annotated[str, StringConstraints(max_length=1000)]
+    proposed_value: Annotated[str, StringConstraints(max_length=256)] | None
+
+
+class ControlledIntakeProposalRecordBody(IntakeProposalBody):
+    """Separate additive wire type; legacy Gemini record bytes stay unchanged."""
+    schema_version: Literal["controlled-intake.v1"] = "controlled-intake.v1"
+    execution_mode: Literal["controlled"] = "controlled"
+    authorship: Literal["controlled_fixture"] = "controlled_fixture"
+    label: Literal["Controlled example; not Gemini transcription."] = "Controlled example; not Gemini transcription."
+    fields: list[ControlledIntakeField] = Field(max_length=50)
+    status: Literal["controlled_example", "unavailable"]
+    code: Identifier
+    next_action: Literal["review_controlled_preview", "manual_review"]
+    conflicts: list[ControlledIntakeConflict] = Field(default_factory=list, max_length=50)
+    provenance: ControlledIntakeProvenance
+    review_state: Literal["unaccepted"] = "unaccepted"
+    execution_approved: Literal[False] = False
+    external_provider_calls: Literal[0] = 0
+    actual_model_tokens: Literal[0] = 0
+    live_qualification: Literal["not_run"] = "not_run"
+
+    @model_validator(mode="after")
+    def controlled_state(self) -> "ControlledIntakeProposalRecordBody":
+        if self.execution_approved is not False:
+            raise ValueError("Source preparation cannot approve execution")
+        if self.source_digest != self.provenance.source_metadata.sha256:
+            raise ValueError("The controlled proposal must bind its retained source")
+        if self.status == "unavailable" and (self.fields or self.next_action != "manual_review"):
+            raise ValueError("Unavailable extraction must have no fields and retain manual review")
+        if self.status == "controlled_example" and (
+                not self.fields or self.provenance.fixture_id is None or self.next_action != "review_controlled_preview"):
+            raise ValueError("A controlled example requires a known fixture and reviewable fields")
+        return self
+
+
 class ReviewedField(StrictModel):
     field_path: Annotated[str, StringConstraints(min_length=1, max_length=256)]
     value: Annotated[str, StringConstraints(min_length=1, max_length=256)]
@@ -797,7 +881,8 @@ PUBLIC_SCHEMAS = {
         CandidateResult, AllowanceOrigin, PlanBody, CreatePlanRequest, ApprovalRequest, AgentProviderConsent,
         StartRunRequest, DesignRequestBody, DesignPlanBody, ObservationProposalBody,
         ObservationReviewRequest, SourceAssetMetadata, IntakeProposalBody, IntakeProposalRecordBody, IntakeRequest,
-        IntakeReviewRequest, AssistantTurnRequest, GroundedExplanation, ScientificResult,
+        IntakeReviewRequest, ControlledIntakeRequest, ControlledIntakeField, ControlledIntakeProvenance,
+        ControlledIntakeProposalRecordBody, AssistantTurnRequest, GroundedExplanation, ScientificResult,
         VerificationRecord, DesignResult, BaselineSearchSettings, BaselineSearchSummary,
     )
 }

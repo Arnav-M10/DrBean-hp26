@@ -1,0 +1,175 @@
+{
+  "$defs": {
+    "SourceAssetMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "declared_media_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg"
+          ],
+          "title": "Declared Media Type",
+          "type": "string"
+        },
+        "observed_media_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg"
+          ],
+          "title": "Observed Media Type",
+          "type": "string"
+        },
+        "byte_size": {
+          "maximum": 5242880,
+          "minimum": 1,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "width": {
+          "maximum": 12000000,
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 12000000,
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "origin": {
+          "enum": [
+            "synthetic",
+            "public"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "retention": {
+          "enum": [
+            "retain",
+            "digest_only"
+          ],
+          "title": "Retention",
+          "type": "string"
+        },
+        "upload_actor_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Upload Actor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "declared_media_type",
+        "observed_media_type",
+        "byte_size",
+        "width",
+        "height",
+        "origin",
+        "retention",
+        "upload_actor_id"
+      ],
+      "title": "SourceAssetMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "local_attempt_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Local Attempt Id",
+      "type": "string"
+    },
+    "preview_schema_version": {
+      "const": "controlled-source-preview.v1",
+      "title": "Preview Schema Version",
+      "type": "string"
+    },
+    "prompt_version": {
+      "const": "controlled-source-proposal.v1",
+      "title": "Prompt Version",
+      "type": "string"
+    },
+    "prompt_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Prompt Digest",
+      "type": "string"
+    },
+    "context_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Context Digest",
+      "type": "string"
+    },
+    "fixture_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Fixture Id"
+    },
+    "fixture_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Fixture Digest"
+    },
+    "fixture_version": {
+      "const": "controlled-source-fixtures.v1",
+      "title": "Fixture Version",
+      "type": "string"
+    },
+    "fixture_review_status": {
+      "const": "pending_independent_owner_review",
+      "title": "Fixture Review Status",
+      "type": "string"
+    },
+    "lookup_method": {
+      "const": "frozen_fixture_lookup",
+      "title": "Lookup Method",
+      "type": "string"
+    },
+    "source_metadata": {
+      "$ref": "#/$defs/SourceAssetMetadata"
+    }
+  },
+  "required": [
+    "local_attempt_id",
+    "preview_schema_version",
+    "prompt_version",
+    "prompt_digest",
+    "context_digest",
+    "fixture_id",
+    "fixture_digest",
+    "fixture_version",
+    "fixture_review_status",
+    "lookup_method",
+    "source_metadata"
+  ],
+  "title": "ControlledIntakeProvenance",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ControlledIntakeProvenance"
+}
