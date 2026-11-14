@@ -51,11 +51,14 @@ tenant-scoped LangGraph saver. Graph checkpoints contain bounded state/refs;
 native bytes remain in artifacts. B journals each tool effect before dispatch;
 checkpoint failure does not delete a completed job/evidence or justify new work.
 
-Each active action retains lower bounds: four model turns, six tool attempts,
+Each active action retains ceilings: four model turns, six tool attempts,
 two science reservations and 300 active seconds; design stays stricter. Pauses
-release the lease and do not consume active time. Session cumulative proposed
-ceilings are eight logical model turns, 24 tool attempts and four scientific
-children. Physical calls are additionally limited by existing admitted session
+release the lease and do not consume active time. New sessions persist
+`research-session-limits.v2`:16 logical model turns,24 tool attempts and4 scientific
+children. The initial8-turn proposal could not fit the complete multi-review loop.
+Legacy session records retain their8-turn limit; a restart does not upgrade it.
+This logical limit grants no provider requests. Physical calls are separately
+limited by explicitly admitted session
 allocation and server-wide ledger (no automatic 12/24 allocation or new grant).
 Default live allocation is zero; one physical request is charged by A's single
 dispatch adapter through B's atomic ledger, not twice by graph middleware.

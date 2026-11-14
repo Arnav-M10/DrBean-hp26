@@ -35,6 +35,7 @@ def research_capabilities(settings, provider_config=None):
         "checkpoint_version": "research-checkpoint.v1", "persistence": "application_sqlite",
         "review_resume": True, "unavailable_reason": reason,
         "session_allocation_required": True, "default_live_allocation": 0,
+        "session_limits_policy": "research-session-limits.v2", "session_limits": {"logical_turns": 16, "tool_calls": 24, "child_count": 4},
         "live_qualification": "not_run", "live_unavailable_reason": "No live qualification requests were made; each live session needs current consent and an explicit operator allocation.",
         "verified_in_environment": False, "scientific_verification": "adapter_specific",
         "auth_retention": "Research persists until administratively removed. Browser credentials expire independently; cross-device identity recovery is not implemented."}

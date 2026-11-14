@@ -1,0 +1,175 @@
+{
+  "schema_version": "general-research-fixtures.v1",
+  "purpose": "Genuine public research files from outside pharmacokinetics, used to test admission, parsing, citations and analysis requests. They are inputs, not answers: the expected values below are what each file prints, checked by tests/test_general_research_fixtures.py.",
+  "retrieved_at": "2026-11-14",
+  "retrieval": "Anonymous HTTPS GET with a generic user agent; no account, key or personal data was sent.",
+  "fixtures": [
+    {
+      "file": "noaa-gml-co2-annmean-mlo.csv",
+      "media_type": "text/csv",
+      "data_origin": "real_observation",
+      "sha256": "72c3ee740c00c8060f689c82adc5f8eda66eef01583e6f4c7c6f8388db311478",
+      "source": {
+        "publisher": "NOAA Global Monitoring Laboratory",
+        "title": "Mauna Loa CO2 annual mean data",
+        "url": "https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_annmean_mlo.csv",
+        "original_sha256": "bdd956e8d7e05ebc3c61ac1f8f8c8cea4a505df56724fba5200b4eb1e0089b2b",
+        "rights": "U.S. Government work. The file asks users to cite NOAA GML; the citation text is in its header."
+      },
+      "modifications": "One contact e-mail address in the comment header replaced with '[email address removed]'. Data lines unchanged.",
+      "quirks": ["43-line comment preamble", "units (ppm) and the meaning of 'unc' (a standard deviation) are stated only in comments"],
+      "expected": {
+        "comment_lines": 43,
+        "row_count": 67,
+        "columns": [["year", null], ["mean", null], ["unc", null]],
+        "cells": [{"line": 45, "values": ["1959", "315.98", "0.12"]}, {"line": 111, "values": ["2025", "427.35", "0.12"]}]
+      },
+      "citations": [
+        {"page_index": 0, "quote": "1959,315.98,0.12", "status": "verified"},
+        {"page_index": 0, "quote": "315.9", "status": "partial_token_match"},
+        {"page_index": 0, "quote": "abbreviated as ppm", "status": "verified"}
+      ]
+    },
+    {
+      "file": "noaa-gml-co2-annmean-mlo.txt",
+      "media_type": "text/plain",
+      "data_origin": "real_observation",
+      "sha256": "3075658876ad4d0d356f32b7439af862f9f1284f9ed40407823bd25acaf168dc",
+      "source": {
+        "publisher": "NOAA Global Monitoring Laboratory",
+        "title": "Mauna Loa CO2 annual mean data (text listing)",
+        "url": "https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_annmean_mlo.txt",
+        "original_sha256": "42acfe30569dd7134bda3ac3eb74e347a55b5133c3926557410e1b4ec4423f7f",
+        "rights": "U.S. Government work; cite NOAA GML as its header requests."
+      },
+      "modifications": "One contact e-mail address replaced with '[email address removed]'.",
+      "quirks": ["whitespace-aligned columns in plain text"],
+      "expected": {"line_count": 113},
+      "citations": [{"page_index": 0, "quote": "2025   427.35", "status": "verified"}]
+    },
+    {
+      "file": "nasa-giss-gistemp-glb-ts-dsst.csv",
+      "media_type": "text/csv",
+      "data_origin": "real_observation",
+      "sha256": "a7b1939db2e7e484c798e925e0f07f8184356c52ac0e7ce264adcd0f25e81253",
+      "source": {
+        "publisher": "NASA Goddard Institute for Space Studies",
+        "title": "GISTEMP v4 global land-ocean temperature index (anomalies, deg C)",
+        "url": "https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv",
+        "original_sha256": "a7b1939db2e7e484c798e925e0f07f8184356c52ac0e7ce264adcd0f25e81253",
+        "rights": "U.S. Government work; cite GISTEMP Team and Lenssen et al. as requested by NASA GISS."
+      },
+      "modifications": "none",
+      "quirks": ["title line before the header", "'***' marks missing values", "no unit in any header", "leading-dot decimals such as -.19"],
+      "expected": {
+        "title_lines": ["Land-Ocean: Global Means"],
+        "row_count": 147,
+        "header": ["Year", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "J-D", "D-N", "DJF", "MAM", "JJA", "SON"],
+        "cells": [{"line": 3, "values": ["1880", "-.19", "-.25"]}]
+      },
+      "citations": [{"page_index": 0, "quote": "1880,-.19,-.25", "status": "verified"}, {"page_index": 0, "quote": "880,-.19", "status": "partial_token_match"}, {"page_index": 0, "quote": ".19", "status": "ambiguous"}]
+    },
+    {
+      "file": "usgs-nwis-01646500-discharge-2024-01.tsv",
+      "media_type": "text/tab-separated-values",
+      "data_origin": "real_observation",
+      "sha256": "e569b18d79c10bc174124cd042769c9a05cc5afc5fa72cee8a095569566a76e4",
+      "source": {
+        "publisher": "U.S. Geological Survey, National Water Information System",
+        "title": "Daily mean discharge, Potomac River near Wash, DC Little Falls Pump Sta (01646500), 2024-01-01 to 2024-01-10 (RDB)",
+        "url": "https://waterservices.usgs.gov/nwis/dv/?format=rdb&sites=01646500&startDT=2024-01-01&endDT=2024-01-10&parameterCd=00060",
+        "original_sha256": "56d1300e22d9115474608723728e6ccf1f825c61fdee6beba1c4b5ad63c992b8",
+        "rights": "U.S. Government work. The header states some data may be provisional."
+      },
+      "modifications": "One support e-mail address replaced with '[email address removed]'.",
+      "quirks": ["RDB column-format row (5s 15s 20d 14n 10s) after the header", "the discharge unit (cubic feet per second) appears only in comments", "coded column names"],
+      "expected": {
+        "format_row_line": 29,
+        "row_count": 10,
+        "header": ["agency_cd", "site_no", "datetime", "68478_00060_00003", "68478_00060_00003_cd"],
+        "cells": [{"line": 30, "values": ["USGS", "01646500", "2024-01-01", "8930", "A"]}, {"line": 39, "values": ["USGS", "01646500", "2024-01-10", "39000", "A"]}]
+      },
+      "citations": [{"page_index": 0, "quote": "2024-01-10 39000 A", "status": "verified"}, {"page_index": 0, "quote": "3900", "status": "partial_token_match"}]
+    },
+    {
+      "file": "usgs-significant-earthquakes-month.geojson",
+      "media_type": "application/json",
+      "data_origin": "real_observation",
+      "sha256": "a1a497a3853cff3eef5863ee157474cf4b403cc48446d5df8aad8a804dd682f8",
+      "source": {
+        "publisher": "U.S. Geological Survey Earthquake Hazards Program",
+        "title": "Significant earthquakes, past month (GeoJSON summary feed), snapshot",
+        "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_month.geojson",
+        "original_sha256": "a1a497a3853cff3eef5863ee157474cf4b403cc48446d5df8aad8a804dd682f8",
+        "rights": "U.S. Government work. A rolling feed: this file is a frozen snapshot."
+      },
+      "modifications": "none",
+      "quirks": ["nested GeoJSON features", "epoch-millisecond times", "nulls"],
+      "expected": {"json_path": "$.features", "row_count": 8, "first_cells": {"properties.mag": "6.4", "properties.place": "30 km WSW of Lata, Solomon Islands"}},
+      "citations": [{"page_index": 0, "quote": "\"mag\":6.4,\"place\":\"30 km WSW of Lata, Solomon Islands\"", "status": "verified"}, {"page_index": 0, "quote": "\"mag\":6.4", "status": "ambiguous"}]
+    },
+    {
+      "file": "noaa-gml-co2-data-mlo.png",
+      "media_type": "image/png",
+      "data_origin": "public_source",
+      "sha256": "401aafb9bf9e7830cf6fce5588bd95e2c8564d205244f2f6ae094fd7156a410f",
+      "source": {
+        "publisher": "NOAA Global Monitoring Laboratory",
+        "title": "Atmospheric CO2 at Mauna Loa Observatory (chart)",
+        "url": "https://gml.noaa.gov/webdata/ccgg/trends/co2_data_mlo.png",
+        "original_sha256": "401aafb9bf9e7830cf6fce5588bd95e2c8564d205244f2f6ae094fd7156a410f",
+        "rights": "U.S. Government work."
+      },
+      "modifications": "none",
+      "quirks": ["chart image: no text layer, values are visual only"],
+      "expected": {"width": 800, "height": 600, "mode": "RGBA"},
+      "citations": [{"page_index": 0, "quote": "Mauna Loa", "status": "unverifiable_no_text_layer"}]
+    },
+    {
+      "file": "usgs-fs-2020-3057-streamflow-wy2019.pdf",
+      "media_type": "application/pdf",
+      "data_origin": "public_source",
+      "sha256": "d254ab44cefc88386bc72cb0655b4c8ee4a56b63c1bfbf9624201c23fd0b2990",
+      "source": {
+        "publisher": "U.S. Geological Survey",
+        "title": "Streamflow—Water Year 2019, Fact Sheet 2020–3057",
+        "url": "https://pubs.usgs.gov/fs/2020/3057/fs20203057.pdf",
+        "original_sha256": "d254ab44cefc88386bc72cb0655b4c8ee4a56b63c1bfbf9624201c23fd0b2990",
+        "rights": "U.S. Government work."
+      },
+      "modifications": "none",
+      "quirks": ["native text with soft hyphens", "en dashes in numbers", "link and open actions (never followed)"],
+      "expected": {"page_count": 6, "text_layers": ["native_pdf_text", "native_pdf_text", "native_pdf_text", "native_pdf_text", "native_pdf_text", "native_pdf_text"], "active_content": ["open_action", "uri_action"]},
+      "citations": [
+        {"page_index": 0, "quote": "Fact Sheet 2020–3057", "status": "verified"},
+        {"page_index": 0, "quote": "Fact Sheet 2020-3057", "status": "verified"},
+        {"page_index": 0, "quote": "25–75 percent", "status": "verified"},
+        {"page_index": 5, "quote": "more than 8,400 year-round, real-time streamflow gages", "status": "verified"},
+        {"page_index": 5, "quote": "8,40", "status": "partial_token_match"},
+        {"page_index": 1, "quote": "more than 8,400 year-round", "status": "wrong_page"}
+      ]
+    },
+    {
+      "file": "naca-tn-1428-pages-1-5-6.pdf",
+      "media_type": "application/pdf",
+      "data_origin": "public_source",
+      "sha256": "106922c6ec183719920784abab234f75b266057dc59e67e09892e47bae15d00b",
+      "source": {
+        "publisher": "NASA Technical Reports Server (NACA archive)",
+        "title": "NACA Technical Note 1428, Notes and Tables for Use in the Analysis of Supersonic Flow (1947), scanned",
+        "url": "https://ntrs.nasa.gov/api/citations/19930082460/downloads/19930082460.pdf",
+        "original_sha256": "117e83968a475c0f798be55396280f5bf38e695aa0d46004e11e3ca190557dd8",
+        "rights": "U.S. Government work (NTRS lists it as public)."
+      },
+      "modifications": "Pages 1, 5 and 6 of the 86-page original (6.6 MB, above the admission limits) copied into a new PDF with pypdfium2 5.14.0 import_pages; page content unchanged.",
+      "quirks": ["scanned pages", "cover page without a usable text layer", "OCR text layer with errors (for example '1+28' for '1428')"],
+      "expected": {"page_count": 3, "text_layers": ["none", "native_pdf_text", "native_pdf_text"]},
+      "citations": [
+        {"page_index": 1, "quote": "Explanation of Tables", "status": "verified"},
+        {"page_index": 1, "quote": "NACA TN No. 1+28", "status": "verified"},
+        {"page_index": 1, "quote": "NACA TN No. 1428", "status": "not_found"},
+        {"page_index": 0, "quote": "NATIONAL ADVISORY COMMITTEE FOR AERONAUTICS", "status": "unverifiable_no_text_layer"}
+      ]
+    }
+  ]
+}

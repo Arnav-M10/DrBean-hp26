@@ -13,13 +13,13 @@ from .research_contracts import (
     ACTION_POLICY, CHECKPOINT_VERSION, RESEARCH_VERSION, ResearchAdvance,
     ResearchBudget, ResearchCreate, ResearchDecision, ResearchEvent,
     ResearchInputReview, ResearchObservation, ResearchPlanRevision, ResearchProviderAllocation, ResearchProviderConsent,
-    ResearchReconcile, ResearchRuntimeContext,
+    ResearchReconcile, ResearchRuntimeContext, ResearchSessionLimits, SESSION_LIMITS_VERSION,
 )
 from .store import utc_now
 from .workflow import DomainError, _hash, _id, _json
 
 GRAPH_VERSION = "research-graph.v1"
-SESSION_LIMITS = {"logical_turns": 8, "tool_calls": 24, "child_count": 4}
+LEGACY_SESSION_LIMITS = {"logical_turns": 8, "tool_calls": 24, "child_count": 4}
 ENDED = {"completed", "failed", "cancelled"}
 
 
@@ -60,6 +60,14 @@ class ResearchService:
     def _revision(self, session, expected):
         if session["revision"] != expected:
             raise DomainError("stale_research_revision", "Refresh the current research state before this action.", 409)
+
+    def limits(self, conn, session):
+        creation = self.workflow._get(conn, session["actor_id"], session["id"], "research_session")
+        stored = creation["body"].get("session_limits")
+        if stored is None:
+            return LEGACY_SESSION_LIMITS
+        limits = ResearchSessionLimits.model_validate(stored)
+        return {key: getattr(limits, key) for key in ("logical_turns", "tool_calls", "child_count")}
 
     def root_context(self, conn, session):
         """Immutable research origin; each scientific plan binds its own inputs."""
@@ -137,7 +145,7 @@ class ResearchService:
             "pending_review": review, "pending_review_digest": session["pending_review_digest"],
             "action": action, "children": children,
             "usage": {key: session[key] for key in ("logical_turns", "tool_calls", "child_count", "physical_calls")},
-            "session_limits": SESSION_LIMITS, "graph_version": session["graph_version"],
+            "session_limits": self.limits(conn, session), "session_limits_policy": creation["body"].get("session_limits_policy", "research-session-limits.v1"), "graph_version": session["graph_version"],
             "reports": [row[0] for row in conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind='report' ORDER BY created_at,id", (session["id"],))],
             "provider_disclosure": self.provider_scope(conn, session),
             "provider_allocation": {"physical_requests": session["physical_allocation"], "input_tokens": session["input_allocation"], "output_tokens": session["output_allocation"]},
@@ -176,7 +184,8 @@ class ResearchService:
                 refs.append({"id": source_id, "sha256": source["body"]["sha256"]})
             if request["provider_consent_id"]:
                 raise DomainError("research_consent_required", "Create the research session, then separately consent to its exact provider disclosure.", 422)
-            creation = self.workflow._insert(conn, actor, workspace_id, "research_session", request)
+            creation = self.workflow._insert(conn, actor, workspace_id, "research_session", {**request,
+                "session_limits_policy": SESSION_LIMITS_VERSION, "session_limits": ResearchSessionLimits().model_dump(mode="json")})
             now = utc_now()
             conn.execute("INSERT INTO research_sessions(id,workspace_id,actor_id,mode,thread_id,graph_version,checkpoint_version,policy_version,problem_id,problem_digest,input_heads,source_refs,consent_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (creation["id"], workspace_id, actor, request["mode"], _id("thread"), self.graph_version, CHECKPOINT_VERSION, ACTION_POLICY,
@@ -221,6 +230,8 @@ class ResearchService:
 
     def _queue(self, conn, session, budget, *, resume_required=False):
         actor, workspace_id = session["actor_id"], session["workspace_id"]
+        if session["logical_turns"] >= self.limits(conn, session)["logical_turns"]:
+            raise DomainError("research_budget_exhausted", "The cumulative research-session turn budget is exhausted.", 409)
         budget = ResearchBudget.model_validate(budget).model_dump(mode="json")
         action_record = self.workflow._insert(conn, actor, workspace_id, "research_action",
             {"session_id": session["id"], "budget": budget, "at_revision": session["revision"]}, session["id"])
@@ -306,7 +317,7 @@ class ResearchService:
         column, budget_key = {"model": ("logical_turns", "model_turns"), "tool": ("tool_calls", "tool_calls"), "child": ("child_count", "scientific_reservations")}[category]
         with self.store.transaction() as conn:
             session, action = self.assert_lease(conn, context)
-            if action[column] >= json.loads(action["budget"])[budget_key] or session[column] >= SESSION_LIMITS[column]:
+            if action[column] >= json.loads(action["budget"])[budget_key] or session[column] >= self.limits(conn, session)[column]:
                 raise DomainError("research_budget_exhausted", "The bounded action or cumulative session budget is exhausted.", 409)
             conn.execute(f"UPDATE research_actions SET {column}={column}+1 WHERE id=?", (action["id"],))
             conn.execute(f"UPDATE research_sessions SET {column}={column}+1 WHERE id=?", (session["id"],))

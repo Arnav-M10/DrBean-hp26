@@ -21,6 +21,7 @@ from bean_api.conversation import (  # noqa: E402
     AssistantResponseRecordBody, DesignDraft, ObservationDraft,
 )
 from bean_api.research_contracts import PUBLIC_RESEARCH_SCHEMAS, RESEARCH_VERSION  # noqa: E402
+from bean_api.general_research.contract import render as render_general_contract  # noqa: E402
 
 
 def write_json(path: Path, value: object) -> None:
@@ -29,6 +30,11 @@ def write_json(path: Path, value: object) -> None:
 
 
 def main() -> None:
+    general_destination = ROOT / "shared" / "contracts" / "general-research.v1"
+    for name, content in render_general_contract().items():
+        target = general_destination / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
     research_destination = ROOT / "shared" / "contracts" / RESEARCH_VERSION
     for name, model in sorted(PUBLIC_RESEARCH_SCHEMAS.items()):
         schema = model.model_json_schema()

@@ -12,6 +12,7 @@ RESEARCH_VERSION = "DB-RESEARCH-1"
 CHECKPOINT_VERSION = "research-checkpoint.v1"
 ACTION_POLICY = "research-action.v1"
 SESSION_POLICY = "research-session.v1"
+SESSION_LIMITS_VERSION = "research-session-limits.v2"
 ResearchMode = Literal["controlled", "live"]
 
 
@@ -43,6 +44,14 @@ class ResearchBudget(StrictModel):
     tool_calls: int = Field(default=6, ge=1, le=6)
     scientific_reservations: int = Field(default=2, ge=1, le=2)
     active_seconds: int = Field(default=300, ge=1, le=300)
+
+
+class ResearchSessionLimits(StrictModel):
+    policy_version: Literal["research-session-limits.v2"] = SESSION_LIMITS_VERSION
+    logical_turns: Literal[16] = 16
+    tool_calls: Literal[24] = 24
+    child_count: Literal[4] = 4
+    default_physical_allocation: Literal[0] = 0
 
 
 class ResearchCreate(StrictModel):
@@ -128,6 +137,80 @@ class ResearchProviderAllocation(StrictModel):
     accepted: ExplicitTrue
 
 
+class ResearchCancel(StrictModel):
+    """An explicit empty body; no graph command, actor or allocation is accepted."""
+
+
+class ResearchRecord(StrictModel):
+    id: Identifier
+    workspace_id: Identifier
+    kind: Annotated[str, StringConstraints(min_length=1, max_length=64)]
+    body: dict[str, Any]
+    digest: Digest
+    parent_id: Identifier | None
+    created_by: str
+    created_at: str
+
+
+class ResearchUsage(StrictModel):
+    logical_turns: int = Field(ge=0)
+    tool_calls: int = Field(ge=0)
+    child_count: int = Field(ge=0)
+    physical_calls: int = Field(ge=0)
+
+
+class ResearchActionSnapshot(ResearchUsage):
+    id: Identifier
+    state: str
+    budget: ResearchBudget
+    active_seconds: Annotated[str, StringConstraints(pattern=r"^[0-9]+\.[0-9]{3}$")]
+    waiting_job_id: Identifier | None
+    error_code: str | None
+
+
+class ResearchSourceRef(StrictModel):
+    id: Identifier
+    sha256: Digest
+
+
+class ResearchReviewedContext(StrictModel):
+    problem: ResearchRecord | None
+    dataset: ResearchRecord | None
+    sources: list[ResearchSourceRef] = Field(max_length=5)
+
+
+class ResearchSnapshot(StrictModel):
+    schema_version: Literal["DB-RESEARCH-1"]
+    id: Identifier
+    workspace_id: Identifier
+    objective: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+    mode: ResearchMode
+    state: Literal["ready", "queued", "running", "waiting_review", "waiting_observation", "waiting_child", "paused", "needs_reconciliation", "completed", "failed", "cancelled"]
+    revision: int = Field(ge=0)
+    problem_id: Identifier | None
+    problem_digest: Digest | None
+    sources: list[ResearchSourceRef] = Field(max_length=5)
+    plan: ResearchRecord | None
+    pending_review: ResearchRecord | None
+    pending_review_digest: Digest | None
+    action: ResearchActionSnapshot | None
+    reviewed_context: ResearchReviewedContext
+    # These retain the existing canonical job response shape. They grant no
+    # authority and contain references rather than duplicated evidence bytes.
+    children: list[dict[str, Any]] = Field(max_length=4)
+    usage: ResearchUsage
+    session_limits: dict[str, int]
+    session_limits_policy: Literal["research-session-limits.v1", "research-session-limits.v2"]
+    graph_version: Literal["research-graph.v1"]
+    checkpoint_version: Literal["research-checkpoint.v1"]
+    policy_version: Literal["research-action.v1"]
+    reports: list[Identifier]
+    provider_disclosure: dict[str, Any]
+    provider_allocation: dict[str, int]
+    created_at: str
+    updated_at: str
+
+
 class ResearchPlanStep(StrictModel):
     id: Identifier
     title: Annotated[str, StringConstraints(min_length=1, max_length=300)]
@@ -175,6 +258,14 @@ class ResearchEvent(StrictModel):
     reference_ids: list[Identifier] = Field(default_factory=list, max_length=16)
 
 
+class ResearchSessionList(StrictModel):
+    items: list[ResearchSnapshot] = Field(max_length=100)
+
+
+class ResearchEventsPage(StrictModel):
+    items: list[ResearchEvent] = Field(max_length=200)
+
+
 @dataclass(frozen=True)
 class ResearchRuntimeContext:
     """Private server-built context. Never accepted from a browser or model."""
@@ -216,5 +307,7 @@ class ResearchPorts(Protocol):
 PUBLIC_RESEARCH_SCHEMAS = {model.__name__: model for model in (
     ResearchBudget, ResearchCreate, ResearchAdvance, ResearchDecision, ResearchReconcile, ResearchDesignConstraints, ResearchObservation, ResearchInputReview,
     ResearchProviderConsent, ResearchProviderAllocation,
+    ResearchSessionLimits,
+    ResearchSnapshot, ResearchSessionList, ResearchEventsPage, ResearchCancel,
     ResearchPlanStep, ResearchPlanRevision, ResearchEvent,
 )}

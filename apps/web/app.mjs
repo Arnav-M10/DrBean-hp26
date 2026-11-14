@@ -340,8 +340,9 @@ byId('export-draft').addEventListener('click', () => {
 
 let renderWorkflow
 createBounds()
-const general = setupGeneralWorkspace({ root: byId('general-workspace') })
-const research = setupResearch({ root: byId('durable-research'), getDraft: currentDraft, getSources: () => general.controller.state.assets })
+let research
+const general = setupGeneralWorkspace({ root: byId('general-workspace'), onChange: () => research?.sourceContextChanged() })
+research = setupResearch({ root: byId('durable-research'), getDraft: currentDraft, getSources: () => general.controller.state.assets, getSourceQuestion: () => general.controller.state.question })
 renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
   const accepted = new Map()
   for (const field of review.body.reviewed_fields) {

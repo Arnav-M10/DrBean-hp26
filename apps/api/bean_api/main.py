@@ -63,7 +63,8 @@ def provider_config_from_env() -> ProviderConfig:
     )
 
 
-def create_app(settings: Settings | None = None, *, provider=None, adapter=None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, provider=None, adapter=None,
+               general_transport_factory=None, controlled_general_responder=None) -> FastAPI:
     settings = settings or Settings.from_env()
     controlled_source_proposer = None
     if settings.source_intake_mode == "controlled":
@@ -150,7 +151,10 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
 
     from .research_routes import register_research_routes
     from .research_runtime import research_capabilities
+    from .general_research import general_research_capabilities, register_general_routes
     register_research_routes(app)
+    register_general_routes(app, transport=general_transport_factory(app) if general_transport_factory else None,
+                            controlled_responder=controlled_general_responder)
 
     @app.get("/healthz")
     def health():
@@ -179,6 +183,7 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
                 "ai_mode": "live_opt_in" if live_dispatch else "controlled_placeholder" if controlled_source_proposer else "disabled_placeholder",
                 "gemini": provider_capabilities,
                 "deepagents": research_capabilities(settings, provider_config),
+                "general_research": general_research_capabilities(app),
                 "transport": {"web": True, "photon": False}}
 
     @app.post(PREFIX + "/exact/decimal")

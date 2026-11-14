@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from fastapi.responses import JSONResponse
 
 from .canonical import parse_json_strict
+
+# Raw research-file uploads carry the user's own bytes (a user's JSON data file may
+# contain floats or non-ASCII keys). They are bounded by the upload limit and parsed
+# by the general research admission path, never by the strict API JSON parser.
+RAW_UPLOAD_PATH = re.compile(r"/api/bean/v1/workspaces/[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}/research-assets")
 
 
 def error_body(request_id: str, code: str, message: str, *, field_paths: list[str] | None = None,
@@ -25,7 +31,8 @@ class RequestBoundary:
         scope.setdefault("state", {})["request_id"] = request_id
         headers = dict(scope.get("headers", []))
         content_type = headers.get(b"content-type", b"").split(b";")[0].lower()
-        is_json = content_type == b"application/json"
+        raw_upload = scope.get("method") == "POST" and RAW_UPLOAD_PATH.fullmatch(scope.get("path", "")) is not None
+        is_json = content_type == b"application/json" and not raw_upload
         limit = self.max_json_bytes if is_json else self.max_upload_bytes
 
         async def wrapped_send(message):
@@ -38,6 +45,14 @@ class RequestBoundary:
         async def reject(code, message, status):
             return await JSONResponse(error_body(request_id, code, message), status_code=status)(scope, receive, wrapped_send)
 
+        limit_message = (f"This server admits files up to {limit // (1024 * 1024)} MiB in its current upload profile. "
+                         "Choose a smaller excerpt. This request was not retained or sent to a provider.") if raw_upload else "Request exceeds the admitted byte limit."
+        try:
+            if int(headers.get(b"content-length", b"0")) > limit:
+                return await reject("request_too_large", limit_message, 413)
+        except ValueError:
+            return await reject("invalid_content_length", "Content-Length must be an integer byte count.", 400)
+
         if headers.get(b"content-encoding", b"identity") != b"identity":
             return await reject("unsupported_content_encoding", "Compressed request bodies are not supported.", 415)
         body = bytearray()
@@ -47,7 +62,7 @@ class RequestBoundary:
                 return
             body.extend(message.get("body", b""))
             if len(body) > limit:
-                return await reject("request_too_large", "Request exceeds the admitted byte limit.", 413)
+                return await reject("request_too_large", limit_message, 413)
             if not message.get("more_body", False):
                 break
         if is_json and body:

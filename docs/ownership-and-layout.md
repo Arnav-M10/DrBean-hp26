@@ -1,25 +1,19 @@
 # Ownership and layout
 
-Five coding workstreams, disjoint files. These are workstreams, not five human entrants: the team roster and the four-person limit are unchanged. Supersedes the pre-merge four-owner table, which said Owner 04 owned all evaluation and that no backend existed.
+Current assignment: **DB-COORDINATOR-3OWNER-1** (November 14, 2026). This three-owner mapping supersedes historical five-workstream routing. Historical evidence and commits retain their original author labels.
 
-| Workstream | Exclusive edit scope |
+| Owner | Exclusive production responsibility |
 |---|---|
-| 1 Science | `packages/groundwork_adapter/**`, scientific mapping examples, engine tests |
-| 2 Backend | `apps/api/bean_api/**` except Owner 3's modules; backend tests except Owner 3's and 5's; `shared/contracts/**`; `scripts/export_contracts.py`; root Python dependencies and `uv.lock` |
-| 3 Gemini/deepagents | `apps/api/bean_api/providers.py`, `coordinator.py`, `conversation.py`, `ai_prompts.py`; `tests/test_provider.py`, `tests/test_coordinator.py`, `tests/test_conversation.py`; `scripts/ai/**` |
-| 4 Product/release | `scripts/dev/**`, `scripts/release/**`, `.github/**`, root `README.md`, `docs/INTEGRATION_STATUS.md`, `docs/ownership-and-layout.md`, `docs/issue-ledger.md`, `docs/release-runbook.md`, `docs/handoff-owner04.md`, `docs/demo/**`, `docs/human-task/**`, `docs/submission-draft.md`, `docs/provenance-and-eligibility.md`, `docs/release-evidence/**`; `apps/web/**` for the minimal functional connection; in `tests/integration/`: `web_manual_smoke.mjs`, `package.json`, `release_checklist.json` |
-| 5 Validation | `evaluation/**`, `docs/evaluation-protocol.md`, `evaluation/README.md`, `scripts/evaluate.py`, `tests/test_evaluation.py`, new Python HTTP/invariant tests `tests/integration/test_*.py` |
+| A — user's Codex | Counterdex science; actual Deep Agents graph/planning/decision policy; providers.py, conversation.py, AI prompts, model adapters/transports and focused tests. |
+| B — teammate Codex | Sole application integrator; API/contracts/authority, SQLite/migrations/checkpoints, ledger, workers/process supervision, general-file parsing/storage/citations/routes; all web UI, launcher/operational CI, dependencies/locks/generated schemas. |
+| C — Claude | Independent evaluator, heldouts, adversarial acceptance and exact-candidate qualification. No new production implementation to independently certify. |
 
-Each workstream also owns exactly one progress log and does not edit the others: `docs/workstreams/01-science.md`, `02-backend.md`, `03-ai.md`, `04-product-release.md`, `05-validation.md`. Workstream 4 maintains this ownership page, the issue ledger and the integration status as the shared index.
+Current logs: docs/workstreams/A-agents-science.md, docs/workstreams/B-application.md and C's retained docs/workstreams/05-validation.md. B maintains docs/integration/APPLICATION_ASSEMBLY.md.
 
-Shared rules:
+The canonical public seam is shared/contracts/DB-RESEARCH-1/README.md and apps/api/bean_api/research_contracts.py. A supplies the graph factory and state/prompt/tool compatibility; B constructs private context, authorizes side effects, supplies the disk saver and registers the actual app/worker. Model dispatch reserves once through the same physical ledger; graph turn admission does not charge it twice.
 
-- A defect in another workstream's files goes to the [issue ledger](issue-ledger.md) with exact input and logs. Nobody copies or patches another owner's subsystem.
-- Owner 2 alone changes root dependencies and regenerates exported contracts.
-- `fixtures/intake/**` controls are preserved; new variants are added separately.
-- The release automation consumes Owner 5's harness and tests. It does not contain a second harness, corpus or ledger. `scripts/release/checklist.py` imports nothing from the product and calls `evaluation/cli.py` as a command.
-- `.gitignore` and `.env.example` have no single owner; changes are additive and noted in the commit.
+Use isolated worktrees. Preserve dirty teammate work, current evidence/history and scientific routing. Agree one writer for shared-file changes. Do not merge obsolete PR14 or whole old stacks to collect overlapping fixes. No model request, credential probe or new public deployment is needed for development. Default live allocation is zero.
 
-Runtime layout created by `scripts/dev/setup.sh` (all ignored by git): `.venv/` backend, `.venv-engine/` engine, `var/` store, sources, private auth file, and `var/run/` pid files and logs.
+Claude's carried-over general-file producer PR40 transfers production maintenance to B. Its original tests are author checks; disclose authorship, obtain A/B cross-review and separate C evaluation of the assembled product.
 
-Default integration branch: `main`. Start new workstream branches from the current `origin/main`, and keep each workstream's changes on its own branch. Workstream 4 works on `claude/dreamy-lamport-dsttgm`.
+Runtime layout (ignored): .venv/ backend, .venv-engine/ matching CPython 3.11 science/replay, var/ private store/sources/auth and var/run/ logs/PIDs. Integrate from current origin/main; old supplied SHAs are evidence anchors, never reset targets.

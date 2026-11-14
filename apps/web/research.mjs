@@ -23,8 +23,8 @@ export function designConstraints(form) {
 }
 
 export class ResearchController {
-  constructor({ getDraft, getSources = () => [], storage = globalThis.sessionStorage, changed = () => {} } = {}) {
-    this.getDraft = getDraft; this.getSources = getSources; this.storage = storage; this.changed = changed
+  constructor({ getDraft, getSources = () => [], getSourceQuestion = () => '', storage = globalThis.sessionStorage, changed = () => {} } = {}) {
+    this.getDraft = getDraft; this.getSources = getSources; this.getSourceQuestion = getSourceQuestion; this.storage = storage; this.changed = changed
     this.connection = {}; this.generation = 0; this.state = this.empty()
   }
   empty() { return { snapshot: null, events: [], evidence: [], history: [], pending: null, error: '', busy: false, form: {}, dataAccepted: false, acceptedDraft: '', reviewAccepted: '', readingAccepted: false } }
@@ -89,12 +89,17 @@ export class ResearchController {
       if (!draft.question.goal.trim()) throw new Error('Enter your research question in Question before starting.')
       inputs = await connection.saveReviewedInputs()
       body = { objective: draft.question.goal.trim(), problem_id: inputs.problem.id, expected_problem_digest: inputs.problem.digest,
-        source_ids: sources.map(asset => asset.id), mode: 'controlled', design_constraints: constraints }
+        source_ids: this.state.form.attachSources ? sources.map(asset => asset.id) : [], mode: 'controlled', design_constraints: constraints }
     } catch (error) { if (generation === this.generation) this.state.error = error.message }
     if (generation !== this.generation) return
     this.state.busy = false
     if (body) await this.mutate(`/workspaces/${connection.workspaceId}/research-sessions`, body)
     else this.emit()
+  }
+  async createFromSources() {
+    const objective = this.getSourceQuestion().trim(), sources = clone(this.getSources())
+    if (!objective || objective.length > 2000 || !sources.length) throw new Error('Select retained files and enter a research question of at most 2,000 characters above.')
+    await this.mutate(`/workspaces/${this.connection.workspaceId}/research-sessions`, { objective, source_ids: sources.map(asset => asset.id), mode: 'controlled' })
   }
   async advance() { const s = this.state.snapshot; if (s) await this.mutate(`/research-sessions/${s.id}/advance`, { expected_revision: s.revision }) }
   async decide(decision) {
@@ -120,14 +125,21 @@ export class ResearchController {
     const s = this.state.snapshot
     if (!this.state.dataAccepted) throw new Error('Review the inputs or clarification answer before accepting.')
     const body = { expected_revision: s.revision, pending_review_id: s.pending_review.id, expected_review_digest: s.pending_review.digest, accepted: true,
-      design_constraints: designConstraints(this.state.form), answers: { clarification: this.state.form.answer || '' } }
+      design_constraints: designConstraints(this.state.form), answers: this.state.form.answer?.trim() ? { clarification: this.state.form.answer } : {} }
+    if (this.state.form.useReviewedModel) {
+      if (this.state.acceptedDraft !== JSON.stringify(this.getDraft())) throw new Error('Review the current measurement and model draft before adopting it.')
+      const generation = this.generation; this.state.busy = true; this.emit()
+      try { const inputs = await this.connection.saveReviewedInputs(); body.problem_id = inputs.problem.id; body.expected_problem_digest = inputs.problem.digest }
+      finally { if (generation === this.generation) { this.state.busy = false; this.emit() } }
+      if (generation !== this.generation) return
+    }
     await this.mutate(`/research-sessions/${s.id}/inputs`, body)
   }
 }
 
-export function setupResearch({ root, getDraft, getSources }) {
+export function setupResearch({ root, getDraft, getSources, getSourceQuestion }) {
   const element = (tag, text = '') => { const item = document.createElement(tag); item.textContent = text; return item }
-  const controller = new ResearchController({ getDraft, getSources, changed: render })
+  const controller = new ResearchController({ getDraft, getSources, getSourceQuestion, changed: render })
   let timer
   const save = (bytes, name) => { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/json' })); const a = element('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }
   const action = async callback => { try { await callback() } catch (error) { controller.state.error = error.message; render() } }
@@ -160,8 +172,13 @@ export function setupResearch({ root, getDraft, getSources }) {
     if (caps?.execution_mode !== 'controlled' || !caps?.dispatch_enabled) root.append(element('p', `Coordination unavailable: ${caps?.unavailable_reason || 'No admitted controlled coordinator is configured'}. Saved evidence remains available. Live coordination requires separate disclosure and explicitly allocated provider capacity.`))
     if (state.pending) { root.append(element('p', 'This request has an uncertain response. Refresh is read-only; deliberately retry the same frozen request to reconcile it.')); details(root, 'Pending request', state.pending.body); button(root, 'Retry same request', () => controller.retry()); button(root, 'Refresh saved state', () => controller.refresh()) }
     if (!s) {
+      if (controller.getSources().length) {
+        root.append(element('p', 'Retain the selected files and question as untrusted research context. This does not convert a paper into concentration data or approve computation.'))
+        button(root, 'Save selected files and research question', () => controller.createFromSources(), Boolean(state.pending))
+      }
       root.append(element('p', 'Review your measurement table and Question below, then save them here. Arbitrary papers remain general analysis until a supported scientific model and assumptions are reviewed.'))
       constraints(root)
+      checkbox(root, 'Attach selected general files as context only; they do not populate or certify these measurements.', Boolean(state.form.attachSources), value => { state.form.attachSources = value; controller.persist() })
       checkbox(root, 'I reviewed the exact measurement values, units, time origin, hard allowances, parameter bounds and question assumptions.', state.dataAccepted, value => { state.dataAccepted = value; state.acceptedDraft = value ? JSON.stringify(getDraft()) : '' })
       button(root, 'Save reviewed inputs and research question', () => controller.create(), Boolean(state.pending))
       for (const previous of state.history) button(root, `Reopen: ${previous.objective}`, () => controller.refresh(previous.id))
@@ -192,6 +209,7 @@ export function setupResearch({ root, getDraft, getSources }) {
       button(root, 'Accept reading for separate recheck review', () => controller.observe(), Boolean(state.pending))
     } else if (review?.kind === 'research_clarification') {
       root.append(element('h4', 'Clarification required'), element('p', review.body.reason)); field(root, 'Reviewed answer', 'answer'); constraints(root)
+      checkbox(root, 'Adopt the supported measurements and model reviewed below for this clarification.', Boolean(state.form.useReviewedModel), value => { state.form.useReviewedModel = value; state.dataAccepted = false; controller.persist() })
       checkbox(root, 'I reviewed this answer and any new measurement constraints.', state.dataAccepted, value => { state.dataAccepted = value; state.acceptedDraft = value ? JSON.stringify(getDraft()) : '' })
       button(root, 'Accept clarified input and continue planning', () => controller.adopt(), Boolean(state.pending))
     }
@@ -218,5 +236,5 @@ export function setupResearch({ root, getDraft, getSources }) {
     if (ACTIVE.has(s.state) && !state.busy && !state.pending) timer = setTimeout(() => action(() => controller.refresh()), 1500)
   }
   render()
-  return { controller, connectionChanged: connection => controller.connect(connection) }
+  return { controller, connectionChanged: connection => controller.connect(connection), sourceContextChanged: () => { if (!controller.state.snapshot) render() } }
 }

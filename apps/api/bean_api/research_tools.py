@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 
 from .contracts import PlanBody
-from .research import SESSION_LIMITS
 from .research_contracts import ResearchDesignConstraints
 from .store import utc_now
 from .workflow import DomainError, _hash, _id
@@ -152,7 +151,7 @@ class ApplicationResearchPorts:
             if existing and existing["request_digest"] != _hash(request):
                 raise DomainError("research_effect_conflict", "A scientific step cannot change after reservation.", 409)
             if not existing:
-                if action["child_count"] >= json.loads(action["budget"])["scientific_reservations"] or session["child_count"] >= SESSION_LIMITS["child_count"]:
+                if action["child_count"] >= json.loads(action["budget"])["scientific_reservations"] or session["child_count"] >= self.service.limits(conn, session)["child_count"]:
                     raise DomainError("research_budget_exhausted", "The scientific reservation budget is exhausted.", 409)
                 conn.execute("UPDATE research_actions SET child_count=child_count+1 WHERE id=?", (action["id"],))
                 conn.execute("UPDATE research_sessions SET child_count=child_count+1 WHERE id=?", (session["id"],))
@@ -240,6 +239,8 @@ class ApplicationResearchPorts:
             session, _ = self.service.assert_lease(conn, self.runtime)
             jobs = [self.workflow._job(conn, self.runtime.actor_id, row["job_id"]) for row in conn.execute(
                 "SELECT job_id FROM research_effects WHERE session_id=? AND job_id IS NOT NULL ORDER BY created_at,id", (session["id"],))]
+            if any(job["state"] in {"queued", "running", "cancel_requested"} for job in jobs):
+                raise DomainError("research_report_work_incomplete", "Authorized scientific work is still active; its scope cannot be hidden by a terminal report.", 409)
             evidence_revision = _hash(jobs)
         snapshots = [self.workflow.create_report(self.runtime.actor_id, job["id"], "research-report:" + _hash([session["id"], evidence_revision, job["id"]]))
             for job in jobs if job["kind"] == "run" and any(r["result_id"] for r in job["scenarios"])]

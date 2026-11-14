@@ -40,27 +40,35 @@ class Store:
         return conn
 
     def migrate(self) -> None:
-        migration = Path(__file__).resolve().parent / "migrations" / "0001_initial.sql"
+        migrations = Path(__file__).resolve().parent / "migrations"
         with closing(self.connect()) as conn:
-            version = conn.execute("PRAGMA user_version").fetchone()[0]
-            if version > self.SCHEMA_VERSION:
-                raise RuntimeError("Database schema is newer than this application")
             conn.execute("PRAGMA journal_mode=WAL")
-            if version < 1:
-                # Idempotent, additive migration; no table or populated data drops.
-                conn.executescript("BEGIN IMMEDIATE;\n" + migration.read_text() + "\nCOMMIT;")
-                conn.execute("INSERT OR IGNORE INTO schema_migrations VALUES (?, ?)", (1, utc_now()))
-                conn.execute("PRAGMA user_version=1")
-            if version < 2:
-                research = migration.with_name("0002_research.sql")
-                conn.executescript("BEGIN IMMEDIATE;\n" + research.read_text() +
-                    "\nINSERT OR IGNORE INTO schema_migrations VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ','now'));"
-                    "\nPRAGMA user_version=2;\nCOMMIT;")
-            if version < 3:
-                observations = migration.with_name("0003_research_observations.sql")
-                conn.executescript("BEGIN IMMEDIATE;\n" + observations.read_text() +
-                    "\nINSERT OR IGNORE INTO schema_migrations VALUES (3, strftime('%Y-%m-%dT%H:%M:%fZ','now'));"
-                    "\nPRAGMA user_version=3;\nCOMMIT;")
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                # Read the version after acquiring the same write lock that
+                # applies migrations. Concurrent API/worker startup cannot apply
+                # a stale version or temporarily lower user_version.
+                version = conn.execute("PRAGMA user_version").fetchone()[0]
+                if version > self.SCHEMA_VERSION:
+                    raise RuntimeError("Database schema is newer than this application")
+                names = ("0001_initial.sql", "0002_research.sql", "0003_research_observations.sql")
+                for number, name in enumerate(names, 1):
+                    if version >= number:
+                        continue
+                    statement = ""
+                    for line in (migrations / name).read_text().splitlines(keepends=True):
+                        statement += line
+                        if sqlite3.complete_statement(statement):
+                            conn.execute(statement)
+                            statement = ""
+                    if statement.strip():
+                        raise RuntimeError("Incomplete trusted migration statement")
+                    conn.execute("INSERT OR IGNORE INTO schema_migrations VALUES (?,?)", (number, utc_now()))
+                    conn.execute(f"PRAGMA user_version={number}")
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:

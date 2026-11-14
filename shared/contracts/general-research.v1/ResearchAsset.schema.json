@@ -1,0 +1,1031 @@
+{
+  "$defs": {
+    "ColumnSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unit"
+        },
+        "unit_status": {
+          "enum": [
+            "stated_in_header",
+            "unresolved"
+          ],
+          "title": "Unit Status",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "numeric",
+            "text",
+            "mixed",
+            "empty"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "numeric_cells": {
+          "title": "Numeric Cells",
+          "type": "integer"
+        },
+        "text_cells": {
+          "title": "Text Cells",
+          "type": "integer"
+        },
+        "empty_cells": {
+          "title": "Empty Cells",
+          "type": "integer"
+        },
+        "missing_marker_cells": {
+          "title": "Missing Marker Cells",
+          "type": "integer"
+        },
+        "absent_cells": {
+          "title": "Absent Cells",
+          "type": "integer"
+        },
+        "min_as_written": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Min As Written"
+        },
+        "max_as_written": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Max As Written"
+        }
+      },
+      "required": [
+        "index",
+        "name",
+        "unit",
+        "unit_status",
+        "kind",
+        "numeric_cells",
+        "text_cells",
+        "empty_cells",
+        "missing_marker_cells",
+        "absent_cells",
+        "min_as_written",
+        "max_as_written"
+      ],
+      "title": "ColumnSummary",
+      "type": "object"
+    },
+    "Heading": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "title": "Level",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "text"
+      ],
+      "title": "Heading",
+      "type": "object"
+    },
+    "ImageSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "image",
+          "title": "Kind",
+          "type": "string"
+        },
+        "width": {
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "title": "Height",
+          "type": "integer"
+        },
+        "display_width": {
+          "title": "Display Width",
+          "type": "integer"
+        },
+        "display_height": {
+          "title": "Display Height",
+          "type": "integer"
+        },
+        "exif_orientation": {
+          "title": "Exif Orientation",
+          "type": "integer"
+        },
+        "mode": {
+          "title": "Mode",
+          "type": "string"
+        },
+        "preview_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Preview Reason"
+        },
+        "ocr": {
+          "const": false,
+          "title": "Ocr",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "width",
+        "height",
+        "display_width",
+        "display_height",
+        "exif_orientation",
+        "mode",
+        "preview_reason",
+        "ocr"
+      ],
+      "title": "ImageSummary",
+      "type": "object"
+    },
+    "JsonSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "json",
+          "title": "Kind",
+          "type": "string"
+        },
+        "top_level": {
+          "enum": [
+            "object",
+            "array",
+            "string",
+            "number",
+            "literal"
+          ],
+          "title": "Top Level",
+          "type": "string"
+        },
+        "top_level_keys": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Top Level Keys",
+          "type": "array"
+        },
+        "max_depth": {
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "value_count_estimate": {
+          "title": "Value Count Estimate",
+          "type": "integer"
+        },
+        "duplicate_keys": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Duplicate Keys",
+          "type": "array"
+        },
+        "tables": {
+          "items": {
+            "$ref": "#/$defs/JsonTable"
+          },
+          "title": "Tables",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "top_level",
+        "top_level_keys",
+        "max_depth",
+        "value_count_estimate",
+        "duplicate_keys",
+        "tables",
+        "warnings"
+      ],
+      "title": "JsonSummary",
+      "type": "object"
+    },
+    "JsonTable": {
+      "additionalProperties": false,
+      "properties": {
+        "json_path": {
+          "title": "Json Path",
+          "type": "string"
+        },
+        "row_count": {
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "column_count": {
+          "title": "Column Count",
+          "type": "integer"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ColumnSummary"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "preview_rows": {
+          "items": {
+            "$ref": "#/$defs/TableRowPreview"
+          },
+          "title": "Preview Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "json_path",
+        "row_count",
+        "column_count",
+        "columns",
+        "preview_rows"
+      ],
+      "title": "JsonTable",
+      "type": "object"
+    },
+    "PageDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "page_index": {
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "page_number": {
+          "title": "Page Number",
+          "type": "integer"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Width"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Height"
+        },
+        "dimension_unit": {
+          "anyOf": [
+            {
+              "enum": [
+                "pt",
+                "px"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dimension Unit"
+        },
+        "rotation": {
+          "anyOf": [
+            {
+              "enum": [
+                0,
+                90,
+                180,
+                270
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rotation"
+        },
+        "image_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Image Sha256"
+        },
+        "image_media_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "image/png",
+                "image/jpeg"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Image Media Type"
+        },
+        "image_width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Image Width"
+        },
+        "image_height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Image Height"
+        },
+        "text_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Text Sha256"
+        },
+        "text_layer": {
+          "enum": [
+            "native_pdf_text",
+            "decoded_text",
+            "none",
+            "unreliable"
+          ],
+          "title": "Text Layer",
+          "type": "string"
+        },
+        "char_count": {
+          "title": "Char Count",
+          "type": "integer"
+        },
+        "text_preview": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First characters of the page text (bounded); the full text is at /research-assets/{id}/pages/{page_index}/text",
+          "title": "Text Preview"
+        }
+      },
+      "required": [
+        "page_index",
+        "page_number",
+        "width",
+        "height",
+        "dimension_unit",
+        "rotation",
+        "image_sha256",
+        "image_media_type",
+        "image_width",
+        "image_height",
+        "text_sha256",
+        "text_layer",
+        "char_count",
+        "text_preview"
+      ],
+      "title": "PageDescriptor",
+      "type": "object"
+    },
+    "ParserInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "ParserInfo",
+      "type": "object"
+    },
+    "PdfSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "pdf",
+          "title": "Kind",
+          "type": "string"
+        },
+        "page_count": {
+          "title": "Page Count",
+          "type": "integer"
+        },
+        "pages_with_text_layer": {
+          "title": "Pages With Text Layer",
+          "type": "integer"
+        },
+        "pages_without_text_layer": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Pages Without Text Layer",
+          "type": "array"
+        },
+        "ocr": {
+          "const": false,
+          "title": "Ocr",
+          "type": "boolean"
+        },
+        "executes_document_scripts": {
+          "const": false,
+          "title": "Executes Document Scripts",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "page_count",
+        "pages_with_text_layer",
+        "pages_without_text_layer",
+        "ocr",
+        "executes_document_scripts"
+      ],
+      "title": "PdfSummary",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "data_origin": {
+          "enum": [
+            "real_observation",
+            "public_source",
+            "synthetic_example",
+            "hypothetical",
+            "unspecified"
+          ],
+          "title": "Data Origin",
+          "type": "string"
+        },
+        "origin_declared_by": {
+          "enum": [
+            "uploader",
+            "not_declared"
+          ],
+          "title": "Origin Declared By",
+          "type": "string"
+        },
+        "origin_verified": {
+          "const": false,
+          "title": "Origin Verified",
+          "type": "boolean"
+        },
+        "source_name_supplied": {
+          "title": "Source Name Supplied",
+          "type": "boolean"
+        },
+        "declared_media_type": {
+          "title": "Declared Media Type",
+          "type": "string"
+        },
+        "detected_media_type": {
+          "title": "Detected Media Type",
+          "type": "string"
+        },
+        "media_type_detection": {
+          "enum": [
+            "declared",
+            "content_signature",
+            "filename_extension_hint",
+            "content_sniff"
+          ],
+          "title": "Media Type Detection",
+          "type": "string"
+        },
+        "text_encoding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Text Encoding"
+        },
+        "parser": {
+          "$ref": "#/$defs/ParserInfo"
+        },
+        "uploaded_at": {
+          "title": "Uploaded At",
+          "type": "string"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data_origin",
+        "origin_declared_by",
+        "origin_verified",
+        "source_name_supplied",
+        "declared_media_type",
+        "detected_media_type",
+        "media_type_detection",
+        "text_encoding",
+        "parser",
+        "uploaded_at",
+        "note"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "TablePreview": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "enum": [
+            "delimited",
+            "json"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "json_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Json Path"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "row_count": {
+          "title": "Row Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source",
+        "json_path",
+        "columns",
+        "rows",
+        "row_count"
+      ],
+      "title": "TablePreview",
+      "type": "object"
+    },
+    "TableRowPreview": {
+      "additionalProperties": false,
+      "properties": {
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "cells": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Cells",
+          "type": "array"
+        }
+      },
+      "required": [
+        "cells"
+      ],
+      "title": "TableRowPreview",
+      "type": "object"
+    },
+    "TableSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "table",
+          "title": "Kind",
+          "type": "string"
+        },
+        "delimiter": {
+          "title": "Delimiter",
+          "type": "string"
+        },
+        "comment_lines": {
+          "title": "Comment Lines",
+          "type": "integer"
+        },
+        "comment_preview": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Comment Preview",
+          "type": "array"
+        },
+        "title_lines": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Title Lines",
+          "type": "array"
+        },
+        "format_row_line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Format Row Line"
+        },
+        "header_line": {
+          "title": "Header Line",
+          "type": "integer"
+        },
+        "row_count": {
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "column_count": {
+          "title": "Column Count",
+          "type": "integer"
+        },
+        "blank_lines": {
+          "title": "Blank Lines",
+          "type": "integer"
+        },
+        "decimal_comma_candidate": {
+          "title": "Decimal Comma Candidate",
+          "type": "boolean"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ColumnSummary"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "preview_rows": {
+          "items": {
+            "$ref": "#/$defs/TableRowPreview"
+          },
+          "title": "Preview Rows",
+          "type": "array"
+        },
+        "ragged_row_lines": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Ragged Row Lines",
+          "type": "array"
+        },
+        "ragged_row_count": {
+          "title": "Ragged Row Count",
+          "type": "integer"
+        },
+        "extra_cells": {
+          "title": "Extra Cells",
+          "type": "integer"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "delimiter",
+        "comment_lines",
+        "comment_preview",
+        "title_lines",
+        "format_row_line",
+        "header_line",
+        "row_count",
+        "column_count",
+        "blank_lines",
+        "decimal_comma_candidate",
+        "columns",
+        "preview_rows",
+        "ragged_row_lines",
+        "ragged_row_count",
+        "extra_cells",
+        "warnings"
+      ],
+      "title": "TableSummary",
+      "type": "object"
+    },
+    "TextSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "text",
+            "markdown"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "line_count": {
+          "title": "Line Count",
+          "type": "integer"
+        },
+        "char_count": {
+          "title": "Char Count",
+          "type": "integer"
+        },
+        "headings": {
+          "items": {
+            "$ref": "#/$defs/Heading"
+          },
+          "title": "Headings",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "line_count",
+        "char_count",
+        "headings",
+        "warnings"
+      ],
+      "title": "TextSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "workspace_id": {
+      "title": "Workspace Id",
+      "type": "string"
+    },
+    "contract_version": {
+      "const": "general-research.v1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "sha256": {
+      "title": "Sha256",
+      "type": "string"
+    },
+    "media_type": {
+      "enum": [
+        "text/csv",
+        "text/tab-separated-values",
+        "application/json",
+        "text/plain",
+        "text/markdown",
+        "image/png",
+        "image/jpeg",
+        "application/pdf"
+      ],
+      "title": "Media Type",
+      "type": "string"
+    },
+    "byte_size": {
+      "title": "Byte Size",
+      "type": "integer"
+    },
+    "filename": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Filename"
+    },
+    "pages": {
+      "items": {
+        "$ref": "#/$defs/PageDescriptor"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "content_summary": {
+      "discriminator": {
+        "mapping": {
+          "image": "#/$defs/ImageSummary",
+          "json": "#/$defs/JsonSummary",
+          "markdown": "#/$defs/TextSummary",
+          "pdf": "#/$defs/PdfSummary",
+          "table": "#/$defs/TableSummary",
+          "text": "#/$defs/TextSummary"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TableSummary"
+        },
+        {
+          "$ref": "#/$defs/JsonSummary"
+        },
+        {
+          "$ref": "#/$defs/TextSummary"
+        },
+        {
+          "$ref": "#/$defs/ImageSummary"
+        },
+        {
+          "$ref": "#/$defs/PdfSummary"
+        }
+      ],
+      "title": "Content Summary"
+    },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/TablePreview"
+      },
+      "title": "Tables",
+      "type": "array"
+    },
+    "active_content_detected": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Active Content Detected",
+      "type": "array"
+    },
+    "active_content_policy": {
+      "const": "never_executed_or_followed",
+      "title": "Active Content Policy",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "workspace_id",
+    "contract_version",
+    "sha256",
+    "media_type",
+    "byte_size",
+    "filename",
+    "pages",
+    "provenance",
+    "content_summary",
+    "tables",
+    "active_content_detected",
+    "active_content_policy",
+    "warnings",
+    "created_at"
+  ],
+  "title": "ResearchAsset",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:general-research.v1:ResearchAsset"
+}

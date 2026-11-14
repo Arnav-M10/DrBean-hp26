@@ -186,8 +186,36 @@ def test_bootstrap_transaction_rolls_back_and_capacity_preserves_history(shared)
         first_id = bootstrap(first)
         assert second.get(PREFIX + "/shared-session").status_code == 429
         assert first.get(PREFIX + "/shared-session").json()["workspace_id"] == first_id
-        assert first.post(PREFIX + "/shared-session/rotate").status_code == 429
+        assert first.post(PREFIX + "/shared-session/rotate").status_code == 200
         assert first.get(PREFIX + f"/workspaces/{first_id}").status_code == 200
+        with app.state.workflow.store.read() as conn:
+            assert conn.execute("SELECT count(*) FROM browser_sessions").fetchone()[0] == 2
+            assert conn.execute("SELECT count(*) FROM browser_sessions WHERE revoked_at IS NULL").fetchone()[0] == 1
+
+
+def test_logged_out_and_expired_credentials_release_capacity_without_erasing_work(shared):
+    app = shared[0]
+    app.state.sessions.max_sessions = 1
+    old_workspaces = []
+    for _ in range(4):
+        with browser(shared) as client:
+            old_workspaces.append(bootstrap(client))
+            assert client.post(PREFIX + "/shared-session/logout").status_code == 200
+    with browser(shared) as client:
+        current = bootstrap(client)
+        assert current not in old_workspaces
+        for old in old_workspaces:
+            assert client.get(PREFIX + "/workspaces/" + old).status_code == 404
+        with app.state.workflow.store.read() as conn:
+            expiry = conn.execute("SELECT expires_at FROM browser_sessions WHERE workspace_id=?", (current,)).fetchone()[0]
+        app.state.sessions.clock = lambda: expiry
+        assert client.get(PREFIX + "/shared-session").status_code == 401
+        # The explicit failed credential is cleared; a later anonymous bootstrap
+        # gets another private identity, never access to the retained old work.
+        assert bootstrap(client) != current
+        with app.state.workflow.store.read() as conn:
+            assert conn.execute("SELECT count(*) FROM workspaces").fetchone()[0] == 6
+            assert conn.execute("SELECT count(*) FROM browser_sessions").fetchone()[0] == 6
 
 
 def test_private_gateway_file_admission_and_hot_configuration(shared, tmp_path):

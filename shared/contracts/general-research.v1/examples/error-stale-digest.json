@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/bean/v1/workspaces/<ws_id>/research-analyses",
+    "body": {
+      "client_operation_id": "analysis-2026-11-14-002",
+      "question": "How did the annual mean change, and what do the NACA pages describe?",
+      "assets": [
+        {
+          "id": "<research_asset_id>",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "consent": {
+        "accepted": true,
+        "provider": "gemini",
+        "model": "controlled-general-analysis",
+        "asset_ids": [
+          "<research_asset_id>"
+        ],
+        "include_question": true
+      }
+    }
+  },
+  "response": {
+    "status": 409,
+    "body": {
+      "code": "asset_digest_mismatch",
+      "message": "The selected file's digest does not match the retained file. Reload the file list and select it again.",
+      "field_paths": [
+        "assets"
+      ],
+      "retryable": false,
+      "current_revision_id": null,
+      "request_id": "<request_id>"
+    }
+  }
+}

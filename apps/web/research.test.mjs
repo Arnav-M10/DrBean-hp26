@@ -74,3 +74,14 @@ test('measurement constraints retain exact values and demand their origin', () =
   const result = designConstraints({ times: '8, 6', allowance: '0.2', horizon: '10', allowanceReason: 'Reviewed prospective bound' })
   assert.deepEqual(result.feasible_times, ['8/1', '6/1']); assert.equal(result.future_hard_allowance, '1/5')
 })
+
+test('general sources retain an untrusted question without forced model inputs or approval', async () => {
+  const calls = [], api = { json: async (path, body) => { calls.push({ path, body }); return body ? snapshot({ problem_id: null }) : { items: [] } } }
+  const { controller: c, connection } = setup(api)
+  c.getSources = () => [{ id: 'research_asset_table' }]; c.getSourceQuestion = () => 'Which model applies to these arbitrary columns?'
+  connection.saveReviewedInputs = () => { throw new Error('General files cannot silently create concentration inputs') }
+  await c.connect(connection); await c.createFromSources()
+  const body = calls.at(-1).body
+  assert.equal(body.objective, c.getSourceQuestion()); assert.equal(body.problem_id, undefined); assert.equal(body.accepted, undefined)
+  assert.deepEqual(body.source_ids, ['research_asset_table']); assert.equal(calls.filter(call => call.body).length, 1)
+})

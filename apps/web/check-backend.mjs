@@ -3,7 +3,7 @@
 // PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
 // BEAN_COUNTERDEX_PYTHON=/absolute/path/to/python3.11 node apps/web/check-backend.mjs
 import { spawn } from 'node:child_process'
-import { mkdtemp, rm, readFile } from 'node:fs/promises'
+import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -50,7 +50,7 @@ const waitForExit = child => new Promise((resolve, reject) => {
   if (child.exitCode !== null) return resolve(child.exitCode)
   child.once('error', reject); child.once('exit', resolve)
 })
-let browser
+let browser, activePage, lastApiResponse
 try {
   const server = start(python, ['-m', 'uvicorn', 'bean_api.main:create_app', '--factory', '--host', '127.0.0.1', '--port', String(apiPort)])
   const web = start(process.execPath, ['apps/web/serve.mjs', String(webPort)])
@@ -68,6 +68,11 @@ try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] })
   const context = await browser.newContext({ acceptDownloads: true })
   const page = await context.newPage(), errors = [], external = []
+  activePage = page
+  page.on('response', async response => {
+    if (!response.url().startsWith(base + '/api/bean/v1/')) return
+    try { lastApiResponse = { url: response.url(), status: response.status(), body: Number(response.headers()['content-length']) > 32768 ? '[bounded response omitted]' : (await response.text()).slice(0, 32768) } } catch { /* diagnostics only */ }
+  })
   page.on('pageerror', error => errors.push(error.message))
   await page.route('**/*', route => {
     const url = route.request().url()
@@ -150,6 +155,8 @@ try {
   await page.click('#question-form button[type=submit]')
   await page.getByLabel('Explanation for the remaining manually reviewed inputs and assumptions', { exact: true }).fill('Reviewed synthetic example measurements, units, domain and claim entered explicitly for this browser test')
   await page.getByRole('button', { name: 'Preview source-bound inputs', exact: true }).click()
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some(button => button.textContent === 'Accept preview and prepare investigation plan' && !button.disabled) || !document.querySelector('#backend-error').hidden)
+  assert.equal(await page.locator('#backend-error').isVisible(), false, await page.locator('#backend-error').textContent())
   await page.getByRole('link', { name: 'Question', exact: true }).click()
   await page.fill('#goal', 'Changed after source preview')
   await page.getByRole('link', { name: 'Review', exact: true }).click()
@@ -370,6 +377,19 @@ try {
   const denied = await fetch(`${base}/api/bean/v1/workspaces`, { headers: { Origin: 'https://external.invalid' } })
   assert.equal(denied.status, 403)
   console.log('Passed: actual browser review/approval/dispatch, real baseline discovery on two reviewed inputs, separately approved positive and no-separation designs from the actual pair, exact native and anchor downloads with installed-engine replay, preserved earlier evidence, reopened design history, zero provider attempts, memory-only credentials, and proxy origin rejection.')
+} catch (error) {
+  if (activePage) {
+    const directory = process.env.BEAN_BROWSER_DIAGNOSTICS_DIR || join(root, 'var/test-evidence/browser-failures')
+    const prefix = join(directory, `browser-${Date.now()}-${process.pid}`)
+    try {
+      await mkdir(directory, { recursive: true })
+      await activePage.screenshot({ path: prefix + '.png' })
+      const detail = { error: error.message, visible_status: (await activePage.locator('body').innerText()).slice(0, 32768), last_api_response: lastApiResponse }
+      await writeFile(prefix + '.json', JSON.stringify(detail, null, 2).split(token).join('[synthetic test credential]'))
+      console.error(`Browser failure diagnostics: ${prefix}`)
+    } catch { /* Preserve the original failure. */ }
+  }
+  throw error
 } finally {
   await browser?.close()
   for (const child of children.reverse()) if (child.exitCode === null && !child.launchError) child.kill('SIGTERM')

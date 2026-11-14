@@ -1,5 +1,6 @@
 """B's application-authority tests. Controlled, no provider/science assertions."""
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import sqlite3
 from pathlib import Path
@@ -261,3 +262,60 @@ def test_stale_queued_action_stops_without_crashing_worker_or_retrying(research)
     stopped = service.get("alice", session["id"])
     assert stopped["state"] == "failed" and stopped["action"]["error_code"] == "stale_research_inputs"
     assert runner.tick() == 0
+
+
+def test_session_limit_policy_persists_and_human_actions_cannot_reset_it(research):
+    service, context, ports = acquired(research)
+    assert service.get("alice", context.research_session_id)["session_limits_policy"] == "research-session-limits.v2"
+    assert service.get("alice", context.research_session_id)["session_limits"]["logical_turns"] == 16
+    for action_index in range(4):
+        for _ in range(4):
+            run(ports.admit_model())
+        pending = run(ports.request_clarification(["scope"], "Review the unchanged scope before another bounded planning action."))
+        service.release(context, "waiting_review")
+        current = service.get("alice", context.research_session_id)
+        body = {"expected_revision": current["revision"], "pending_review_id": pending["id"], "expected_review_digest": pending["review_digest"], "accepted": True, "answers": {"scope": "Unchanged reviewed scope"}}
+        if action_index == 3:
+            code("research_budget_exhausted", lambda: service.adopt_inputs("alice", current["id"], body, "exhausted"))
+        else:
+            queued = service.adopt_inputs("alice", current["id"], body, "answer-" + str(action_index))
+            context = service.acquire("alice", queued["action"]["id"], "next-worker")
+            ports = ApplicationResearchPorts(service, context)
+    assert service.get("alice", context.research_session_id)["usage"]["logical_turns"] == 16
+
+
+def test_legacy_session_creation_record_retains_its_eight_turn_limits(research):
+    service, session, request = research
+    legacy = service.workflow.create_record("alice", session["workspace_id"], "research_session", request, "legacy-session-metadata")
+    with service.store.read() as conn:
+        assert service.limits(conn, {"id": legacy["id"], "actor_id": "alice"})["logical_turns"] == 8
+
+
+def test_model_report_cannot_hide_a_still_queued_approved_child(research):
+    service, context, ports, prepared, _ = approved(research)
+    run(ports.execute_child(prepared["review_id"], prepared["review_digest"]))
+    code("research_report_work_incomplete", lambda: run(ports.publish_report()))
+    with service.store.read() as conn:
+        assert conn.execute("SELECT count(*) FROM entities WHERE kind='report'").fetchone()[0] == 0
+        assert conn.execute("SELECT count(*) FROM jobs WHERE state='queued'").fetchone()[0] == 1
+
+
+def test_concurrent_additive_migration_preserves_legacy_metadata(tmp_path):
+    from bean_api.store import utc_now
+    path = tmp_path / "legacy.sqlite3"
+    migration = Path(__file__).resolve().parents[1] / "apps/api/bean_api/migrations/0001_initial.sql"
+    with sqlite3.connect(path) as conn:
+        conn.executescript(migration.read_text())
+        conn.execute("INSERT INTO schema_migrations VALUES (1,?)", (utc_now(),))
+        conn.execute("INSERT INTO workspaces(id,name,created_at) VALUES ('legacy','Preserved workspace',?)", (utc_now(),))
+        conn.execute("INSERT INTO memberships VALUES ('legacy','alice')")
+        conn.execute("PRAGMA user_version=1")
+    def reopen(_):
+        store = Store(path)
+        assert Workflow(store).workspace("alice", "legacy")["name"] == "Preserved workspace"
+        with store.read() as conn:
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == Store.SCHEMA_VERSION
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(reopen, range(8)))
+    with Store(path).read() as conn:
+        assert [row[0] for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version")] == [1, 2, 3]
