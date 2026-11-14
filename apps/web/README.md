@@ -4,7 +4,7 @@ The dependency-free editor supports CSV/manual measurements, exact rational entr
 
 ## Run locally
 
-From the repository root, follow the backend setup in `README.md` and start the API on `127.0.0.1:8000` and its durable worker. Start this frontend with `node apps/web/serve.mjs`, or run `node serve.mjs` from `apps/web`. Open `http://127.0.0.1:4173`. No frontend installation is required. Run `node --test` from `apps/web` (15 tests).
+From the repository root run `scripts/dev/setup.sh` once, then `scripts/dev/start.sh`. That starts the API on `127.0.0.1:8000`, its durable worker and this frontend on `http://127.0.0.1:4173`, with AI in placeholder mode. To run only the editor, use `node apps/web/serve.mjs`. No frontend installation is required. Run `node --test` from `apps/web` (15 tests).
 
 Open **Local backend connection**, enter the local researcher bearer token from the private backend auth file, and connect. Choose or create a workspace. Tokens stay only in memory; they are cleared from the password field after submission, never put in URLs, exports, browser storage or cookies. Disconnect clears the client and selected records. Reload requires reconnecting.
 
@@ -33,7 +33,7 @@ The Windows-only `03_Researcher_Reviewer_Web.md` was not supplied in this cloud 
 `check-backend.mjs` launches the actual API and worker with an isolated temporary SQLite database and synthetic in-process credentials, then drives Chromium. It requires an installed backend Python environment and Playwright, and ports 8000/4173 must be free. It removes its temporary data and stops its processes.
 
 ```sh
-PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node apps/web/check-backend.mjs
+node apps/web/check-backend.mjs
 ```
 
-Set `BEAN_TEST_PYTHON` and `CHROMIUM_PATH` to override the default `.venv/bin/python` and `/usr/bin/chromium`. Playwright is a test-only dependency, not shipped in the frontend. Observed validation: all 15 Node tests passed; the real browser/API check passed plan preparation, approval, blocked unqualified UI dispatch, explicit unsupported worker lifecycle via HTTP, persisted run retrieval, exact evidence/report download, stale-edit controls, 390px layout, memory-only credentials and proxy origin rejection. The worker check deliberately tests its honest unsupported result; it is not a real scientific scenario, fixture replay, Gemini or live-evidence success.
+It finds Playwright through Node's normal resolution (`npm install` in `tests/integration`, or `NODE_PATH`); set `PLAYWRIGHT_MODULE` to name an entry file explicitly. Set `BEAN_TEST_PYTHON` and `CHROMIUM_PATH` to override `.venv/bin/python` and Playwright's own Chromium. Provider credentials in your shell are removed from the processes it starts. Playwright is a test-only dependency, not shipped in the frontend. Observed validation: all 15 Node tests passed; the real browser/API check passed plan preparation, approval, blocked unqualified UI dispatch, explicit unsupported worker lifecycle via HTTP, persisted run retrieval, exact evidence/report download, stale-edit controls, 390px layout, memory-only credentials and proxy origin rejection. The worker check deliberately tests its honest unsupported result; it is not a real scientific scenario, fixture replay, Gemini or live-evidence success.

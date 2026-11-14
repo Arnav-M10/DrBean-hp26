@@ -1,21 +1,78 @@
 # Cross-owner issue ledger
 
-Maintained by Owner 04. Each entry has a reproducible input, expected behaviour, actual evidence, responsible owner and retest status. Owner 04 does not fix another owner's component.
+Maintained by Workstream 4. Each entry has a reproducible input, expected behaviour, actual evidence, responsible owner and retest status. Nobody fixes another owner's component. Summary by gate: [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md).
 
-Tested commit for the evidence below: branch `claude/dreamy-lamport-dsttgm` on top of `d95c19e`.
+Entries I-001 to I-010 were opened before the backend and engine were merged. Their original text is kept below; the table gives their current status. Entries from I-011 were opened on the integrated tree at `586fb9b`.
 
 | ID | Owner | Status | Summary |
 |---|---|---|---|
-| I-001 | 02 | open, blocking | No backend or `/api/bean/v1` exists |
-| I-002 | 02 | open, blocking | Request and response schemas are not frozen |
-| I-003 | 02 | open | Controlled test transport must be explicit and inert in the live deployment |
-| I-004 | 02 | open | Provider layer must reserve against the shared budget ledger |
-| I-005 | 01 | open, blocking | No Groundwork adapter; oracle expectations await scientific review |
-| I-006 | 03, 02 | open | Decimal input grammar differs between the web parser and the contract wording |
-| I-007 | 03 | open | Draft download cannot be reopened |
-| I-008 | 03 | open | Expected transcriptions need a human visual check |
-| I-009 | human team | open, blocking live work | Reuse ruling, Gemini access and spend, names, consultation |
-| I-010 | 02 | open | C08/C09 need a conditional scenario in the real plan contract |
+| I-001 | 2 | **closed** | Backend and `/api/bean/v1` now exist and start with one command |
+| I-002 | 2 | **closed** | Schemas are published in `shared/contracts/DB-SC-1` |
+| I-003 | 2, 3 | open | Controlled transports must be unreachable in ordinary startup (see I-012) |
+| I-004 | 2, 3, 5 | open | Two budget ledgers exist (backend SQLite, harness JSONL); one authority must be defined before any live call |
+| I-005 | 1 | partly closed | Engine exists and passes standalone; not integrated (see I-013) |
+| I-006 | 2, 4 | open | Decimal input grammar differs between the web parser and the server |
+| I-007 | 4 | open | Draft download cannot be reopened; durable server records can |
+| I-008 | 5 | open | Harness expected transcriptions need a human visual check |
+| I-009 | human team | open | Reuse ruling, names, consultation; live Gemini deliberately deferred |
+| I-010 | 2, 3 | open | Conditional objective for harness cases C08/C09 versus the real plan contract |
+| I-011 | 2 | open, minor | Float in JSON is refused without naming the field |
+| I-012 | 3 | open | Provider enables from environment variables; disabled must be the code default |
+| I-013 | 1, 2 | **open, blocks G1 and G2** | API and worker select the unavailable adapter; engine bridge missing |
+| I-014 | 1, 2 | open | Engine runs only on CPython 3.11; backend needs 3.12 or 3.13 |
+| I-015 | 2 | open, target platform | Historical `RLIMIT_AS` failures on the target Mac need a recheck |
+| I-016 | 5 | open, blocks strict gate | HTTP/invariant suite and offline real-science lane not delivered |
+| I-017 | 4 | open, waits for G1 | Browser controls for source review, design and follow-up not built |
+
+## I-011: float refusal does not name the field (Owner 2)
+
+- **Input:** `POST /api/bean/v1/workspaces/{w}/datasets` with `rows[0].concentration` as the JSON number `4.8`.
+- **Expected:** 422 with `field_paths` naming `rows.0.concentration`, as happens for the non-canonical string `"4.8"`.
+- **Actual:** 422 `invalid_json`, `field_paths: []`. The value is correctly refused, not repaired. The browser never sends floats, so this affects other clients only.
+- **Evidence:** `docs/release-evidence/stack-smoke.json`, fact `float_refusal_names_the_field: false`.
+
+## I-012: provider must be disabled by default in code (Owner 3)
+
+- **Input:** start the API by hand (not through the launcher) with `GEMINI_API_KEY`, `GEMINI_MODEL`, `BEAN_GEMINI_ACCOUNT_GATE=approved`, `BEAN_GEMINI_ACCOUNT_DECISION_ID` and an image token bound set.
+- **Expected for this sprint:** Gemini stays disabled until an explicit live switch is set on a new user instruction. A key appearing in the environment must not be enough.
+- **Actual:** `provider_config_from_env` in `apps/api/bean_api/main.py` builds a ready provider from those variables alone. `scripts/dev/start.sh`, the stack smoke, the browser check and CI all remove them, and the smoke proves a planted decoy key leaves `gemini.configured` false. A hand-started API is not protected.
+- **Proposed seam:** honour `BEAN_AI_MODE` (the launcher sets `placeholder`); require an explicit different value plus the existing gate before `check_ready` can pass. Owner 3 decides the name.
+- **Retest:** `python3 scripts/release/stack_smoke.py`; plus Owner 5's network-denial test.
+
+## I-013: engine bridge missing (Owners 1 and 2)
+
+- **Input:** `scripts/dev/start.sh`, then `python3 scripts/release/stack_smoke.py --require-science`.
+- **Expected (G1):** capabilities report an available, qualified adapter; the approved baseline run on the shared five-row example returns a real scientific outcome with candidates and native artifact bytes.
+- **Actual:** `science.implemented=false`, reason `groundwork_adapter_not_installed`. The run completes with `scientific_outcome: unsupported`, 0 candidates, 0 artifacts. The engine is installed at `.venv-engine` and its interpreter path is passed to both processes as `BEAN_ENGINE_PYTHON`, unused.
+- **Also needed from Owner 1:** candidate discovery from supplied input. The engine's current entry points compare two supplied candidates; they do not search for an outside candidate.
+- **Retest:** the command above exits 0.
+
+## I-014: two interpreters (Owners 1 and 2)
+
+- **Input:** `python3.13 -m unittest discover -s packages/groundwork_adapter/tests`; the same on 3.11.
+- **Actual:** 3.11: 138 passed. 3.13: 4 failures, 23 errors. The backend requires 3.12 or 3.13.
+- **Decision taken for launch:** two explicit runtimes, both installed by setup. The bridge must therefore cross a process boundary, or Owner 1 qualifies 3.12/3.13.
+
+## I-015: target Mac recheck (Owner 2, with Workstream 4)
+
+- **Historical finding at the audit commit:** on the target Mac the backend had 136 passed, 17 failed, 11 setup errors, from unsupported `RLIMIT_AS` in image and scientific process setup.
+- **Current evidence:** Linux x86_64 only: 164 backend tests pass. `apps/api/bean_api/science.py` still calls `resource.setrlimit(resource.RLIMIT_AS, ...)` unconditionally.
+- **Retest:** on the Mac, `scripts/dev/setup.sh` then `python3 scripts/release/checklist.py --record`. Not done; no Mac is available to this workstream.
+
+## I-016: Owner 5 evidence not delivered
+
+- **Expected:** `tests/integration/test_*.py` driving baseline, approved design, native download and replay, and hypothetical follow-up through ordinary startup; an offline real-science lane in the harness; a model-network guard.
+- **Actual:** none present. The checklist reports `owner5_http_suite` as unrun, which keeps G1 to G3 from passing in strict mode.
+
+## I-017: remaining browser controls (Workstream 4)
+
+- **Built by a teammate at `586fb9b`:** connect, workspace, save inputs, frozen plan review, explicit approval, queue (disabled until the adapter is qualified), run retrieval, evidence and report download.
+- **Not built:** source image beside a placeholder proposal with review; candidate pair, feasible times and allowance review with separate design approval; result table with bands; actual or hypothetical follow-up; native evidence download with the replay command.
+- **Why not yet:** the work order starts these after G1. Building them against an adapter that returns `unsupported` would mean guessing response shapes.
+
+---
+
+# Entries opened before the merge (original text)
 
 ## I-001: no backend or API (Owner 02)
 

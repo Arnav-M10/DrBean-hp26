@@ -1,45 +1,56 @@
-# 120-second demo script
+# Two-minute demo script
 
-One script for both the in-person presentation and the optional video. No sponsor scene follows it. The timing is narrative, not a latency claim.
+One script for the in-person presentation and the optional video. The timings are narrative targets, not promised runtimes. This is the only current demo script.
 
-**Readiness today: only the first twelve seconds can be shown live.** Every later scene depends on components that do not exist yet. Do not record or present a scene until its "needs" column is met by a real run. Never splice a mock into a sequence described as live.
+**The story:** "Several explanations fit these measurements. Dr. Bean exposes the ambiguity and helps choose a measurement that distinguishes this pair, with evidence you can rerun."
 
-| Time | Show | Say | Needs before it can be shown | Ready |
-|---|---|---|---|---|
-| 0–12 s | The web workspace with the synthetic series and the two-rate model. A fit curve that looks fine. | "A good-looking fit does not tell you what your data actually pin down. This researcher wants to know whether the elimination rate must lie in a claimed range, and what to measure next." | `apps/web` | yes |
-| 12–32 s | Upload `c04a.png`. Gemini's proposals beside the image, each with its region. The stained allowance flagged as ambiguous. The person types 0.2 and accepts. | "Gemini reads the sheet and proposes each value with its location. It will not guess the smudged allowance. A person confirms the meaning; nothing enters the analysis unreviewed." | Source admission, live Gemini intake, review view (Owners 02, 03). A real recorded run of C04. | no |
-| 32–55 s | The frozen plan, the approval click, then the actual tool trace. | "The researcher approves one bounded computation for exactly this reviewed problem. The agent can only call the tools this plan permits." | Plans, approvals, runs, deepagents tools, Groundwork baseline (Owners 01, 02). | no |
-| 55–75 s | The result card from typed backend fields, the grounded explanation, and two recorded traces side by side: C08 and C09. | "Here a checked alternative outside the range exists, so the claim is not forced by the data. When the same request met an inconclusive result, the agent stopped instead. Same permissions, different evidence, different action." | Real result; live-agent traces for C08 and C09 labelled "live model, controlled tools". | no |
-| 75–100 s | Feasible times and a future hard allowance entered; a separate approval; the suggestion with its tier. | "The next measurement is a new request with its own approval. This is numerical guidance for two named candidates at the times the lab can actually sample. It is not a global optimum and not a checked separation." | Design routes and job (Owners 01, 02, 03). | no |
-| 100–120 s | A reading added and labelled HYPOTHETICAL in the banner and the row; the new investigation beside the unchanged old one; the reviewer export. | "A new reading starts a new investigation. This one is hypothetical and says so everywhere. It could rule out either candidate or both. It would never prove the range. The earlier evidence stays inspectable." | Observation proposals, revisions, export (Owners 02, 03). | no |
+**Readiness today: scenes 3 to 6 cannot be shown.** They need a real scientific result through the application (gate G1, then G2). Show a scene only when its "needs" column is met by a real run. Never splice a mock into a sequence described as live, and never show the engine's prepared fixture as if the application produced it.
 
-## What to disclose on screen and aloud
+Every AI element on screen carries a visible **placeholder AI** label until the user authorizes live testing. Say it aloud once: "Gemini is wired in but switched off for this demo; these proposals are controlled placeholder output."
 
-- Every source is synthetic. The banner on each sheet says so.
-- Any previously completed run shows its real time, mode and commit. A pending live call stays pending.
-- Controlled-tool traces are labelled as such and never described as real science.
-- If the exact tier is unavailable, say "numerical guidance" and show no stronger badge.
-- If a real result is inconclusive, present it as unresolved. Do not change allowances to get a better scene.
+| Scene | Time | Show (only what the release actually renders) | Say | Needs | Ready |
+|---|---|---|---|---|---|
+| 1 Problem | 15 s | The five-row measurement table and the claimed range for the elimination rate. | "A fit looks fine, but does the data really force this rate into the claimed range? And if not, what should we measure next?" | web workspace | yes |
+| 2 Source review | 20 s | The lab-sheet image beside the proposed values, labelled placeholder AI; one unresolved field; the person corrects and accepts. | "Values are proposed with their location on the sheet. Nothing enters the analysis until a person reviews it." | source review control (I-017); controlled proposals | no |
+| 3 Counterevidence | 30 s | The frozen plan, the approval click, then the result table: a reference candidate and an outside candidate, both within every hard allowance. | "The researcher approves one bounded computation. The engine finds another explanation that fits every reading but has a rate outside the claimed range. It is exactly checked. So these data do not force the claim." | G1 (I-013) | no |
+| 4 Next measurement | 30 s | Feasible times 6 and 8 h and future allowance 0.2 mg/L reviewed; a separate approval; a table with the selected time and the two possible-reading bands. | "Choosing the next measurement is a separate request with its own approval. For this pair, at the times the lab can sample, 8 hours separates them: no reading can fit both." | G2 | no |
+| 5 Follow-up | 15 s | A reading entered and labelled HYPOTHETICAL; a new revision beside the unchanged original; which candidate survives. | "A hypothetical 3.4 keeps the reference and excludes the outside candidate. A different reading could exclude the other, or both. It never proves the range." | G2 | no |
+| 6 Replay and insight | 10 s | Download of the native evidence and the replay command printing `replay: passed`. | "Anyone can rerun the exact check. That is a fresh run of the same checker, not a second proof system." | native export through the API | no |
 
-## Questions judges may ask, and where the answer is
+No curve is shown: the web workspace renders tables, not plots. If a basic curve lands after the tables work, add it then.
+
+The numbers in scenes 4 and 5 are regression oracles for one audited pair on the shared synthetic example. A real search may choose another pair and another time. Say what the run on screen actually produced.
+
+## If real computation is slow on the day
+
+Use a saved real scientific run from this build, shown with its real time and commit and the words "saved run". Never call it fresh. If no real run exists, show scenes 1 and the manual plan and approval path only, and say plainly that the engine is not yet connected.
+
+## Disclose
+
+- All data are synthetic.
+- AI output is placeholder; live Gemini has not been run.
+- The result is conditional on the reviewed model, measurements and hard allowances.
+- The suggestion is specific to two named candidates, the reviewed times and the stated allowance. It is not a global optimum.
+
+## Questions judges may ask
 
 | Question | Answer source |
 |---|---|
 | What predates the event? | `docs/provenance-and-eligibility.md` |
-| Which tests use controlled tools? | `evaluation/results/REPORT.md`, lane column |
-| What did Gemini actually choose? | sanitized traces under `evaluation/results/traces/` |
-| What did the checker establish? | the run's verification record; today: nothing has run |
-| What is unsupported? | README "What does not exist yet"; runbook "Omitted integrations" |
+| Is the AI real? | Placeholder now. Real deepagents graph, controlled model. Live Gemini: not run. `docs/INTEGRATION_STATUS.md` |
+| Change an input and show me | New immutable revision, new plan, new approval, real recomputation. Works for the manual path today. |
+| What did the checker establish? | The run's verification record and native bundle; today, nothing through the application |
+| Which tests are controlled? | `docs/handoff-owner04.md`, results by lane |
 
 ## Rehearsal checklist (presentation device)
 
-- [ ] Timer run on the presentation device: at or under 120 seconds, twice.
-- [ ] Sheet readable at the chosen browser zoom; long fractions do not overflow.
-- [ ] Whole path works by keyboard alone.
-- [ ] Network disconnected: the page still loads (the smoke confirms no external request) and the saved-results fallback opens.
-- [ ] A no-useful-suggestion result has a prepared, honest line.
-- [ ] Hypothetical data is identified visually and verbally.
-- [ ] Only synthetic content and authorized people appear in any recording.
-- [ ] Local saved-results fallback and the cleared source packet are on the device.
+- [ ] `scripts/dev/setup.sh` and `start.sh` succeed on the device; doctor shows Gemini live disabled.
+- [ ] Timed run at or under 120 seconds, twice.
+- [ ] Model APIs unreachable (network off or blocked): everything still works.
+- [ ] Tables readable at the chosen zoom; long fractions stay inside details.
+- [ ] Whole path works by keyboard.
+- [ ] A prepared honest line for "no separation established".
+- [ ] Hypothetical data labelled on screen and aloud.
+- [ ] Saved-run fallback and recovery commands on the device.
 
 None of these has been done.
