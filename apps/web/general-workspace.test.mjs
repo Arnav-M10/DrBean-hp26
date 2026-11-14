@@ -147,3 +147,51 @@ test('selection checks counts, server-advertised formats and size without readin
   assert.throws(() => validateFileSelection([], [{ name: 'macro.xlsm', type: 'application/vnd.ms-excel', size: 1 }], limits), /not supported/)
   assert.throws(() => validateFileSelection([{ byte_size: GENERAL_LIMITS.totalBytes - 1 }], [{ name: 'a.txt', type: 'text/plain', size: 2 }], limits), /combined limit/)
 })
+
+test('uncertain uploads keep exact key and bytes across retry and reload reselection, including empty MIME', async () => {
+  const f = await fixture()
+  const keys = [], bodies = []
+  let fail = true
+  f.service.upload = async (file, key) => {
+    keys.push(key); bodies.push({ type: file.type, name: file.name, bytes: Buffer.from(await file.arrayBuffer()) })
+    if (fail) throw Object.assign(new Error('Lost upload acknowledgement'), { kind: 'uncertain' })
+    return f.asset
+  }
+  const file = new File([text], f.file.name, { type: '' })
+  await f.ui.upload([file]); assert.equal(f.ui.state.pendingUploads.length, 1)
+  const restored = new GeneralResearchWorkspace({ storage: f.storage, serviceFactory: () => f.service })
+  await restored.connect(f.connection)
+  assert.equal(keys.length, 1, 'reload never retries an upload')
+  fail = false; await restored.upload([file])
+  assert.equal(keys[0], keys[1]); assert.deepEqual(bodies[0], bodies[1])
+  assert.equal(bodies[1].type, 'text/csv'); assert.equal(restored.state.assets.length, 1)
+})
+
+test('restore immediately clears old UI, locks edits, and keeps same-identity workspace pending history', async () => {
+  const f = await fixture(); await reviewed(f)
+  f.service.analyze = async () => { throw new Error('Unknown outcome') }
+  await f.ui.analyze()
+  const original = f.ui.state.pending[0].body
+  await f.ui.connect({ ...f.connection, workspaceId: 'ws-second' })
+  let release
+  f.service.asset = () => new Promise(resolve => { release = () => resolve(f.asset) })
+  const emissions = []
+  f.ui.changed = state => emissions.push({ busy: state.busy, assets: state.assets.length, question: state.question })
+  const restoration = f.ui.connect(f.connection)
+  assert.deepEqual(emissions[0], { busy: true, assets: 0, question: '' })
+  f.ui.editQuestion('This edit must be disabled during restoration')
+  release(); await restoration
+  assert.equal(f.ui.state.pending[0].body.client_operation_id, original.client_operation_id)
+  assert.notEqual(f.ui.state.question, 'This edit must be disabled during restoration')
+})
+
+test('reopen rejects a same-workspace wrong result or wrong metadata identity without replacing evidence', async () => {
+  const f = await fixture(); await reviewed(f); await f.ui.analyze()
+  const original = f.ui.state.result
+  f.service.analysis = async () => ({ ...f.result, id: 'wrong-analysis' })
+  await f.ui.reopen(f.ui.state.history[0])
+  assert.match(f.ui.state.error, /selected saved result/); assert.deepEqual(f.ui.state.result, original)
+  f.service.asset = async () => ({ ...f.asset, id: 'wrong-source' })
+  await f.ui.reopen(f.ui.state.history[0])
+  assert.match(f.ui.state.error, /selected bytes or workspace/); assert.deepEqual(f.ui.state.result, original)
+})

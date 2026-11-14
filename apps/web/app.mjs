@@ -1,9 +1,10 @@
 import { parseMeasurementsCsv, validateMeasurements } from './exact.mjs'
 import { validateQuestion } from './question.mjs'
 import { setupWorkflow } from './workflow.mjs'
+import { setupGeneralWorkspace } from './general-workspace.mjs'
 
 const byId = id => document.getElementById(id)
-const sections = ['inputs', 'question', 'review', 'investigations', 'report']
+const sections = ['research', 'inputs', 'question', 'review', 'investigations', 'report']
 const measurementFields = [
   ['time', 'Elapsed time'], ['concentration', 'Concentration'], ['epsilon', 'Hard allowance'],
 ]
@@ -217,8 +218,10 @@ function renderReview() {
 function route(focusHeading = true) {
   const requested = location.hash.slice(1)
   if (requested === 'main') return
-  const selected = sections.includes(requested) ? requested : 'inputs'
+  const selected = sections.includes(requested) ? requested : 'research'
   for (const section of sections) byId(section).hidden = section !== selected
+  byId('backend-source-review').hidden = selected === 'research'
+  byId('export-draft').hidden = selected === 'research'
   for (const link of document.querySelectorAll('.workspace-nav a')) {
     if (link.hash === `#${selected}`) link.setAttribute('aria-current', 'page')
     else link.removeAttribute('aria-current')
@@ -336,6 +339,7 @@ byId('export-draft').addEventListener('click', () => {
 
 let renderWorkflow
 createBounds()
+const general = setupGeneralWorkspace({ root: byId('general-workspace') })
 renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
   const accepted = new Map()
   for (const field of review.body.reviewed_fields) {
@@ -351,7 +355,7 @@ renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
   rowsReviewed = false; questionReviewed = false
   byId('dataset-origin').value = source.body.origin === 'synthetic' ? 'synthetic' : ''
   renderRows(); location.hash = 'inputs'; announce('Reviewed source values copied to the measurement draft. Review missing fields and the question before preparing science.')
-})
+}, { onConnectionChange: connection => general.connectionChanged(connection) })
 addRow()
 renderRows()
 route(false)

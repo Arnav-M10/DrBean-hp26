@@ -49,6 +49,7 @@ export function validateResearchAsset(asset, expected = {}) {
       || !Number.isSafeInteger(asset.byte_size) || asset.byte_size < 1 || asset.byte_size > GENERAL_LIMITS.fileBytes) throw new Error('The server did not return a valid retained file identity.')
   bounded(asset.filename, 240, 'filename')
   if (expected.sha256 && asset.sha256 !== expected.sha256 || expected.byte_size !== undefined && asset.byte_size !== expected.byte_size
+      || expected.id && asset.id !== expected.id
       || expected.workspaceId && asset.workspace_id && asset.workspace_id !== expected.workspaceId) throw new Error('The retained file does not match the selected bytes or workspace.')
   const pages = list(asset.pages, GENERAL_LIMITS.pdfPages, 'page list')
   if (!pages.length) throw new Error('The server admitted no inspectable pages. Use a supported file or a smaller excerpt.')
@@ -114,27 +115,35 @@ export class GeneralResearchWorkspace {
   constructor({ serviceFactory = generalService, changed = () => {}, storage = globalThis.sessionStorage, randomId = () => crypto.randomUUID() } = {}) {
     this.serviceFactory = serviceFactory; this.changed = changed; this.storage = storage; this.randomId = randomId
     this.generation = 0; this.connection = {}; this.state = this.empty()
+    this.uploadFiles = new Map()
   }
-  empty() { return { assets: [], question: '', review: null, accepted: false, busy: false, error: '', notice: '', pending: [], history: [], result: null, resultQuestion: '', citation: null } }
+  empty() { return { assets: [], question: '', review: null, accepted: false, busy: false, error: '', notice: '', pending: [], pendingUploads: [], history: [], result: null, resultQuestion: '', citation: null } }
   emit() { this.changed(this.state) }
-  key() { return `drbean-general-v1:${this.connection.workspaceId}` }
+  key() { return `drbean-general-v1:${this.identityId}:${this.connection.workspaceId}` }
   persist() {
     if (!this.connection.workspaceId) return
-    try { this.storage?.setItem(this.key(), JSON.stringify({ version: 1, assets: this.state.assets.map(({ id, sha256 }) => ({ id, sha256 })), question: this.state.question, pending: this.state.pending, history: this.state.history })) } catch { this.state.notice = 'Browser storage is unavailable. Keep this tab open to retain pending request identities.' }
+    try { this.storage?.setItem(this.key(), JSON.stringify({ version: 1, assets: this.state.assets.map(({ id, sha256 }) => ({ id, sha256 })), question: this.state.question, pending: this.state.pending, pendingUploads: this.state.pendingUploads, history: this.state.history })) } catch { this.state.notice = 'Browser storage is unavailable. Keep this tab open to retain pending request identities.' }
   }
   async connect(connection) {
     const same = connection.api === this.connection.api && connection.workspaceId === this.connection.workspaceId && connection.mode === this.connection.mode
     const previousModel = this.limits?.model
+    const identityId = connection.identityId ?? (connection.api === this.connection.api && connection.mode === this.connection.mode ? this.identityId : `${connection.mode}:${connection.workspaceId}`)
     this.connection = connection; this.limits = generalCapabilities(connection.capabilities)
     if (same && previousModel !== this.limits.model) { this.state.review = null; this.state.accepted = false }
     if (same) { this.emit(); return }
-    this.generation++; this.state = this.empty()
+    this.generation++; this.state = this.empty(); this.uploadFiles.clear(); this.identityId = identityId
     this.service = null
     if (!connection.api || !connection.workspaceId || !['browser_session', 'local_owner'].includes(connection.mode)) { this.emit(); return }
     this.service = this.serviceFactory(connection.api, connection.workspaceId)
+    const service = this.service
+    this.state.busy = true; this.state.notice = 'Restoring your private workspace…'; this.emit()
     let saved
     try {
-      for (let index = this.storage?.length - 1; index >= 0; index--) { const key = this.storage.key(index); if (key?.startsWith('drbean-general-v1:') && key !== this.key()) this.storage.removeItem(key) }
+      const previousIdentity = this.storage?.getItem('drbean-general-active-identity')
+      if (previousIdentity && previousIdentity !== identityId) {
+        for (let index = this.storage.length - 1; index >= 0; index--) { const key = this.storage.key(index); if (key?.startsWith('drbean-general-v1:')) this.storage.removeItem(key) }
+      }
+      this.storage?.setItem('drbean-general-active-identity', identityId)
       saved = JSON.parse(this.storage?.getItem(this.key()) ?? 'null')
     } catch { /* No guessed server lookups or analysis on storage failure. */ }
     const generation = this.generation
@@ -143,16 +152,22 @@ export class GeneralResearchWorkspace {
         const references = list(saved.assets, this.limits.maxFiles, 'saved source references')
         const assets = await Promise.all(references.map(async ref => {
           if (!ID.test(ref.id) || !SHA.test(ref.sha256)) throw new Error('Invalid saved source reference.')
-          return validateResearchAsset(await this.service.asset(ref.id), { sha256: ref.sha256, workspaceId: connection.workspaceId })
+          return validateResearchAsset(await service.asset(ref.id), { id: ref.id, sha256: ref.sha256, workspaceId: connection.workspaceId })
         }))
         if (generation !== this.generation) return
         this.state.assets = assets; this.state.question = bounded(saved.question, 8000, 'saved question')
         this.state.pending = list(saved.pending, 10, 'pending operations').map(operation => this.restoreOperation(operation))
+        this.state.pendingUploads = list(saved.pendingUploads ?? [], 5, 'pending uploads').map(operation => {
+          if (!ID.test(operation.id) || !SHA.test(operation.sha256) || !Object.values(TYPES).includes(operation.media_type)
+              || !Number.isSafeInteger(operation.byte_size) || operation.byte_size < 1 || operation.byte_size > GENERAL_LIMITS.fileBytes) throw new Error('Invalid saved upload identity.')
+          bounded(operation.filename, 240, 'saved upload filename')
+          return { ...operation, status: 'uncertain' }
+        })
         this.state.history = list(saved.history, 20, 'saved analyses').filter(item => ID.test(item.id))
         this.state.notice = this.state.pending.length ? 'A request may have completed before this page closed. Inspect its frozen disclosure and deliberately retry the same request; no analysis runs automatically.' : 'Retained sources restored. Reopen a saved analysis without another model call.'
       } catch (error) { if (generation === this.generation) this.state.error = `Saved workspace could not be reopened: ${error.message}` }
     }
-    if (generation === this.generation) this.emit()
+    if (generation === this.generation) { this.state.busy = false; this.emit() }
   }
   restoreOperation(operation) {
     const body = operation?.body
@@ -189,14 +204,36 @@ export class GeneralResearchWorkspace {
         const raw = await file.arrayBuffer()
         const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', raw)), n => n.toString(16).padStart(2, '0')).join('')
         if (generation !== this.generation) return
-        const retained = validateResearchAsset(await service.upload(file, this.randomId()), { sha256: digest, byte_size: file.size, workspaceId })
+        const hint = fileMediaHint(file)
+        let operation = this.state.pendingUploads.find(item => item.sha256 === digest && item.filename === file.name && item.media_type === hint && item.byte_size === file.size)
+        if (!operation) {
+          if (this.state.pendingUploads.length >= 5) throw new Error('Resolve a pending upload before selecting another file.')
+          operation = { id: this.randomId(), filename: file.name, media_type: hint, byte_size: file.size, sha256: digest, status: 'sent' }
+          this.state.pendingUploads.push(operation)
+        }
+        const wrapped = { name: file.name, type: hint, size: file.size, arrayBuffer: async () => raw.slice(0) }
+        this.uploadFiles.set(operation.id, wrapped); this.persist()
+        let retained
+        try {
+          retained = validateResearchAsset(await service.upload(wrapped, operation.id), { sha256: digest, byte_size: file.size, workspaceId })
+        } catch (error) {
+          if (generation === this.generation) { operation.status = 'uncertain'; this.persist() }
+          throw error
+        }
         if (generation !== this.generation) return
         if (!this.state.assets.some(asset => asset.id === retained.id)) this.state.assets.push(retained)
+        this.state.pendingUploads = this.state.pendingUploads.filter(item => item !== operation)
+        this.uploadFiles.delete(operation.id)
         this.persist()
       }
       this.state.notice = 'Files retained for your inspection. Nothing has been sent to Gemini.'
     } catch (error) { if (generation === this.generation) this.state.error = `${error.message} Previously admitted files and evidence are preserved.` }
     finally { if (generation === this.generation) { this.state.busy = false; this.emit() } }
+  }
+  async retryUpload(operationId) {
+    const file = this.uploadFiles.get(operationId)
+    if (file) return this.upload([file])
+    this.state.notice = 'Reselect the original file to retry this upload. Its exact filename, bytes and media hint must match; the saved operation ID will be reused.'; this.emit()
   }
   prepareReview() {
     try {
@@ -228,7 +265,7 @@ export class GeneralResearchWorkspace {
     try {
       const result = await service.analyze(body)
       if (generation !== this.generation) return
-      const sources = await Promise.all(body.assets.map(async ref => validateResearchAsset(await service.asset(ref.id), { sha256: ref.sha256, workspaceId })))
+      const sources = await Promise.all(body.assets.map(async ref => validateResearchAsset(await service.asset(ref.id), { id: ref.id, sha256: ref.sha256, workspaceId })))
       if (generation !== this.generation) return
       this.state.result = validateResearchAnalysis(result, sources, workspaceId)
       this.state.resultQuestion = body.question; this.state.resultAssets = sources
@@ -249,8 +286,10 @@ export class GeneralResearchWorkspace {
     const service = this.service, workspaceId = this.connection.workspaceId
     this.state.busy = true; this.state.error = ''; this.emit()
     try {
-      const assets = await Promise.all(item.assets.map(async ref => validateResearchAsset(await service.asset(ref.id), { sha256: ref.sha256, workspaceId })))
-      const result = validateResearchAnalysis(await service.analysis(item.id), assets, workspaceId)
+      const assets = await Promise.all(item.assets.map(async ref => validateResearchAsset(await service.asset(ref.id), { id: ref.id, sha256: ref.sha256, workspaceId })))
+      const loaded = await service.analysis(item.id)
+      if (loaded?.id !== item.id) throw new Error('The retrieved analysis does not match the selected saved result.')
+      const result = validateResearchAnalysis(loaded, assets, workspaceId)
       if (generation !== this.generation) return
       this.state.result = result; this.state.resultQuestion = item.question; this.state.resultAssets = assets; this.state.notice = 'Saved analysis retrieved. No new model call was made.'
     } catch (error) { if (generation === this.generation) this.state.error = error.message }
@@ -325,6 +364,12 @@ export function setupGeneralWorkspace({ root, serviceFactory = generalService, s
       assets.append(card)
     }
     upload.append(assets); root.append(upload)
+    for (const operation of state.pendingUploads) {
+      const pending = element('div', '', { class: 'errors', role: 'status' })
+      pending.append(element('p', `Upload outcome uncertain: ${operation.filename}. The original operation is retained; it is never retried automatically.`))
+      click(pending, `Retry upload: ${operation.filename}`, () => controller.retryUpload(operation.id), state.busy)
+      upload.append(pending)
+    }
 
     const question = element('div', '', { class: 'card' })
     question.append(element('h3', '2. Ask about these files'))

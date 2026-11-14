@@ -4,6 +4,7 @@ import { BeanApi, baselineAvailable, baselineExplanation, liveGeminiAvailable } 
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 import { setupDesignWorkflow } from './design-workflow.mjs'
 import { designAvailable } from './design.mjs'
+import { bootstrapSharedSession } from './session.mjs'
 const byId = id => document.getElementById(id)
 function node(tag, text) { const n = document.createElement(tag); n.textContent = text; return n }
 function exactRecord(title, record) {
@@ -14,15 +15,17 @@ function save(bytes, name) {
   const a = document.createElement('a'); a.href = url; a.download = name; a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
-export function setupWorkflow(getDraft, applyReviewedFields) {
+export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChange = () => {} } = {}) {
   let api, capabilities, workspace = '', plan, approval, run, report, frozen, inputs, busy = false, pollTimer
+  let connectionMode = 'local_owner'
+  let connectionIdentity
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
   const available = () => baselineAvailable(capabilities)
   const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save, openRun: async id => { await refreshRun(id); location.hash = 'investigations' } })
   const assistant = setupAssistantWorkflow({ context: () => ({ api, workspace, run, busy, capabilities }), button, node, exactRecord })
   const sources = setupSourceWorkflow({ context: () => ({ api, workspace, busy, capabilities }), applyReviewedFields, getDraft, button, node, exactRecord, useInputs: async materialized => {
-    const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(materialized.problem))
+    const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(materialized.problem, getDraft().question.goal))
     inputs = materialized; plan = prepared; frozen = fingerprint(); approval = undefined
   } })
   function reset() { sources.reset(); assistant.reset(); clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
@@ -51,6 +54,9 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
     run = { ...loaded, evidence }; report = undefined
   }
   function render() {
+    Promise.resolve(onConnectionChange({ api, capabilities, workspaceId: workspace, mode: connectionMode, identityId: connectionIdentity })).catch(error => {
+      byId('backend-error').textContent = error.message; byId('backend-error').hidden = false
+    })
     const review = byId('backend-review'); review.replaceChildren(node('h3', 'Manual investigation plan'))
     byId('workspace-controls').hidden = !api
     for (const id of ['connect-form', 'new-workspace']) for (const el of byId(id).elements) el.disabled = busy
@@ -186,7 +192,7 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
       const caps = await candidate.json('/capabilities')
       if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('Unsupported API contract or policy version.')
       await candidate.json('/workspaces') // Authenticate before retaining the client.
-      api = candidate; capabilities = caps; workspace = ''; reset(); await workspaces()
+      api = candidate; capabilities = caps; connectionMode = 'local_owner'; connectionIdentity = 'local-owner:' + crypto.randomUUID(); workspace = ''; reset(); await workspaces()
       byId('connection-status').textContent = `Connected · DB-SC-1 / GF-2. Baseline discovery: ${available() ? 'available; each result is checked separately' : 'unavailable'}. ${liveGeminiAvailable(capabilities) ? `Gemini (${capabilities.gemini.model}) is enabled for separately approved image intake and explanations. Manual scientific runs make no model-provider calls.` : 'Gemini remains disabled. No model-provider calls are made by this manual workflow.'}`
     })
   })
@@ -201,27 +207,30 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
     })
   })
   render()
-  // The public preview supplies a restricted demo identity at its server-side
-  // gateway. Its app credential never reaches JavaScript or browser storage.
+  // GPT1's bootstrap is the only automatic-authentication boundary. It returns
+  // nonsecret metadata and a cookie transport; shared-demo is never a fallback.
   ;(async () => {
-    let session
+    let shared
     try {
-      const result = await fetch('/api/bean/v1/shared-session', { credentials: 'omit', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(5000) })
-      if (result.status !== 200) return
-      session = await result.json()
-    } catch { return }
-    if (session?.mode !== 'shared_demo' || session.credentials !== 'server_managed') return
+      shared = await bootstrapSharedSession()
+      if (!shared) return // The local owner boundary alone returns 404.
+    } catch (error) {
+      connectionMode = 'session_error'; byId('connect-form').hidden = true
+      byId('connection-status').textContent = 'The private browser session could not be established. Reload after the server is available.'
+      byId('backend-error').textContent = error.message; byId('backend-error').hidden = false
+      render(); return
+    }
     byId('connect-form').hidden = true
-    byId('connection-panel').querySelector('summary').textContent = 'Shared demo workspace'
-    byId('connection-panel').querySelector('p').textContent = 'Open and work together. Everyone with this link can see and change the demo data. Your private workspaces are separate; Gemini uses the server owner’s key and shared trial allowance.'
-    byId('connection-panel').open = true
+    byId('connection-panel').querySelector('summary').textContent = 'Private workspace connection'
+    byId('connection-panel').querySelector('p').textContent = 'Your browser has a private workspace. Gemini uses the server owner’s configuration and shared application allowance. No access token or Gemini key is entered here.'
     await perform(async () => {
-      const candidate = new BeanApi(null)
+      const candidate = shared.api
       const caps = await candidate.json('/capabilities')
       if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('Unsupported shared server.')
-      await candidate.json('/workspaces')
-      api = candidate; capabilities = caps; workspace = ''; reset(); await workspaces(true)
-      byId('connection-status').textContent = 'Connected automatically to the shared demo. No API key or access token is needed.'
+      api = candidate; capabilities = caps; connectionMode = 'browser_session'
+      connectionIdentity = 'browser-session:' + shared.session.workspace_id
+      workspace = shared.session.workspace_id; reset(); await workspaces()
+      byId('connection-status').textContent = 'Connected automatically to your private workspace. No API key or access token is needed.'
     })
   })()
   return render
