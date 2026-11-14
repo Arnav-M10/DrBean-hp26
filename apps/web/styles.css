@@ -59,7 +59,7 @@ pre { font-family: var(--mono); font-size: var(--t-xs); white-space: pre-wrap; o
 sup { line-height: 0; }
 
 h1, h2, h3 { text-wrap: balance; }
-p { text-wrap: pretty; }
+p { text-wrap: pretty; max-inline-size: 75ch; }
 h1 { font-weight: 650; font-size: var(--t-2xl); line-height: 1.2; letter-spacing: -.025em; }
 h2 { font-size: var(--t-lg); line-height: 1.3; font-weight: 680; }
 h3 { font-size: var(--t-md); line-height: 1.35; font-weight: 680; }
@@ -82,7 +82,7 @@ h2 + p, h3 + p, h4 + p { margin-top: var(--s1); color: var(--ink-2); }
 /* Same semantic step navigation, expressed as a compact top index. */
 .shell { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s6); width: min(68rem, 100% - 3rem); margin: var(--s5) auto var(--s7); align-items: start; }
 main { min-width: 0; width: 100%; }
-main:focus { outline: none; }
+main:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; }
 
 .steps { position: static; min-width: 0; border-bottom: 1px solid var(--rule); }
 .steps ol { list-style: none; margin: 0; padding: 0; }
@@ -102,7 +102,6 @@ main:focus { outline: none; }
 #step-list > li[data-current] .step-n { color: var(--act); }
 #step-list > li[data-current] .step-name { color: var(--ink); font-weight: 650; }
 .substeps { display: flex; flex-wrap: wrap; gap: var(--s3); margin: 0 0 var(--s2) !important; }
-#step-list > li:not([data-current]) .substeps { display: none; }
 .substeps a { display: block; padding: .35rem 0; font-size: var(--t-sm); text-decoration: none; color: var(--ink-3); }
 .substeps a[aria-current] { color: var(--act); font-weight: 600; text-decoration: underline; }
 .steps-note { margin-block: var(--s2); font-size: var(--t-sm); color: var(--ink-3); }
@@ -166,6 +165,8 @@ label { font-weight: 600; }
 .stack input, .stack textarea, .stack select { margin-top: var(--s1); font-weight: 400; }
 input[type='text'], input[type='password'], input:not([type]), textarea, select { display: block; width: 100%; min-height: 2.75rem; padding: .5rem .65rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-strong); border-radius: var(--r-ctl); }
 input[type='file'] { display: block; margin-top: var(--s1); font: inherit; max-width: 100%; }
+input[type='file']::file-selector-button { min-height: 2.75rem; padding: .5rem .8rem; margin-inline-end: .75rem; font: inherit; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-strong); border-radius: var(--r-ctl); cursor: pointer; }
+input[type='file']:disabled::file-selector-button, .button.file-button:has(input:disabled) { color: var(--ink-3); background: var(--sunken); border-color: var(--rule); cursor: not-allowed; }
 textarea { resize: vertical; min-height: 4rem; }
 input::placeholder, textarea::placeholder { color: var(--ink-3); opacity: 1; }
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 0; border-color: var(--focus); }
@@ -181,11 +182,11 @@ fieldset.group > legend { font-size: var(--t-lg); font-weight: 680; padding: 0; 
 .bound.target legend { color: var(--claim); }
 .bound-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 .bound-pair .stack { margin-top: 0; font-weight: 500; font-size: var(--t-sm); }
-details > summary { cursor: pointer; font-weight: 600; min-height: 2rem; display: list-item; }
+details > summary { cursor: pointer; font-weight: 600; min-height: 2.75rem; display: list-item; }
 details[open] > summary { margin-bottom: var(--s2); }
 
 /* ---------- Tables ---------- */
-.table-region { overflow: auto; border: 1px solid var(--rule); border-radius: var(--r-ctl); max-width: 100%; }
+.table-region { position: relative; overflow: auto; border: 1px solid var(--rule); border-radius: var(--r-ctl); max-width: 100%; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .edit-table { min-width: 36rem; }
 th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
@@ -287,7 +288,7 @@ td.num, th.num { text-align: right; }
 .retained-file + .retained-file { border-top: 1px solid var(--rule); margin-top: var(--s4); padding-top: var(--s2); }
 .general-disclosure, .general-citation-panel, .general-mapping-review { margin-top: var(--s4); padding: var(--s4) 0; border-top: 1px solid var(--rule); }
 .general-statement { border-bottom: 1px solid var(--rule); padding-bottom: var(--s3); }
-.citation-link { margin: 0 var(--s2) var(--s2) 0; font-size: var(--t-sm); min-height: 2.25rem !important; }
+.citation-link { margin: 0 var(--s2) var(--s2) 0; font-size: var(--t-sm); min-height: 2.75rem !important; }
 .general-control-label { border-left: 4px solid var(--wait); padding-left: var(--s3); }
 #general-history button { margin: var(--s1); }
 #general-workspace { min-width: 0; overflow-wrap: anywhere; }
@@ -302,7 +303,7 @@ dd { overflow-wrap: anywhere; }
 .import-preview { flex: 0 0 100%; min-width: 0; border-top: 1px solid var(--rule); padding-top: var(--s3); }
 .import-preview > * + * { margin-top: var(--s2); }
 
-.sr-only, .skip:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sr-only, .skip:not(:focus) { position: absolute; inset: 0 auto auto 0; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .skip:focus { position: fixed; z-index: 10; top: var(--s2); left: var(--s2); padding: var(--s2) var(--s3); background: var(--surface); }
 
 /* ---------- Narrow screens ---------- */
@@ -339,8 +340,8 @@ dd { overflow-wrap: anywhere; }
    use the native instant disclosure rather than a JavaScript height wrapper. */
 @supports (interpolate-size: allow-keywords) {
   details { interpolate-size: allow-keywords; }
-  details::details-content { block-size: 0; overflow: clip; opacity: .25; transition: block-size var(--motion-panel) var(--motion-ease), content-visibility var(--motion-panel) allow-discrete, opacity var(--motion-panel) ease; }
-  details[open]::details-content { block-size: auto; opacity: 1; }
+  details::details-content { block-size: 0; overflow: clip; transition: block-size var(--motion-panel) var(--motion-ease), content-visibility var(--motion-panel) allow-discrete; }
+  details[open]::details-content { block-size: auto; }
 }
 
 @media (forced-colors: active) {

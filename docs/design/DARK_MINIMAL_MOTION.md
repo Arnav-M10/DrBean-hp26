@@ -53,14 +53,73 @@ read credentials or change application/scientific state.
 
 ## References and verification
 
-Read Anthropic frontend-design and webapp-testing, Vercel Web Interface Guidelines,
-and Impeccable4.9.1 craft-floor/Operate/animation playbooks. Use compatible plain
-browser guidance; no framework migration. Impeccable context binary was not
-installed/run. Apple's motion reference was requested but network policy refused
-developer.apple.com; do not claim a successful retrieval.
+Read [Anthropic frontend-design](https://github.com/anthropics/skills/tree/main/skills/frontend-design)
+and [webapp-testing](https://github.com/anthropics/skills/tree/main/skills/webapp-testing),
+[Vercel Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines),
+and [Impeccable4.9.1](https://github.com/pbakaus/impeccable) craft-floor, Operate,
+animate, adapt, typeset, quieter, harden, polish, audit and optimize guidance.
+Use compatible plain-browser guidance; no framework migration. Impeccable's
+context/detector binary was not installed/run. The [Apple motion reference](https://developer.apple.com/design/human-interface-guidelines/motion)
+was requested but network policy refused its host; retrieval is not claimed.
 
-Verification in progress: actual rendered phone/tablet/laptop/200% views, keyboard,
-rapid navigation, native disclosures, reduced motion, long text, empty/error states,
-ordinary launcher/science/download path, and existing web checks. Screenshots and
-receipts are stored under ignored `var/design-evidence/`; final PR records exact SHA
-and actual results. This design change grants no new scientific/live qualification.
+## Observed verification and reproduction
+
+[PR49](https://github.com/Arnav-M10/DrBean-hp26/pull/49) records exact tested SHA
+and CI. Local prepared runtimes: backend3.12.14, engine3.11.18, Chromium and pinned
+Playwright1.63. No model requests. Existing test predicates remain unchanged.
+
+```sh
+node --test apps/web/*.test.mjs
+NODE_PATH="$PWD/tests/integration/node_modules" CHROMIUM_PATH=/usr/bin/chromium \
+  node apps/web/check-motion.mjs
+BEAN_DESIGN_CAPTURE_DIR="$PWD/var/design-evidence/science" \
+  NODE_PATH="$PWD/tests/integration/node_modules" CHROMIUM_PATH=/usr/bin/chromium \
+  node apps/web/check-research.mjs
+BEAN_DESIGN_CAPTURE_DIR="$PWD/var/design-evidence/science" \
+  NODE_PATH="$PWD/tests/integration/node_modules" CHROMIUM_PATH=/usr/bin/chromium \
+  BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python" \
+  BEAN_COUNTERDEX_REPLAY_PYTHON="$PWD/.venv-engine/bin/python" \
+  node apps/web/check-backend.mjs
+NODE_PATH="$PWD/tests/integration/node_modules" CHROMIUM_PATH=/usr/bin/chromium \
+  node tests/integration/shared-session-browser.mjs
+```
+
+-81 web checks pass. Design runner9 grouped checks pass at320/390/834/1440px:
+  keyboard focus, validation, long CSV names/values, native disclosures, rapid
+  navigation and Back/Forward,200% CSS zoom/reflow, empty/unavailable states,
+  preference changes, activity deduplication and response-only download feedback.
+  Its API failure and hook probes are explicitly labelled presentation fixtures.
+- Real launcher/browser agent path7 checks passes: two separate approvals,
+  actual baseline/design, both native downloads and fresh installed-engine replay.
+- Preserved manual browser path passes: changed input, real discoveries,
+  separately approved positive/no-separation designs, follow-up, retained native
+  evidence and fresh replay. Optional screenshots run only after existing assertions.
+- Actual private HTTPS/browser path16 checks passes; zero provider attempts and
+  API/browser outbound requests. No session/proxy/approval/ledger changes.
+- Rendered token contrast:body16.01:1; secondary9.66; helper6.76;
+  placeholder/disabled6.15; semantic text6.94–8.69; focus11.23;
+  control borders3.81; plot lines8.47–9.98 on raised surfaces.
+- Chromium layout CPU across each scripted viewport's interactions/captures:
+  53–84ms total, style38–73ms total. This is an observed local trace, not a
+  cross-device frame-rate or Core Web Vitals claim. Motion module is5.7KB source,
+  no request/dependency/font imports and no permanent animation loop.
+
+The checks found and fixed a genuinely overflowing absolutely positioned screen
+reader label inside the narrow table, and preserved secondary step links needed
+by the manual path. They do not hide overflowing scientific data or weaken tests.
+
+Selected before/after/real-result captures and receipts: [evidence](evidence/README.md).
+Other captures remain under ignored `var/design-evidence/`. Screenshots are review
+evidence, not pixel-locked regression goldens. No live/scientific release claim.
+
+## Integration boundary and limits
+
+Owner1 integrates this design PR with automatic access/PR47 and journey/PR48,
+preserving Owner3's copy/structure and the small registered hooks. Retest the
+actual resulting tree; separate branch passes are not combined acceptance.
+Only study/result appearance and motion are owned here. No unrelated branches
+were merged. No physical phone, Safari/WebKit, screen-reader session or live
+Gemini qualification was run. Engines without intrinsic-size disclosure animation
+use normal instant details; missing WAAPI leaves navigation/content operational.
+Optional `BEAN_DESIGN_RECORD_VIDEO=1` needs the pinned Playwright ffmpeg binary;
+normal design acceptance and screenshots do not require it.

@@ -9,6 +9,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { captureDesign } from './design-capture.mjs'
 
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -111,6 +112,7 @@ try {
   const approve = panel.getByRole('button', { name: 'Approve exact operation and continue', exact: true })
   assert.equal(await approve.isDisabled(), true)
   check('real-maintained-plan-and-canonical-interrupt-do-not-authorize-a-child')
+  await captureDesign(page, 'agent-investigation-review')
   await panel.getByLabel('I approve only this frozen scientific scope and its limits.', { exact: true }).check()
   await approve.click()
   await panel.getByRole('button', { name: 'Plan next step for separate review', exact: true }).waitFor({ timeout: 140000 })
@@ -118,6 +120,7 @@ try {
   assert.equal(session.state, 'completed')
   assert.equal(session.children.length, 1)
   assert.equal(session.reports.length, 1)
+  await captureDesign(page, 'agent-baseline-report')
   await panel.getByRole('button', { name: 'Plan next step for separate review', exact: true }).click()
   await panel.getByRole('heading', { name: 'Review the separate pair-design operation', exact: true }).waitFor({ timeout: 140000 })
   session = await api(`/research-sessions/${session.id}`)
@@ -131,6 +134,7 @@ try {
   assert.deepEqual(session.pending_review.body.request.candidate_ids, baseline.body.result.candidates.map(candidate => candidate.id))
   assert.equal(await approve.isDisabled(), true)
   check('approved-real-baseline-read-by-agent-leads-to-separate-bound-pair-design-review')
+  await captureDesign(page, 'agent-separate-design-review')
   await panel.getByLabel('I approve only this frozen scientific scope and its limits.', { exact: true }).check()
   await approve.click()
   await page.waitForFunction(() => document.querySelector('#durable-research').textContent.includes('State: completed'), null, { timeout: 140000 })
@@ -139,6 +143,7 @@ try {
   assert.ok(session.children.every(child => child.state === 'completed'))
   assert.equal(session.reports.length, 2)
   check('separate-design-approval-computes-design-and-accepts-evidence-bound-report')
+  await captureDesign(page, 'agent-design-report')
   const [download] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'Download research report snapshot', exact: true }).last().click()])
   await download.saveAs(join(output, 'report.json'))
   const report = JSON.parse(await readFile(join(output, 'report.json'), 'utf8')).body

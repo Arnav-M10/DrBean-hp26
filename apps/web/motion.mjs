@@ -27,7 +27,7 @@ export function installMotion(doc = document) {
       const key = chart.outerHTML
       if (charts.has(key)) continue
       charts.add(key); if (charts.size > 64) charts.delete(charts.values().next().value)
-      play(chart, [{ opacity: .55 }, { opacity: 1 }])
+      play(chart, [{ opacity: .85 }, { opacity: 1 }])
     }
   }
   function activity(list) {
@@ -41,7 +41,7 @@ export function installMotion(doc = document) {
       seen.add(id)
       // Existing/reopened history is immediately readable. Only newly joined
       // events on an established stream get bounded feedback.
-      if (!initial && count < 4) play(item, [{ opacity: .45, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], MOTION.event, count++ * 24)
+      if (!initial && count < 4) play(item, [{ opacity: .85, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], MOTION.event, count++ * 24)
     }
     while (seen.size > 256) seen.delete(seen.values().next().value)
     while (streams.size > 24) streams.delete(streams.keys().next().value)
@@ -52,7 +52,7 @@ export function installMotion(doc = document) {
     if (next && next !== page) {
       const order = [...doc.querySelectorAll('.page')], direction = order.indexOf(next) < order.indexOf(page) ? -1 : 1
       if (page) byElement.get(page)?.cancel()
-      if (page) play(next, [{ opacity: .7, transform: `translateX(${direction * 6}px)` }, { opacity: 1, transform: 'none' }])
+      if (page) play(next, [{ opacity: .88, transform: `translateX(${direction * 6}px)` }, { opacity: 1, transform: 'none' }])
       page = next
     }
     if (next) revealCharts(next)
