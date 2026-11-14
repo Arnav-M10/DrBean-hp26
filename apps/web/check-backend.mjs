@@ -170,6 +170,7 @@ try {
   const plan = await api(`/records/${run.plan_id}`)
   assert.equal(plan.body.scientific_profile, 'counterdex.v1')
   assert.equal(plan.body.objective.version, 'research-objective.v1')
+  assert.equal(plan.body.objective.question, 'Changed after source preview', 'the exact reviewed source question must survive materialization')
 
   async function downloadAndReplay(result, name, design = false) {
     const reference = result.artifacts[0]
