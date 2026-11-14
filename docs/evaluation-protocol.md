@@ -37,6 +37,68 @@ The audit pair (reference A=9.041075603155, ke=0.122, ka=3.54; outside A=8.26797
 
 Three defenses stay distinct: a wrong expected identity fails **binding**; a changed byte fails **integrity**; a mathematically false enclosure with internal hashes recomputed in the test fails **fresh computation**. For the mutation the real original anchor rejects the packet first; a deliberately changed test-only anchor is then supplied solely to reach the mathematical check. That diagnostic sacrifices packet authentication on purpose and authenticates nothing. Endpoint equality is inside the closed claim; touching bands (allowance equal to half the computed centre gap) give a non-positive exact margin and no selection.
 
+## Four evidence lanes for the paper, Gemini and Deep Agents sprint (`cli.py lanes`)
+
+These four lanes sit alongside the manifest lanes above. None may stand in for another. Every report is appended, hash-chained, to `evaluation/results/lanes/reports.jsonl`, and its artifacts (JUnit XML, guard summary) sit in a directory of their own.
+
+| Lane | Model | Science | Command | Establishes | Does not establish |
+|---|---|---|---|---|---|
+| `controlled_callbacks` | controlled doubles authored by the tests | controlled callbacks, in-process application | `cli.py lanes run --lane controlled_callbacks` (pytest `-m "not real_stack and not real_science"`) | authority, review, accounting and error handling | Gemini quality, live adaptivity, real computation |
+| `controlled_science` | controlled or none; zero dispatch verified | actual Counterdex through the launched API and worker | `cli.py lanes run --lane controlled_science` (pytest `-m "real_stack or real_science"`) | orchestration and real scientific integration over HTTP | anything about live Gemini |
+| `live_gemini` | live Gemini | actual tools and engine | **no command**; reported `not_run` | real extraction and decisions on a predeclared subset, inside one user-enabled budget | general accuracy |
+| `historical_replay` | none | fresh `replay-native` of retained packets against their separately recorded anchors | `cli.py lanes run --lane historical_replay` | retained bytes still bind and replay under this checker | discovery, fresh inference, or that the application produced the packet now |
+
+### What every report records
+
+- **Source identity and versions:**
+  - the commit and the dirty flag (changed paths included);
+  - the source identity, which is the git tree digests of the application (`apps`, `packages`, `shared`, `scripts`, `pyproject.toml`, `uv.lock`), the harness (`evaluation`, `tests/integration`, minus evidence-only paths) and `fixtures`, plus the Counterdex source digest;
+  - every backend `*VERSION` constant (prompt, policy, contract and projection versions), the contracts tree digest, dependency pins and installed package versions;
+  - the repository engine identity, and the installed engine compared with it file by file;
+  - fixture digests and the platform.
+- **Requests and usage:**
+  - External model requests count as a verified zero only when the egress guard was installed in every process, including each launched stack, whose guard log is kept, and recorded no blocked attempt.
+  - Deliberate guard self-tests announce their probes and are listed separately.
+  - Otherwise the count is `unknown`, or `attempted_and_blocked`.
+  - Provider tokens are never written as zero. They are `not_applicable` when no request was dispatched.
+  - Controlled double calls are `not_measured`.
+- **Run record:**
+  - the command with its exit status, timestamps and duration;
+  - the preconditions: the installed engine equals the repository source, and the source identity was unchanged during the run;
+  - per-test outcomes (`passed`, `failed`, `xfailed`, `not_available`, `harness_pending`).
+
+### The `evidence_lanes` gate
+
+This gate is required. Each required lane is decided by its newest report whose four identity digests equal the tested checkout's.
+- Reports from another identity never count, even if they are newer.
+- A dirty or preview newest report blocks the lane.
+- A failed newest report fails it, and a later clean pass supersedes it.
+- A broken hash chain or a changed artifact fails the gate.
+- `live_gemini` is listed as `not_run` and is not required.
+
+`NOT_AVAILABLE` means a capability is not advertised by this candidate. `HARNESS_PENDING` means the capability is advertised but its attack has not been written yet. Both are counted separately from passes and product failures.
+
+## Paper corpus, scoring and attack matrix
+
+- **Corpus (`evaluation/corpus/`).**
+  - At least six development documents (Owner 4 renders them from Owner 1's data; awaited).
+  - Four independently authored synthetic held-aside variants (H1–H4), sealed by digest in `holdouts.sealed.json`. The files themselves are git-ignored until the freeze.
+  - Gold comes from independent Apple PDFKit renderings (`tools/render_pages.swift`). Every native-text quote must be found on its cited page.
+  - The live subset is predeclared and `not_run`.
+- **Scoring (`drbean_eval/paper_scoring.py`).** Each measure is a numerator and denominator with its failures listed, compared exactly with `Fraction`:
+  - reading precision and coverage, for what was offered and for what was accepted after review;
+  - page locators;
+  - citation source occurrence;
+  - unsupported numbers;
+  - ambiguity flagging versus silent resolution;
+  - trap violations (interval, SD, pooled mean, injected value, authority);
+  - human corrections;
+  - eligibility.
+- **Attacks (`evaluation/attack_matrix.json`).**
+  - Ten categories, each with the tests that already observe it on the current candidate and the tests waiting for paper, metered-model or resume capabilities.
+  - Hostile PDF assets (`drbean_eval/hostile_pdfs.py`, 19 assets and 10 hostile filenames) are generated at test time.
+  - Library-level controlled attacks on the metered gateway and the paper-proposal validator run wherever those modules exist. Today that is the PR #35 preview.
+
 ## Zero external model dispatch: how it is proved
 
 - Every launched process loads `evaluation/drbean_eval/guard/sitecustomize.py`: an audit hook refuses non-loopback DNS and connections, and a spy refuses construction of `google.genai.Client` (which LangChain's Gemini model also builds). SDK imports, types and schemas stay allowed. Every refusal is logged; an attempt is a **P0 finding even though nothing left the machine**.

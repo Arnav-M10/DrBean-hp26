@@ -1787,7 +1787,7 @@
       "id": "H-LANE-ENGINE-PRECONDITION",
       "severity": "P2",
       "owner": "5 (harness)",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "Lane reports judged the engine precondition by the engine interpreter's installed copy, so checkouts without one (preview worktrees) were reported failed although the application ran the repository source",
       "minimal_input": "python3.11 evaluation/cli.py lanes run --lane controlled_callbacks --app-repo <worktree without .venv-engine> --results evaluation/results/previews/pr35-3a7816e",
       "command": "same; then inspect preconditions in evaluation/results/previews/pr35-3a7816e/lanes/reports.jsonl",
@@ -1801,7 +1801,21 @@
           "lane_95503c92ead24a0d"
         ],
         "regression": "evaluation/tests/test_lanes.py::EnginePreconditionTests"
-      }
+      },
+      "retests": [
+        {
+          "at_commit": "harness e12c512 against previews 3a7816e (PR #35) and d0148aa (PR #33)",
+          "result": "The same preview runs now pass their preconditions (application import resolves the repository source; no installed copy in the worktree interpreter). Closed by retest.",
+          "evidence": {
+            "reports": [
+              "lane_1c86a89352b248ec",
+              "lane_65fd953469e04b65",
+              "lane_14457236e1b143be",
+              "lane_e403723180574529"
+            ]
+          }
+        }
+      ]
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main).",
