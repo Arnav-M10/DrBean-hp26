@@ -291,12 +291,13 @@ try {
   await page.getByRole('button', { name: 'Prepare follow-up investigation plan', exact: true }).click()
   await page.locator('#followup-approve-scope').check()
   await page.getByRole('button', { name: 'Approve reviewed follow-up', exact: true }).click()
-  const [followupResponse] = await Promise.all([
-    page.waitForResponse(response => response.request().method() === 'POST' && /\/plans\/[^/]+\/runs$/.test(new URL(response.url()).pathname)),
-    page.getByRole('button', { name: 'Queue approved follow-up', exact: true }).click(),
-  ])
-  const followupId = (await followupResponse.json()).id
-  await page.waitForFunction(id => document.querySelector('#backend-investigations').textContent.includes(id + ' · execution:'), followupId)
+  await page.getByRole('button', { name: 'Queue approved follow-up', exact: true }).click()
+  await page.waitForFunction(baselineId => {
+    const status = document.querySelector('#backend-investigations [role="status"]')?.textContent
+    const match = status?.match(/^(run_[a-zA-Z0-9]+) · execution:/)
+    return match && match[1] !== baselineId
+  }, run.id)
+  const followupId = (await page.locator('#backend-investigations [role="status"]').textContent()).match(/^(run_[a-zA-Z0-9]+)/)[1]
   assert.equal(new URL(page.url()).hash, '#investigations')
   let followupRun
   for (let attempt = 0; attempt < 150; attempt++) {
