@@ -50,7 +50,8 @@ def test_corrected_source_value_reaches_real_science_and_replays(stack_factory, 
     source = upload.json()
 
     request = {"execution_mode": "controlled", "source_id": source["id"], "expected_source_digest": source["body"]["sha256"]}
-    proposal = client.post(f"/workspaces/{workspace}/intake-proposals", request, label="proposal")
+    proposal_key = client.new_key("proposal")
+    proposal = client.post(f"/workspaces/{workspace}/intake-proposals", request, key=proposal_key)
     body = proposal["body"]
     checks.expect("controlled_authorship_is_explicit", body.get("authorship") == "controlled_fixture"
                   and body.get("status") == "controlled_example"
@@ -58,7 +59,7 @@ def test_corrected_source_value_reaches_real_science_and_replays(stack_factory, 
                   f"authorship {body.get('authorship')}, status {body.get('status')}")
     checks.expect("no_provider_attempt_for_a_controlled_proposal", "provider_attempt_id" not in body
                   and client.get(f"/workspaces/{workspace}/provider-attempts") == [], "provider ledger stays empty")
-    again = client.post(f"/workspaces/{workspace}/intake-proposals", request, label="proposal-retry")
+    again = client.post(f"/workspaces/{workspace}/intake-proposals", request, key=proposal_key)  # same operation
     checks.expect("retried_proposal_is_the_same_record", again == proposal, f"{again.get('id')} vs {proposal['id']}")
 
     reviewed = []
