@@ -573,7 +573,8 @@ function renderOverview() {
       <button type="button" class="primary" data-action="setup" data-kind="${kind}" data-source="${s.index}" data-table="${f.t}"${off ? ' disabled' : ''}>${CHECKS[kind].button}</button></li>`
   })
   const reader = gen.limits().analysisMode === 'controlled' ? 'The local test responder' : 'Gemini'
-  items.push(`<li${aiBlock ? ' class="off"' : ''}><div><h3>Ask the assistant</h3><p>${escapeHTML(aiBlock ?? `${reader} reads ${sources.filter(s => s.asset).length === 1 ? 'the file' : 'all the files'} and answers your question with quotes from them. The answer is not checked.`)}</p></div>
+  const one = sources.filter(s => s.asset).length === 1
+  items.push(`<li${aiBlock ? ' class="off"' : ''}><div><h3>Ask the assistant</h3><p>${escapeHTML(aiBlock ?? `${reader} reads ${one ? 'the file' : 'all the files'} and answers your question with quotes from ${one ? 'it' : 'them'}. The answer is not checked.`)}</p></div>
     <button type="button" class="${checks.length ? 'secondary' : 'primary'}" data-action="ask"${aiBlock ? ' disabled' : ''}>Ask the assistant</button></li>`)
   $('can-do').innerHTML = items.join('')
   const loose = found.flatMap(s => s.found.filter(f => !f.checks.length).map(f => ({ s, f })))
