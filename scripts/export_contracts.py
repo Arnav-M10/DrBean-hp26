@@ -20,6 +20,7 @@ from bean_api.conversation import (  # noqa: E402
     AssistantOutput, AssistantProposalRecord, AssistantProposalRecordBody,
     AssistantResponseRecordBody, DesignDraft, ObservationDraft,
 )
+from bean_api.research_contracts import PUBLIC_RESEARCH_SCHEMAS, RESEARCH_VERSION  # noqa: E402
 
 
 def write_json(path: Path, value: object) -> None:
@@ -28,6 +29,11 @@ def write_json(path: Path, value: object) -> None:
 
 
 def main() -> None:
+    research_destination = ROOT / "shared" / "contracts" / RESEARCH_VERSION
+    for name, model in sorted(PUBLIC_RESEARCH_SCHEMAS.items()):
+        schema = model.model_json_schema()
+        schema.update({"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": f"urn:dr-bean:{RESEARCH_VERSION}:{name}"})
+        write_json(research_destination / f"{name}.schema.json", schema)
     destination = ROOT / "shared" / "contracts" / CONTRACT_VERSION
     schemas = {**PUBLIC_SCHEMAS, **{model.__name__: model for model in (
         AssistantOutput, AssistantProposalRecord, AssistantProposalRecordBody,

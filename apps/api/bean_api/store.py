@@ -22,7 +22,7 @@ class Store:
     calls must happen after the transaction closes.
     """
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, path: str | Path):
         self.path = str(Path(path).resolve())
@@ -51,6 +51,11 @@ class Store:
                 conn.executescript("BEGIN IMMEDIATE;\n" + migration.read_text() + "\nCOMMIT;")
                 conn.execute("INSERT OR IGNORE INTO schema_migrations VALUES (?, ?)", (1, utc_now()))
                 conn.execute("PRAGMA user_version=1")
+            if version < 2:
+                research = migration.with_name("0002_research.sql")
+                conn.executescript("BEGIN IMMEDIATE;\n" + research.read_text() +
+                    "\nINSERT OR IGNORE INTO schema_migrations VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ','now'));"
+                    "\nPRAGMA user_version=2;\nCOMMIT;")
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:

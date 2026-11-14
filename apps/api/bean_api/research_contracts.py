@@ -4,15 +4,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal, Protocol
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, StringConstraints, model_validator
 
-from .contracts import Digest, ExplicitTrue, Identifier, StrictModel
+from .contracts import AllowanceOrigin, Digest, ExplicitTrue, Identifier, Rational, StrictModel
 
 RESEARCH_VERSION = "DB-RESEARCH-1"
 CHECKPOINT_VERSION = "research-checkpoint.v1"
 ACTION_POLICY = "research-action.v1"
 SESSION_POLICY = "research-session.v1"
 ResearchMode = Literal["controlled", "live"]
+
+
+class ResearchDesignConstraints(StrictModel):
+    feasible_times: list[Rational] = Field(min_length=1, max_length=64)
+    future_hard_allowance: Rational
+    maximum_horizon: Rational
+    allowance_origin: AllowanceOrigin
+    requested_tier: Literal["numerical_guidance", "checked_pair_separation"]
+    allow_construction: bool = False
+    allow_continuation: bool = False
+
+    @model_validator(mode="after")
+    def valid_grid(self):
+        from fractions import Fraction
+        if Fraction(self.future_hard_allowance) <= 0 or Fraction(self.maximum_horizon) <= 0:
+            raise ValueError("Future allowance and horizon must be positive")
+        if len(set(self.feasible_times)) != len(self.feasible_times) or any(not 0 < Fraction(t) <= Fraction(self.maximum_horizon) for t in self.feasible_times):
+            raise ValueError("Future times must be unique, positive and within the horizon")
+        if self.allow_continuation and not self.allow_construction:
+            raise ValueError("Continuation requires construction permission")
+        return self
 
 
 class ResearchBudget(StrictModel):
@@ -32,6 +53,15 @@ class ResearchCreate(StrictModel):
     source_ids: list[Identifier] = Field(default_factory=list, max_length=5)
     mode: ResearchMode = "controlled"
     provider_consent_id: Identifier | None = None
+    design_constraints: ResearchDesignConstraints | None = None
+
+    @model_validator(mode="after")
+    def bindings(self):
+        if bool(self.problem_id) != bool(self.expected_problem_digest):
+            raise ValueError("problem_id and expected_problem_digest must be supplied together")
+        if len(set(self.source_ids)) != len(self.source_ids):
+            raise ValueError("source_ids must be unique")
+        return self
 
 
 class ResearchAdvance(StrictModel):
@@ -67,6 +97,24 @@ class ResearchPlanStep(StrictModel):
 class ResearchPlanRevision(StrictModel):
     version: Literal["research-plan.v1"] = "research-plan.v1"
     steps: list[ResearchPlanStep] = Field(max_length=32)
+
+    @model_validator(mode="after")
+    def dependencies_exist(self):
+        ids = {step.id for step in self.steps}
+        if len(ids) != len(self.steps):
+            raise ValueError("Plan step IDs must be unique")
+        pending = {step.id: set(step.dependencies) for step in self.steps}
+        for step, deps in pending.items():
+            if not deps <= ids or step in deps:
+                raise ValueError("Plan dependencies must reference other existing steps")
+        resolved: set[str] = set()
+        while pending:
+            ready = {step for step, deps in pending.items() if deps <= resolved}
+            if not ready:
+                raise ValueError("Plan dependencies must be acyclic")
+            resolved |= ready
+            pending = {step: deps for step, deps in pending.items() if step not in ready}
+        return self
 
 
 class ResearchEvent(StrictModel):
@@ -107,13 +155,14 @@ class ResearchPorts(Protocol):
     Every method is async. Non-idempotent model attempts consume admission before
     dispatch; child operations journal intent and reuse the same canonical job.
     """
+    async def check_authority(self) -> None: ...
     async def context(self) -> dict[str, Any]: ...
     async def update_plan(self, plan: dict[str, Any]) -> dict[str, Any]: ...
     async def prepare_investigation(self) -> dict[str, Any]: ...
     async def prepare_design(self, constraints: dict[str, Any]) -> dict[str, Any]: ...
     async def prepare_followup(self) -> dict[str, Any]: ...
     async def require_review(self, review_id: str, review_digest: str) -> dict[str, Any]: ...
-    async def execute_child(self, review_id: str) -> dict[str, Any]: ...
+    async def execute_child(self, review_id: str, expected_review_digest: str) -> dict[str, Any]: ...
     async def read_evidence(self, evidence_id: str) -> dict[str, Any]: ...
     async def request_clarification(self, fields: list[str], reason: str) -> dict[str, Any]: ...
     async def publish_report(self) -> dict[str, Any]: ...
@@ -122,6 +171,6 @@ class ResearchPorts(Protocol):
 
 
 PUBLIC_RESEARCH_SCHEMAS = {model.__name__: model for model in (
-    ResearchBudget, ResearchCreate, ResearchAdvance, ResearchDecision, ResearchReconcile,
+    ResearchBudget, ResearchCreate, ResearchAdvance, ResearchDecision, ResearchReconcile, ResearchDesignConstraints,
     ResearchPlanStep, ResearchPlanRevision, ResearchEvent,
 )}

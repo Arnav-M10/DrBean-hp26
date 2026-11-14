@@ -262,38 +262,44 @@ class Workflow:
         from .contracts import PlanBody
         body = PlanBody.model_validate(_body(body)).model_dump(mode="json")
         def action(conn: sqlite3.Connection) -> dict:
-            problem = self._get(conn, actor, body["problem_id"], "problem")
-            self._same_workspace(workspace_id, problem)
-            current = self.authorize(actor, workspace_id, conn)
-            if current["current_problem_id"] != problem["id"]:
-                raise DomainError("stale_revision", "Review the current problem before making a plan.", current_revision_id=current["current_problem_id"])
-            if body["problem_digest"] != problem["digest"] or body["dataset_id"] != problem["body"]["dataset_id"]:
-                raise DomainError("binding_mismatch", "The plan must bind the exact reviewed problem and dataset.", 422)
-            for scenario in body["scenarios"]:
-                target = self._get(conn, actor, scenario["problem_id"], "problem")
-                self._same_workspace(workspace_id, target)
-                if target["digest"] != scenario["problem_digest"]:
-                    raise DomainError("binding_mismatch", "A scenario problem digest does not match.", 422, ["scenarios"])
-            if body.get("followup"):
-                self._followup_context(conn, actor, body)
-            disclosure = body["provider_disclosure"]
-            for source_id in disclosure.get("source_asset_ids", []):
-                self._same_workspace(workspace_id, self._get(conn, actor, source_id, "source_asset"))
-            if disclosure["provider"] == "gemini":
-                permission = self._get(conn, actor, disclosure["permission_id"], "provider_consent")
-                self._same_workspace(workspace_id, permission)
-                consent = permission["body"]
-                if permission["created_by"] != actor or consent.get("accepted") is not True or any(
-                    consent.get(field) != disclosure[field] for field in ("provider", "model", "source_asset_ids", "context_fields")
-                ) or consent.get("problem_id") != body["problem_id"]:
-                    raise DomainError("provider_consent_mismatch", "Provider permission must cover this exact model, problem, source and context disclosure.", 403)
-            if body.get("parent_plan_id") is None and conn.execute(
-                "SELECT 1 FROM entities WHERE workspace_id=? AND kind='plan' AND digest=?",
-                (workspace_id, _digest("plan", body)),
-            ).fetchone():
-                raise DomainError("plan_ancestry_required", "An intentional rerun needs a new reviewed plan linked by parent_plan_id.", 422, ["parent_plan_id"])
-            return self._insert(conn, actor, workspace_id, "plan", body, body.get("parent_plan_id"))
+            return self._create_plan_in_transaction(conn, actor, workspace_id, body)
         return self._perform(actor, workspace_id, "create:plan", key, body, action)
+
+    def _create_plan_in_transaction(self, conn, actor, workspace_id, body):
+        """Canonical preparation reusable under a fenced research transaction."""
+        from .contracts import PlanBody
+        body = PlanBody.model_validate(_body(body)).model_dump(mode="json")
+        problem = self._get(conn, actor, body["problem_id"], "problem")
+        self._same_workspace(workspace_id, problem)
+        current = self.authorize(actor, workspace_id, conn)
+        if current["current_problem_id"] != problem["id"]:
+            raise DomainError("stale_revision", "Review the current problem before making a plan.", current_revision_id=current["current_problem_id"])
+        if body["problem_digest"] != problem["digest"] or body["dataset_id"] != problem["body"]["dataset_id"]:
+            raise DomainError("binding_mismatch", "The plan must bind the exact reviewed problem and dataset.", 422)
+        for scenario in body["scenarios"]:
+            target = self._get(conn, actor, scenario["problem_id"], "problem")
+            self._same_workspace(workspace_id, target)
+            if target["digest"] != scenario["problem_digest"]:
+                raise DomainError("binding_mismatch", "A scenario problem digest does not match.", 422, ["scenarios"])
+        if body.get("followup"):
+            self._followup_context(conn, actor, body)
+        disclosure = body["provider_disclosure"]
+        for source_id in disclosure.get("source_asset_ids", []):
+            self._same_workspace(workspace_id, self._get(conn, actor, source_id, "source_asset"))
+        if disclosure["provider"] == "gemini":
+            permission = self._get(conn, actor, disclosure["permission_id"], "provider_consent")
+            self._same_workspace(workspace_id, permission)
+            consent = permission["body"]
+            if permission["created_by"] != actor or consent.get("accepted") is not True or any(
+                consent.get(field) != disclosure[field] for field in ("provider", "model", "source_asset_ids", "context_fields")
+            ) or consent.get("problem_id") != body["problem_id"]:
+                raise DomainError("provider_consent_mismatch", "Provider permission must cover this exact model, problem, source and context disclosure.", 403)
+        if body.get("parent_plan_id") is None and conn.execute(
+            "SELECT 1 FROM entities WHERE workspace_id=? AND kind='plan' AND digest=?",
+            (workspace_id, _digest("plan", body)),
+        ).fetchone():
+            raise DomainError("plan_ancestry_required", "An intentional rerun needs a new reviewed plan linked by parent_plan_id.", 422, ["parent_plan_id"])
+        return self._insert(conn, actor, workspace_id, "plan", body, body.get("parent_plan_id"))
 
     def followup_context(self, actor: str, plan_body: dict) -> dict:
         """Resolve the approved fixed-pair lineage without consulting mutable drafts."""
@@ -392,26 +398,33 @@ class Workflow:
         plan = self.get(actor, plan_id, kind)
         request = {"plan_id": plan_id, "plan_digest": plan_digest, "expected_revision_id": expected_revision_id, "expires_seconds": expires_seconds}
         def action(conn: sqlite3.Connection) -> dict:
-            frozen = self._get(conn, actor, plan_id, kind)
-            if frozen["digest"] != plan_digest:
-                raise DomainError("binding_mismatch", "Approval does not match the exact previewed plan.", 422, ["plan_digest"])
-            expected = frozen["body"]["problem_id"] if scope == "investigation" else frozen["body"]["request"]["problem_id"]
-            if expected_revision_id != expected:
-                raise DomainError("stale_revision", "Approval must name the reviewed problem revision.", current_revision_id=expected)
-            if scope == "investigation":
-                current = self.authorize(actor, plan["workspace_id"], conn)
-                if current["current_problem_id"] != expected:
-                    raise DomainError("stale_revision", "Inputs changed after this preview. Create and review a new plan.", current_revision_id=current["current_problem_id"])
-            existing = conn.execute("SELECT * FROM approvals WHERE plan_id=? AND actor_id=?", (plan_id, actor)).fetchone()
-            if existing:
-                if existing["expires_at"] <= utc_now():
-                    raise DomainError("approval_expired", "Create a new reviewed plan after this approval expires.")
-                return dict(existing)
-            approval_id = _id("approval")
-            expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_seconds)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-            conn.execute("INSERT INTO approvals VALUES (?,?,?,?,?,?,?,?,?)", (approval_id, plan["workspace_id"], plan_id, plan_digest, actor, scope, expected_revision_id, utc_now(), expires_at))
-            return dict(conn.execute("SELECT * FROM approvals WHERE id=?", (approval_id,)).fetchone())
+            return self._approve_in_transaction(conn, actor, plan_id, expected_revision_id, plan_digest, scope, expires_seconds)
         return self._perform(actor, plan["workspace_id"], f"approve:{scope}:{plan_id}", key, request, action)
+
+    def _approve_in_transaction(self, conn, actor, plan_id, expected_revision_id, plan_digest, scope, expires_seconds=900):
+        """Canonical approval reused by the atomic research decision boundary."""
+        if not 1 <= expires_seconds <= 3600:
+            raise DomainError("invalid_expiry", "Approval lifetime must be between one second and one hour.", 422)
+        kind = "plan" if scope == "investigation" else "design_plan"
+        plan = frozen = self._get(conn, actor, plan_id, kind)
+        if frozen["digest"] != plan_digest:
+            raise DomainError("binding_mismatch", "Approval does not match the exact previewed plan.", 422, ["plan_digest"])
+        expected = frozen["body"]["problem_id"] if scope == "investigation" else frozen["body"]["request"]["problem_id"]
+        if expected_revision_id != expected:
+            raise DomainError("stale_revision", "Approval must name the reviewed problem revision.", current_revision_id=expected)
+        if scope == "investigation":
+            current = self.authorize(actor, plan["workspace_id"], conn)
+            if current["current_problem_id"] != expected:
+                raise DomainError("stale_revision", "Inputs changed after this preview. Create and review a new plan.", current_revision_id=current["current_problem_id"])
+        existing = conn.execute("SELECT * FROM approvals WHERE plan_id=? AND actor_id=?", (plan_id, actor)).fetchone()
+        if existing:
+            if existing["expires_at"] <= utc_now():
+                raise DomainError("approval_expired", "Create a new reviewed plan after this approval expires.")
+            return dict(existing)
+        approval_id = _id("approval")
+        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_seconds)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        conn.execute("INSERT INTO approvals VALUES (?,?,?,?,?,?,?,?,?)", (approval_id, plan["workspace_id"], plan_id, plan_digest, actor, scope, expected_revision_id, utc_now(), expires_at))
+        return dict(conn.execute("SELECT * FROM approvals WHERE id=?", (approval_id,)).fetchone())
 
     def approve_plan(self, actor: str, plan_id: str, expected_revision_id: str, plan_digest: str, key: str, expires_seconds: int = 900) -> dict:
         return self._approve(actor, plan_id, expected_revision_id, plan_digest, key, "investigation", expires_seconds)
@@ -441,25 +454,31 @@ class Workflow:
         plan = self.get(actor, plan_id, plan_kind)
         request = {"plan_id": plan_id, "approval_id": approval_id}
         def action(conn: sqlite3.Connection) -> dict:
-            approval = conn.execute("SELECT * FROM approvals WHERE id=? AND actor_id=? AND plan_id=? AND scope=?", (approval_id, actor, plan_id, scope)).fetchone()
-            if approval is None or approval["workspace_id"] != plan["workspace_id"] or approval["plan_digest"] != plan["digest"]:
-                raise DomainError("approval_required", "A matching approval by the authenticated person is required.", 403)
-            existing = conn.execute("SELECT * FROM jobs WHERE plan_id=?", (plan_id,)).fetchone()
-            if existing:
-                if existing["approval_id"] != approval_id:
-                    raise DomainError("plan_already_started", "This plan already has its one accepted run.")
-                return self._job(conn, actor, existing["id"])
-            if approval["expires_at"] <= utc_now():
-                raise DomainError("approval_expired", "The approval expired before work was reserved.", 403)
-            if scope == "investigation":
-                current = self.authorize(actor, plan["workspace_id"], conn)
-                if current["current_problem_id"] != approval["expected_revision_id"]:
-                    raise DomainError("stale_revision", "Inputs changed before work was reserved. Review a new plan.", current_revision_id=current["current_problem_id"])
-            job_id = _id(job_kind)
-            conn.execute("INSERT INTO jobs(id,workspace_id,plan_id,approval_id,actor_id,kind,state,created_at) VALUES (?,?,?,?,?,?,'queued',?)",
-                         (job_id, plan["workspace_id"], plan_id, approval_id, actor, job_kind, utc_now()))
-            return self._job(conn, actor, job_id)
+            return self._start_in_transaction(conn, actor, plan_id, approval_id, scope)
         return self._perform(actor, plan["workspace_id"], f"start:{scope}:{plan_id}", key, request, action)
+
+    def _start_in_transaction(self, conn, actor, plan_id, approval_id, scope):
+        """Reserve/reconcile one canonical child inside an authority transaction."""
+        plan_kind, job_kind = ("plan", "run") if scope == "investigation" else ("design_plan", "design_job")
+        plan = self._get(conn, actor, plan_id, plan_kind)
+        approval = conn.execute("SELECT * FROM approvals WHERE id=? AND actor_id=? AND plan_id=? AND scope=?", (approval_id, actor, plan_id, scope)).fetchone()
+        if approval is None or approval["workspace_id"] != plan["workspace_id"] or approval["plan_digest"] != plan["digest"]:
+            raise DomainError("approval_required", "A matching approval by the authenticated person is required.", 403)
+        existing = conn.execute("SELECT * FROM jobs WHERE plan_id=?", (plan_id,)).fetchone()
+        if existing:
+            if existing["approval_id"] != approval_id:
+                raise DomainError("plan_already_started", "This plan already has its one accepted run.")
+            return self._job(conn, actor, existing["id"])
+        if approval["expires_at"] <= utc_now():
+            raise DomainError("approval_expired", "The approval expired before work was reserved.", 403)
+        if scope == "investigation":
+            current = self.authorize(actor, plan["workspace_id"], conn)
+            if current["current_problem_id"] != approval["expected_revision_id"]:
+                raise DomainError("stale_revision", "Inputs changed before work was reserved. Review a new plan.", current_revision_id=current["current_problem_id"])
+        job_id = _id(job_kind)
+        conn.execute("INSERT INTO jobs(id,workspace_id,plan_id,approval_id,actor_id,kind,state,created_at) VALUES (?,?,?,?,?,?,'queued',?)",
+                     (job_id, plan["workspace_id"], plan_id, approval_id, actor, job_kind, utc_now()))
+        return self._job(conn, actor, job_id)
 
     def start_run(self, actor: str, plan_id: str, approval_id: str, key: str) -> dict:
         return self._start(actor, plan_id, approval_id, key, "investigation")
@@ -715,83 +734,90 @@ class Workflow:
         return self._perform(actor, workspace_id, "assistant-turn", key, {"body": body, "expected_revision": expected_revision}, action)
 
     def create_design_plan(self, actor: str, run_id: str, body: dict, key: str) -> dict:
-        from .contracts import DesignPlanBody, DesignRequestBody
+        from .contracts import DesignRequestBody
         request = DesignRequestBody.model_validate(_body(body)).model_dump(mode="json")
         run = self.get_run(actor, run_id)
         def action(conn: sqlite3.Connection) -> dict:
-            current = self._job(conn, actor, run_id, "run")
-            historical = self._get(conn, actor, current["plan_id"], "plan")
-            if request["historical_run_id"] != run_id:
-                raise DomainError("binding_mismatch", "The design request must name the selected historical run.", 422)
-            scenario = next((item for item in historical["body"]["scenarios"] if item["id"] == request["scenario_id"]), None)
-            if scenario is None or scenario["problem_id"] != request["problem_id"] or scenario["problem_digest"] != request["problem_digest"]:
-                raise DomainError("binding_mismatch", "Design must bind the exact historical scenario and problem.", 422)
-            child = conn.execute("SELECT * FROM scenario_reservations WHERE run_id=? AND scenario_id=?", (run_id, request["scenario_id"])).fetchone()
-            if child is None or child["state"] != "completed" or not child["result_id"]:
-                raise DomainError("historical_evidence_required", "The selected scenario needs usable historical evidence before design.", 422)
-            evidence = self._get(conn, actor, child["result_id"], "evidence")["body"]["result"]
-            native_design = evidence.get("projection_version") == "DB-SC-1-to-groundwork-v1"
-            if evidence.get("expected_binding") == "mismatch":
-                raise DomainError("binding_mismatch", "Mismatched evidence cannot support a design proposal.", 422)
-            if native_design:
-                if request.get("scientific_profile") != "counterdex.v1" or request.get("requested_tier") not in {"checked_pair_separation", "numerical_guidance"}:
-                    raise DomainError("unsupported_design_tier", "Native baseline design requires an explicit reviewed numerical or checked request.",
-                                      422, ["requested_tier"])
-                if (evidence.get("verification") != "valid" or evidence.get("replay") != "passed"
-                        or evidence.get("expected_binding") != "matches"):
-                    raise DomainError("historical_evidence_required", "Design requires matching freshly checked historical evidence.", 422)
-                refs = evidence.get("artifacts", [])
-                if request.get("source_artifact_ids"):
-                    raise DomainError("unsupported_artifact_reuse", "Prospective certificate reuse is not supported; the original baseline is retained separately.",
-                                      422, ["source_artifact_ids"])
-                if len(refs) != 1:
-                    raise DomainError("historical_artifact_required", "The selected baseline must retain one original native artifact.", 422)
-            if request.get("scientific_profile") == "counterdex.v1":
-                from fractions import Fraction
-                from .scientific_projection import project_design, project_native_design, project_problem
-                problem = self._get(conn, actor, request["problem_id"], "problem")
-                dataset = self._get(conn, actor, problem["body"]["dataset_id"], "dataset")
-                historical_horizon = max(Fraction(row["time"]) for row in dataset["body"]["rows"] if row["included"])
-                if Fraction(request["maximum_horizon"]) < historical_horizon:
-                    raise DomainError("unavailable_horizon", "The reviewed horizon must cover the included historical observations.", 422, ["maximum_horizon"])
-                historical_artifacts = {artifact["id"]: artifact for artifact in evidence.get("artifacts", [])}
-                artifact_ids = list(historical_artifacts) if native_design else request.get("source_artifact_ids", [])
-                for artifact_id in artifact_ids:
-                    if artifact_id not in historical_artifacts:
-                        raise DomainError("artifact_not_in_scope", "A source artifact must belong to the selected historical scenario.", 422, ["source_artifact_ids"])
-                    artifact = self._get(conn, actor, artifact_id, "native_artifact")
-                    self._same_workspace(run["workspace_id"], artifact)
-                    if any(artifact["body"][key] != historical_artifacts[artifact_id][key]
-                           for key in ("sha256", "byte_size", "media_type")):
-                        raise DomainError("artifact_binding_mismatch", "Historical native artifact bytes differ from the selected reference.", 422, ["source_artifact_ids"])
-                    if native_design and artifact["body"].get("origin") != {
-                            "run_id": run_id, "scenario_id": request["scenario_id"],
-                            "plan_id": current["plan_id"], "approval_id": current["approval_id"]}:
-                        raise DomainError("artifact_binding_mismatch", "Native baseline provenance differs from the selected approved run.", 422)
-                if native_design:
-                    # Reuse dispatch/publication's exact reviewed-scope admission;
-                    # baseline lineage never becomes prospective certificate reuse.
-                    from .canonical import semantic_digest
-                    project_native_design(request, project_problem(problem, dataset), semantic_digest("design-request", request))
-                else:
-                    project_design(request, project_problem(problem, dataset), [None, None])
-            candidates = {item.get("id"): item for item in evidence.get("candidates", []) if isinstance(item, dict)}
-            for candidate_id, vector in zip(request["candidate_ids"], request["candidate_vectors"], strict=True):
-                candidate = candidates.get(candidate_id)
-                if candidate is None:
-                    raise DomainError("candidate_not_in_scope", "Both fixed candidates must be present in the selected historical evidence.", 422, ["candidate_ids"])
-                if native_design and candidate.get("verification") != "valid":
-                    raise DomainError("candidate_not_compatible", "Both selected candidates need valid historical compatibility checks.", 422, ["candidate_ids"])
-                candidate_vector = candidate.get("parameter_vector")
-                if candidate_vector != vector:
-                    raise DomainError("candidate_vector_mismatch", "The exact fixed vector differs from its historical candidate.", 422, ["candidate_vectors"])
-                if candidate.get("problem_id") != request["problem_id"] or candidate.get("problem_digest") != request["problem_digest"]:
-                    raise DomainError("binding_mismatch", "Candidate belongs to a different immutable problem identity.", 422)
-            request_record = self._insert(conn, actor, run["workspace_id"], "design_request", request)
-            plan_body = DesignPlanBody(request=request, request_digest=request_record["digest"]).model_dump(mode="json")
-            result = self._insert(conn, actor, run["workspace_id"], "design_plan", plan_body, request_record["id"])
-            return result
+            return self._create_design_plan_in_transaction(conn, actor, run_id, request)
         return self._perform(actor, run["workspace_id"], f"create:design-plan:{run_id}", key, request, action)
+
+    def _create_design_plan_in_transaction(self, conn, actor, run_id, request):
+        """Canonical preparation reusable under a fenced research transaction."""
+        from .contracts import DesignPlanBody, DesignRequestBody
+        request = DesignRequestBody.model_validate(_body(request)).model_dump(mode="json")
+        run = self._job(conn, actor, run_id, "run")
+        current = self._job(conn, actor, run_id, "run")
+        historical = self._get(conn, actor, current["plan_id"], "plan")
+        if request["historical_run_id"] != run_id:
+            raise DomainError("binding_mismatch", "The design request must name the selected historical run.", 422)
+        scenario = next((item for item in historical["body"]["scenarios"] if item["id"] == request["scenario_id"]), None)
+        if scenario is None or scenario["problem_id"] != request["problem_id"] or scenario["problem_digest"] != request["problem_digest"]:
+            raise DomainError("binding_mismatch", "Design must bind the exact historical scenario and problem.", 422)
+        child = conn.execute("SELECT * FROM scenario_reservations WHERE run_id=? AND scenario_id=?", (run_id, request["scenario_id"])).fetchone()
+        if child is None or child["state"] != "completed" or not child["result_id"]:
+            raise DomainError("historical_evidence_required", "The selected scenario needs usable historical evidence before design.", 422)
+        evidence = self._get(conn, actor, child["result_id"], "evidence")["body"]["result"]
+        native_design = evidence.get("projection_version") == "DB-SC-1-to-groundwork-v1"
+        if evidence.get("expected_binding") == "mismatch":
+            raise DomainError("binding_mismatch", "Mismatched evidence cannot support a design proposal.", 422)
+        if native_design:
+            if request.get("scientific_profile") != "counterdex.v1" or request.get("requested_tier") not in {"checked_pair_separation", "numerical_guidance"}:
+                raise DomainError("unsupported_design_tier", "Native baseline design requires an explicit reviewed numerical or checked request.",
+                                  422, ["requested_tier"])
+            if (evidence.get("verification") != "valid" or evidence.get("replay") != "passed"
+                    or evidence.get("expected_binding") != "matches"):
+                raise DomainError("historical_evidence_required", "Design requires matching freshly checked historical evidence.", 422)
+            refs = evidence.get("artifacts", [])
+            if request.get("source_artifact_ids"):
+                raise DomainError("unsupported_artifact_reuse", "Prospective certificate reuse is not supported; the original baseline is retained separately.",
+                                  422, ["source_artifact_ids"])
+            if len(refs) != 1:
+                raise DomainError("historical_artifact_required", "The selected baseline must retain one original native artifact.", 422)
+        if request.get("scientific_profile") == "counterdex.v1":
+            from fractions import Fraction
+            from .scientific_projection import project_design, project_native_design, project_problem
+            problem = self._get(conn, actor, request["problem_id"], "problem")
+            dataset = self._get(conn, actor, problem["body"]["dataset_id"], "dataset")
+            historical_horizon = max(Fraction(row["time"]) for row in dataset["body"]["rows"] if row["included"])
+            if Fraction(request["maximum_horizon"]) < historical_horizon:
+                raise DomainError("unavailable_horizon", "The reviewed horizon must cover the included historical observations.", 422, ["maximum_horizon"])
+            historical_artifacts = {artifact["id"]: artifact for artifact in evidence.get("artifacts", [])}
+            artifact_ids = list(historical_artifacts) if native_design else request.get("source_artifact_ids", [])
+            for artifact_id in artifact_ids:
+                if artifact_id not in historical_artifacts:
+                    raise DomainError("artifact_not_in_scope", "A source artifact must belong to the selected historical scenario.", 422, ["source_artifact_ids"])
+                artifact = self._get(conn, actor, artifact_id, "native_artifact")
+                self._same_workspace(run["workspace_id"], artifact)
+                if any(artifact["body"][key] != historical_artifacts[artifact_id][key]
+                       for key in ("sha256", "byte_size", "media_type")):
+                    raise DomainError("artifact_binding_mismatch", "Historical native artifact bytes differ from the selected reference.", 422, ["source_artifact_ids"])
+                if native_design and artifact["body"].get("origin") != {
+                        "run_id": run_id, "scenario_id": request["scenario_id"],
+                        "plan_id": current["plan_id"], "approval_id": current["approval_id"]}:
+                    raise DomainError("artifact_binding_mismatch", "Native baseline provenance differs from the selected approved run.", 422)
+            if native_design:
+                # Reuse dispatch/publication's exact reviewed-scope admission;
+                # baseline lineage never becomes prospective certificate reuse.
+                from .canonical import semantic_digest
+                project_native_design(request, project_problem(problem, dataset), semantic_digest("design-request", request))
+            else:
+                project_design(request, project_problem(problem, dataset), [None, None])
+        candidates = {item.get("id"): item for item in evidence.get("candidates", []) if isinstance(item, dict)}
+        for candidate_id, vector in zip(request["candidate_ids"], request["candidate_vectors"], strict=True):
+            candidate = candidates.get(candidate_id)
+            if candidate is None:
+                raise DomainError("candidate_not_in_scope", "Both fixed candidates must be present in the selected historical evidence.", 422, ["candidate_ids"])
+            if native_design and candidate.get("verification") != "valid":
+                raise DomainError("candidate_not_compatible", "Both selected candidates need valid historical compatibility checks.", 422, ["candidate_ids"])
+            candidate_vector = candidate.get("parameter_vector")
+            if candidate_vector != vector:
+                raise DomainError("candidate_vector_mismatch", "The exact fixed vector differs from its historical candidate.", 422, ["candidate_vectors"])
+            if candidate.get("problem_id") != request["problem_id"] or candidate.get("problem_digest") != request["problem_digest"]:
+                raise DomainError("binding_mismatch", "Candidate belongs to a different immutable problem identity.", 422)
+        request_record = self._insert(conn, actor, run["workspace_id"], "design_request", request)
+        plan_body = DesignPlanBody(request=request, request_digest=request_record["digest"]).model_dump(mode="json")
+        result = self._insert(conn, actor, run["workspace_id"], "design_plan", plan_body, request_record["id"])
+        return result
 
     def create_observation_proposal(self, actor: str, workspace_id: str, body: dict, key: str) -> dict:
         from .contracts import ObservationProposalBody

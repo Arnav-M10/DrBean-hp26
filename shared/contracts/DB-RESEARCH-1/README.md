@@ -1,5 +1,26 @@
 # DB-RESEARCH-1 executable seam
 
+Executable examples: `examples.json` (valid/refused requests) and
+`event-plan.fixture.json` (bounded producer-authored event and plan shape).
+`scripts/export_contracts.py` generates the public schemas from the Python types.
+
+Private ports include read-only `check_authority()` and
+`execute_child(review_id, expected_review_digest)`; dispatch revalidates that
+exact digest in the canonical reservation transaction. Preparation/review/child
+responses contain `review_id`, `review_digest`, `kind`, `approval_id`, and
+`scope={plan_id,plan_digest,input_digest}`. `input_digest` identifies the immutable
+research origin; each scientific plan additionally binds its exact dataset/problem
+revision, including a separately reviewed later observation. `context()` returns
+the original objective/question and reviewed context, explicit `reference_ids`,
+canonical `reviews`, current admitted `budget` and optional design constraints.
+
+Schema2 adds research records to the same SQLite store. Journal intent is durable
+before scientific reservation; canonical child creation and journal association
+are atomic. A lost checkpoint/acknowledgement reconciles that child without new
+science allocation. Unknown inference outcomes pause for reconciliation and stay
+reserved; recovery does not automatically repeat inference. Human waiting releases
+the advancing lease and retains action counters, thread and immutable reviews.
+
 B branch `codex/durable-research-application`, base main `299a356`. Public DTOs
 and private ports: `apps/api/bean_api/research_contracts.py`. A owns graph state,
 factory/model adapters and policies; B owns canonical records/ports/checkpoints,
