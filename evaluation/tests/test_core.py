@@ -30,8 +30,15 @@ class RationalAndCanonicalJson(unittest.TestCase):
         self.assertEqual(contract.decimal_to_rational("5.34984763"), "534984763/100000000")
         self.assertEqual(contract.decimal_to_rational("-0.0"), "0/1")
         self.assertEqual(contract.decimal_to_rational("0.1"), "1/10")  # not 3602879701896397/36028797018963968
-        for bad in ("1e3", "NaN", ".5", "5.", "0x10", "1/2", ""):
-            with self.assertRaises(contract.ContractError):
+        # Oracle revision 2 follows the authoritative API grammar (bean_api.canonical.parse_decimal):
+        # a sign, a bare leading or trailing point and a bounded decimal exponent are admitted.
+        self.assertEqual(contract.decimal_to_rational(".5"), "1/2")
+        self.assertEqual(contract.decimal_to_rational("5."), "5/1")
+        self.assertEqual(contract.decimal_to_rational("+5"), "5/1")
+        self.assertEqual(contract.decimal_to_rational("1e3"), "1000/1")
+        self.assertEqual(contract.decimal_to_rational("1.5E-2"), "3/200")
+        for bad in ("NaN", "0x10", "1/2", "", ".", "e5", "+", "1e129", "1e1000", "1e0001", " 1", "1 ", "0.5\n"):
+            with self.assertRaises(contract.ContractError, msg=repr(bad)):
                 contract.decimal_to_rational(bad)
 
     def test_canonical_json_profile(self):

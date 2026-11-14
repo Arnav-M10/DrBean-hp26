@@ -1,9 +1,24 @@
-"""Test oracle for the DB-SC-1 wire profile, written from the contract text.
+"""Test oracle for the DB-SC-1 wire profile, written independently from the contract text.
 
-This is NOT the product canonicalizer. Owner 02 owns the authoritative
-implementation and golden byte fixtures. The harness uses this oracle only to
-check fixtures and observed API output; any disagreement is an issue-ledger
-entry for Owner 02, never something to "fix" here silently.
+This is NOT the product canonicalizer. Owner 02's implementation
+(``apps/api/bean_api/canonical.py``) and its golden fixtures are authoritative.
+The harness uses this oracle to check fixtures and observed API output.
+
+Revision 2 (Workstream 5) deliberately aligned four boundaries with the
+authoritative profile after cross-implementation probes showed the oracle
+accepted inputs the API rejects. Each is pinned by a golden boundary test in
+``evaluation/tests/test_contract_boundaries.py`` and compared against the API in
+``tests/test_evaluation.py``:
+
+* a rational must match in full: ``"1/2\n"`` is rejected (``$`` matched before a
+  trailing newline);
+* JSON integer tokens may not carry a sign, so ``-0`` is rejected like any
+  negative counter (``json.loads`` silently turned ``-0`` into ``0``);
+* maximum nesting depth is 32 (was 64), counted the same way as the API;
+* numerator and denominator are limited to 256 digits each, integers to 16
+  digits and 2**53-1, and parsed JSON to 1 MiB;
+* finite decimal spelling follows the API grammar: optional sign, ``.5`` and
+  ``5.``, and a decimal exponent of at most three digits and magnitude 128.
 """
 from __future__ import annotations
 
@@ -14,7 +29,11 @@ from fractions import Fraction
 from math import gcd
 
 MAX_SAFE_INT = 9007199254740991
-MAX_DEPTH = 64
+MAX_DEPTH = 32
+MAX_DIGITS = 256
+MAX_INTEGER_DIGITS = 16
+MAX_JSON_BYTES = 1024 * 1024
+MAX_DECIMAL_EXPONENT = 128
 IDENTITY_KINDS = ("dataset", "problem", "plan", "design-request", "suggestion", "report")
 
 AXES = {
@@ -28,8 +47,8 @@ AXES = {
 }
 ERROR_BODY_KEYS = ("code", "message", "field_paths", "retryable", "current_revision_id", "request_id")
 
-_RATIONAL = re.compile(r"^(0|-?[1-9][0-9]*)/([1-9][0-9]*)$")
-_DECIMAL = re.compile(r"^(-?)([0-9]+)(?:\.([0-9]+))?$")
+_RATIONAL = re.compile(r"(0|-?[1-9][0-9]*)/([1-9][0-9]*)")
+_DECIMAL = re.compile(r"([+-]?)(?:([0-9]+)(?:\.([0-9]*))?|\.([0-9]+))(?:[eE]([+-]?[0-9]+))?")
 
 
 class ContractError(ValueError):
@@ -38,10 +57,12 @@ class ContractError(ValueError):
 
 def is_canonical_rational(text) -> bool:
     """Reduced n/d: signed numerator, positive denominator, gcd one, zero is 0/1."""
-    if not isinstance(text, str):
+    if not isinstance(text, str) or len(text) > 2 * MAX_DIGITS + 2:
         return False
-    match = _RATIONAL.match(text)
+    match = _RATIONAL.fullmatch(text)
     if not match:
+        return False
+    if len(match.group(1).lstrip("-")) > MAX_DIGITS or len(match.group(2)) > MAX_DIGITS:
         return False
     numerator, denominator = int(match.group(1)), int(match.group(2))
     if numerator == 0:
@@ -61,13 +82,22 @@ def from_fraction(value: Fraction) -> str:
 
 
 def decimal_to_rational(source: str) -> str:
-    """Exact conversion of a finite decimal spelling. No floats are involved."""
-    match = _DECIMAL.match(source) if isinstance(source, str) else None
+    """Exact conversion of a finite decimal spelling. No floats or Decimal objects are involved."""
+    match = _DECIMAL.fullmatch(source) if isinstance(source, str) and len(source) <= MAX_DIGITS else None
     if not match:
         raise ContractError(f"not a finite decimal spelling: {source!r}")
-    sign, whole, places = match.group(1), match.group(2), match.group(3) or ""
-    value = Fraction(int(whole + places), 10 ** len(places))
-    return from_fraction(-value if sign else value)
+    sign, whole, places, bare_places, exponent = match.groups()
+    digits_whole, digits_places = (whole or ""), (places if whole is not None else bare_places) or ""
+    shift = 0
+    if exponent is not None:
+        if len(exponent.lstrip("+-")) > 3 or abs(int(exponent)) > MAX_DECIMAL_EXPONENT:
+            raise ContractError(f"decimal exponent outside the admitted range: {source!r}")
+        shift = int(exponent)
+    value = Fraction(int((digits_whole + digits_places) or "0"), 10 ** len(digits_places)) * Fraction(10) ** shift
+    text = from_fraction(-value if sign == "-" else value)
+    if not is_canonical_rational(text):
+        raise ContractError(f"decimal converts outside the admitted rational bounds: {source!r}")
+    return text
 
 
 def _escape(text: str) -> str:
@@ -153,14 +183,24 @@ def _depth(value, level=0):
             _depth(item, level + 1)
 
 
-def parse_strict(data: bytes):
+def _integer(token: str) -> int:
+    """JSON integers are unsigned counters: '-0' and every signed token are rejected, as by the API."""
+    if token.startswith("-") or len(token) > MAX_INTEGER_DIGITS:
+        raise ContractError(f"integer token {token[:20]!r} is not a nonnegative safe counter")
+    return int(token)
+
+
+def parse_strict(data: bytes, max_bytes: int = MAX_JSON_BYTES):
     """Parse wire JSON, failing (not repairing) on the DB-SC-1 rejections."""
+    if len(data) > max_bytes:
+        raise ContractError(f"JSON exceeds {max_bytes} bytes")
     try:
         text = data.decode("utf-8", errors="strict")
     except UnicodeDecodeError as error:
         raise ContractError(f"invalid UTF-8: {error}") from None
     try:
-        value = json.loads(text, object_pairs_hook=_no_duplicates, parse_float=_reject, parse_constant=_reject)
+        value = json.loads(text, object_pairs_hook=_no_duplicates, parse_float=_reject, parse_constant=_reject,
+                           parse_int=_integer)
     except RecursionError:
         raise ContractError("nesting too deep") from None
     except json.JSONDecodeError as error:
