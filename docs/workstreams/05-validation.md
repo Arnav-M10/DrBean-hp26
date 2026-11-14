@@ -64,11 +64,12 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
+| `main` + `codex/gemini-offline-integration` (local merge) | `9cc90e0` + `c95ab28` | zero-dispatch passes; Owner 3 fixes both coordinator P2 residuals (strict xfail XPASS); the worker's controlled lane breaks with `provider_placeholder_disabled` until Owner 2 selects mode=controlled (F-AI-INTEGRATION-SEAM). |
 | `backend/browser-baseline` (now merged as PR #6) | `cc779bf` | plain: hero fails (F-MAC-NPROC). diagnostic: discovery + baseline replay pass; changed input, concurrency, design authority, zero dispatch pass; hero blocked by F-DESIGN-SOURCE-ARTIFACTS; follow-up per-candidate blocked (F-FOLLOWUP-FEEDBACK); cancel/restart unobservable (computation < 1 s). |
 
 ## Next exact actions
 
-1. Preview Owner 3's `codex/gemini-offline-integration` against the zero-dispatch and controlled-boundary tests.
+1. Done: Owner 3 preview recorded. When it merges, remove the two strict-xfail markers (they will fail the suite) and rerun the worker-boundary tests after Owner 2 adopts mode=controlled.
 2. Cancellation is now observable with `--diagnostic science_barrier` (a harness-side barrier inside the scientific child): running cancellation passes; a worker SIGKILL leaves an orphan computation (P0 F-ORPHAN-WORKER-KILL, Owner 2). Ask Owner 2 for a product-side test barrier so this can become acceptance evidence.
 3. Remaining master-brief gaps in my lane: stale-approval-after-revision HTTP check, extended native negative controls (truncation, missing dependency, wrong profile, duplicate member, oversized, another run's packet), endpoint-level admission goldens from `shared/contracts/DB-SC-1/fixtures/admission-golden.json`, guard coverage for the CLI process and credential-read detection, ledger corruption handling, metamorphic engine controls, and grading C08/C09 from the real graph at the controlled tier.
 4. Retest F-MAC-NPROC, F-BASELINE-DISCOVERY, F-NATIVE-BYTES and F-FOLLOWUP-FEEDBACK whenever `main` moves.

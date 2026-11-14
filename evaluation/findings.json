@@ -1,7 +1,7 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T05:20:00Z",
+  "updated_at": "2026-11-14T05:40:00Z",
   "application_code_commit": "9cc90e0 (origin/main incl. PR #6 browser-baseline, #7 Owner 4, #8 this branch to 4ea7cb3)",
   "observed_at_harness_commit": "8bb1fbe",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
@@ -21,6 +21,20 @@
         "results": "evaluation/results/previews/main-d6a71c2/science_barrier (RS-CANCEL-RESTART no_orphan_after_worker_kill)",
         "context": "packages/groundwork_adapter/docs/BRIDGE.md requires the launching parent to kill the session before its own exit; a SIGKILLed parent cannot",
         "suggested_seam": "parent-death watchdog in science._child (poll os.getppid() or pipe EOF, then killpg own session), plus persisting the child pgid so worker --recover can kill leftovers"
+      }
+    },
+    {
+      "id": "F-AI-INTEGRATION-SEAM",
+      "severity": "P1",
+      "owner": "2 and 3",
+      "status": "open",
+      "title": "Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane",
+      "minimal_input": "origin/main 9cc90e0 merged locally with codex/gemini-offline-integration c95ab28 (clean merge)",
+      "command": "in that worktree: BEAN_COUNTERDEX_PYTHON=<python3.11> .venv/bin/python -m pytest -q tests --ignore=tests/integration; .venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py",
+      "expected": "one agreed controlled-lane selection: Worker._agent uses ProviderConfig(mode='controlled') with an OfflineChatModel for the disclosed offline AI lane; Owner 2's worker/offline tests updated together (Owner 3's scripts/ai/HANDOFF.md asks for this)",
+      "observed": "provider_placeholder_disabled from main's Worker._agent (it calls check_ready() on a placeholder config); failing: tests/test_worker.py::test_worker_actual_framework_uses_durable_attempts_and_frozen_evidence, tests/test_backend_offline.py::test_ordinary_provider_configuration_never_reads_provider_environment, ::test_http_intake_and_conversation_keep_provider_attempts_zero, and Workstream 5's three worker-boundary tests. Owner 3's own 74 tests and all zero-dispatch tests pass on the combination.",
+      "evidence": {
+        "results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"
       }
     },
     {
@@ -435,25 +449,43 @@
       "id": "F-COORDINATOR-OPTIONAL-STATUS",
       "severity": "P2",
       "owner": "3",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "title": "run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow)",
       "minimal_input": "scripted model: execute baseline, then return_grounded_explanation",
       "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k optional_scenario_cannot_silently_vanish",
       "expected": "the coordinator itself reports an unresolved disposition",
       "observed": "status completed (strict xfail)",
-      "evidence": {}
+      "evidence": {},
+      "retests": [
+        {
+          "at_commit": "preview: main 9cc90e0 + codex/gemini-offline-integration c95ab28 (local merge)",
+          "result": "Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then.",
+          "evidence": {
+            "results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"
+          }
+        }
+      ]
     },
     {
       "id": "F-COORDINATOR-PROVIDER-LABEL",
       "severity": "P2",
       "owner": "3",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "title": "Coordinator attempt metadata names provider gemini for controlled-model turns",
       "minimal_input": "run_coordinator with a controlled chat_model",
       "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k masquerade",
       "expected": "controlled turns carry an explicit controlled/placeholder marker at the source",
       "observed": "metadata provider=gemini; the worker wraps it in controlled_attempt records, so no live-looking row reaches the provider ledger (strict xfail)",
-      "evidence": {}
+      "evidence": {},
+      "retests": [
+        {
+          "at_commit": "preview: main 9cc90e0 + codex/gemini-offline-integration c95ab28 (local merge)",
+          "result": "Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then.",
+          "evidence": {
+            "results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"
+          }
+        }
+      ]
     },
     {
       "id": "F-TEST-VAR-LEAK",
