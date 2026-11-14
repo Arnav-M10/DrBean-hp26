@@ -7,15 +7,22 @@ The Python import and command-line module are `counterdex`; the console command
 is also `counterdex`. The repository ownership directory remains
 `packages/groundwork_adapter/`.
 
-It compares two frozen parameter vectors on a reviewed finite grid. The
+It discovers candidate vectors from reviewed observations with a deterministic
+bounded rate grid and amplitude screening. Every retained exact vector is
+independently checked against the historical hard allowances. One compatible
+vector strictly outside the closed claim is a checked counterexample; failure
+to find one says only what this bounded search found.
+
+It then compares two frozen parameter vectors on a reviewed finite grid. The
 numerical tier provides finite binary64 diagnostics with an exact-input boundary.
 The exact tier uses a fixed rational exponential enclosure rule, freshly checks
 both candidates against every included historical hard bound, and applies the
 strict margin `abs(p1-p2)-e1-e2-2*eta > 0`. Its certificate is specific to this
 analytic template. It is not a general ODE checker or a global design optimizer.
 
-Two matching candidates and an explicit positive future hard allowance are
-required. A checked time can rule out fitting **both selected choices**; a datum
+Pair design requires two checked candidates and an explicit positive future hard
+allowance. A single historical witness remains useful with pair design disabled.
+A checked time can rule out fitting **both selected choices**; a datum
 can exclude either or both. None of this establishes physical truth, instrument
 precision, the entire compatible parameter set, or the original interval claim.
 
@@ -24,10 +31,17 @@ precision, the entire compatible parameter set, or the original interval claim.
 From the repository root, using CPython 3.11:
 
 ```sh
-python3 -m pip install --no-deps ./packages/groundwork_adapter
-python3 -m unittest discover -s packages/groundwork_adapter/tests -v
-python3 -m counterdex capabilities
+python3.11 -m pip install --no-deps ./packages/groundwork_adapter
+python3.11 -m unittest discover -s packages/groundwork_adapter/tests -v
+python3.11 -m counterdex capabilities
 ```
+
+For the complete application-shaped discovery → design → hypothetical reading
+→ replay loop, use [the prepared runtime bridge](docs/BRIDGE.md),
+[exact application mapping](docs/APPLICATION_MAPPING.md), and
+[the executed synthetic decision example](docs/DECISION_EXAMPLE.md).
+The standalone commands also include `baseline`, `replay-baseline`, `bridge`,
+and `replay-native`; run `python3.11 -m counterdex --help` for their inputs.
 
 For source-only development, prefix commands with
 `PYTHONPATH=packages/groundwork_adapter`. Build tooling is separate from the
@@ -40,11 +54,11 @@ All supplied examples are synthetic. Their workflow IDs are fixture IDs, not
 real approvals. The backend must validate real approval and operation scope.
 
 ```sh
-python3 -m counterdex run \
+python3.11 -m counterdex run \
   packages/groundwork_adapter/fixtures/checked_success.request.json \
   --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json \
   --output /tmp/counterdex-example.bundle.json
-python3 -m counterdex replay /tmp/counterdex-example.bundle.json \
+python3.11 -m counterdex replay /tmp/counterdex-example.bundle.json \
   --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json
 ```
 
@@ -83,8 +97,10 @@ cancellation and cannot authorize work. Publish a checked report and its complet
 bytes atomically. Owner 3 consumes typed tiers and the fixed interpretation
 selector; browser replay remains unavailable. Owner 4 qualifies deployment.
 Counterdex's standalone CPython 3.11 qualification differs from the backend's
-Python 3.12/3.13 environment. Backend integration remains pending; this rename
-does not widen the scientific runtime or establish an integrated worker.
+Python 3.12/3.13 environment. The prepared subprocess bridge and parent example
+connect those runtimes without widening exact runtime qualification. Ordinary
+API/worker wiring and independent HTTP acceptance remain separate integration
+work; passing package tests does not establish that gate.
 
 The problem identity includes row order, excluded rows, notes and provenance.
 The design identity includes candidate vectors/IDs/artifact associations, grid,
@@ -93,7 +109,7 @@ The bundle identity excludes only its named top-level `suggestion_digest` field.
 Raw artifact SHA-256 hashes remain separate from DB-SC-1 semantic identities.
 The existing `groundwork.*.v1` schema identifiers, `dr-bean` hash domains, and
 model/proof/selection policy identifiers remain compatibility data. The public
-package rename does not change those normative values.
+package preserves those normative values.
 
 ## Evidence and release
 
@@ -107,12 +123,13 @@ package rename does not change those normative values.
 Regenerate fixtures after any package code change:
 
 ```sh
-python3 packages/groundwork_adapter/scripts/generate_fixtures.py
+python3.11 packages/groundwork_adapter/scripts/generate_fixtures.py
+python3.11 packages/groundwork_adapter/scripts/generate_decision_fixtures.py
 ```
 
 The generator writes current fixtures only. The initial published fixture
 archive retains its original bytes and requires its original prepared source
-for fresh replay. Counterdex has not been uploaded to PyPI by this rename task.
+for fresh replay. This sprint prepares version 0.2.0; it does not upload to PyPI.
 
 The partial fixture uses a deterministic cancellation callback; rerunning its
 request through the CLI without that callback produces a new completed result.
