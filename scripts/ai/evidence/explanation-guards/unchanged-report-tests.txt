@@ -1,0 +1,34 @@
+F......................                                                  [100%]
+=================================== FAILURES ===================================
+_ test_guard_controls[The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.-None] _
+
+text = 'The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.'
+expected = None
+
+    @pytest.mark.parametrize("text, expected", [
+        ("The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.", None),
+        ("The selected time is 8/1 h; 8.0 h is the same exact value.", None),
+        ("This proves the interval.", "unsupported_claim"),
+        ("The outside candidate has ke 0.05.", "unsupported_numeric_claim"),
+        ("The margin is 15% of the allowance.", "unsupported_numeric_claim"),
+        ("This does not prove the interval.", None),
+    ])
+    def test_guard_controls(text, expected):
+>       assert rejection(text) == expected
+E       AssertionError: assert 'unsupported_claim' == None
+E        +  where 'unsupported_claim' = rejection('The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.')
+
+/tmp/test_drbean_independent_explanation_526f15a.py:45: AssertionError
+=============================== warnings summary ===============================
+tests/integration/test_ai_boundaries.py:27
+  /workspace/DrBean-explanation/tests/integration/test_ai_boundaries.py:27: PytestUnknownMarkWarning: Unknown pytest.mark.controlled_app - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    pytestmark = [pytest.mark.controlled_app]
+
+../../tmp/test_drbean_independent_explanation_526f15a.py:19
+  /tmp/test_drbean_independent_explanation_526f15a.py:19: PytestUnknownMarkWarning: Unknown pytest.mark.controlled_app - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    pytestmark = [pytest.mark.controlled_app]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../../tmp/test_drbean_independent_explanation_526f15a.py::test_guard_controls[The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.-None]
+1 failed, 22 passed, 2 warnings in 0.79s

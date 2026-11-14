@@ -1,0 +1,61 @@
+{
+  "code_commit": "c20d8497647ec87a4d0ca0c8119f49e3f63c0aa6",
+  "merged_base": "55403ab3d897c256d71c10131e53ac92cdca9872",
+  "branch": "codex/ai-controlled-review",
+  "mode": "controlled_offline",
+  "live_qualification": "not_run",
+  "backend_tests": {
+    "passed": 516,
+    "skipped": 0,
+    "command": "PATH=<prepared-python311>:$PATH BEAN_COUNTERDEX_PYTHON=<counterdex-runtime-python> BEAN_COUNTERDEX_REPLAY_PYTHON=<counterdex-runtime-python> .venv/bin/python /tmp/drbean-offline-tests.py -q tests --ignore=tests/integration",
+    "evidence": "backend-tests.txt"
+  },
+  "focused_source_review": {
+    "passed": 94,
+    "evidence": "source-review-focused-tests.txt"
+  },
+  "independent_ai_tests": {
+    "passed": 37,
+    "command": ".venv/bin/python -m pytest -q --runxfail tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py",
+    "expectations_modified": false,
+    "evidence": "independent-ai-tests.txt"
+  },
+  "offline_preflight": {
+    "passed": true,
+    "external_dispatch_attempts": 0,
+    "observation_scope": "socket.connect/connect_ex in this preflight process",
+    "evidence": "offline-preflight.json"
+  },
+  "schema_compatibility": {
+    "legacy_contract_and_golden_files_checked": 46,
+    "changed_legacy_files": [],
+    "deterministic_export": true,
+    "export_output": "Exported 43 shared schemas and five fixture files to /workspace/DrBean-ai/shared/contracts/DB-SC-1"
+  },
+  "ruff": {
+    "passed": true,
+    "output": "All checks passed!",
+    "files": [
+      "apps/api/bean_api/config.py",
+      "apps/api/bean_api/contracts.py",
+      "apps/api/bean_api/intake.py",
+      "apps/api/bean_api/main.py",
+      "apps/api/bean_api/coordinator.py",
+      "tests/test_provider.py",
+      "tests/test_controlled_intake.py",
+      "tests/test_coordinator.py",
+      "scripts/ai/probe.py"
+    ]
+  },
+  "git_diff_check": true,
+  "real_science_acceptance": "source -> controlled proposal -> human correction -> ordinary review/materialization -> separately approved actual Counterdex -> native download -> fresh replay",
+  "test_input_provenance": "disclosed synthetic development sources and scripted human/control model actions; no holdout packet exposed",
+  "remaining_boundaries": [
+    "UI adoption by Owner 4",
+    "independent full-stack/release qualification by Owner 5",
+    "controlled conversation/horizon DTO and authenticated draft lineage seam AI-SEAM-03",
+    "normal approved design/follow-up callbacks",
+    "automatic reconciliation of interrupted storage writes",
+    "live Gemini activation explicitly unauthorized"
+  ]
+}
