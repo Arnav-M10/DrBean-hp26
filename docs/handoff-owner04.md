@@ -18,7 +18,7 @@ No gate fully passes. G0 holds for root only: for an ordinary user every approve
 
 1. `scripts/dev/start.sh`; open `http://127.0.0.1:4173`.
 2. Open **Local backend connection**, paste the token from `var/auth.json`, connect, create a workspace.
-3. Enter the shared five-row example: times 0.25, 0.5, 1, 2, 4 h; concentrations 4.80, 7.20, 8.00, 6.80, 5.70 mg/L; hard allowance 0.50 each.
+3. Click **Load synthetic example** (it is the shared five-row example), or enter it by hand: times 0.25, 0.5, 1, 2, 4 h; concentrations 4.80, 7.20, 8.00, 6.80, 5.70 mg/L; hard allowance 0.50 each.
 4. Question: experiment identifier, t=0 description, origin Synthetic; A `[0.001, 30]`, ke `[0.015, 0.35]`, ka `[0.4, 8]`; target `[0.10, 0.17]`; describe the allowance origin.
 5. Review, **Save inputs and prepare plan**, read the frozen plan, tick the approval box, approve.
 6. Queue stays disabled in the browser (the adapter reports no qualified baseline). The same run over HTTP (see `scripts/release/stack_smoke.py`) completes with `unsupported`, reason `baseline_producer_unavailable`.
@@ -38,9 +38,9 @@ The domain, claim and any future times are team-selected assumptions for review,
 | Backend lint and schema export | clean; exported schemas match committed |
 | Engine tests (CPython 3.11) | 257 passed, 2 skipped |
 | Engine native replay of prepared bundle | replay passed, binding matches, verification valid |
-| Web unit tests | 16 passed |
+| Web unit tests | 22 passed |
 | Browser to real API (`check-backend.mjs`) | passed |
-| Web editor smoke | 14 of 14 passed (editor only, not science) |
+| Web editor smoke | 17 of 17 passed (editor only, not science) |
 | Launcher tests | 7 passed |
 | Harness self-checks (Owner 5's) | 40 unit tests, manifest verifies, grader self-test passes |
 | Harness product report | 34 entries unrun, recorded before the merge; retained as history |

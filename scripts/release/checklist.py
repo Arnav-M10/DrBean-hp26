@@ -167,6 +167,8 @@ def check_env():
     env = {k: v for k, v in ENV.items() if k not in ("BEAN_DATABASE_PATH", "BEAN_BLOB_DIR", "BEAN_AUTH_FILE",
                                                      "BEAN_ARTIFACT_DIR")}
     scratch = tempfile.mkdtemp(prefix="drbean-checks-")
+    # Tests that look up "python3.11" must find the qualified engine runtime, not another interpreter.
+    env["PATH"] = os.path.dirname(ENGINE_PY) + os.pathsep + env.get("PATH", "")
     env.update(BEAN_DATABASE_PATH=os.path.join(scratch, "bean.sqlite3"), BEAN_BLOB_DIR=os.path.join(scratch, "sources"),
                BEAN_AUTH_FILE=os.path.join(scratch, "auth.json"), BEAN_ARTIFACT_DIR=os.path.join(scratch, "artifacts"))
     return env, scratch

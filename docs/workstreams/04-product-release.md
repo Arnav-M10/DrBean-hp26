@@ -34,6 +34,8 @@ Standing brief: master document DB-MASTER-1, section 2. This log is a navigation
 - PROD-0: setup, start, stop, status, doctor, recover (`scripts/dev/`); two declared runtimes; owned-process tracking; port-collision refusal; partial-start cleanup; doctor reports API, worker, adapter, baseline discovery, native replay, storage, AI mode and Gemini live as separate facts.
 - PROD-1: proxy shape preserved. Fresh transport checks in the stack smoke: missing and invalid credentials refused, another actor cannot read the workspace, run or report, foreign origin refused at the web proxy, duplicate start returns the same run, same key with another body conflicts, consumed approval not replayed after restart, report bytes match their declared hash and are labelled as an application report, not a native packet.
 - PROD-4 (automation): `checklist.py` inventory and `--strict-offline`; evidence must match the tested commit; `clean_checkout.sh` with declared runtimes and its own store; CI workflow without model secrets (not yet observed running on GitHub).
+- Web client hardening (PROD-1): responses size-bounded and strictly parsed; a lost mutation answer is reported as uncertain and a retry reuses the same operation key; refusals carry code, fields and current revision; queueing follows `science.available` and `baseline_discovery` and shows the server's reason (I-019 open for Owner 2's confirmation).
+- Web editor (PROD-2 items allowed before the science gate): empty rows reported with their repair and removable; imported rows kept and excluded instead; row-count and spelling limits match the server; the built-in example is the shared five-row example; long exact values wrap; visible focus outline.
 - Web maintenance after contract changes: plans send `scientific_profile` and a reviewed objective; browser check made portable and placeholder-safe.
 - Documents: README, runbook, handoff, ownership, issue ledger, integration status, demo script, submission claim table, consultation protocol.
 
@@ -45,13 +47,13 @@ Standing brief: master document DB-MASTER-1, section 2. This log is a navigation
 | `python3 scripts/release/stack_smoke.py` | launch path 31/31; G1 not passed (`baseline_producer_unavailable`) |
 | `.venv/bin/python -m pytest -q tests --ignore=tests/integration` | 264 passed |
 | `.venv-engine/bin/python -m unittest discover -s packages/groundwork_adapter/tests` | 257 passed, 2 skipped |
-| `node --test` in `apps/web` | 16 passed |
+| `node --test` in `apps/web` | 22 passed |
 | `node apps/web/check-backend.mjs` | passed (honest unsupported lifecycle; not a science success) |
-| `node tests/integration/web_manual_smoke.mjs` | 14/14 (editor only) |
+| `node tests/integration/web_manual_smoke.mjs` | 17/17 (editor only) |
 | `python3 -m unittest scripts/dev/test_launcher.py` | 7 passed |
 | `python3 scripts/release/checklist.py --strict-offline` | exit 1, as it should |
 | `python3 scripts/release/user_conditions_check.py` | **failed**: 2 of 5 boundary tests fail as an unprivileged user owning 64 processes (passes at 30, fails at 34) |
-| GitHub Actions `ci` on this branch | runs 1 and 2 green (before PR #3); runs 3 to 5 red: backend 2 failed, stack smoke 28/31, both I-018 |
+| GitHub Actions `ci` on this branch | runs 1 and 2 green (before PR #3); runs 3 to 6 red from I-018. Run 6 (`58a2b1e`): ordinary-user check fails on the runner exactly as locally (uid 1001, 64 processes, 2 of 5); backend job with the real engine runtime: 4 failed, 247 passed, 13 skipped |
 
 ## Blockers and who holds them
 
@@ -65,7 +67,7 @@ Standing brief: master document DB-MASTER-1, section 2. This log is a navigation
 
 1. When I-013 closes: `python3 scripts/release/stack_smoke.py --require-science`; extend the smoke through design, native download, engine replay and a hypothetical follow-up using real returned identities.
 2. Then PROD-2 browser controls against real responses, in this order: result table with separate states, design review and separate approval, follow-up with actual/hypothetical origin, native download with the replay command, source review with placeholder label.
-3. Until then, independent of other owners: confirm the CI workflow runs on GitHub once this branch is in a pull request; keep the smoke and browser check passing after each merge of `main`.
+3. Until then, independent of other owners: read each CI run (it is the only non-root lane this workstream has); keep the smoke and browser checks passing after each merge of `main`; rerun `user_conditions_check.py` as soon as Owner 2 changes the process guard.
 
 ## Deferred, not to be started without a new instruction
 

@@ -28,7 +28,10 @@ jobs:
       # Both declared runtimes, so the real-engine backend tests run instead of skipping.
       - run: python3 scripts/dev/launcher.py setup
       - name: backend tests with the qualified CPython 3.11 engine runtime
-        run: BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python" uv run pytest -q tests --ignore=tests/integration -rs
+        run: |
+          export BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python"
+          export PATH="$PWD/.venv-engine/bin:$PATH"   # some tests look up python3.11 on PATH
+          uv run pytest -q tests --ignore=tests/integration -rs
       - run: uv run ruff check apps tests scripts
       - name: exported schemas match the committed ones
         run: |
