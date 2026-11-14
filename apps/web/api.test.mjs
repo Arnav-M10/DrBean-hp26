@@ -86,3 +86,13 @@ test('oversized and malformed responses are refused, not parsed', async () => {
   const garbage = new BeanApi('t', async () => new Response('<html>'))
   await assert.rejects(garbage.json('/x'), e => e.kind === 'malformed')
 })
+
+
+test('follow-up explanation preserves pair scope and refuses unchecked conclusions', () => {
+  const result = { native_replay: { operation: 'review' }, verification: 'valid', expected_binding: 'matches', replay: 'passed', scientific_outcome: 'inconclusive' }
+  assert.match(baselineExplanation(result), /rechecked the two previously selected candidates/)
+  assert.match(baselineExplanation(result), /does not establish global model inconsistency/)
+  for (const changed of [{ verification: 'invalid' }, { expected_binding: 'mismatch' }, { replay: 'unavailable' }]) {
+    assert.match(baselineExplanation({ ...result, ...changed }), /incomplete or its evidence does not match/)
+  }
+})

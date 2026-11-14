@@ -97,3 +97,7 @@ Merged the current integrated backend/design browser work into the contribution 
 Fresh checks on macOS with Node 25.9.0: 29 web unit tests pass, smoke JavaScript syntax passes, release environment assertions pass, and diff whitespace checks pass. Full browser and Mac stack execution remain unverified. `uv` is absent from PATH. PR #12 CI previously passed launcher tests, backend lint/tests/schemas, web, engine/replay and harness checks; corrected HTTP runtime selection reached 40 passed, 3 failed, 2 xfailed. Remaining failures concern native evidence/design tier, follow-up results/lineage and interruption observations, plus the separate descendant process-boundary check.
 
 Next eligible tasks: implement source-review and follow-up browser controls against current contracts; qualify installed browser dependencies and target Mac setup; reconcile independent failures and rerun strict offline release. Human consultation and rehearsal remain pending.
+
+## Follow-up result presentation
+
+Added candidate-specific feedback when reopening a native review run through the existing run lookup. Displays recorded observation origin, compatible/excluded/unresolved status, violating observation IDs and reason. Explanation distinguishes a checked pair review from baseline discovery and preserves uncertainty when replay or binding fails. New regression plus existing web tests: 30 pass. JavaScript syntax and diff checks pass. Full browser/API exercise remains pending. Follow-up entry and source-review controls remain unfinished.
