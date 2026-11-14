@@ -49,18 +49,30 @@ function parseJson(bytes) {
 
 export class BeanApi {
   #token
+  #mode
   #keys = new Map()
-  constructor(token, fetcher = globalThis.fetch.bind(globalThis)) { this.#token = token; this.fetcher = fetcher }
-  async request(path, body, mediaType = 'application/json', operationKey) {
-    const serialized = body === undefined ? undefined : mediaType === 'application/json' ? JSON.stringify(body) : body
+  constructor(token, fetcher = globalThis.fetch.bind(globalThis), { mode = 'local_bearer' } = {}) {
+    if (!['local_bearer', 'browser_session'].includes(mode)) throw new Error('Unsupported connection mode.')
+    if (mode === 'browser_session' && token) throw new Error('Browser sessions cannot use bearer credentials.')
+    this.#token = token; this.#mode = mode; this.fetcher = fetcher
+  }
+  async request(path, body, mediaType = 'application/json', operationKey, extraHeaders = {}, { raw = false } = {}) {
+    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || path.includes('\\')) throw new Error('A local API path is required.')
+    const structuredJson = mediaType === 'application/json' && !raw
+    const serialized = body === undefined ? undefined : structuredJson ? JSON.stringify(body) : body
     const headers = {}
+    for (const [name, value] of Object.entries(extraHeaders)) {
+      if (name !== 'X-Source-Name' || typeof value !== 'string' || value.length > 255 || !/^[\x20-\x7e]+$/.test(value) || /[/\\]/.test(value)) throw new Error('Invalid source filename metadata.')
+      headers[name] = value
+    }
     if (this.#token) headers.Authorization = `Bearer ${this.#token}`
     if (serialized !== undefined) {
+      if (typeof mediaType !== 'string' || mediaType.length > 255 || !/^[\x20-\x7e]+$/.test(mediaType)) throw new Error('Invalid source media type.')
       headers['Content-Type'] = mediaType
       // One operation key per distinct request. A retry of the same request reuses it, so an
       // uncertain outcome can be resolved without creating a second operation.
-      const identity = mediaType === 'application/json' ? serialized : Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', serialized)), b => b.toString(16).padStart(2, '0')).join('')
-      const operation = path + '\n' + mediaType + '\n' + identity
+      const identity = structuredJson ? serialized : Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', serialized)), b => b.toString(16).padStart(2, '0')).join('')
+      const operation = path + '\n' + mediaType + '\n' + identity + '\n' + JSON.stringify(extraHeaders)
       if (!this.#keys.has(operation)) this.#keys.set(operation, crypto.randomUUID())
       headers['Idempotency-Key'] = operationKey ?? this.#keys.get(operation)
     }
@@ -68,8 +80,8 @@ export class BeanApi {
     try {
       response = await this.fetcher(`/api/bean/v1${path}`, {
         method: serialized === undefined ? 'GET' : 'POST', headers, body: serialized,
-        credentials: 'omit', cache: 'no-store', redirect: 'error',
-        signal: AbortSignal.timeout(/^\/workspaces\/[^/]+\/(intake-proposals|assistant-turns)$/.test(path) ? 75000 : 15000),
+        credentials: this.#mode === 'browser_session' ? 'same-origin' : 'omit', cache: 'no-store', redirect: 'error',
+        signal: AbortSignal.timeout(/^\/workspaces\/[^/]+\/(intake-proposals|assistant-turns|research-analyses)$/.test(path) ? 75000 : 15000),
       })
     } catch {
       // Never resent automatically. The person decides; the same key is reused if they retry.
@@ -90,6 +102,22 @@ export class BeanApi {
   async assistantTurn(workspace, body) {
     if (typeof body.client_operation_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.client_operation_id)) throw new Error('A bounded assistant operation identity is required.')
     return parseJson(await readBounded(await this.request(`/workspaces/${encodeURIComponent(workspace)}/assistant-turns`, body, 'application/json', body.client_operation_id), MAX_JSON_BYTES))
+  }
+  async researchAnalysis(workspace, body) {
+    if (typeof body.client_operation_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.client_operation_id)) throw new Error('A bounded research operation identity is required.')
+    return parseJson(await readBounded(await this.request(`/workspaces/${encodeURIComponent(workspace)}/research-analyses`, body, 'application/json', body.client_operation_id), MAX_JSON_BYTES))
+  }
+  async uploadResearchAsset(workspace, file, operationId) {
+    if (operationId !== undefined && (typeof operationId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(operationId))) throw new Error('A bounded upload operation identity is required.')
+    if (!Number.isInteger(file.size) || file.size < 1 || file.size > 5242880) throw new Error('Choose a research file up to 5 MiB.')
+    const bytes = await file.arrayBuffer()
+    if (bytes.byteLength !== file.size) throw new Error('The research file changed while it was read.')
+    // File type is only an admission hint: the server inspects the original bytes.
+    const type = file.type || 'application/octet-stream', headers = {}
+    // The optional wire filename is printable ASCII. Unicode names remain in the
+    // page; the server supplies a safe fallback name without altering file bytes.
+    if (typeof file.name === 'string' && file.name.length <= 255 && /^[\x20-\x7e]+$/.test(file.name) && !/[/\\]/.test(file.name)) headers['X-Source-Name'] = file.name
+    return parseJson(await readBounded(await this.request(`/workspaces/${encodeURIComponent(workspace)}/research-assets`, bytes, type, operationId, headers, { raw: true }), MAX_JSON_BYTES))
   }
   async uploadSource(workspace, file, origin) {
     if (!['image/png', 'image/jpeg'].includes(file.type) || file.size < 1 || file.size > 5242880) throw new Error('Choose a PNG or JPEG up to 5 MiB.')

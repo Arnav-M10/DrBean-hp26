@@ -59,7 +59,7 @@ or a provider credential. Only the gateway receives its file path through
 `BEAN_SHARE_GATEWAY_FILE`; no secret value is placed in its environment.
 The API reads this configuration at request time, compares digests and validates
 the shared origin again. Sharing never edits `auth.json` or creates a demo actor.
-The API's `BEAN_SHARED_GATEWAY_FILE` defaults to `share-gateway.json` beside its
+The API's `BEAN_SHARE_GATEWAY_FILE` defaults to `share-gateway.json` beside its
 existing database. A missing file disables session bootstrap (404); provisioning
 it needs no API restart. Existing owner tokens and data remain unchanged.
 
@@ -72,10 +72,15 @@ through failure/restart; gateway and tunnel environments contain no provider key
 ## General-research joins for Claude and the UI owner
 
 Keep the exact raw asset and synchronous analysis routes/bodies in the prompts.
-`BeanApi.uploadResearchAsset(workspace,file)` and
+`BeanApi.uploadResearchAsset(workspace,file,operationId?)` and
 `BeanApi.researchAnalysis(workspace,body)` provide bounded transport; analysis
 keeps its exact operation ID/body after an uncertain response and uses a 75-second
 transport deadline. Reopening is GET only, with no model redispatch.
+When supplied, the upload operation ID contains 1–128 ASCII letters, digits,
+underscores or hyphens and is sent unchanged as `Idempotency-Key`; an explicit
+retry reuses that ID. When omitted, the transport retains an automatic ID for
+the same path, media type, original bytes and optional filename metadata. A
+changed filename receives a different automatic ID even when bytes match.
 Optional `X-Source-Name` is printable ASCII, at most 255 bytes. Omit it for an
 unrepresentable filename instead of inventing an encoding or dropping file
 contents; retain local display names. A Unicode filename encoding amendment must
