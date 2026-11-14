@@ -328,3 +328,16 @@ dd { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Critique pass 1 */
+.connection > summary { display: list-item; }
+.connection:has(+ .connection-note) { margin-bottom: var(--s1); }
+.connection-note { margin: 0 0 var(--s5) var(--s4); }
+.connection[open] + .connection-note { display: none; }
+.edit-table td:last-child { white-space: nowrap; }
+.table-region table { min-width: 34rem; }
+.table-region th, .table-region td { overflow-wrap: normal; }
+.claim-group #bounds .bound:first-child { border-top: 0; padding-top: 0; }
+fieldset.group > .help { margin: var(--s1) 0 var(--s2); }
+fieldset.group .bound:first-of-type { border-top: 0; }
+.page > .block:last-child { margin-bottom: 0; }

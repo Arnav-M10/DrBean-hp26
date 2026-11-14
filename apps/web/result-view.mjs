@@ -77,7 +77,7 @@ export function keLine({ domain, target, candidates }) {
   const lo = toNumber(domain.lower), hi = toNumber(domain.upper)
   const tLo = toNumber(target.lower), tHi = toNumber(target.upper)
   if (![lo, hi, tLo, tHi].every(Number.isFinite) || hi <= lo) return null
-  const width = 640, left = 16, right = 16, axisY = 84
+  const width = narrow() ? 380 : 640, left = 16, right = 16, axisY = 84
   const x = value => left + (Math.min(Math.max(value, lo), hi) - lo) / (hi - lo) * (width - left - right)
   const root = svg('svg', { viewBox: `0 0 ${width} 126`, role: 'img', 'aria-labelledby': 'ke-line-title ke-line-desc' })
   root.append(svg('title', { id: 'ke-line-title' }, 'Elimination rate ke: claimed range and checked candidates'))
@@ -89,7 +89,7 @@ export function keLine({ domain, target, candidates }) {
   const mid = (x(tLo) + x(tHi)) / 2
   root.append(svg('text', { class: 'claim-label', x: mid, y: axisY - 30, 'text-anchor': 'middle' }, 'Claimed range'))
   root.append(svg('line', { class: 'axis', x1: left, x2: width - right, y1: axisY, y2: axisY }))
-  for (const tick of niceTicks(lo, hi, 6)) {
+  for (const tick of niceTicks(lo, hi, narrow() ? 4 : 6)) {
     root.append(svg('line', { class: 'axis', x1: x(tick), x2: x(tick), y1: axisY, y2: axisY + 5 }))
     root.append(svg('text', { class: 'tick', x: x(tick), y: axisY + 19, 'text-anchor': 'middle' }, readable(tick)))
   }
@@ -98,7 +98,7 @@ export function keLine({ domain, target, candidates }) {
     const cx = x(candidate.ke), labelY = 12 + (index % 3) * 14
     root.append(svg('line', { x1: cx, x2: cx, y1: labelY + 3, y2: axisY - 9, stroke: candidate.color, 'stroke-width': 1, 'stroke-dasharray': '2 2' }))
     root.append(svg('circle', { cx, cy: axisY - 9, r: 6, fill: candidate.color, stroke: '#fff', 'stroke-width': 2 }))
-    const anchor = cx > width - 120 ? 'end' : cx < 120 ? 'start' : 'middle'
+    const anchor = cx > width - 110 ? 'end' : cx < 110 ? 'start' : 'middle'
     root.append(svg('text', { class: 'label', x: anchor === 'end' ? cx - 4 : anchor === 'start' ? cx + 4 : cx, y: labelY, 'text-anchor': anchor, fill: candidate.color }, `${candidate.short} · ke ≈ ${readable(candidate.ke)}`))
   })
   return root
@@ -108,7 +108,7 @@ export function keLine({ domain, target, candidates }) {
 export function concentrationChart({ rows, curves = [], markTime = null, height = 300 }) {
   const included = rows.filter(row => Number.isFinite(row.t) && Number.isFinite(row.c))
   if (!included.length) return null
-  const width = 640, pad = { l: 52, r: 16, t: 14, b: 44 }
+  const width = narrow() ? 380 : 640, pad = { l: 44, r: 12, t: 14, b: 44 }
   const tMax = Math.max(...included.map(r => r.t), markTime ?? 0, ...curves.map(c => c.until ?? 0)) * 1.05
   const curveFns = curves.map(curve => ({ ...curve, f: t => curve.A * (Math.exp(-curve.ke * t) - Math.exp(-curve.ka * t)) }))
   const samples = curveFns.map(curve => Array.from({ length: 121 }, (_, i) => { const t = tMax * i / 120; return [t, curve.f(t)] }))
@@ -122,7 +122,7 @@ export function concentrationChart({ rows, curves = [], markTime = null, height 
     root.append(svg('line', { class: 'grid', x1: pad.l, x2: width - pad.r, y1: y(tick), y2: y(tick) }))
     root.append(svg('text', { class: 'tick', x: pad.l - 8, y: y(tick) + 4, 'text-anchor': 'end' }, readable(tick)))
   }
-  for (const tick of niceTicks(0, tMax, 7)) {
+  for (const tick of niceTicks(0, tMax, narrow() ? 4 : 7)) {
     root.append(svg('line', { class: 'axis', x1: x(tick), x2: x(tick), y1: height - pad.b, y2: height - pad.b + 5 }))
     root.append(svg('text', { class: 'tick', x: x(tick), y: height - pad.b + 18, 'text-anchor': 'middle' }, readable(tick)))
   }
@@ -148,4 +148,6 @@ export function concentrationChart({ rows, curves = [], markTime = null, height 
   return root
 }
 
-export const CANDIDATE_COLORS = ['#a12a45', '#1f4f8a', '#1c6740', '#7c4f00']
+// Bean red is reserved for the claim, so candidates never use it.
+export const CANDIDATE_COLORS = ['#1f4f8a', '#b25b0e', '#1c6740', '#5b3f8f']
+const narrow = () => (globalThis.innerWidth ?? 1024) < 640

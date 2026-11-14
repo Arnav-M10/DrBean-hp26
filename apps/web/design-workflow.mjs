@@ -20,7 +20,7 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
     }
   }
   function field(parent, key, label, { choices, check = false, multiline = false } = {}) {
-    const wrapper = node('label', label); wrapper.className = 'stack'
+    const wrapper = node('label', check ? ` ${label}` : label); if (!check) wrapper.className = 'stack'
     const control = document.createElement(choices ? 'select' : multiline ? 'textarea' : 'input')
     control.id = `design-${key}`
     if (choices) for (const [value, text] of choices) { const option = node('option', text); option.value = value; control.append(option) }
@@ -31,7 +31,8 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
     }
     control.disabled = context().busy
     control.addEventListener('input', () => { draft[key] = check ? control.checked : control.value; edited() })
-    wrapper.append(control); parent.append(wrapper); return control
+    if (check) wrapper.prepend(control); else wrapper.append(control)
+    parent.append(wrapper); return control
   }
   async function refresh(id = jobId) {
     const { api, workspace } = context()
@@ -114,8 +115,9 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
     button(section, 'Open or refresh design', () => refresh(), !api || !workspace)
     section.append(node('p', 'Keep this identifier to reopen the comparison later. A running comparison updates by itself and is never repeated.'))
     if (job) {
-      section.append(node('p', `${job.id} · design execution: ${job.state}`), exactRecord('Persisted design job', job))
-      if (jobPlan) section.append(node('p', `Design result scope: historical run ${jobPlan.body.request.historical_run_id}, scenario ${jobPlan.body.request.scenario_id}, pair ${jobPlan.body.request.candidate_ids.join(' and ')}.`), exactRecord('Approved scope for this design job', jobPlan))
+      const line = node('p', `${job.id} · design execution: ${job.state}`); line.className = 'tech'
+      section.append(line, exactRecord('Persisted design job', job))
+      if (jobPlan) { const scope = node('p', `Design result scope: historical run ${jobPlan.body.request.historical_run_id}, scenario ${jobPlan.body.request.scenario_id}, pair ${jobPlan.body.request.candidate_ids.join(' and ')}.`); scope.className = 'tech'; section.append(scope, exactRecord('Approved scope for this design job', jobPlan)) }
       if (job.error_code) section.append(node('p', `Design execution stopped: ${job.error_code}.`))
     }
     if (suggestion) {
@@ -156,7 +158,7 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
       section.append(exactRecord('Exact design evidence record', suggestion))
       for (const reference of result.artifacts ?? []) {
         const name = `dr-bean-${reference.id}`
-        section.append(node('p', `Native design evidence: ${reference.byte_size} bytes · SHA-256 ${reference.sha256}`))
+        section.append(node('h4', 'Download comparison evidence'), node('p', `Native design evidence: ${reference.byte_size.toLocaleString()} bytes, SHA-256 ${reference.sha256}`)); section.lastChild.className = 'tech'
         button(section, 'Download native design evidence', async () => { const file = await api.download(`/artifacts/${encodeURIComponent(reference.id)}`, reference); save(file.bytes, `${name}.native.json`) })
         button(section, 'Download design replay anchors', async () => { const file = await api.download(`/artifacts/${encodeURIComponent(reference.id)}/anchor?download=true`); save(file.bytes, `${name}.anchors.json`) })
         section.append(node('p', 'Replay the retained design and baseline history with the matching Counterdex CPython 3.11 package. Native replay checks supported mathematical facts; browser download hashes establish byte integrity only.'), node('pre', `python3.11 -m counterdex replay-native ${name}.native.json --anchors ${name}.anchors.json`))

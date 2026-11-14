@@ -186,8 +186,7 @@ function createBounds() {
   }
   const container = byId('bounds')
   container.append(make(bounds[3]))
-  container.append(element('h3', 'Search limits'), element('p', 'The checker only considers parameter values inside these ranges. Wider limits search more; the result holds only within them.', { class: 'help' }))
-  for (const bound of bounds.slice(0, 3)) container.append(make(bound))
+  for (const bound of bounds.slice(0, 3)) byId('search-limits').append(make(bound))
 }
 
 function currentDraft() {
@@ -272,6 +271,7 @@ function route(focusHeading = true) {
     else main.removeAttribute('aria-current')
   }
   document.title = `${pageTitles[page]} · Dr. Bean`
+  document.querySelector('#step-list > li[data-current] > a')?.scrollIntoView({ block: 'nearest', inline: 'center' })
   if (page === 'review') renderReview()
   if (requested === 'research') byId('files-path').open = true
   renderWorkflow?.()
@@ -308,8 +308,13 @@ function updateChrome() {
   pill.dataset.state = status.connected ? 'on' : status.mode === 'session_error' ? 'error' : 'off'
   pill.textContent = status.connected ? (status.mode === 'browser_session' ? 'Private workspace' : status.workspace ? 'Connected' : 'Connected, no workspace') : status.mode === 'session_error' ? 'Connection failed' : 'Not connected'
   byId('connection-panel').dataset.state = status.connected && status.workspace ? 'on' : 'off'
-  byId('connect-hint').hidden = Boolean(status.connected && status.workspace)
-  byId('connect-hint-text').textContent = status.connected ? 'Connected. Choose or create a workspace in the panel above to keep your work on the server.' : 'You are not connected to a Dr. Bean server yet. You can prepare inputs now, but saving, approving and running need a connection.'
+  const summary = byId('connection-panel').querySelector('summary'), note = byId('connection-summary-note')
+  if (status.connected && status.workspace) {
+    const name = byId('workspace-select').selectedOptions[0]?.textContent
+    summary.textContent = status.mode === 'browser_session' ? 'Connected to your private workspace' : `Connected to workspace “${name || status.workspace}”`
+    note.textContent = 'Saved checks and research plans are stored in this workspace on the server.'
+  } else if (status.connected) { summary.textContent = 'Connected: choose a workspace'; note.textContent = 'Pick an existing workspace or create one to keep your work on the server.' }
+  else if (status.mode === 'session_error') note.textContent = 'The private session could not be established. Reload once the server is available.'
 
   const context = byId('study-context')
   const experiment = byId('experiment-id').value.trim()
@@ -509,11 +514,6 @@ byId('start-example').addEventListener('click', () => {
   byId('example-note').hidden = !filled
   location.hash = 'inputs'
   byId('example').click()
-})
-byId('connect-hint-open').addEventListener('click', () => {
-  const panel = byId('connection-panel'); panel.open = true
-  const target = byId('bearer').closest('form').hidden ? panel.querySelector('summary') : byId('bearer')
-  panel.scrollIntoView({ block: 'start' }); target.focus()
 })
 byId('question-form').addEventListener('input', () => updateChrome())
 addRow()

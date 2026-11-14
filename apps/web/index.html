@@ -55,7 +55,7 @@
           </div>
         </div>
       </details>
-      <div id="connect-hint" class="note wait connect-hint"><p id="connect-hint-text"></p><button type="button" class="secondary" id="connect-hint-open">Open connection</button></div>
+      <p id="connection-summary-note" class="fine connection-note">Needed to save inputs, approve and run checks. You can prepare a draft without it.</p>
       <div id="backend-error" class="errors" role="alert" hidden></div>
 
       <!-- 1 · Start -->
@@ -137,7 +137,7 @@
             </table>
           </div>
           <p id="source-summary" class="source-summary"></p>
-          <figure class="mini-plot" id="input-plot" hidden><figcaption>Your included readings, with each allowance drawn as a vertical bar.</figcaption></figure>
+          <figure class="chart mini-plot" id="input-plot" hidden><figcaption>Your included readings, with each allowance drawn as a vertical bar.</figcaption></figure>
           <details id="source-details" hidden><summary>Where these rows came from</summary><ul id="sources"></ul></details>
           <footer class="actions spread">
             <button class="secondary" type="button" id="add-row">Add row</button>
@@ -169,8 +169,13 @@
             <h2>The claim being tested</h2>
             <p>Concentration starts at zero and absorption is faster than elimination (ka &gt; ke). Both endpoints of the claim are included.</p>
             <div id="bounds"></div>
-            <details><summary>Model equation</summary><p><code>C(t) = A × (exp(−ke × t) − exp(−ka × t))</code></p></details>
           </div>
+          <fieldset class="group">
+            <legend>Search limits</legend>
+            <p class="help">The checker only considers parameter values inside these ranges. Wider limits search more; any result holds only within them.</p>
+            <div id="search-limits"></div>
+            <details><summary>Model equation</summary><p><code>C(t) = A × (exp(−ke × t) − exp(−ka × t))</code></p></details>
+          </fieldset>
           <fieldset class="group">
             <legend>Why you trust the allowances</legend>
             <label class="stack">Origin of the allowances<span class="help">Say where ±0.50 mg/L (or your values) comes from: assay specification, team choice, synthetic setting.</span><textarea id="allowanceOrigin" rows="2" required></textarea></label>
