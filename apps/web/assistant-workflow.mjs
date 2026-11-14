@@ -61,7 +61,7 @@ export function setupAssistantWorkflow({ context, button, node, exactRecord }) {
     section.append(node('h4', 'Statements from the evidence records'))
     for (const statement of body.critical_statements ?? []) section.append(node('p', statement))
     if (body.model_commentary) section.append(node('h4', 'Gemini commentary, not checked by Dr. Bean'), node('p', body.model_commentary))
-    if (body.commentary_status === 'suppressed') section.append(node('p', 'Gemini commentary was withheld because the evidence records did not support it. The checked results above are unaffected.'))
+    if (body.commentary_status === 'suppressed') section.append(node('p', 'Gemini commentary was withheld because the evidence records did not support it. The recorded results above are unchanged.'))
     if (body.message) section.append(node('p', body.message))
     if (body.code) section.append(node('p', `Response code: ${body.code}.`))
     section.append(exactRecord('Exact assistant response and provider attempt identity', response))
