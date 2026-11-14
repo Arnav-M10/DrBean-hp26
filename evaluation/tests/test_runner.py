@@ -120,8 +120,12 @@ class Runner(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.results)
 
-    def run_lane(self, lane, subject, only=None):
-        return runner.run_lane(lane, subject, ROOT, self.results, REPO, only, self.ledger)
+    def run_lane(self, lane, subject, only=None, activation=None):
+        return runner.run_lane(lane, subject, ROOT, self.results, REPO, only, self.ledger, activation)
+
+    def run_live(self, lane, subject, only=None):
+        """Budget-machinery tests only: stub subject, isolated temporary ledger, synthetic activation."""
+        return self.run_lane(lane, subject, only, runner.SyntheticActivation())
 
     def test_without_a_subject_all_24_entries_are_recorded_unrun(self):
         records = self.run_lane("fixture_contract", NoSubject())
@@ -129,7 +133,8 @@ class Runner(unittest.TestCase):
         self.assertEqual({r["status"] for r in records}, {"unrun"})
         self.assertTrue(all(r["reason"] and r["tested_commit"] and r["started_at"].endswith("Z") for r in records))
         self.assertEqual(len(runner.read_attempts(self.results)), 24)
-        self.assertIn("| fixture_contract | fixture_contract | 24 | 24 |", report.render(ROOT, self.results))
+        # Report v2 columns: lane, lane version, enabled, provider, tools, scheduled, attempts.
+        self.assertIn("| fixture_contract | 1 | yes | controlled/none | any | 24 | 24 |", report.render(ROOT, self.results))
 
     def test_attempts_are_append_only_and_numbered(self):
         self.run_lane("fixture_contract", NoSubject(), ["C01-A"])
@@ -156,15 +161,25 @@ class Runner(unittest.TestCase):
                               ["C01-A"])[0]
         self.assertEqual(other["status"], "error")
 
+    def test_live_lanes_are_disabled_without_explicit_activation(self):
+        BudgetLedger(self.ledger).open_cohort("t", "A. Human", "synthetic test allowance")
+        for lane in ("live_intake", "live_agent_controlled_tools", "actual_full_stack"):
+            records = self.run_lane(lane, StubSubject())
+            self.assertTrue(records)
+            self.assertEqual({r["status"] for r in records}, {"unrun"}, lane)
+            self.assertTrue(all("NOT_RUN" in r["reason"] for r in records))
+        state = BudgetLedger(self.ledger).state()
+        self.assertEqual(state["reservations"], {})  # an open cohort alone dispatches and reserves nothing
+
     def test_live_lane_without_an_authorized_cohort_makes_no_request(self):
-        record = self.run_lane("live_intake", StubSubject(), ["C01"])[0]
+        record = self.run_live("live_intake", StubSubject(), ["C01"])[0]
         self.assertEqual(record["status"], "unrun")
         self.assertIn("cohort", record["reason"])
         self.assertFalse(os.path.exists(self.ledger))
 
     def test_fixture_cannot_be_substituted_into_a_live_lane(self):
         BudgetLedger(self.ledger).open_cohort("t", "A. Human", "synthetic test allowance")
-        record = self.run_lane("live_intake", StubSubject(lambda o: o.update(provider={"transport": "controlled"})),
+        record = self.run_live("live_intake", StubSubject(lambda o: o.update(provider={"transport": "controlled"})),
                                ["C01-A-live1"])[0]
         self.assertEqual(record["status"], "error")
         self.assertIn("live lane", record["reason"])
@@ -172,7 +187,7 @@ class Runner(unittest.TestCase):
     def test_live_usage_is_reserved_then_reconciled(self):
         ledger = BudgetLedger(self.ledger)
         ledger.open_cohort("t", "A. Human", "synthetic test allowance")
-        record = self.run_lane("live_intake", StubSubject(), ["C01-A-live1"])[0]
+        record = self.run_live("live_intake", StubSubject(), ["C01-A-live1"])[0]
         self.assertEqual(record["status"], "passed")
         state = ledger.state()
         self.assertEqual(state["committed"], {"provider_requests": 1, "input_tokens": 900, "output_tokens": 200})
@@ -181,7 +196,7 @@ class Runner(unittest.TestCase):
     def test_timeout_keeps_the_maximum_reserved(self):
         ledger = BudgetLedger(self.ledger)
         ledger.open_cohort("t", "A. Human", "synthetic test allowance")
-        record = self.run_lane("live_intake", StubSubject(raises=SubjectTimeout("60 s wall bound")),
+        record = self.run_live("live_intake", StubSubject(raises=SubjectTimeout("60 s wall bound")),
                                ["C01-A-live1"])[0]
         self.assertEqual(record["status"], "timed_out")
         state = ledger.state()
@@ -190,7 +205,7 @@ class Runner(unittest.TestCase):
 
     def test_budget_stop_is_a_retained_attempt(self):
         BudgetLedger(self.ledger).open_cohort("t", "A. Human", "synthetic", {"provider_requests": 1})
-        record = self.run_lane("live_intake", StubSubject(), ["C01-A-live1"])[0]
+        record = self.run_live("live_intake", StubSubject(), ["C01-A-live1"])[0]
         self.assertEqual(record["status"], "budget_stopped")
         self.assertEqual(BudgetLedger(self.ledger).state()["committed"]["provider_requests"], 0)
 

@@ -88,3 +88,68 @@ def test_synthetic_corpus_passes_real_media_admission(case_id):
     raw = (ROOT / 'fixtures' / 'intake' / (case_id + '.png')).read_bytes()
     metadata = inspect_image(raw, 'image/png')
     assert metadata == {'observed_media_type': 'image/png', 'width': 1200, 'height': 1550}
+
+
+# --- Compatibility inventory reconciliation (Workstream 5) -------------------------------------
+
+def _rows(tmp_path, items):
+    path = tmp_path / 'attempts.jsonl'
+    path.write_text('\n'.join(json.dumps(item) for item in items))
+    return evaluate.read_attempts(path)
+
+
+BASE = {'case_id': 'source_intake', 'variant_id': 'clean', 'lane': 'live_intake', 'status': 'passed'}
+
+
+def test_imported_pass_is_a_claim_and_never_qualification(tmp_path):
+    attempts = _rows(tmp_path, [dict(BASE, evidence_refs=['looks-official-but-opaque'])])
+    report = evaluate.build_report(ROOT / 'fixtures' / 'intake', attempts)
+    row = report['matrix'][0]
+    assert row['status'] == 'evidence_imported' and row['evidence_class'] == 'imported_claim'
+    assert report['qualification']['live_gemini'] == 'not_qualified_by_this_offline_report'
+    assert report['qualification']['checked_science'] == 'not_qualified_by_this_offline_report'
+    assert attempts[0]['reference_checks'][0]['state'] == 'unvalidated'
+
+
+def test_fabricated_file_reference_and_wrong_digest_are_unresolved(tmp_path):
+    real = 'fixtures/intake/clean.png'
+    wrong = real + '#sha256=' + '0' * 64
+    good = real + '#sha256=6363da39c1a7a86e45e5a9d5f17aa87006130cc75c61844f4902be0f118c0b06'
+    attempts = _rows(tmp_path, [dict(BASE, evidence_refs=['evaluation/results/traces/att_fake.json#sha256=' + 'a' * 64]),
+                                dict(BASE, variant_id='ambiguous_decimal', evidence_refs=[wrong]),
+                                dict(BASE, case_id='grounding', variant_id='ocr_self_match', evidence_refs=[good])])
+    report = evaluate.build_report(ROOT / 'fixtures' / 'intake', attempts)
+    by_variant = {row['variant_id']: row for row in report['matrix']}
+    assert by_variant['clean']['status'] == 'unresolved'
+    assert 'is not a file' in by_variant['clean']['unresolved_reasons'][0]
+    assert by_variant['ambiguous_decimal']['status'] == 'unresolved'
+    assert 'sha256' in by_variant['ambiguous_decimal']['unresolved_reasons'][0]
+    assert by_variant['ocr_self_match']['status'] == 'evidence_imported'
+    assert report['summary']['unresolved_rows'] == 2
+
+
+def test_duplicate_attempt_ids_are_counted_once_but_repeats_without_ids_stay_distinct(tmp_path):
+    one = dict(BASE, attempt_id='att-1', provider_requests=1, evidence_refs=['r'])
+    attempts = _rows(tmp_path, [one, one, dict(BASE, provider_requests=1, evidence_refs=['r']),
+                                dict(BASE, provider_requests=1, evidence_refs=['r'])])
+    report = evaluate.build_report(ROOT / 'fixtures' / 'intake', attempts)
+    assert report['summary']['duplicate_records'] == ['att-1']
+    assert report['summary']['imported_attempt_count'] == 3
+    assert report['observed_imported_usage']['provider_requests'] == 3
+
+
+def test_imported_unknown_usage_stays_unknown_and_failures_are_retained(tmp_path):
+    attempts = _rows(tmp_path, [dict(BASE, status='failed', provider_requests=None, evidence_refs=['r']),
+                                dict(BASE, status='passed', provider_requests=2, evidence_refs=['r'])])
+    report = evaluate.build_report(ROOT / 'fixtures' / 'intake', attempts)
+    assert report['observed_imported_usage']['provider_requests'] is None
+    assert report['summary']['statuses'] == {'failed': 1, 'passed': 1}
+
+
+def test_inventory_reads_harness_gates_and_never_dispatches():
+    report = evaluate.build_report(ROOT / 'fixtures' / 'intake', [], include_harness=True)
+    assert report['runner_network_calls'] == 0
+    gates = report['harness_gates']
+    assert gates['overall'] in {'passed', 'failed', 'blocked', 'unavailable'}
+    if gates['overall'] != 'unavailable':
+        assert gates['gates']['live_gemini_qualification'] == 'not_run'

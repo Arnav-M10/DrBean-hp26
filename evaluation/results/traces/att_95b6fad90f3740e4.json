@@ -1,0 +1,272 @@
+{
+  "attempt_id": "att_95b6fad90f3740e4",
+  "controlled": null,
+  "entry_id": "RS-HERO-FULL",
+  "input": null,
+  "lane": "offline_real_science",
+  "observation": {
+    "approvals_created": 0,
+    "case_sha256": "696e1809f493d28a764cc0208ad180cf16b564b4eb816899e027887ac7803c10",
+    "checks": [
+      {
+        "detail": "valid synthetic PNG refused: 422 malformed_image",
+        "finding": "F-PLATFORM-RLIMIT",
+        "id": "source_image_admitted",
+        "level": "required",
+        "outcome": "failed"
+      },
+      {
+        "detail": "state failed",
+        "id": "baseline_run_terminal",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "1 scenario rows",
+        "id": "single_baseline_reservation",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "run state failed, error scientific_worker_failed; scenario reasons ['scientific_attempt_failed']",
+        "finding": "F-PLATFORM-RLIMIT",
+        "id": "baseline_completed_with_evidence",
+        "level": "required",
+        "outcome": "failed"
+      },
+      {
+        "detail": "0 inside and 0 outside candidate(s); design needs two distinct fixed candidates from this run",
+        "finding": "F-HERO-NO-PAIR",
+        "id": "design_pair_available",
+        "level": "required",
+        "outcome": "blocked"
+      }
+    ],
+    "details": {
+      "baseline": {
+        "candidates": [],
+        "expected_binding": null,
+        "independent_oracle_history": null,
+        "reason_code": null,
+        "replay": null,
+        "scientific_outcome": null,
+        "verification": null
+      },
+      "pair": [],
+      "records": {
+        "approval_id": "approval_953cf7eeef0d40fb988acd6d7b305a82",
+        "dataset_digest": "61d9f1198279155f4ece12fc3b96f8e0572e3c39fb87bb6708ecfeab224f4105",
+        "dataset_id": "dataset_db56f97b81be4e42863293b6786091fe",
+        "evidence_ids": [],
+        "plan_digest": "30d2c72586b8dc76a7aefc91f6cf23e48977d6b8a099d1cc5f45b046e70b8100",
+        "plan_id": "plan_56ead2e5fac3429ba7cca5a036ad4556",
+        "problem_digest": "f8b3f10f9cfc5255d7ccc5ac904f4c49dbe21cd49296be0cb191d74f0e245317",
+        "problem_id": "problem_cd5035e239fb4f29b1f617ca1d4a74f2",
+        "run_id": "run_477ba985d200480aa94b80fa6ec2d949",
+        "run_state": "failed",
+        "workspace_id": "ws_9a98c47bc13c40679e46a3167c9d2851"
+      }
+    },
+    "disclosed_text": [],
+    "entry_id": "RS-HERO-FULL",
+    "evidence_index": {
+      "hero-approval": {
+        "path": "records/hero-approval.json",
+        "sha256": "10016b209d489893830a1f0a3c37b51d863562cf6c74d7152e560609b4883be0"
+      },
+      "hero-dataset": {
+        "path": "records/hero-dataset.json",
+        "sha256": "67155f8ebf57f9520cbe8b8321c322310d39ca7373fd3db30af05ff6c06235e4"
+      },
+      "hero-plan": {
+        "path": "records/hero-plan.json",
+        "sha256": "082ee424855c072a7c6856c1d07c34f457a15e4b1418ff4b023b1c08385c5619"
+      },
+      "hero-problem": {
+        "path": "records/hero-problem.json",
+        "sha256": "ad525f8f0cdbe0da096ec26c0f6ed54fd062cc1d5efe2982be37abba73f2c2ed"
+      },
+      "hero-run": {
+        "path": "records/hero-run.json",
+        "sha256": "af78e6eba05459ecfd5ab50f53f97ecaa8f34336af55190b45e63fcda29f681f"
+      }
+    },
+    "exchanges": [
+      {
+        "latency_ms": 2.052,
+        "method": "POST",
+        "request_id": "7b4a8582-0485-4fbe-83ed-e1e4f70754a9",
+        "response_bytes": 196,
+        "response_sha256": "ac8e1ecb7034dc8ebd3db0b5634908f3b5790bac7861a936a36f9f2b83a0999c",
+        "route": "/workspaces",
+        "status": 201
+      },
+      {
+        "latency_ms": 25.287,
+        "method": "POST",
+        "request_id": "bcb98ca7-c088-4b5d-9872-e8d4d1260bc2",
+        "response_bytes": 254,
+        "response_sha256": "b39ef05f06c47de129b825b99935665f9d0c9e451aa66b407af9e35d4a210307",
+        "route": "/workspaces/{id}/source-assets",
+        "status": 422
+      },
+      {
+        "latency_ms": 2.812,
+        "method": "POST",
+        "request_id": "635cc02c-9611-43e8-ba1c-e52652647e2f",
+        "response_bytes": 1618,
+        "response_sha256": "6788d309318afce3396236d4e8f68d582da477200d44ea051573df26f347bd0b",
+        "route": "/workspaces/{id}/datasets",
+        "status": 201
+      },
+      {
+        "latency_ms": 1.944,
+        "method": "POST",
+        "request_id": "b40e95e6-8a78-46f3-aa64-f3556ff108d4",
+        "response_bytes": 831,
+        "response_sha256": "dc32816d0084456c1ea52c3061b52455ac8f6b4675d3db67f85fcf72db118a06",
+        "route": "/workspaces/{id}/problems",
+        "status": 201
+      },
+      {
+        "latency_ms": 35.489,
+        "method": "GET",
+        "request_id": "6d58476b-db0a-4286-8784-a1b32904331b",
+        "response_bytes": 42130,
+        "response_sha256": "24d6caa1f846a3f94dbbd198e09da186f628f6176521afbcdb8f2673b8162d56",
+        "route": "/openapi.json",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.331,
+        "method": "POST",
+        "request_id": "245fb4e6-2b59-4587-8f27-b9c4f392c042",
+        "response_bytes": 1124,
+        "response_sha256": "247bd912860fb6f1ae117bed631c3e2a828de87945fc18bb8522d58a84c53731",
+        "route": "/workspaces/{id}/plans",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.397,
+        "method": "POST",
+        "request_id": "b72b143c-ca0d-49ed-bd0a-5f95aec4df86",
+        "response_bytes": 431,
+        "response_sha256": "35021633178aeba6bc4266bdbbe375cde759558b0afc2cc17a8546a1cb95d256",
+        "route": "/plans/{id}/approvals",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.751,
+        "method": "POST",
+        "request_id": "283b249b-e1c0-416b-a9f4-1fb0c2a20efd",
+        "response_bytes": 469,
+        "response_sha256": "4b57b49fe4ff4b1494e9d5f5799c261bc10ccdfcc0762f846199d0698a2e32df",
+        "route": "/plans/{id}/runs",
+        "status": 202
+      },
+      {
+        "latency_ms": 1.27,
+        "method": "GET",
+        "request_id": "6f47f43b-f1d8-4972-94f9-bbfb8fc3dc1c",
+        "response_bytes": 469,
+        "response_sha256": "4b57b49fe4ff4b1494e9d5f5799c261bc10ccdfcc0762f846199d0698a2e32df",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.76,
+        "method": "GET",
+        "request_id": "cdc09ee8-91b0-47c9-9656-5cdcbdb64e65",
+        "response_bytes": 765,
+        "response_sha256": "3882c47da1862be651b3848bd98b901cd113c07070977951b61369edb8d9b0ea",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.871,
+        "method": "GET",
+        "request_id": "e00c20eb-41f2-4d08-ad33-35fea6b65a19",
+        "response_bytes": 852,
+        "response_sha256": "3ef90e3748af9b75f4457a45dae878c30b4794f11c0456d326294c919b37189a",
+        "route": "/runs/{id}",
+        "status": 200
+      }
+    ],
+    "external_dispatch": {
+      "attempt_sites": [],
+      "client_constructions": 0,
+      "credential_names_present": [],
+      "egress_attempts": 0,
+      "guarded_processes": 4,
+      "verified": true
+    },
+    "job_ids": [
+      "run_477ba985d200480aa94b80fa6ec2d949"
+    ],
+    "lane": "offline_real_science",
+    "lane_version": 1,
+    "native_artifacts": [],
+    "operation": "science",
+    "provider": {
+      "note": "manual plans; no model, controlled or live, was invoked by these scenarios",
+      "placeholder_identity": null,
+      "transport": "none"
+    },
+    "provider_requests": 0,
+    "readiness": {
+      "api": {
+        "health": {
+          "contract_version": "DB-SC-1",
+          "service": "dr-bean",
+          "status": "ready"
+        },
+        "ready": true
+      },
+      "science": {
+        "ready": false,
+        "reported": {
+          "browser_replay": false,
+          "claim_families": [],
+          "configured": false,
+          "design_tiers": [],
+          "implemented": false,
+          "native_replay": false,
+          "reason": "groundwork_adapter_not_installed",
+          "verified_in_environment": false
+        }
+      },
+      "worker": {
+        "holds_sqlite_worker_lock": true,
+        "process_alive": true,
+        "ready": true
+      }
+    },
+    "records": {
+      "approval_id": "approval_953cf7eeef0d40fb988acd6d7b305a82",
+      "dataset_digest": "61d9f1198279155f4ece12fc3b96f8e0572e3c39fb87bb6708ecfeab224f4105",
+      "dataset_id": "dataset_db56f97b81be4e42863293b6786091fe",
+      "evidence_ids": [],
+      "plan_digest": "30d2c72586b8dc76a7aefc91f6cf23e48977d6b8a099d1cc5f45b046e70b8100",
+      "plan_id": "plan_56ead2e5fac3429ba7cca5a036ad4556",
+      "problem_digest": "f8b3f10f9cfc5255d7ccc5ac904f4c49dbe21cd49296be0cb191d74f0e245317",
+      "problem_id": "problem_cd5035e239fb4f29b1f617ca1d4a74f2",
+      "run_id": "run_477ba985d200480aa94b80fa6ec2d949",
+      "run_state": "failed",
+      "workspace_id": "ws_9a98c47bc13c40679e46a3167c9d2851"
+    },
+    "reviewer_approvals": 1,
+    "schema": "eval-observation/v1",
+    "scientific_jobs": 1,
+    "state": "failed",
+    "tested_commit": "da5ecdc3f6add4689bf52129d2f00978884840c1",
+    "timings": {
+      "basis": "local loopback wall time measured by the harness; not provider latency",
+      "http_exchanges": 11,
+      "http_latency_ms_max": 35.489,
+      "http_latency_ms_total": 79.964
+    },
+    "tools": {
+      "transport": "real"
+    }
+  }
+}

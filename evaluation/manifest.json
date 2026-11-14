@@ -1,4 +1,5 @@
 {
+  "ancestry_archive": "manifests/manifest-v<N>.json holds every superseded manifest byte-for-byte",
   "caps": {
     "cohort": {
       "input_tokens": 64000,
@@ -97,8 +98,8 @@
     "source_sha256": "2dc232c8f2477ed959864e039d97655c287e6cce61cc54179daa6b0569f0fe59",
     "wire_profile": "DB-SC-1"
   },
-  "frozen_at": "2026-11-14T02:15:31Z",
-  "harness_version": "0.1.0",
+  "frozen_at": "2026-11-14T03:22:25Z",
+  "harness_version": "0.2.0",
   "holdouts": {
     "items": {
       "h01": {
@@ -118,7 +119,72 @@
     },
     "status": "prepared and sealed by digest; not used for prompt tuning; ungraded"
   },
-  "manifest_version": 1,
+  "lanes": {
+    "actual_full_stack": {
+      "cohort": true,
+      "enabled": false,
+      "live_provider": true,
+      "meaning": "v1 lane coupling real science to a live provider; retained, disabled, NOT_RUN",
+      "provider": [
+        "live"
+      ],
+      "tools": "real",
+      "version": 1,
+      "zero_dispatch_required": false
+    },
+    "fixture_contract": {
+      "cohort": false,
+      "enabled": true,
+      "live_provider": false,
+      "meaning": "offline controlled model/application boundary; never evidence about Gemini or science",
+      "provider": [
+        "controlled",
+        "none"
+      ],
+      "tools": null,
+      "version": 1,
+      "zero_dispatch_required": false
+    },
+    "live_agent_controlled_tools": {
+      "cohort": true,
+      "enabled": false,
+      "live_provider": true,
+      "meaning": "future live Gemini agent decisions; NOT_RUN",
+      "provider": [
+        "live"
+      ],
+      "tools": "controlled",
+      "version": 1,
+      "zero_dispatch_required": false
+    },
+    "live_intake": {
+      "cohort": true,
+      "enabled": false,
+      "live_provider": true,
+      "meaning": "future live Gemini intake; NOT_RUN until a new explicit user instruction",
+      "provider": [
+        "live"
+      ],
+      "tools": null,
+      "version": 1,
+      "zero_dispatch_required": false
+    },
+    "offline_real_science": {
+      "cohort": false,
+      "enabled": true,
+      "live_provider": false,
+      "meaning": "actual local API, worker and science through HTTP; zero external model dispatch",
+      "provider": [
+        "none",
+        "controlled"
+      ],
+      "tools": "real",
+      "version": 1,
+      "zero_dispatch_required": true
+    }
+  },
+  "live_activation": "disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared accounted allocation, Owner 3's operator path and independent grading of predeclared cases. The CLI has no switch for it.",
+  "manifest_version": 2,
   "modality": {
     "chosen": "image/png",
     "pdf": "not selected; unrun by decision"
@@ -318,7 +384,72 @@
         "scheduled_attempt": 2,
         "variant": "A"
       }
+    ],
+    "offline_real_science": [
+      {
+        "entry_id": "RS-HERO-FULL",
+        "lane": "offline_real_science",
+        "note": "real baseline, separate design approval, raw artifact download, fresh native replay",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-CHANGED-INPUT",
+        "lane": "offline_real_science",
+        "note": "changed scientific input: fresh identities and computation, original result unchanged",
+        "operation": "science",
+        "packet": "changed-input-v1"
+      },
+      {
+        "entry_id": "RS-RETRY-CONCURRENT",
+        "lane": "offline_real_science",
+        "note": "concurrent and retried starts: one accepted run, no duplicate science",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-DESIGN-AUTHORITY",
+        "lane": "offline_real_science",
+        "note": "baseline approval cannot authorize design; pair, allowance and grid bound",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-FOLLOWUP",
+        "lane": "offline_real_science",
+        "note": "hypothetical readings: new lineage, new approval, per-candidate outcomes",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-CANCEL-RESTART",
+        "lane": "offline_real_science",
+        "note": "queued and running cancellation, worker restart: no orphan, no redispatch",
+        "operation": "science",
+        "packet": "hero-v1"
+      },
+      {
+        "entry_id": "RS-ZERO-DISPATCH",
+        "lane": "offline_real_science",
+        "note": "whole lane: guard active in API and worker, zero external model dispatch",
+        "operation": "science",
+        "packet": "hero-v1"
+      }
     ]
+  },
+  "science_packets": {
+    "changed-input-v1": {
+      "file": "cases/science/changed-input-v1.json",
+      "sha256": "1062680b4b3193b6f00d22ad7bd826ffdf5b8074d3356359a5ac9396402e3837"
+    },
+    "fixed-pair-regression-v1": {
+      "file": "cases/science/fixed-pair-regression-v1.json",
+      "sha256": "04ffef6d9d47bcc59f8283fdeacc3383d46072cac5021546ab0d2cf334d2a7f2"
+    },
+    "hero-v1": {
+      "file": "cases/science/hero-v1.json",
+      "sha256": "696e1809f493d28a764cc0208ad180cf16b564b4eb816899e027887ac7803c10"
+    }
   },
   "sources": {
     "c01a": {
@@ -405,5 +536,12 @@
       "file": "sources/c10b.png",
       "sha256": "4a9cf5389ecafa09368eefbcc292369f4c99527f6778c531a689f67c0c62996e"
     }
-  }
+  },
+  "supersedes": [
+    {
+      "archived": "manifests/manifest-v1.json",
+      "manifest_version": 1,
+      "sha256": "f72c61ddedf9809052e64fa8ea11fd13c77aeecc57fe63affeb9fea4c6940d57"
+    }
+  ]
 }

@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-"""Offline GF-2 evidence inventory. Never dispatches a provider or science job.
+"""Compatibility inventory entry point (corpus integrity + imported evidence). Never dispatches anything.
 
-A report distinguishes corpus integrity checks from controlled application traces,
-fixture-fed live-model traces, and full-stack traces. Imported evidence is not a
-scientific verifier, independent oracle review, or account-eligibility decision.
+Scope since the five-workstream split: this script is NOT a second qualification system.
+The authoritative evaluation, lanes, append-only attempts and release gates live in
+``evaluation/`` (``python3.11 evaluation/cli.py inventory|gate``). This script keeps two jobs:
+
+1. corpus integrity of ``fixtures/intake`` (bytes, size, decodability) — the corpus lane;
+2. a compatibility view of *imported* evidence JSONL from older tooling. Every imported
+   row is an ``imported_claim``: a supplied ``status: passed`` never becomes qualification.
+   References written as ``<repo-relative path>#sha256=<hex>`` are checked; a missing file or
+   mismatched digest leaves the row ``unresolved`` with a concrete reason. Duplicate
+   ``attempt_id`` values are counted once and reported; rows without an id stay distinct.
+
+Qualification fields are copied from the harness gates when available and otherwise stay
+``not_qualified_by_this_offline_report``. Live Gemini stays not run.
 """
 from __future__ import annotations
 
@@ -77,6 +87,37 @@ def inspect_corpus(directory: Path) -> list[dict[str, Any]]:
     return checks
 
 
+def validate_reference(reference: Any, root: Path = ROOT) -> dict[str, Any]:
+    """'path#sha256=<hex>' is verified against the repository; anything else is an unvalidated label."""
+    if not isinstance(reference, str) or not reference.strip():
+        return {'reference': reference, 'state': 'invalid', 'reason': 'empty or non-string reference'}
+    if '#sha256=' not in reference:
+        return {'reference': reference, 'state': 'unvalidated', 'reason': 'opaque label; nothing to verify'}
+    rel, digest = reference.split('#sha256=', 1)
+    candidate = (root / rel).resolve()
+    if root.resolve() not in candidate.parents or not candidate.is_file():
+        return {'reference': reference, 'state': 'missing_file', 'reason': f'{rel} is not a file in this repository'}
+    actual = hashlib.sha256(candidate.read_bytes()).hexdigest()
+    if actual != digest.lower():
+        return {'reference': reference, 'state': 'digest_mismatch', 'reason': f'{rel} has sha256 {actual[:12]}...'}
+    return {'reference': reference, 'state': 'verified', 'reason': None}
+
+
+def harness_gates() -> dict[str, Any]:
+    """Authoritative qualification lives in the evaluation harness; read it, never recompute it."""
+    import sys
+    sys.path.insert(0, str(ROOT / 'evaluation'))
+    try:
+        from drbean_eval import gates, runner
+        state = runner.git_state(str(ROOT))
+        result = gates.compute(str(ROOT / 'evaluation'), str(ROOT / 'evaluation' / 'results'), state['commit'],
+                               state['dirty'], str(ROOT / 'evaluation' / 'findings.json'))
+        return {'overall': result['overall'], 'tested_commit': result['tested_commit'],
+                'gates': {g['gate']: g['status'] for g in result['gates']}}
+    except Exception as error:  # the inventory must still work without the harness
+        return {'overall': 'unavailable', 'error': f'{type(error).__name__}'}
+
+
 def read_attempts(path: Path | None) -> list[dict[str, Any]]:
     if path is None:
         return []
@@ -101,8 +142,24 @@ def read_attempts(path: Path | None) -> list[dict[str, Any]]:
                 raise ValueError(f'Invalid {field} on line {line_number}')
         if item['lane'] == 'deterministic_control' and (item.get('provider_requests', 0) or item.get('scientific_jobs', 0)):
             raise ValueError('Deterministic evidence cannot claim live provider/science work')
+        item = dict(item, evidence_class='imported_claim', line=line_number,
+                    reference_checks=[validate_reference(ref) for ref in item['evidence_refs']])
         attempts.append(item)
     return attempts
+
+
+def deduplicate(attempts: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
+    """Same attempt_id counted once (usage never doubled); rows without an id are distinct attempts."""
+    seen, unique, duplicates = set(), [], []
+    for attempt in attempts:
+        key = attempt.get('attempt_id')
+        if key is not None and key in seen:
+            duplicates.append(str(key))
+            continue
+        if key is not None:
+            seen.add(key)
+        unique.append(attempt)
+    return unique, duplicates
 
 
 def total_if_known(attempts: list[dict[str, Any]], field: str) -> int | None:
@@ -111,15 +168,21 @@ def total_if_known(attempts: list[dict[str, Any]], field: str) -> int | None:
     return sum(attempt[field] for attempt in attempts)
 
 
-def build_report(directory: Path, attempts: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    attempts = attempts or []
+def build_report(directory: Path, attempts: list[dict[str, Any]] | None = None,
+                 include_harness: bool = False) -> dict[str, Any]:
+    attempts, duplicates = deduplicate(attempts or [])
     corpus = inspect_corpus(directory)
     live = [attempt for attempt in attempts if attempt['lane'] != 'deterministic_control']
     rows = []
     for name, title, variants, required in MATRIX:
         for variant in variants:
             matching = [attempt for attempt in attempts if attempt['case_id'] == name and attempt['variant_id'] == variant]
-            rows.append({'case_id': name, 'name': title, 'variant_id': variant, 'required_evidence': required, 'status': 'not_run' if not matching else 'evidence_imported', 'attempts': matching})
+            broken = [check for attempt in matching for check in attempt.get('reference_checks', [])
+                      if check['state'] in ('missing_file', 'digest_mismatch', 'invalid')]
+            status = 'not_run' if not matching else 'unresolved' if broken else 'evidence_imported'
+            rows.append({'case_id': name, 'name': title, 'variant_id': variant, 'required_evidence': required,
+                         'status': status, 'evidence_class': 'imported_claim' if matching else None,
+                         'unresolved_reasons': [check['reason'] for check in broken], 'attempts': matching})
     counts = Counter(attempt['status'] for attempt in attempts)
     durations = [attempt['duration_ms'] for attempt in live if attempt.get('duration_ms') is not None]
     requests = total_if_known(live, 'provider_requests')
@@ -139,7 +202,9 @@ def build_report(directory: Path, attempts: list[dict[str, Any]] | None = None) 
         'corpus_checks': corpus,
         'matrix_scope': 'Backend mapping of the supplied acceptance table; Owner04 agreement pending. Not a claim that 24 application or live traces ran.',
         'matrix': rows,
-        'summary': {'planned_cases': 12, 'planned_variants': 24, 'corpus_integrity_passed': sum(x['status'] == 'passed' for x in corpus), 'imported_attempt_count': len(attempts), 'live_attempt_count': len(live), 'statuses': dict(counts)},
+        'summary': {'planned_cases': 12, 'planned_variants': 24, 'corpus_integrity_passed': sum(x['status'] == 'passed' for x in corpus), 'imported_attempt_count': len(attempts), 'live_attempt_count': len(live), 'statuses': dict(counts), 'duplicate_records': duplicates, 'unresolved_rows': sum(row['status'] == 'unresolved' for row in rows)},
+        'scope': 'compatibility inventory; authoritative lanes and gates: python3.11 evaluation/cli.py inventory',
+        'harness_gates': harness_gates() if include_harness else {'overall': 'not_requested'},
         'shared_live_allocation': LIMITS,
         'observed_imported_usage': {'provider_requests': requests, 'input_tokens': input_tokens, 'output_tokens': output_tokens, 'scientific_jobs': jobs, 'cost': None, 'allocation_exceeded': exceeded},
         'live_latency_ms': {'sample_count': len(durations), 'median': median(durations) if durations else None, 'min': min(durations) if durations else None, 'max': max(durations) if durations else None},
@@ -155,7 +220,7 @@ def main() -> int:
     parser.add_argument('--attempts', type=Path, help='Optional retained evidence JSONL; never replaces earlier attempts.')
     parser.add_argument('--output', type=Path, help='Write the JSON report here; otherwise print to stdout.')
     args = parser.parse_args()
-    report = build_report(args.corpus, read_attempts(args.attempts))
+    report = build_report(args.corpus, read_attempts(args.attempts), include_harness=True)
     encoded = json.dumps(report, indent=2) + '\n'
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
