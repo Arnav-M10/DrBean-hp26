@@ -195,3 +195,101 @@ inconclusive science, candidate-specific feedback and fresh native replay.
 No whole-product, live-provider or release-ready claim follows from this branch.
 Useful specialists and wider paper processing remain behind the working parent
 and ordinary browser gates. B alone chooses the application merge sequence.
+# Urgent offline investigation checkpoint — November 14, 2026
+
+A implemented `bean_api.research_controlled.build_controlled_research_model()`
+against B's actual PR41 caller at `0cabe92076f3575eff029d9904c5a52c0bb6510e`.
+This zero-argument factory returns an explicitly offline deterministic fixture,
+not live AI. It uses the actual Deep Agents planning/tool graph and consumes
+returned proposal IDs, canonical approval, actual child evidence and guarded
+report acceptance. It never supplies candidates or scientific results.
+
+Ordinary create_app/Worker checks now demonstrate: reviewed synthetic inputs →
+plan → human review pause → canonical approval → actual Counterdex baseline →
+explicit evidence read → updated next-step plan → accepted canonical report.
+The same objective/dataset name with changed concentrations computes a bounded
+search miss and proposes clarification instead of pair-design review. Missing
+reviewed assumptions stop before any scientific job. Downloaded native bytes
+replay against external anchors using this checkout's Counterdex source in
+qualified CPython3.11; an inconclusive/unsupported result stays so.
+
+A fixed approval-action wakeup when LangGraph has applied pending writes but
+B's raw checkpoint still names the old action. Exact reconstructed bindings and
+versions are required; counters are not reset. `continue_pending()` additionally
+reconciles only committed tool work or a retained terminal result under the same
+action, rejecting pending model/middleware retries. B should adopt that method
+for same-action recovery; its runtime/authority files were not edited here.
+
+Validation: **156 passed** across controlled policy, ordinary application/native
+replay, graph/adversarial, pending continuation, application adapter and metered
+application tests; Ruff and diff checks passed. Guarded execution used backend
+CPython3.13 and scientific CPython3.11. Four metered-path tests use explicitly
+substituted SDK/readiness fixtures: ordinary live-shaped planning/clarification,
+real consent/session/physical ledgers and refusal at missing admission or an
+exhausted allocation. They are not live-provider qualification. No provider
+requests, credential inspection or production capacity changes occurred.
+
+Run in the assembled B+A checkout, with prepared local runtimes:
+
+```sh
+env -i PATH=/opt/homebrew/bin:/usr/bin:/bin LANG=C.UTF-8 \
+  PYTHONDONTWRITEBYTECODE=1 BEAN_AI_MODE=placeholder \
+  BEAN_COUNTERDEX_PYTHON=/path/to/qualified-python3.11 \
+  PYTHONPATH=apps/api:evaluation/drbean_eval/guard \
+  DRBEAN_EGRESS_GUARD_LOG=/tmp/drbean-offline-research-guard.jsonl \
+  /path/to/backend-python3.13 -B -m pytest -q -p no:cacheprovider \
+  tests/test_research_controlled.py tests/test_research_controlled_application.py \
+  tests/test_research_pending_continuation.py tests/test_research_coordinator.py \
+  tests/test_research_coordinator_adversarial.py tests/test_research_integration.py \
+  tests/test_research_metered_application.py
+```
+
+Scope: baseline and useful next-action/report now exercised; actual checked pair
+design follows this checkpoint. Report commentary is retained in graph messages
+as a guarded annotation, not misrepresented as B's canonical report body.
+These are A author integration checks; B integrates and C qualifies the resulting
+candidate/browser. Live coordination remains `not_run`.
+
+## Same-graph metered baseline and next-action boundary
+
+The factory checkpoint is pushed at `39930b846f46c7475ed39228d10ada1739b38715`
+in [PR44](https://github.com/Arnav-M10/DrBean-hp26/pull/44); B received the exact
+command on PR41. Main advanced to `070b697` (its tree equals B's tested0cabe92).
+
+The complete baseline now also passes through the ordinary live-shaped model
+factory with the actual Gemini chat adapter/gateway and SQLite consent/session/
+shared ledger. An explicitly controlled SDK responder runs the offline policy
+on the actual serialized messages/tool results; no hosted request or credential
+test occurs. Six requested calls create exactly six reserved-before-dispatch
+attempts, totaling **63,802 reserved input tokens**, within the unchanged64,000
+ceiling. Missing consent/allocation and exhausted capacity still refuse. This
+narrow input fits; larger inputs may correctly exhaust the conservative limit.
+It establishes adapter/accounting integration, not Gemini understanding or live
+free-tier qualification.
+
+To fit that existing limit, `research-prompt.v3` uses compact instructions for
+the actual SDK TodoListMiddleware and tool descriptions. Model context retains
+all scientific record bodies, rows (including excluded rows), allowances,
+assumptions, provenance, IDs and digests. It omits only storage timestamps,
+actor/workspace metadata and aliases an identical current-problem envelope.
+Scientific bodies are copied intact, including any nested source metadata.
+Authority/checkpoint binding still uses the original full context; incompatible
+old prompt checkpoints are refused. No provider estimator or budget changed.
+
+The offline policyv2 preserves completed todos across explicit actions, rereads
+the baseline and checks its current problem identity/digest before proposing
+design, requires positive checked margin for a reading recommendation, and
+includes baseline+design evidence in canonical order in the next report.
+Component controls cover zero margin, numerical guidance, changed assumptions
+and no separation. **Ordinary pair-design continuation is not yet available:**
+B's `ResearchService.advance` accepts ready/paused but refuses completed reports
+with409 `research_not_advanceable`. Two concrete application regressions report
+that exact dependency as xfail; they do not pass or bypass B's state machine.
+B owns admitting an explicit bounded next action/UI affordance and the trusted
+pending-tool caller adoption. No B implementation or C test was edited.
+
+Final local regression: **240 passed, 2 explicitly unavailable pair-flow cases**
+across the first checkpoint suites plus Gemini chat model/gateway controls.
+Ruff/diff checks pass; the guard logged only installations (no provider/network/
+credential events). These results remain author checks. C should challenge the
+eventual integrated commit, and B remains sole application integrator.
