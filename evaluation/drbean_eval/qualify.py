@@ -79,6 +79,11 @@ def _link_checks(records: dict) -> list[dict]:
         if not all((dataset, problem, plan, approval, run)):
             check(f"links:{label}:complete", False, "a baseline record is missing from the saved evidence")
             continue
+        workspaces = {r.get("workspace_id") for r in (dataset, problem, plan, approval, run) if isinstance(r, dict)}
+        workspaces |= {records[name].get("workspace_id") for name in records if name.startswith(label + "-")
+                       and isinstance(records[name], dict) and records[name].get("workspace_id")}
+        check(f"links:{label}:same_workspace", len(workspaces - {None}) == 1,
+              f"records span workspaces {sorted(w for w in workspaces if w)}")
         check(f"links:{label}:problem_dataset", problem["body"]["dataset_id"] == dataset["id"]
               and problem["body"]["dataset_digest"] == dataset["digest"])
         check(f"links:{label}:plan_problem", plan["body"]["problem_id"] == problem["id"]

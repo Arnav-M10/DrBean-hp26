@@ -800,8 +800,50 @@ def scenario_retry_concurrent(flow: Flow, packet: dict, *, threads: int = 8) -> 
     checks.expect("repeat_approval_returns_same_approval", second["id"] == approval["id"],
                   "an approval is not multiplied by repetition")
     flow.save_record("concurrency-run", finished)
+    stale = check_stale_approval(flow, packet, checks)
     return {"checks": checks, "observation": {"run_id": run_id, "distinct_runs": len(ids), "errors": errors,
-                                              "job_states": activity.get("job_states")}}
+                                              "job_states": activity.get("job_states"), "stale_approval": stale}}
+
+
+def check_stale_approval(flow: Flow, packet: dict, checks: Checks) -> dict:
+    """An approval binds the reviewed revision: a newer dataset revision makes the old approval unusable."""
+    workspace = flow.client.post("/workspaces", {"name": "Dr. Bean evaluation stale approval"}, label="sa-ws")["id"]
+    flow.workspaces.append(workspace)
+    dataset = flow.client.post(f"/workspaces/{workspace}/datasets", packet["dataset"], label="sa-dataset")
+    problem = flow.client.post(f"/workspaces/{workspace}/problems",
+                               {**packet["problem"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]},
+                               label="sa-problem")
+    plan = flow.client.post(f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"],
+                            "plan": flow.plan_body(problem, dataset, "Stale approval control")}, label="sa-plan")
+    approval = flow.client.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
+                                "expected_current_revision_id": problem["id"], "accepted": True}, label="sa-approve")
+    revised_rows = [dict(row) for row in packet["dataset"]["rows"]]
+    revised_rows[0] = {**revised_rows[0], "hard_allowance": "2/5", "original_values": {
+        **revised_rows[0].get("original_values", {}), "hard_allowance": "0.40"}}
+    revised = flow.client.post(f"/workspaces/{workspace}/datasets", {**packet["dataset"], "rows": revised_rows,
+                               "parent_id": dataset["id"], "change_reason": "Reviewed tighter allowance on row 1"},
+                               label="sa-revision")
+    outcome: dict = {"revision": revised["id"]}
+    try:
+        flow.client.post(f"/plans/{plan['id']}/runs", {"approval_id": approval["id"],
+                         "expected_plan_digest": plan["digest"]}, label="sa-start-stale")
+        checks.add("approval_invalidated_by_new_revision", "failed",
+                   "a run started from an approval whose reviewed dataset is no longer current",
+                   finding="F-STALE-APPROVAL")
+        outcome["started"] = True
+    except ApiFailure as error:
+        checks.expect("approval_invalidated_by_new_revision", error.status in (403, 409, 422)
+                      and error.code in ("stale_revision", "approval_required"), f"{error.status} {error.code}")
+        outcome["refusal"] = error.code
+    try:
+        flow.client.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
+                         "expected_current_revision_id": problem["id"], "accepted": True}, label="sa-reapprove")
+        checks.add("stale_plan_cannot_be_reapproved", "failed", "an approval was issued against a superseded revision",
+                   finding="F-STALE-APPROVAL")
+    except ApiFailure as error:
+        checks.expect("stale_plan_cannot_be_reapproved", error.code == "stale_revision" or error.status in (409, 422),
+                      f"{error.status} {error.code}")
+    return outcome
 
 
 def scenario_design_authority(flow: Flow, packet: dict) -> dict:
