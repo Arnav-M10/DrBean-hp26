@@ -10,6 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 FOLDER = ROOT / "evaluation" / "coordinator"
+OBSERVATIONS = ROOT / "evaluation" / "results" / "coordinator"   # evidence-only path: updates keep harness identity
 GROUPS = {"scientific", "coordinator_journey", "coordinator_graph", "authority_privacy", "durability", "metering",
           "general_files", "release"}
 FIELDS = {"id", "group", "blocking", "behavior_owner", "statement", "observable", "pass", "lanes"}
@@ -50,7 +51,7 @@ class FrozenPredicates(unittest.TestCase):
                          {"passed", "failed", "not_available", "not_run", "historical_only", "author_check"})
 
     def test_baseline_observations_cover_every_predicate_with_declared_statuses(self):
-        baselines = sorted(FOLDER.glob("baseline-*.json"))
+        baselines = sorted(OBSERVATIONS.glob("baseline-*.json"))
         if not baselines:
             self.skipTest("no baseline observation recorded yet")
         ids = {item["id"] for item in self.data["predicates"]}
