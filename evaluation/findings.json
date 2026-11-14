@@ -1834,6 +1834,26 @@
         "library_probe": "inspect: 236 MiB peak; render: watchdog killed at 2228 MiB in 0.93 s",
         "regression": "tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (opt-in; strict xfail on darwin)"
       }
+    },
+    {
+      "id": "F-PAPER-IDENTITY-CONTRACTS",
+      "severity": "P2",
+      "owner": "2 (contracts), with 3 and 4",
+      "status": "open",
+      "title": "Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written",
+      "minimal_input": "compare: PR #34 shared/contracts/RESEARCH_AGENT_HANDOFF.json identity.page_identity; PR #35 ai_prompts.PaperPageContext/PaperCitation; PR #36 papers/_pdf_worker.inspect() page records and papers/citations.validate_citation()",
+      "command": "read-only comparison of the three branches (no execution needed)",
+      "expected": "one agreed page identity (id, physical page, digest of what), one citation coordinate space (units, origin, rotation, render scale) and one disclosure digest that the parser emits, the proposal validator checks and the ledger binds",
+      "observed": "PR #34: page_id, physical_page_number, source_sha256, text_reference, image_reference, parser_version; disclosure binds selected_page_manifest_digest. PR #35: page_id + page_sha256 per page; citation bbox = four integers within an admitted pixel width/height with top < bottom (top-left pixel space at an unstated render scale); page_manifest_digest and selected_page_subset_digest. PR #36: no page_id or page_sha256 (text_sha256 = hash of extracted text); boxes in PDF points with a bottom-left origin before /Rotate, plus render_box() to map to preview pixels at a given scale; digests manifest_sha256, selection_sha256, subset_sha256",
+      "impact": "each PR passes its own tests, but a proposal cannot be validated against a parser manifest without an undefined mapping; a box validated in one space can point at the wrong region in another (rotation and scale), and 'page_sha256' has no producer",
+      "suggested_fix": "Owner 2 publishes the mapping in research-agent.v1: page_id = the manifest's page identity; the page digest = a named producer (for example sha256 of the page's text or of the rendered PNG at a fixed scale); citations in PDF points with Owner 4's render_box for display; page_manifest_digest = PR #36 selection_sha256 (which already binds source, manifest and subset digests). PR #35 and PR #36 then adopt it before assembly",
+      "evidence": {
+        "branches": {
+          "pr34": "33dc7f4",
+          "pr35": "c952c35",
+          "pr36": "081bbdc"
+        }
+      }
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main).",

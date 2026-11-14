@@ -52,6 +52,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 | F-PAPER-EXPONENT-FLATTENING | P2 | 3 (with 4: parser) | open | A superscript exponent flattened by the PDF text layer ('1.1 × 10' + superscript '1' read as '1.1 × 101') is accepted as the exact value 101 with no visual-review flag |
 | H-LANE-ENGINE-PRECONDITION | P2 | 5 (harness) | retested | Lane reports judged the engine precondition by the engine interpreter's installed copy, so checkouts without one (preview worktrees) were reported failed although the application ran the repository source |
 | F-PAPER-RENDER-MEMORY | P1 | 4 (papers worker; resource_policy with 2) | open | On macOS a page preview of a small PDF whose content inflates to gigabytes drives the PDF worker to multiple GiB: memory is bounded only by time |
+| F-PAPER-IDENTITY-CONTRACTS | P2 | 2 (contracts), with 3 and 4 | open | Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -476,6 +477,14 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Expected:** the preview is refused (resource_limit) or completes within the worker's 768 MiB memory bound, as on Linux where RLIMIT_AS enforces it
 - **Observed:** without the watchdog kill: the request returned 200 after the process tree peaked at 2440 MiB; with it: killed at 1549 MiB, then a 422 resource_limit. resource_policy reports address_space 'unavailable' on darwin, so only RLIMIT_CPU (12 s) and the 15 s wall clock bound the renderer; inspection stays bounded (pypdf caps decompression; 236 MiB peak)
 - **Evidence:** {"library_probe": "inspect: 236 MiB peak; render: watchdog killed at 2228 MiB in 0.93 s", "preview": "7139c90 = 500ba3c + PR #36 081bbdc, plus f02e2a6 applying docs/proposals/owner2-paper-routes.patch (unreviewed by Owner 2) and an unlocked uv resolution of pypdf 7.1.0 / pypdfium2 5.15.2; labelled preview", "regression": "tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory (opt-in; strict xfail on darwin)"}
+
+## F-PAPER-IDENTITY-CONTRACTS (P2, owner 2 (contracts), with 3 and 4, open)
+
+- **Input:** compare: PR #34 shared/contracts/RESEARCH_AGENT_HANDOFF.json identity.page_identity; PR #35 ai_prompts.PaperPageContext/PaperCitation; PR #36 papers/_pdf_worker.inspect() page records and papers/citations.validate_citation()
+- **Command:** `read-only comparison of the three branches (no execution needed)`
+- **Expected:** one agreed page identity (id, physical page, digest of what), one citation coordinate space (units, origin, rotation, render scale) and one disclosure digest that the parser emits, the proposal validator checks and the ledger binds
+- **Observed:** PR #34: page_id, physical_page_number, source_sha256, text_reference, image_reference, parser_version; disclosure binds selected_page_manifest_digest. PR #35: page_id + page_sha256 per page; citation bbox = four integers within an admitted pixel width/height with top < bottom (top-left pixel space at an unstated render scale); page_manifest_digest and selected_page_subset_digest. PR #36: no page_id or page_sha256 (text_sha256 = hash of extracted text); boxes in PDF points with a bottom-left origin before /Rotate, plus render_box() to map to preview pixels at a given scale; digests manifest_sha256, selection_sha256, subset_sha256
+- **Evidence:** {"branches": {"pr34": "33dc7f4", "pr35": "c952c35", "pr36": "081bbdc"}}
 
 ## Check-level finding ids (raised only when the check fails)
 
