@@ -61,8 +61,8 @@ export function createComparison({ route, workspace, available, seconds, onConne
     d.columns ??= C.guessCurrentColumns(d.tables[d.table])
     d.rows = C.currentsFrom(d.tables[d.table], d.columns, d.sigmaForAll)
   }
-  function useTables(tables, base) {
-    const best = tables.reduce((pick, t, i) => t.rows.length > tables[pick].rows.length ? i : pick, 0)
+  function useTables(tables, base, preferred) {
+    const best = preferred ?? tables.reduce((pick, t, i) => t.rows.length > tables[pick].rows.length ? i : pick, 0)
     const d = { ...C.blankComparison(), ...base, tables, table: best }
     applyTable(d)
     begin(withDefaults(d))
@@ -89,6 +89,8 @@ export function createComparison({ route, workspace, available, seconds, onConne
   // --- Step 1 ---------------------------------------------------------------------------------
   function sourceLine() {
     if (draft.kind === 'sample') return 'Made-up currents from the repository’s synthetic example, in µA. Change any value.'
+    const table = draft.tables[draft.table]
+    if (draft.kind === 'file' && table?.fromAssistant) return `From ${table.file}${table.page ? `, page ${table.page}` : ''}. The assistant copied these values: check every one against the file.`
     if (draft.kind === 'file') return `From ${draft.name}. The original file is saved in your workspace. Check every value against it.`
     if (draft.kind === 'paste') return 'From the table you pasted. Check every value.'
     if (draft.kind === 'saved') return 'The currents saved with this comparison. Changing them needs a new approval.'

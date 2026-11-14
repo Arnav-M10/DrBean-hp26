@@ -50,10 +50,10 @@
 
 <nav class="steps" aria-label="Study steps">
   <ol>
-    <li><a href="#data" data-step="data"><span class="num" aria-hidden="true"><b>1</b><svg><use href="#i-check"/></svg></span><span class="label" data-label="data">Data and claim</span></a></li>
-    <li><a href="#check" data-step="check"><span class="num" aria-hidden="true"><b>2</b><svg><use href="#i-check"/></svg></span><span class="label" data-label="check">Check</span></a></li>
-    <li><a href="#result" data-step="result"><span class="num" aria-hidden="true"><b>3</b><svg><use href="#i-check"/></svg></span><span class="label">Result</span></a></li>
-    <li><a href="#next" data-step="next"><span class="num" aria-hidden="true"><b>4</b><svg><use href="#i-check"/></svg></span><span class="label">Next measurement</span></a></li>
+    <li><a href="#data" data-step="data"><span class="num" aria-hidden="true"><b>1</b><svg><use href="#i-check"/></svg></span><span class="label">Data</span></a></li>
+    <li><a href="#check" data-step="check"><span class="num" aria-hidden="true"><b>2</b><svg><use href="#i-check"/></svg></span><span class="label">Approval</span></a></li>
+    <li><a href="#result" data-step="result"><span class="num" aria-hidden="true"><b>3</b><svg><use href="#i-check"/></svg></span><span class="label">Answer</span></a></li>
+    <li><a href="#next" data-step="next"><span class="num" aria-hidden="true"><b>4</b><svg><use href="#i-check"/></svg></span><span class="label">Next step</span></a></li>
   </ol>
 </nav>
 
@@ -67,26 +67,40 @@
   </div>
   <section id="data" aria-labelledby="data-title">
     <div id="start" class="start">
-      <h1 id="data-title">Bring your readings</h1>
-      <div class="kinds" role="radiogroup" aria-label="What your readings are">
-        <label><input type="radio" name="study-kind" value="concentration" checked>Drug concentration over time</label>
-        <label><input type="radio" name="study-kind" value="currents">Electron currents at a collector</label>
-      </div>
-      <p id="start-lead" class="lead">Concentration over time, from any file. Dr. Bean finds the numbers, you confirm them, and the checker tests your claim about the elimination rate.</p>
+      <h1 id="data-title">Bring your files and your question</h1>
+      <p class="lead">Any field, any file. The assistant reads your files and answers with quotes from them. When a table fits a model Dr. Bean can check, it checks the answer too.</p>
+      <label class="field question-field">Your question<textarea id="question" data-question rows="2" maxlength="2000" spellcheck="true" placeholder="For example: does this drug clear faster than 0.17 per hour? What changed between the two runs?"></textarea></label>
       <label id="drop" class="drop">
-        <input id="file" type="file" accept=".csv,.tsv,.tab,.txt,.json,.md,.pdf,text/csv,text/tab-separated-values,application/json,text/plain,text/markdown,application/pdf,image/png,image/jpeg">
+        <input id="file" type="file" multiple accept=".csv,.tsv,.tab,.txt,.json,.md,.pdf,.png,.jpg,.jpeg,text/csv,text/tab-separated-values,application/json,text/plain,text/markdown,application/pdf,image/png,image/jpeg">
         <svg aria-hidden="true"><use href="#i-upload"/></svg>
-        <span class="drop-title">Drop a file or choose one</span>
-        <span class="meta">CSV, TSV, JSON, text, Markdown or a PDF of up to 10 pages. Up to 5 MB.</span>
+        <span class="drop-title">Drop files or choose them</span>
+        <span class="meta">Up to 5 files: CSV, TSV, JSON, text, Markdown, PDF of up to 10 pages, PNG or JPEG. Up to 5 MB each.</span>
       </label>
       <div class="start-actions">
-        <button type="button" class="secondary" data-action="paste"><svg aria-hidden="true"><use href="#i-paste"/></svg>Paste a table</button>
-        <button type="button" class="secondary" data-action="type"><svg aria-hidden="true"><use href="#i-plus"/></svg>Type readings</button>
-        <button type="button" class="quiet-button" data-action="sample">Try the sample readings</button>
+        <button type="button" class="secondary" data-action="paste"><svg aria-hidden="true"><use href="#i-paste"/></svg>Paste or type a table</button>
+        <p class="meta examples">Or try an example with <button type="button" class="link" data-action="sample-concentration">drug levels after a dose</button> or <button type="button" class="link" data-action="sample-currents">electron currents at a collector</button>.</p>
       </div>
-      <p id="start-note" class="hint" hidden></p>
       <p id="start-problem" class="problem" hidden></p>
       <p id="start-status" class="status" role="status" hidden></p>
+    </div>
+
+    <div id="overview" hidden>
+      <h1>What Dr. Bean found</h1>
+      <label class="field question-field">Your question<textarea id="overview-question" data-question rows="2" maxlength="2000" spellcheck="true" placeholder="What do you want to know from these files?"></textarea></label>
+      <ul id="source-list" class="files sources"></ul>
+      <div class="table-actions">
+        <label class="secondary small file-add"><input id="file-more" type="file" multiple accept=".csv,.tsv,.tab,.txt,.json,.md,.pdf,.png,.jpg,.jpeg,text/csv,text/tab-separated-values,application/json,text/plain,text/markdown,application/pdf,image/png,image/jpeg"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add files</label>
+        <p id="overview-status" class="status left" role="status" hidden></p>
+      </div>
+      <h2 class="sub">What it can do with them</h2>
+      <ul id="can-do" class="can-do"></ul>
+      <details id="manual-check" class="technical" hidden>
+        <summary>Use a table for a check anyway</summary>
+        <div class="manual-body">
+          <label class="field">Table<select id="manual-table"></select></label>
+          <div class="file-actions"><button type="button" class="secondary small" data-action="manual" data-kind="concentration">Check as drug concentration over time</button><button type="button" class="secondary small" data-action="manual" data-kind="currents">Compare as electron currents</button></div>
+        </div>
+      </details>
     </div>
 
     <div id="editor" hidden>
@@ -229,6 +243,20 @@
       </div>
     </div>
    </div>
+   <div id="ai-check" class="pane" hidden>
+    <h1>Approve the reading</h1>
+    <p id="ai-check-lead" class="lead"></p>
+    <table class="facts"><tbody id="ai-check-facts"></tbody></table>
+    <label class="check-line consent"><input type="checkbox" id="ai-consent"><span id="ai-consent-text"></span></label>
+    <p id="ai-check-problem" class="problem" hidden></p>
+    <div class="actions">
+      <a href="#data" class="back">Change the files or question</a>
+      <div class="go">
+        <p id="ai-check-status" class="status" role="status" hidden></p>
+        <button id="ai-send" type="button" class="primary" data-action="ai-send">Send to the assistant</button>
+      </div>
+    </div>
+   </div>
    <div id="cmp-check" class="pane" hidden>
     <h1>Approve the comparison</h1>
     <p class="lead">Nothing runs until you approve it. This is a numerical fit, not an exact Counterdex proof.</p>
@@ -285,6 +313,45 @@
     <div class="actions">
       <a href="#data" class="back">Change data or claim</a>
       <div class="go"><p id="next-unavailable" class="meta" hidden></p><button id="to-next" type="button" class="primary" data-action="go-next">Plan the next measurement</button></div>
+    </div>
+   </div>
+   <div id="ai-result" class="pane" hidden>
+    <div class="result-head">
+      <p id="ai-note" class="meta"></p>
+      <nav class="views" aria-label="Answer views"><a href="#result" data-view>Answer</a><a href="#result-readings" data-view>Sources</a><a href="#result-files" data-view>Files</a></nav>
+    </div>
+    <div id="ai-answer">
+      <h1 id="ai-title"></h1>
+      <p id="ai-summary" class="lead"></p>
+      <p id="ai-label" class="notice-line"></p>
+      <div class="answer-grid">
+        <div>
+          <h2 class="sub">Claims and the words they rest on</h2>
+          <div id="ai-claims"></div>
+        </div>
+        <div>
+          <div id="ai-checkable"></div>
+          <div id="ai-questions-wrap"><h2 class="sub">Questions for you</h2><div id="ai-questions"></div></div>
+          <h2 class="sub">What this reading does not show</h2>
+          <ul id="ai-limits" class="limit-list"></ul>
+        </div>
+      </div>
+      <div id="ai-tables"></div>
+    </div>
+    <div id="ai-sources" hidden>
+      <h1>Sources</h1>
+      <p class="lead">Every quote in the answer, by file and page. The server compares each quote with the file's own text.</p>
+      <div id="ai-source-list"></div>
+    </div>
+    <div id="ai-files" hidden>
+      <h1>Files</h1>
+      <p class="lead">The files the assistant read, kept in your private workspace with their fingerprints.</p>
+      <ul id="ai-file-list" class="files"></ul>
+      <button type="button" class="secondary small" data-action="ai-view">View the saved answer as JSON</button>
+    </div>
+    <div class="actions">
+      <a href="#data" class="back">Change the files or question</a>
+      <div class="go"><button id="ai-to-next" type="button" class="primary" data-action="ai-go-next">See the next steps</button></div>
     </div>
    </div>
    <div id="cmp-result" class="pane" hidden>
@@ -389,6 +456,16 @@
       </div>
     </div>
    </div>
+   <div id="ai-next" class="pane" hidden>
+    <h1>Next steps</h1>
+    <p id="ai-next-lead" class="lead"></p>
+    <div id="ai-next-checks"></div>
+    <h2 class="sub">What the assistant suggests</h2>
+    <div id="ai-steps"></div>
+    <div class="actions">
+      <a href="#result" class="back">Back to the answer</a>
+    </div>
+   </div>
    <div id="cmp-next" class="pane" hidden>
     <div class="result-head">
       <p class="meta">Noise level</p>
@@ -416,7 +493,7 @@
 </main>
 
 <dialog id="paste-dialog" aria-labelledby="paste-title">
-  <h2 id="paste-title">Paste a table</h2>
+  <h2 id="paste-title">Paste or type a table</h2>
   <p>Copy rows from a spreadsheet, a paper or a text file. Columns can be separated by tabs, commas or spaces. A header line helps Dr. Bean name the columns.</p>
   <label class="field">Rows<textarea id="paste-text" rows="8" spellcheck="false"></textarea></label>
   <p id="paste-problem" class="problem" hidden></p>
@@ -427,6 +504,12 @@
   <div class="dialog-head"><h2 id="file-title"></h2><button type="button" class="icon" data-action="close" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
   <div id="file-body" class="file-body"></div>
   <div class="dialog-actions"><button type="button" class="secondary" data-action="save-file"><svg aria-hidden="true"><use href="#i-download"/></svg>Download this JSON file</button><button type="button" class="primary" data-action="close">Done</button></div>
+</dialog>
+
+<dialog id="ai-dialog" aria-labelledby="ai-dialog-title" class="wide">
+  <div class="dialog-head"><h2 id="ai-dialog-title">The saved answer</h2><button type="button" class="icon" data-action="close" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+  <div class="file-body"><pre id="ai-dialog-body" class="raw-json"></pre></div>
+  <div class="dialog-actions"><button type="button" class="primary" data-action="close">Done</button></div>
 </dialog>
 
 <dialog id="cmp-dialog" aria-labelledby="cmp-dialog-title" class="wide">

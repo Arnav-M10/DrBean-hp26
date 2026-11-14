@@ -1,8 +1,10 @@
-// Dr. Bean study page: your data in, a checked answer out. Every scientific step runs on
-// the server; this page saves inputs, asks for each approval, waits for real results and
-// makes the downloaded files readable. Two kinds of study share the four steps:
-// concentration over time (research agent + Counterdex exact check) and electron currents
-// (the numerical model comparison service, compare-app.mjs).
+// Dr. Bean study page: any files and a question in; an answer out, checked where it can be.
+// Every step runs on the server; this page saves inputs, asks for each approval, waits for
+// real results and makes them readable. Three paths share the four steps, and the files
+// decide which ones are offered:
+//   the assistant (general research service: Gemini, or its local test responder), any field;
+//   an exact check (research agent + Counterdex) for concentration over time;
+//   a numerical comparison (model comparison service) for electron collector currents.
 import { bootstrapSharedSession, readConnection } from '../session.mjs'
 import { parseExact } from '../exact.mjs'
 import { chartSVG } from './chart.mjs'
@@ -10,6 +12,9 @@ import { convert, guessColumns, readingsFrom, tablesFromJSON, tablesFromText } f
 import { page as sym } from './math.mjs'
 import { $, countStatus, failure, readable, saveText, size, status } from './ui.mjs'
 import { createComparison } from './compare-app.mjs'
+import { createGeneral } from './general-app.mjs'
+import { CHECKS, overview } from './general.mjs'
+import { fileMediaHint, generalCapabilities, validateFileSelection } from '../general-workspace.mjs'
 import { curvesFor, escapeHTML, fileView, finding, formatBound, formatRate, fromTexts, nextFinding, nextTable, readableReport, readingTable, summarize } from './results.mjs'
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -32,19 +37,23 @@ let busy = false
 // never while someone is still filling the form in for the first time.
 let shown = { tried: false, touched: {} }, nextShown = { tried: false, touched: {} }
 
-// Which kind of study the start screen offers; a viewer convenience, kept in this browser.
-const KIND = 'dr-bean.study.kind'
-let mode = (() => { try { return localStorage.getItem(KIND) === 'currents' ? 'currents' : 'concentration' } catch { return 'concentration' } })()
-function setMode(next) {
-  mode = next === 'currents' ? 'currents' : 'concentration'
-  try { localStorage.setItem(KIND, mode) } catch { /* the choice just is not remembered */ }
-}
+// The path on screen: null until the person picks something to do with their files.
+let mode = null                  // 'concentration' | 'currents' | 'general' | null
+let sources = []                 // [{ asset, tables, name? }] files in this study, read by the intake
+let question = ''
+const setMode = next => { mode = next }
 const comparisonAvailable = () => capabilities ? capabilities.model_comparison?.available === true : null
 const cmp = createComparison({
   route: () => route(), workspace: () => workspace, available: comparisonAvailable,
   seconds: () => capabilities?.model_comparison?.max_compute_seconds ?? 10,
   onConnectionFailure: error => connectionFailure(error),
   save: entry => { study = entry ?? {}; writeStore() },
+})
+const gen = createGeneral({
+  route: () => route(), api: () => api, workspace: () => workspace, capabilities: () => capabilities,
+  sources: () => sources.filter(s => s.asset), question: () => question,
+  save: entry => { study = entry ?? {}; writeStore() },
+  startCheck: (kind, tables, index, asset) => startCheck(kind, tables, index, asset),
 })
 
 function blankDraft() {
@@ -106,7 +115,8 @@ async function connect(startNew = false) {
     const opened = await bootstrapSharedSession(undefined, { startNew })
     // A different workspace shares nothing with the old one, so its study starts empty.
     if (workspace && workspace !== opened.session.workspace_id) {
-      draft = blankDraft(); snapshot = null; results = null; cmp.reset(); $('study-name').textContent = ''; location.hash = 'data'
+      draft = blankDraft(); snapshot = null; results = null; cmp.reset(); gen.reset(); sources = []; question = ''; mode = null
+      $('study-name').textContent = ''; location.hash = 'data'
     }
     api = opened.api; workspace = opened.session.workspace_id
     api.setConnectionFailureHandler(error => { if (api === opened.api && !connecting) connectionFailure(error) })
@@ -127,16 +137,30 @@ async function connect(startNew = false) {
 const canRun = () => capabilities?.science?.available && capabilities.deepagents?.dispatch_enabled && capabilities.deepagents.execution_mode !== 'live'
 
 function connectionLabel() {
-  if (!api || !capabilities) return
-  const research = capabilities.deepagents
-  if (mode === 'currents') setConnection(comparisonAvailable() ? 'Private workspace' : 'Comparisons are not available on this server', comparisonAvailable() ? '' : 'bad')
-  else if (!capabilities.science?.available) setConnection('The checker is not running on this server', 'bad')
-  else if (!research?.dispatch_enabled) setConnection('Checks are turned off on this server', 'bad')
-  else if (research.execution_mode === 'live') setConnection('This server uses a live model, which needs consent in the classic view', 'bad')
-  else setConnection('Private workspace')
+  if (api && capabilities) setConnection('Private workspace')
+}
+// Why the exact check cannot run here, or null.
+function checkBlocker() {
+  if (!capabilities) return 'Connecting to the server…'
+  if (!capabilities.science?.available) return 'The checker is not running on this server.'
+  if (!capabilities.deepagents?.dispatch_enabled) return 'Checks are turned off on this server.'
+  if (capabilities.deepagents.execution_mode === 'live') return 'This server plans checks with a live model, which needs consent in the classic view.'
+  return null
 }
 
 async function reopen() {
+  if (study.kind === 'general' && study.analysisId) {
+    try {
+      const { assets, asked } = await gen.reopen(study.analysisId, study.assetIds ?? [])
+      sources = await Promise.all(assets.map(async asset => ({ asset, tables: await readTables(asset) })))
+      question = asked; setMode('general')
+      $('study-name').textContent = sources.length === 1 ? stem(sources[0].asset.filename) : `${sources.length} files`
+      if (!location.hash) location.replace('#result')
+    } catch (error) {
+      if (error.status === 404) { study = {}; writeStore() }
+    }
+    return
+  }
   if (study.kind === 'currents' && study.comparisonId) {
     try {
       await cmp.reopen(study.comparisonId)
@@ -186,34 +210,62 @@ function startStatus(text, problem = false) {
   $('start-problem').textContent = problem ? text : ''
 }
 
-async function useFile(file) {
-  if (!file) return
-  if (!api) return startStatus('Connect first: the page could not open your private workspace.', true)
-  if (file.size > 5 * 1024 * 1024) return startStatus('This file is larger than 5 MB. Save the table on its own and try again.', true)
-  try {
-    startStatus(`Uploading ${file.name}…`)
-    const asset = await api.uploadResearchAsset(workspace, file)
-    if (asset.media_type.startsWith('image/')) {
-      return startStatus('Dr. Bean cannot read numbers from an image here, because the AI reader is off on this server. Type the readings, paste them, or upload a CSV or a PDF with selectable text.', true)
-    }
-    startStatus(`Reading ${asset.filename || file.name}…`)
-    const tables = []
-    for (const p of asset.pages.slice(0, 10)) {
-      const page = await api.json(`/research-assets/${encodeURIComponent(asset.id)}/pages/${p.page_index}/text`)
-      const where = { file: asset.filename || file.name, page: asset.media_type === 'application/pdf' ? p.page_number : null }
-      tables.push(...(asset.media_type === 'application/json' ? tablesFromJSON(page.text, where) : tablesFromText(page.text, where)))
-    }
-    if (!tables.length) return startStatus(`No table of numbers was found in ${asset.filename || file.name}. Paste or type the readings instead.`, true)
-    startStatus('')
-    const base = { kind: 'file', name: (asset.filename || file.name).replace(/\.[^.]+$/, ''), asset }
-    if (mode === 'currents') { $('study-name').textContent = base.name; cmp.useTables(tables, base) } else useTables(tables, base)
-  } catch (error) {
-    startStatus(readable(error), true)
+const stem = name => String(name || 'file').replace(/\.[^.]+$/, '')
+
+// Tables of numbers in a saved file, read from its text pages. Images have no text to read.
+async function readTables(asset) {
+  const tables = []
+  if (asset.media_type.startsWith('image/')) return tables
+  for (const p of asset.pages.slice(0, 10)) {
+    if (p.char_count === 0) continue
+    const page = await api.json(`/research-assets/${encodeURIComponent(asset.id)}/pages/${p.page_index}/text`)
+    const where = { file: asset.filename, page: asset.media_type === 'application/pdf' ? p.page_number : null }
+    tables.push(...(asset.media_type === 'application/json' ? tablesFromJSON(page.text, where) : tablesFromText(page.text, where)))
   }
+  return tables
 }
 
-function useTables(tables, base) {
-  const best = tables.reduce((pick, t, i) => t.rows.length > tables[pick].rows.length ? i : pick, 0)
+async function addFiles(list) {
+  const files = [...list].filter(Boolean)
+  if (!files.length) return
+  const where = sources.length ? 'overview-status' : null
+  const say = (text, bad = false) => where ? status(where, text, bad ? 'bad' : 'busy') : startStatus(text, bad)
+  if (!api) return say('Connect first: the page could not open your private workspace.', true)
+  try { validateFileSelection(sources.filter(s => s.asset).map(s => s.asset), files, generalCapabilities(capabilities)) } catch (error) { return say(error.message, true) }
+  for (const file of files) {
+    try {
+      say(`Uploading ${file.name}…`)
+      // The browser's type is only a hint; the server reads the bytes to decide what the file is.
+      const typed = file.type && file.type !== 'application/octet-stream' ? file : new File([file], file.name, { type: fileMediaHint(file) })
+      const asset = await api.uploadResearchAsset(workspace, typed)
+      say(`Reading ${asset.filename}…`)
+      sources.push({ asset, tables: await readTables(asset) })
+    } catch (error) {
+      return say(`${file.name}: ${readable(error)}`, true)
+    }
+  }
+  say('')
+  showOverview()
+}
+
+// Back to the files, with nothing chosen yet.
+function showOverview() {
+  mode = null; draft = blankDraft(); cmp.reset(); gen.reset(); snapshot = null; results = null; study = {}; writeStore()
+  $('study-name').textContent = sources.length === 1 ? stem(sources[0].asset?.filename ?? sources[0].name) : sources.length ? `${sources.length} files` : ''
+  location.hash = 'data'; route()
+}
+
+// A check that starts from one table: from a file, or from the assistant's copy of one.
+function startCheck(kind, tables, index, asset) {
+  const base = { kind: 'file', name: stem(asset?.filename ?? 'table'), asset: asset ?? null }
+  setMode(kind)
+  $('study-name').textContent = base.name
+  if (kind === 'currents') cmp.useTables(tables, base, index)
+  else useTables(tables, base, index)
+}
+
+function useTables(tables, base, preferred) {
+  const best = preferred ?? tables.reduce((pick, t, i) => t.rows.length > tables[pick].rows.length ? i : pick, 0)
   draft = { ...blankDraft(), ...base, tables, table: best }
   applyTable()
   $('study-name').textContent = draft.name
@@ -458,16 +510,16 @@ const pkReached = {
   next: () => Boolean(results && results.m.outcome === 'certified_counterexample' && results.m.candidates.length === 2),
 }
 
-const reached = new Proxy({}, { get: (_, step) => (mode === 'currents' ? cmp.reached : pkReached)[step] })
+const noneReached = { data: () => true, check: () => false, result: () => false, next: () => false }
+const PATHS = { concentration: 'pk', currents: 'cmp', general: 'ai' }
+const reached = new Proxy({}, { get: (_, step) => ({ concentration: pkReached, currents: cmp.reached, general: gen.reached }[mode] ?? noneReached)[step] })
 
 function route() {
   let v = view()
   if (!reached[VIEWS[v]]()) v = 'data'
   const section = VIEWS[v]
-  const currents = mode === 'currents'
-  for (const step of ['check', 'result', 'next']) { $(`pk-${step}`).hidden = currents; $(`cmp-${step}`).hidden = !currents }
-  document.querySelector('[data-label="data"]').textContent = currents ? 'Data and models' : 'Data and claim'
-  document.querySelector('[data-label="check"]').textContent = currents ? 'Comparison' : 'Check'
+  const path = PATHS[mode] ?? 'pk'
+  for (const step of ['check', 'result', 'next']) for (const pane of ['pk', 'cmp', 'ai']) $(`${pane}-${step}`).hidden = pane !== path
   document.querySelectorAll('main > section').forEach(s => { s.hidden = s.id !== section })
   const index = STEPS.indexOf(section)
   document.querySelectorAll('[data-step]').forEach((link, i) => {
@@ -477,36 +529,56 @@ function route() {
     if (reached[step]()) link.removeAttribute('aria-disabled'); else link.setAttribute('aria-disabled', 'true')
   })
   if (section === 'data') renderDataStep()
-  if (section === 'check') currents ? cmp.renderCheck() : renderCheck()
-  if (section === 'result') currents ? cmp.renderResult(v) : renderResult(v)
-  if (section === 'next') currents ? cmp.renderNext() : renderNext()
-  const titles = { data: 'Your data', check: currents ? 'Approve the comparison' : 'Approve the check', result: 'Result', next: 'Next measurement' }
+  const by = { pk: { check: renderCheck, result: renderResult, next: renderNext }, cmp: { check: cmp.renderCheck, result: cmp.renderResult, next: cmp.renderNext },
+    ai: { check: gen.renderCheck, result: gen.renderResult, next: gen.renderNext } }[path]
+  if (section !== 'data') by[section](v)
+  const titles = { data: 'Your data', check: { pk: 'Approve the check', cmp: 'Approve the comparison', ai: 'Approve the reading' }[path], result: 'Answer', next: 'Next step' }
   document.title = `${titles[section]}: Dr. Bean`
   $('announce').textContent = titles[section]
 }
 
-// Step 1 shows the start screen until there is a draft of the kind on screen.
-const START = {
-  concentration: { lead: 'Concentration over time, from any file. Dr. Bean finds the numbers, you confirm them, and the checker tests your claim about the elimination rate.', note: '' },
-  currents: { lead: 'Electron currents from a planar collector at several angles and energy windows, from any file. Dr. Bean fits an isotropic and a bi-Maxwellian distribution to the same currents and finds the setting that could tell them apart.',
-    note: 'This version compares made-up currents only. The fits are numerical, not exact proofs.' },
-}
+// Step 1: the start screen, then what Dr. Bean found in the files, then the chosen editor.
 function renderDataStep() {
-  const currents = mode === 'currents', editing = currents ? cmp.editing() : Boolean(draft.kind)
-  $('start').hidden = editing
-  $('editor').hidden = currents || !draft.kind
-  $('cmp-editor').hidden = !currents || !cmp.editing()
-  if (!editing) return renderStart()
-  if (currents) cmp.renderData(); else renderData()
+  const pk = mode === 'concentration' && Boolean(draft.kind), cm = mode === 'currents' && cmp.editing()
+  const found = !pk && !cm && sources.length > 0
+  $('start').hidden = pk || cm || found
+  $('overview').hidden = !found
+  $('editor').hidden = !pk
+  $('cmp-editor').hidden = !cm
+  syncQuestion()
+  if (pk) renderData()
+  else if (cm) cmp.renderData()
+  else if (found) renderOverview()
 }
-function renderStart() {
-  document.querySelectorAll('[name="study-kind"]').forEach(input => {
-    input.checked = input.value === mode
-    input.disabled = input.value === 'currents' && comparisonAvailable() === false
+function syncQuestion() {
+  document.querySelectorAll('[data-question]').forEach(el => { if (document.activeElement !== el) el.value = question })
+}
+
+function describeSource(s) {
+  const TYPE = { 'text/csv': 'CSV', 'text/tab-separated-values': 'TSV', 'application/json': 'JSON', 'text/markdown': 'Markdown', 'text/plain': 'Text', 'application/pdf': 'PDF', 'image/png': 'Image', 'image/jpeg': 'Image' }
+  const a = s.asset, kind = !a ? 'Pasted text' : TYPE[a.media_type] ?? 'File'
+  const pages = a?.pages?.length > 1 ? `, ${a.pages.length} pages` : ''
+  const tables = s.tables.length ? `${s.tables.length} table${s.tables.length === 1 ? '' : 's'} of numbers (${s.tables.map(t => `${t.rows.length} rows`).join(', ')})`
+    : a?.media_type.startsWith('image/') ? 'Only the assistant can read images' : 'No table of numbers found by Dr. Bean’s own reader'
+  return `${kind}${pages}. ${tables}.`
+}
+function renderOverview() {
+  const found = overview(sources), aiBlock = gen.blocker(), checkOff = { concentration: checkBlocker(), currents: comparisonAvailable() === false ? 'Comparisons are not available on this server.' : null }
+  $('source-list').innerHTML = found.map(s => `<li><div><h3>${escapeHTML(s.asset?.filename ?? s.name)}</h3><p>${escapeHTML(describeSource(s))}</p></div>
+    <button type="button" class="icon" aria-label="Remove ${escapeHTML(s.asset?.filename ?? s.name)}" data-action="remove-source" data-index="${s.index}"><svg aria-hidden="true"><use href="#i-x"/></svg></button></li>`).join('')
+  const checks = found.flatMap(s => s.found.flatMap(f => f.checks.map(kind => ({ kind, s, f }))))
+  const items = checks.map(({ kind, s, f }) => {
+    const off = checkOff[kind], header = f.table.header ? ` Columns: ${f.table.header.slice(0, 4).join(', ')}.` : ''
+    return `<li${off ? ' class="off"' : ''}><div><h3>${CHECKS[kind].title}</h3><p>${escapeHTML(off ?? `${CHECKS[kind].how}, from ${f.table.rows.length} rows in ${s.asset?.filename ?? s.name}${f.table.page ? `, page ${f.table.page}` : ''}.${header}`)}</p></div>
+      <button type="button" class="primary" data-action="setup" data-kind="${kind}" data-source="${s.index}" data-table="${f.t}"${off ? ' disabled' : ''}>${CHECKS[kind].button}</button></li>`
   })
-  $('start-lead').textContent = START[mode].lead
-  $('start-note').hidden = !START[mode].note
-  $('start-note').textContent = START[mode].note
+  const reader = gen.limits().analysisMode === 'controlled' ? 'The local test responder' : 'Gemini'
+  items.push(`<li${aiBlock ? ' class="off"' : ''}><div><h3>Ask the assistant</h3><p>${escapeHTML(aiBlock ?? `${reader} reads ${sources.filter(s => s.asset).length === 1 ? 'the file' : 'all the files'} and answers your question with quotes from them. The answer is not checked.`)}</p></div>
+    <button type="button" class="${checks.length ? 'secondary' : 'primary'}" data-action="ask"${aiBlock ? ' disabled' : ''}>Ask the assistant</button></li>`)
+  $('can-do').innerHTML = items.join('')
+  const loose = found.flatMap(s => s.found.filter(f => !f.checks.length).map(f => ({ s, f })))
+  $('manual-check').hidden = !loose.length
+  $('manual-table').innerHTML = loose.map(({ s, f }) => `<option value="${s.index}:${f.t}">${escapeHTML(s.asset?.filename ?? s.name)}${f.table.page ? `, page ${f.table.page}` : ''}: ${f.table.rows.length} rows${f.table.header ? `, ${escapeHTML(f.table.header.slice(0, 3).join(', '))}` : ''}</option>`).join('')
 }
 
 function renderData() {
@@ -517,6 +589,7 @@ function renderData() {
   document.querySelectorAll('[name="origin"]').forEach(input => { input.checked = input.value === draft.origin })
   document.querySelectorAll('[data-limit]').forEach(input => { if (document.activeElement !== input) input.value = draft.limits[input.dataset.limit] })
   const where = draft.kind === 'sample' ? 'Sample readings, made up for trying Dr. Bean. Change any value.'
+    : draft.kind === 'file' && draft.tables[draft.table]?.fromAssistant ? `From ${escapeHTML(draft.tables[draft.table].file)}${draft.tables[draft.table].page ? `, page ${draft.tables[draft.table].page}` : ''}. The assistant copied these values: check every one against the file.`
     : draft.kind === 'file' ? `From ${escapeHTML(draft.asset?.filename || draft.name)}. The original file is saved with your study. Check every value against it.`
     : draft.kind === 'saved' ? 'The readings and claim saved with this study. Changing them starts a new check.'
     : draft.kind === 'paste' ? 'From the table you pasted. Check every value.' : 'Type your readings below.'
@@ -706,24 +779,31 @@ document.addEventListener('click', event => {
   if (!target) return
   if (target.dataset.step && target.getAttribute('aria-disabled') === 'true') { event.preventDefault(); return }
   const action = target.dataset.action
-  if (action === 'sample' && mode === 'currents') { $('study-name').textContent = 'Sample currents'; cmp.sample() }
-  else if (action === 'type' && mode === 'currents') { $('study-name').textContent = 'My currents'; cmp.type() }
-  else if (action === 'sample') useSample()
-  else if (action === 'type') { draft = { ...blankDraft(), kind: 'typed', name: 'My readings', rows: [0, 1, 2].map(() => ({ time: '', value: '', allowance: '', included: true })) }; $('study-name').textContent = draft.name; showEditor() }
+  if (action === 'sample-concentration') { sources = []; setMode('concentration'); useSample() }
+  else if (action === 'sample-currents') { sources = []; setMode('currents'); $('study-name').textContent = 'Sample currents'; cmp.sample() }
+  else if (action === 'setup') { const s = sources[Number(target.dataset.source)]; startCheck(target.dataset.kind, s.tables, Number(target.dataset.table), s.asset) }
+  else if (action === 'manual') { const [s, i] = $('manual-table').value.split(':').map(Number); startCheck(target.dataset.kind, sources[s].tables, i, sources[s].asset) }
+  else if (action === 'ask') { setMode('general'); gen.prepare(); if (!gen.reached.check()) { setMode(null); route() } }
+  else if (action === 'remove-source') { sources.splice(Number(target.dataset.index), 1); showOverview() }
   else if (action === 'paste') { $('paste-text').value = ''; $('paste-problem').hidden = true; $('paste-dialog').showModal() }
   else if (action === 'use-paste') {
-    const tables = [...tablesFromJSON($('paste-text').value), ...tablesFromText($('paste-text').value, { file: 'the pasted table' })]
-    if (!tables.length) { $('paste-problem').hidden = false; $('paste-problem').textContent = 'No table of numbers was found. Put one reading per line, with its time and concentration.'; return }
+    const text = $('paste-text').value
+    const tables = [...tablesFromJSON(text), ...tablesFromText(text, { file: 'the pasted table' })]
+    if (!text.trim()) { $('paste-problem').hidden = false; $('paste-problem').textContent = 'Paste or type something first.'; return }
     $('paste-dialog').close()
-    if (mode === 'currents') { $('study-name').textContent = 'Pasted currents'; cmp.useTables(tables, { kind: 'paste', name: 'Pasted currents' }) }
-    else useTables(tables, { kind: 'paste', name: 'Pasted readings' })
+    // Saved as a text file, so the assistant can read it too. If the server cannot take files,
+    // the table is still used here, without the assistant.
+    addFiles([new File([text], 'pasted-table.txt', { type: 'text/plain' })]).then(() => {
+      if (!sources.length && tables.length) { sources.push({ asset: null, name: 'Pasted table', tables }); showOverview() }
+    })
   }
   else if (action === 'close') target.closest('dialog').close()
   else if (action === 'add') { draft.rows.push({ time: '', value: '', allowance: draft.allowanceForAll || '', included: true }); renderRows(); renderData(); $('rows').lastElementChild?.querySelector('[data-key="time"]')?.focus() }
   else if (action === 'remove') { draft.rows.splice(Number(target.dataset.row), 1); renderRows(); renderData() }
   else if (action === 'retry-connection') connect()
   else if (action === 'start-new-workspace') connect(true)
-  else if (action === 'start-over' || action === 'new-study') { draft = blankDraft(); cmp.reset(); study = {}; snapshot = null; results = null; writeStore(); $('study-name').textContent = ''; location.hash = 'data'; route() }
+  else if (action === 'start-over' && sources.length) showOverview()
+  else if (action === 'start-over' || action === 'new-study') { sources = []; question = ''; startStatus(''); showOverview() }
   else if (action === 'prepare') prepare()
   else if (action === 'approve-check') approve('check-status', 'approve-check', () => { location.hash = 'result' })
   else if (action === 'go-next') { if (draft.kind === 'sample' && !next.times) next = { ...SAMPLE.next }; location.hash = 'next' }
@@ -734,17 +814,19 @@ document.addEventListener('click', event => {
   else if (action === 'report') downloadReport(target)
 })
 
-document.addEventListener('change', event => {
-  if (event.target.name !== 'study-kind') return
-  setMode(event.target.value); startStatus(''); connectionLabel(); route()
+// The question is one value, shown on the start screen and above the files.
+document.addEventListener('input', event => {
+  if (event.target.dataset.question === undefined) return
+  question = event.target.value
+  if (!$('overview').hidden) renderOverview()
 })
 
-// Clearing the input lets the same file be chosen again after a failed upload.
-$('file').addEventListener('change', event => { const file = event.target.files[0]; event.target.value = ''; useFile(file) })
+// Clearing the input lets the same files be chosen again after a failed upload.
+for (const id of ['file', 'file-more']) $(id).addEventListener('change', event => { const files = [...event.target.files]; event.target.value = ''; addFiles(files) })
 const drop = $('drop')
 drop.addEventListener('dragover', event => { event.preventDefault(); drop.classList.add('over') })
 drop.addEventListener('dragleave', () => drop.classList.remove('over'))
-drop.addEventListener('drop', event => { event.preventDefault(); drop.classList.remove('over'); useFile(event.dataTransfer.files[0]) })
+drop.addEventListener('drop', event => { event.preventDefault(); drop.classList.remove('over'); addFiles([...event.dataTransfer.files]) })
 
 let viewing = null
 function openFile(file) {

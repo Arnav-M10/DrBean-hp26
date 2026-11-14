@@ -150,3 +150,52 @@ test('the computed synthetic response reads as an honest answer and a next setti
   assert.equal(C.resultGroups(m).length, 6)
   assert.equal(C.caseGroups(m, m.cases[0]).filter(g => g.selected).length, 1)
 })
+
+// --- Any files and a question -----------------------------------------------------------------------
+test('the files decide which checks are offered; unnamed or unrelated tables get none', async () => {
+  const G = await import('./general.mjs')
+  const [drug] = tablesFromText('Time (min),Plasma concentration (ng/mL)\n15,4800\n30,7200\n60,8000\n', { file: 'lab.csv' })
+  const [currents] = tablesFromText('angle (deg),E min (eV),current (uA)\n0,0,42.9\n45,8,30.5\n', { file: 'c.csv' })
+  const [co2] = tablesFromText('year,mean (ppm)\n2019,411.66\n2020,414.24\n2021,416.45\n', { file: 'co2.csv' })
+  const [bare] = tablesFromText('0.25 4.80\n0.5 7.20\n1 8.00\n', { file: 'bare.txt' })
+  const [water] = tablesFromText('Time (h),Water level (m)\n1,2.0\n2,3.5\n3,4.0\n', { file: 'w.csv' })
+  assert.deepEqual(G.checksFor(drug), ['concentration'])
+  assert.deepEqual(G.checksFor(currents), ['currents'])
+  assert.deepEqual(G.checksFor(co2), [])
+  assert.deepEqual(G.checksFor(bare), [])
+  assert.deepEqual(G.checksFor(water), [])
+  const sources = [{ asset: { id: 'a' }, tables: [co2] }, { asset: { id: 'b' }, tables: [drug, currents] }]
+  assert.deepEqual(G.firstMatch(sources, 'concentration'), { s: 1, t: 0 })
+  assert.deepEqual(G.firstMatch(sources, 'currents'), { s: 1, t: 1 })
+  assert.equal(G.overview(sources)[1].found[1].checks[0], 'currents')
+})
+
+test('the assistant request discloses exactly the approved files and question', async () => {
+  const G = await import('./general.mjs')
+  const assets = [{ id: 'research_asset_1', sha256: 'a'.repeat(64), filename: 'x.csv' }, { id: 'research_asset_2', sha256: 'b'.repeat(64), filename: 'y.pdf' }]
+  const body = G.analysisRequest({ question: '  What changed?  ', assets, model: 'gemini-x', operationId: 'study-1' })
+  assert.equal(body.question, 'What changed?')
+  assert.deepEqual(body.assets, [{ id: 'research_asset_1', sha256: 'a'.repeat(64) }, { id: 'research_asset_2', sha256: 'b'.repeat(64) }])
+  assert.deepEqual(body.consent, { accepted: true, provider: 'gemini', model: 'gemini-x', asset_ids: ['research_asset_1', 'research_asset_2'], include_question: true })
+  assert.match(G.operationId(), /^study-[a-z0-9]+-[0-9a-f]{16}$/)
+})
+
+test('the published example answer reads with its quotes, and its tables can start a check', async () => {
+  const G = await import('./general.mjs')
+  const example = JSON.parse(readFileSync(new URL('../../../shared/contracts/general-research.v1/examples/analysis.json', import.meta.url), 'utf8'))
+  const record = example.response.body
+  const assets = [...new Set(record.body.citations.map(c => c.asset_id))].map((id, i) => ({ id, filename: `file-${i + 1}.csv`, sha256: 'c'.repeat(64) }))
+  const m = G.readAnalysis(record, assets)
+  assert.equal(m.controlled, true)
+  assert.equal(m.failed, null)
+  const claims = G.claimList(m)
+  assert.ok(claims.includes('<span class="kind">Observation</span>'))
+  assert.ok(claims.includes('“# USE OF NOAA GML DATA”'))
+  assert.ok(G.sourcesView(m).includes('Found in the file'))
+  const first = record.body.extracted_tables[0]
+  const table = G.tableFromAnalysis(first, 'file-1.csv')
+  assert.equal(table.fromAssistant, true)
+  assert.deepEqual(table.header, first.columns)
+  assert.equal(table.rows.length, first.rows.length)
+  assert.ok(G.nextSteps(m).includes('Review the values'))
+})

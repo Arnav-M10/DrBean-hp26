@@ -142,20 +142,47 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-colo
 .notice p { max-width: 72ch; }
 .notice-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 
-/* What the readings are: a two-way switch above the drop target. */
-.kinds { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; margin-top: 20px; width: fit-content; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-c); }
-.kinds label { position: relative; padding: 8px 16px; border-radius: var(--radius-s); color: var(--text-2); font-size: 15px; cursor: pointer; transition: color 0.15s var(--ease), background-color 0.15s var(--ease); }
-.kinds label:hover { color: var(--text); }
-.kinds input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
-.kinds label:has(input:checked) { background: var(--raised); color: var(--text); }
-.kinds label:has(input:focus-visible) { outline: 2px solid var(--text); outline-offset: 1px; }
-.kinds label:has(input:disabled) { opacity: 0.5; cursor: not-allowed; }
-.start .kinds + .lead { margin-top: 16px; }
-.start-note { margin-top: 12px; }
+/* Step 1: a question, files, and what Dr. Bean found in them. */
+.question-field { margin: 20px 0; max-width: 920px; }
+.question-field textarea { min-height: 64px; resize: vertical; font: inherit; line-height: 1.45; }
+.link { padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 500; cursor: pointer; transition: color 0.15s var(--ease); }
+.link:hover { color: var(--primary-hover); }
+.examples { margin: 0 0 0 8px; }
+.sources li { align-items: flex-start; }
+.sources h3 { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.file-add { position: relative; overflow: hidden; }
+.file-add input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-add:focus-within { outline: 2px solid var(--text); outline-offset: 2px; }
+.can-do { list-style: none; margin: 8px 0 0; padding: 0; max-width: 960px; }
+.can-do li { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.can-do h3 { font-size: 17px; font-weight: 600; }
+.can-do p { margin-top: 4px; color: var(--text-2); max-width: 64ch; }
+.can-do .off p { color: var(--text-3); }
+ul.plain { list-style: none; margin: 0; padding: 0; }
+ul.plain li + li { margin-top: 4px; }
+#ai-label { margin: 12px 0 0; }
+.manual-body { display: grid; gap: 12px; margin-top: 12px; max-width: 640px; }
+.consent { margin-top: 20px; white-space: normal; align-items: flex-start; max-width: 72ch; }
+.consent input { margin-top: 4px; }
+.answer-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 32px; }
+ol.claims { list-style: none; padding: 0; margin: 4px 0 0; }
+.claims li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.claims .kind { display: inline-block; margin-right: 10px; color: var(--text-3); font-size: 14px; }
+.claims .meta { margin-top: 4px; }
+.quote { margin: 8px 0 0; padding: 8px 12px; border-left: 2px solid var(--line-strong); background: var(--surface); border-radius: 0 var(--radius-s) var(--radius-s) 0; }
+.quote p { color: var(--text-2); font-size: 15px; overflow-wrap: anywhere; }
+.quote cite { display: block; margin-top: 4px; color: var(--text-3); font-size: 13px; font-style: normal; }
+.quote.unverified { border-left-color: var(--bad); }
+.found-table { margin-top: 32px; max-width: 1100px; }
+.found-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.found-head h3 { font-size: 17px; font-weight: 600; }
+.table-scroll { position: relative; overflow-x: auto; margin-top: 12px; }
+.source-group { margin-top: 24px; max-width: 920px; }
+.source-group h3 { font-size: 16px; font-weight: 600; }
 
 /* Step 1, empty: the drop target is the page. */
 .start .lead { margin-bottom: 28px; }
-.drop { position: relative; display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 260px; padding: 32px; text-align: center; cursor: pointer;
+.drop { position: relative; display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 200px; padding: 32px; text-align: center; cursor: pointer;
   background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-p); transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease); }
 .drop:hover, .drop.over { background: var(--raised); border-color: var(--text-2); }
 .drop:focus-within { outline: 2px solid var(--text); outline-offset: 2px; }
@@ -318,7 +345,7 @@ dialog textarea { font-family: var(--mono); resize: vertical; }
 }
 @media (max-width: 920px) {
   .work, .result-work { grid-template-columns: 1fr; }
-  .about-data, .cmp-about { grid-template-columns: 1fr; }
+  .about-data, .cmp-about, .answer-grid { grid-template-columns: 1fr; }
   /* Seven columns do not fit a phone: the currents table scrolls sideways inside its box. */
   .cmp-work { grid-template-columns: minmax(0, 1fr); }
   .cmp-work .table-area { position: relative; min-width: 0; overflow-x: auto; }
@@ -337,7 +364,7 @@ dialog textarea { font-family: var(--mono); resize: vertical; }
   .actions .primary { width: 100%; }
   .actions { flex-direction: column-reverse; align-items: stretch; }
   .actions .back, .actions .quiet-button { text-align: center; }
-  .files li { flex-direction: column; align-items: stretch; }
+  .files li, .can-do li { flex-direction: column; align-items: stretch; }
   .facts th { width: auto; display: block; padding-bottom: 0; border: 0; }
   .facts td { display: block; padding-top: 4px; }
   .readings input:not([type=checkbox]) { padding: 8px 6px; }
