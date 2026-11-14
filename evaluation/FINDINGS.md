@@ -469,6 +469,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Observed:** precondition FAILED ('installed Counterdex None differs in None'); 111 passed / 10 xfailed and 17 passed / 7 NOT_AVAILABLE were recorded as failed lane reports
 - **Evidence:** {"failed_reports": ["lane_3022c056c95f4f23", "lane_95503c92ead24a0d"], "regression": "evaluation/tests/test_lanes.py::EnginePreconditionTests"}
 - **Retest at harness e12c512 against previews 3a7816e (PR #35) and d0148aa (PR #33):** The same preview runs now pass their preconditions (application import resolves the repository source; no installed copy in the worktree interpreter). Closed by retest. (evidence: {"reports": ["lane_1c86a89352b248ec", "lane_65fd953469e04b65", "lane_14457236e1b143be", "lane_e403723180574529"]})
+- **Retest at harness after 10c302c (combined preview e67c3cf of PRs #33, #35, #36):** The first fix over-relaxed the check: it made a stale installed copy informational. The combined preview showed that native replay (python -I -m counterdex) imports the installed copy, and 20 backend tests failed with source_version_mismatch while the copy was stale. Corrected: an installed copy, when present, must equal the source; absence still passes on the child import path. Regression updated. (evidence: {"combined_backend_with_stale_copy": "20 failed / 878 passed, all source_version_mismatch"})
 
 ## F-PAPER-RENDER-MEMORY (P1, owner 4 (papers worker; resource_policy with 2), open)
 

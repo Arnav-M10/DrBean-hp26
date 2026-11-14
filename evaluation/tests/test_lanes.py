@@ -234,12 +234,13 @@ class EnginePreconditionTests(unittest.TestCase):
         app = os.path.dirname(ROOT)
         source = lanes.engine_controls.engine_source_identity(os.path.join(app, "packages", "groundwork_adapter"))
         repository = {"imported_from": "repository", "version": "x", "source_sha256": source["source_sha256"]}
-        for installed in ({"installed": False}, {"installed": True, "matches_repository": False,
-                                                 "differing_files": ["core.py"]}):
+        for installed, expected in (({"installed": False}, True), ({"installed": True, "matches_repository": True}, True),
+                                    ({"installed": True, "matches_repository": False, "differing_files": ["core.py"]},
+                                     False)):
             with self.subTest(installed=installed):
                 result = lanes.engine_precondition({"versions": {"engine_repository": repository,
                                                                  "engine_installed": installed}}, app)
-                self.assertTrue(result["passed"], result["detail"])
+                self.assertEqual(result["passed"], expected, result["detail"])
         for imported in ({**repository, "imported_from": "elsewhere"}, {**repository, "source_sha256": "0" * 64}, {}):
             with self.subTest(imported=imported):
                 result = lanes.engine_precondition({"versions": {"engine_repository": imported,

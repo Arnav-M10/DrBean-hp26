@@ -1814,6 +1814,13 @@
               "lane_e403723180574529"
             ]
           }
+        },
+        {
+          "at_commit": "harness after 10c302c (combined preview e67c3cf of PRs #33, #35, #36)",
+          "result": "The first fix over-relaxed the check: it made a stale installed copy informational. The combined preview showed that native replay (python -I -m counterdex) imports the installed copy, and 20 backend tests failed with source_version_mismatch while the copy was stale. Corrected: an installed copy, when present, must equal the source; absence still passes on the child import path. Regression updated.",
+          "evidence": {
+            "combined_backend_with_stale_copy": "20 failed / 878 passed, all source_version_mismatch"
+          }
         }
       ]
     },

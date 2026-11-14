@@ -425,22 +425,24 @@ def _write_json(directory: str, name: str, value) -> str:
 
 
 def engine_precondition(report: dict, app: str) -> dict:
-    """The engine the application runs is its checkout's repository source.
+    """The engine the application runs is its checkout's repository source, on both of its import paths.
 
-    The application's scientific child (bean_api/counterdex_child.py) puts ``packages/groundwork_adapter`` first on
-    sys.path, so an installed copy in the engine interpreter is shadowed. The check therefore mirrors that import
-    (engine_controls.engine_identity) and compares its digest with the tested source. The installed copy is recorded
-    as information only (H-LANE-ENGINE-PRECONDITION: the first version checked the installed copy and wrongly failed
-    checkouts that have none)."""
+    The scientific child (bean_api/counterdex_child.py) puts ``packages/groundwork_adapter`` first on sys.path, and the
+    check mirrors that import (engine_controls.engine_identity). Native replay runs ``python -I -m counterdex``,
+    which imports the interpreter's installed copy. So an installed copy, when present, must be identical to the
+    source: a stale copy fails replays with source_version_mismatch (seen in the combined preview). An interpreter
+    with no installed copy (a preview worktree) passes on the child path alone. This is H-LANE-ENGINE-PRECONDITION:
+    the first version failed checkouts with no copy, and its first fix wrongly made a stale copy informational."""
     versions_ = report.get("versions") or {}
     imported = versions_.get("engine_repository") or {}
     expected = engine_controls.engine_source_identity(os.path.join(app, "packages", "groundwork_adapter"))
-    ok = imported.get("imported_from") == "repository" and bool(expected["source_sha256"]) and \
-        imported.get("source_sha256") == expected["source_sha256"]
     installed = versions_.get("engine_installed") or {}
+    ok = imported.get("imported_from") == "repository" and bool(expected["source_sha256"]) and \
+        imported.get("source_sha256") == expected["source_sha256"] and \
+        (not installed.get("installed") or installed.get("matches_repository") is True)
     note = ("no installed copy in the engine interpreter" if not installed.get("installed") else
             "installed copy identical to the source (shadowed)" if installed.get("matches_repository") else
-            f"installed copy differs in {installed.get('differing_files')} (shadowed by the repository source)")
+            f"installed copy differs in {installed.get('differing_files')} (stale: replay would use it)")
     return {"id": "engine_runtime_matches_repository_source", "passed": ok,
             "detail": (f"the application's import path resolves Counterdex {imported.get('version')} to the "
                        f"repository source; {note}") if ok else
