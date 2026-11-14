@@ -190,7 +190,8 @@ FACT_KEYS = {
     "scientific_outcome", "verification", "expected_binding", "design_tier", "tier", "replay",
     "candidate_ids", "target", "hard_allowance", "horizon", "selected_time", "future_hard_allowance",
     "margin", "problem_id", "problem_digest", "state", "reason", "code", "observable",
-    "reason_code", "candidates", "selected_option",
+    "reason_code", "candidates", "selected_option", "candidate_results", "native_replay",
+    "origin", "dataset_origin", "experiment_id", "time_origin",
 }
 NUMBERS = re.compile(r"(?<![A-Za-z_])[-+]?\d+(?:/\d+|\.\d+)?")
 
@@ -211,22 +212,47 @@ class ConversationService:
 
     def _reference_records(self, actor: str, workspace_id: str, request: AssistantTurnRequest) -> list[dict]:
         records = []
+        selected_problem = None
         if request.problem_id:
-            records.append(_same_workspace(self.workflow.get(actor, request.problem_id, kind="problem"), workspace_id))
+            selected_problem = _same_workspace(self.workflow.get(actor, request.problem_id, kind="problem"), workspace_id)
+            records.append(selected_problem)
         if request.run_id:
             run = _same_workspace(self.workflow.get_run(actor, request.run_id), workspace_id)
             plan = _same_workspace(self.workflow.get(actor, run["plan_id"], kind="plan"), workspace_id)
             if request.problem_id and request.problem_id != plan["body"]["problem_id"]:
                 raise _domain("reference_binding_mismatch", "The selected problem and run refer to different immutable revisions.")
             if not request.problem_id:
-                records.append(_same_workspace(self.workflow.get(actor, plan["body"]["problem_id"], kind="problem"), workspace_id))
+                selected_problem = _same_workspace(self.workflow.get(actor, plan["body"]["problem_id"], kind="problem"), workspace_id)
+                records.append(selected_problem)
             records.append({**run, "body": {"state": run["state"]}})
             for scenario in run.get("scenarios", []):
                 result_id = scenario.get("result_id") or scenario.get("evidence_id")
                 if result_id:
-                    records.append(_same_workspace(self.workflow.get(actor, result_id), workspace_id))
+                    evidence = _same_workspace(self.workflow.get(actor, result_id, kind="evidence"), workspace_id)
+                    if evidence["body"].get("run_id") != run["id"] or evidence["body"].get("scenario_id") != scenario["scenario_id"]:
+                        raise _domain("reference_binding_mismatch", "The selected evidence does not belong to this run and scenario.")
+                    records.append(evidence)
         if request.suggestion_id:
-            records.append(_same_workspace(self.workflow.get(actor, request.suggestion_id, kind="suggestion"), workspace_id))
+            suggestion = _same_workspace(self.workflow.get(actor, request.suggestion_id, kind="suggestion"), workspace_id)
+            verification = suggestion["body"].get("verification_record") or {}
+            if selected_problem is not None:
+                expected_digest = verification.get("expected_problem_digest")
+                if expected_digest is None:
+                    raise _domain("suggestion_problem_binding_unavailable", "This suggestion has no retained problem binding. Inspect it separately from the selected problem.", 409)
+                if expected_digest != selected_problem["digest"]:
+                    raise _domain("reference_binding_mismatch", "The selected suggestion and problem refer to different immutable revisions.")
+            if request.run_id:
+                # DesignResult retains its problem binding, but the current
+                # backend supplies no authenticated suggestion-to-design-job
+                # lookup. Equal problems or candidate IDs cannot identify a run.
+                raise _domain("suggestion_run_binding_unavailable", "The historical run associated with this suggestion cannot be established. Inspect the suggestion separately or select run evidence without it.", 409)
+            records.append(suggestion)
+        for problem in [record for record in records if record.get("kind") == "problem"]:
+            dataset = _same_workspace(self.workflow.get(actor, problem["body"]["dataset_id"], kind="dataset"), workspace_id)
+            if dataset["digest"] != problem["body"]["dataset_digest"]:
+                raise _domain("reference_binding_mismatch", "The selected problem does not bind the retained dataset revision.")
+            if not any(record["id"] == dataset["id"] for record in records):
+                records.append(dataset)
         return records
 
     @staticmethod
@@ -236,6 +262,17 @@ class ConversationService:
         verification_record = body.get("verification_record")
         if isinstance(verification_record, dict):
             body.setdefault("expected_binding", verification_record["expected_binding"])
+            body.setdefault("problem_digest", verification_record["expected_problem_digest"])
+        replay = body.get("native_replay")
+        if isinstance(replay, dict):
+            # Keep the named replay's independent axes without copying a large
+            # nested proof transcript into conversational context.
+            body["native_replay"] = {key: replay[key] for key in (
+                "replay", "scope", "integrity", "verification", "expected_binding",
+                "recorded_result_matches", "reason_code", "dataset_origin", "operation", "packet_profile",
+            ) if key in replay}
+            if "dataset_origin" in replay:
+                body.setdefault("dataset_origin", replay["dataset_origin"])
         if isinstance(body.get("candidates"), list):
             body["candidate_ids"] = [candidate["id"] for candidate in body["candidates"]]
         if body.get("selected_time") is not None:
@@ -243,7 +280,7 @@ class ConversationService:
         return body
 
     def _facts(self, records: list[dict]) -> tuple[list[dict], list[str]]:
-        facts, statements = [], []
+        facts, statements, candidate_statements = [], [], []
         for record in records:
             body = self._scientific_body(record)
             for key in sorted(FACT_KEYS.intersection(body)):
@@ -257,6 +294,10 @@ class ConversationService:
             if binding == "mismatch":
                 statements.append("This artifact does not establish a result for the reviewed problem because its expected binding mismatches.")
                 continue
+            replay = body.get("native_replay") or {}
+            if replay.get("recorded_result_matches") is False or replay.get("integrity") == "failed":
+                statements.append("The retained native replay does not match this evidence. No checked scientific conclusion is established by this record.")
+                continue
             for key in ("scientific_outcome", "design_tier", "tier"):
                 value = body.get(key)
                 if value == "certified_counterexample" and (verification != "valid" or binding != "matches"):
@@ -265,9 +306,31 @@ class ConversationService:
                     statements.append("The suggestion has not satisfied the checked-separation replay and binding gates.")
                 elif value in OUTCOME_STATEMENTS:
                     statements.append(OUTCOME_STATEMENTS[value])
-        if not statements:
+            origin = body.get("origin", body.get("dataset_origin"))
+            if origin == "hypothetical":
+                statements.append("These data include hypothetical observations; they must remain labeled hypothetical in follow-up work.")
+            elif origin == "synthetic":
+                statements.append("These observations are synthetic examples rather than acquired measurements.")
+            elif origin == "actual":
+                statements.append("The user declared these observations actual; the application has not independently authenticated physical acquisition.")
+            if binding == "matches":
+                for candidate in body.get("candidate_results", []):
+                    candidate_id, status = candidate["candidate_id"], candidate["verification"]
+                    if status == "valid":
+                        candidate_statements.append(f"Fixed candidate {candidate_id} remains compatible with the reviewed observations. Compatibility does not identify the true model.")
+                    elif status == "invalid" and candidate.get("violating_observation_ids"):
+                        candidate_statements.append(f"Fixed candidate {candidate_id} is excluded by the reviewed observations. This does not establish that all allowed assignments are excluded.")
+                    elif status in {"inconclusive", "unsupported", "failed", "not_checked", "invalid"}:
+                        candidate_statements.append(f"The check for fixed candidate {candidate_id} has status {status}; it does not establish compatibility or observational exclusion.")
+        if not statements and not candidate_statements:
             statements = ["No checked scientific finding is attached to this turn. Review the selected records and capabilities before starting new work."]
-        return facts, list(dict.fromkeys(statements))
+        # Preserve outcome/provenance warnings before detailed candidate prose.
+        # The response schema admits 32 statements even for two 16-candidate
+        # scenarios; remaining details stay in the authoritative record facts.
+        statements = list(dict.fromkeys([*statements, *candidate_statements]))
+        if len(statements) > 32:
+            statements = [*statements[:31], "Additional candidate-specific results remain available in the linked authoritative evidence records."]
+        return facts, statements
 
     def _history(self, actor: str, workspace_id: str, request: AssistantTurnRequest) -> list[dict]:
         # Read the most recent bounded user turns, then retain only the same research references.
@@ -341,6 +404,16 @@ class ConversationService:
                 **base, "author": "server", "provider_attempt_id": None, "model_commentary": None,
                 "next_action": "clarify", "code": "provider_model_mismatch",
                 "message": "The configured model changed. Review a new provider disclosure before sending context.",
+            })
+        capabilities = getattr(self.provider, "capabilities", None)
+        if callable(capabilities) and capabilities().get("execution_mode") == "controlled":
+            # Current public response/proposal contracts require Gemini
+            # authorship and a provider-attempt identity. They cannot truthfully
+            # represent controlled commentary or a local controlled attempt.
+            return self._finish(actor, workspace_id, key, turn, {
+                **base, "author": "server", "provider_attempt_id": None, "model_commentary": None,
+                "next_action": "clarify", "code": "controlled_provenance_unavailable",
+                "message": "Controlled assistance cannot be represented by this response contract. Review the trusted facts or continue through manual proposal controls.",
             })
         from .providers import AttemptContext
         result = None
@@ -471,7 +544,7 @@ class ConversationService:
             allowed_candidates = set()
             for record in records:
                 allowed_candidates.update(self._scientific_body(record).get("candidate_ids", []))
-            if len(draft.candidate_ids) != 2 or not set(draft.candidate_ids).issubset(allowed_candidates):
+            if len(set(draft.candidate_ids)) != 2 or not set(draft.candidate_ids).issubset(allowed_candidates):
                 missing("candidate_ids", "Select two fixed candidates from the historical result before constructing a design plan.")
             return {"kind": "design", "draft": draft.model_dump(), "diagnostics": diagnostics}
         draft = output.observation_draft
