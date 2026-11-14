@@ -1,0 +1,112 @@
+UTC start: 2026-11-14T08:41:20.743014+00:00
+Scope: existing backend bridge with fresh matching engine; not a PDF workflow or live-model qualification.
+Repository: /Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science
+Commit: 8b29b3fa802c8c10e9bb5d8bd0cd6a88a4289bcc
+Initial git status: clean
+Backend: Python 3.13.18
+Requested backend /bin/python3.13.18 does not exist; verified prepared /bin/python was selected.
+Identity command: env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/apps/api:/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/tests BEAN_COUNTERDEX_PYTHON=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin/python BEAN_COUNTERDEX_REPLAY_PYTHON=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin/python BEAN_DATABASE_PATH=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/ambient/bean.sqlite3 BEAN_BLOB_DIR=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/ambient/sources BEAN_ARTIFACT_DIR=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/ambient/artifacts BEAN_AUTH_FILE=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/ambient/nonexistent-auth.json 'BEAN_AUTH_TOKENS_JSON={}' TMPDIR=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/tmp/ LANGCHAIN_TRACING_V2=false LANGSMITH_TRACING=false /Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin/python -c 'import json,counterdex;from counterdex.identity import implementation_identity;i=implementation_identity();print(json.dumps({"module":counterdex.__file__,"adapter_version":i["adapter_version"],"python":i["python"],"source_digest":i["source_digest"]},sort_keys=True))'
+Installed engine identity: {"adapter_version": "0.3.0", "module": "/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/lib/python3.11/site-packages/counterdex/__init__.py", "python": "3.11.17", "source_digest": "510580863d6dbb13a569f7f28ad9822111a50356981208e08608827fcef4ee69"}
+Parent guard runner: /tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/offline_pytest.py
+"""Parent pytest socket guard; child-process enforcement is not established."""
+import socket
+import sys
+
+def deny_connect(*args, **kwargs):
+    raise AssertionError("Socket dispatch forbidden in backend qualification pytest process")
+
+socket.socket.connect = deny_connect
+socket.socket.connect_ex = deny_connect
+
+if __name__ == "__main__":
+    import pytest
+    raise SystemExit(pytest.main(sys.argv[1:]))
+
+Guard scope: pytest process socket.connect/connect_ex only; no independently established arbitrary-child/engine network guard. Child environment is sanitized; controlled/placeholder provider fixtures remain separate evidence.
+Command: env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/apps/api:/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/tests BEAN_COUNTERDEX_PYTHON=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin/python BEAN_COUNTERDEX_REPLAY_PYTHON=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin/python BEAN_DATABASE_PATH=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/ambient/bean.sqlite3 BEAN_BLOB_DIR=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/ambient/sources BEAN_ARTIFACT_DIR=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/ambient/artifacts BEAN_AUTH_FILE=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/ambient/nonexistent-auth.json 'BEAN_AUTH_TOKENS_JSON={}' TMPDIR=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/tmp/ LANGCHAIN_TRACING_V2=false LANGSMITH_TRACING=false /Users/arnav/Documents/HackPrinceton/DrBean-claude-E33LtS/.venv/bin/python /tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/offline_pytest.py -q -p no:cacheprovider --basetemp=/tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/pytest --durations=15 tests --ignore=tests/integration
+Store/temp root: /tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr
+........................................................................ [ 11%]
+........................................................................ [ 23%]
+........................................................................ [ 34%]
+........................................................................ [ 46%]
+........................................................................ [ 58%]
+........................................................................ [ 69%]
+........................................................................ [ 81%]
+........................................................................ [ 93%]
+.s.ssssssssssss............................                              [100%]
+============================= slowest 15 durations =============================
+1.66s call     tests/test_restart_evidence.py::test_restart_acknowledges_unstarted_cancellation_and_preserves_queued_work
+1.65s call     tests/test_restart_evidence.py::test_restart_after_real_evidence_preserves_downloads_and_never_redispatches
+1.27s setup    tests/test_native_followup_workflow.py::test_reviewed_followup_uses_its_own_time_allowance_and_complete_provenance[hypothetical]
+1.27s setup    tests/test_native_followup_workflow.py::test_reviewed_followup_uses_its_own_time_allowance_and_complete_provenance[actual]
+1.25s setup    tests/test_conversation.py::test_real_followup_explanations_preserve_individual_results_and_hypothetical_origin[both_excluded]
+1.25s setup    tests/test_native_followup_workflow.py::test_reviewed_followup_uses_its_own_time_allowance_and_complete_provenance[transcription]
+1.24s setup    tests/test_native_followup_workflow.py::test_hypothetical_followup_rechecks_original_pair_with_new_approval_and_portable_history[first_survives]
+1.23s setup    tests/test_conversation.py::test_controlled_unsupported_followup_read_without_a_digest_remains_explainable
+1.23s setup    tests/test_native_followup_workflow.py::test_hypothetical_followup_rechecks_original_pair_with_new_approval_and_portable_history[both_excluded]
+1.22s setup    tests/test_conversation.py::test_real_followup_explanations_preserve_individual_results_and_hypothetical_origin[first_survives]
+1.22s call     tests/test_controlled_native_workflow.py::test_controlled_graph_adapts_to_actual_native_evidence[True-no_counterexample_found-completed-2]
+1.22s setup    tests/test_native_followup_workflow.py::test_hypothetical_followup_rechecks_original_pair_with_new_approval_and_portable_history[second_survives]
+1.20s setup    tests/test_conversation.py::test_authenticated_separating_followup_cannot_report_both_selected_candidates_compatible[not_supplied-reference_binding_mismatch-422]
+1.20s setup    tests/test_conversation.py::test_authenticated_separating_followup_cannot_report_both_selected_candidates_compatible[wrong_digest-reference_binding_mismatch-422]
+1.19s setup    tests/test_conversation.py::test_real_followup_explanations_preserve_individual_results_and_hypothetical_origin[second_survives]
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_worker_qualification.py:39: Prepared CPython 3.11 is required for actual replay qualification controls
+SKIPPED [11] tests/test_worker_qualification.py:67: Prepared CPython 3.11 is required for actual replay qualification controls
+SKIPPED [1] tests/test_worker_qualification.py:88: Prepared CPython 3.11 is required for actual replay qualification controls
+606 passed, 13 skipped in 91.07s (0:01:31)
+Pytest exit: 0
+Elapsed seconds: 91.504
+Final commit: 8b29b3fa802c8c10e9bb5d8bd0cd6a88a4289bcc
+Final git status: clean
+UTC end: 2026-11-14T08:42:52.336513+00:00
+
+Supplement: close PATH-discovery qualification skips without changing tests or source.
+UTC start: 2026-11-14T08:43:28.220248+00:00
+Fixture uses shutil.which python3.11; corrected explicit PATH resolves: /Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin/python3.11
+Command: env -i PATH=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin:/usr/bin:/bin:/usr/sbin:/sbin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/apps/api:/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/tests BEAN_COUNTERDEX_PYTHON=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin/python BEAN_COUNTERDEX_REPLAY_PYTHON=/Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science/.venv-engine/bin/python BEAN_DATABASE_PATH=/tmp/counterdex-paper-backend-8b29b3f-qualification-o_1riold/ambient/bean.sqlite3 BEAN_BLOB_DIR=/tmp/counterdex-paper-backend-8b29b3f-qualification-o_1riold/ambient/sources BEAN_ARTIFACT_DIR=/tmp/counterdex-paper-backend-8b29b3f-qualification-o_1riold/ambient/artifacts BEAN_AUTH_FILE=/tmp/counterdex-paper-backend-8b29b3f-qualification-o_1riold/ambient/nonexistent-auth.json 'BEAN_AUTH_TOKENS_JSON={}' TMPDIR=/tmp/counterdex-paper-backend-8b29b3f-qualification-o_1riold/tmp/ LANGCHAIN_TRACING_V2=false LANGSMITH_TRACING=false /Users/arnav/Documents/HackPrinceton/DrBean-claude-E33LtS/.venv/bin/python /tmp/counterdex-paper-backend-8b29b3f-1r9h4lpr/offline_pytest.py -vv -p no:cacheprovider --basetemp=/tmp/counterdex-paper-backend-8b29b3f-qualification-o_1riold/pytest --durations=5 tests/test_worker_qualification.py
+Guard scope unchanged: parent pytest socket denial only; sanitized child environment.
+============================= test session starts ==============================
+platform darwin -- Python 3.13.18, pytest-9.0.2, pluggy-1.7.0 -- /Users/arnav/Documents/HackPrinceton/DrBean-claude-E33LtS/.venv/bin/python
+rootdir: /Users/arnav/Documents/HackPrinceton/DrBean-hp26-paper-science
+configfile: pyproject.toml
+collecting ... collected 14 items
+
+tests/test_worker_qualification.py::test_qualification_does_not_probe_after_supervised_result PASSED [  7%]
+tests/test_worker_qualification.py::test_package_badge_and_module_name_cannot_qualify_result PASSED [ 14%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[native_replay-integrity-failed] PASSED [ 21%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[native_replay-verification-invalid] PASSED [ 28%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[native_replay-expected_binding-not_supplied] PASSED [ 35%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[native_replay-recorded_result_matches-False] PASSED [ 42%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[native_replay-suggestion_digest-0000000000000000000000000000000000000000000000000000000000000000] PASSED [ 50%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[verification_record-expected_scientific_problem_digest-0000000000000000000000000000000000000000000000000000000000000000] PASSED [ 57%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[verification_record-observed_scientific_problem_digest-0000000000000000000000000000000000000000000000000000000000000000] PASSED [ 64%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[None-native_suggestion_digest-None] PASSED [ 71%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[None-candidate_results-value8] PASSED [ 78%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[None-selected_time-6/1] PASSED [ 85%]
+tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[None-design_tier-no_separation_established] PASSED [ 92%]
+tests/test_worker_qualification.py::test_qualification_rejects_margin_not_established_by_replay PASSED [100%]
+
+============================= slowest 5 durations ==============================
+0.12s setup    tests/test_worker_qualification.py::test_qualification_does_not_probe_after_supervised_result
+0.00s call     tests/test_worker_qualification.py::test_qualification_does_not_probe_after_supervised_result
+0.00s setup    tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[native_replay-integrity-failed]
+0.00s setup    tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[native_replay-verification-invalid]
+0.00s call     tests/test_worker_qualification.py::test_qualification_rejects_swapped_or_incomplete_replay[native_replay-integrity-failed]
+============================== 14 passed in 0.22s ==============================
+Supplement pytest exit: 0
+Supplement elapsed seconds: 0.352
+Final commit: 8b29b3fa802c8c10e9bb5d8bd0cd6a88a4289bcc
+Final git status: clean
+UTC end: 2026-11-14T08:43:28.613935+00:00
+
+Coverage accounting:
+- Full backend command (tests excluding tests/integration): 606 passed, 13 skipped, 0 failed in91.07s;91.504s wall.
+- All13 initial skips came from test_worker_qualification.py's PATH-only python3.11 discovery; BEAN_COUNTERDEX_PYTHON alone does not configure that fixture.
+- Separate complete worker-qualification file with fresh engine bin explicitly on PATH:14 passed,0 skipped/failed in0.22s;0.352s wall. One package-badge control had already passed in the full run.
+- Therefore all619 unique backend cases collected by the full command were exercised successfully across the two runs;620 passing case executions include that one repeat. This is not represented as one619-pass invocation.
+- Existing backend coverage includes exact source review/materialization, approval/admission, actual baseline/design/followup-native production and fresh replay, candidate/vector/projection/tier/reuse/publication controls, controlled agent decisions/narration, ledger accounting, cancellation, parent loss/restart and retained evidence.
+- Matching installed engine: Counterdex0.3.0, CPython3.11.17, source510580863d6dbb13a569f7f28ad9822111a50356981208e08608827fcef4ee69. Backend CPython3.13.18.
+- Both commands used sanitized environments and isolated ambient database/blob/artifact/auth paths, pytest basetemp and TMPDIR. No real credentials or auth file were inherited. No repository file was edited; exact8b29b3f remained clean.
+- Network enforcement claim remains limited to the parent pytest socket.connect/connect_ex monkeypatch; arbitrary child/engine network enforcement is not independently established. Existing disabled/controlled fixtures establish their own provider behavior. No live qualification claimed.
+- This qualifies the existing application bridge against the new matching engine. It does not qualify a PDF parser, paper UI, live extraction, combined paper workflow or historical packets against a changed runtime.

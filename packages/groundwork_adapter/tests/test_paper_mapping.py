@@ -13,7 +13,7 @@ import unittest
 from counterdex.application import project_application
 from counterdex.bridge import dispatch
 from counterdex.errors import AdapterError
-from counterdex.exact import artifact_digest, canonical_bytes, rational_text, strict_json_loads
+from counterdex.exact import artifact_digest, canonical_bytes, strict_json_loads
 from counterdex.paper_mapping import assess_paper_scope, convert_scalar, oral_amplitude
 from test_application import application_records, rebind
 from test_bridge import investigation_request
@@ -27,24 +27,58 @@ FACTS = dict(model_form="two_rate_difference", regimen="single_initial_event",
              reviewed_assumptions=REVIEWED)
 
 
-def paper_records(*, unit_variant=False):
+def paper_records(*, unit_variant=False, fixture=None):
     """Controlled accepted records at the scientific seam, not a parsed PDF."""
-    fixture = json.loads(FIXTURE.read_text())
+    fixture = json.loads(FIXTURE.read_text()) if fixture is None else fixture
     source = fixture["unit_variant_source" if unit_variant else "canonical_source"]
+    model, canonical = fixture["model"], fixture["canonical_source"]
+    # This authored fixture has one explicitly supported expression. This is
+    # neither a parser nor permission to interpret arbitrary paper equations.
+    if (model["expression"] != "C(t) = A * (exp(-ke*t) - exp(-ka*t))"
+            or model["initial_state"] != "C(0) = 0" or model["rate_order"] != "0 < ke < ka"):
+        raise AssertionError("Review the authored model, initial state and physical rate meanings before mapping them")
+    if unit_variant and set(source["unchanged_source_fields"]) != {"model", "canonical_source.domain", "canonical_source.claim"}:
+        raise AssertionError("The unit variant must explicitly retain its model, domain and claim source")
     problem, dataset = application_records()
     suffix = "units" if unit_variant else "canonical"
     dataset["id"], problem["id"] = "dataset_paper_" + suffix, "problem_paper_" + suffix
-    problem["body"]["dataset_id"] = dataset["id"]
+    domain = {parameter: {side: convert_scalar(bounds[side], bounds["unit"],
+        quantity="concentration" if parameter == "A" else "rate")["normalized_value"]
+        for side in ("lower", "upper")} for parameter, bounds in canonical["domain"].items()}
+    domain["rate_order"] = "ke_lt_ka"
+    claim = canonical["claim"]
+    target = {"parameter": claim["parameter"], "closed": claim["closed"],
+        **{side: convert_scalar(claim[side], claim["unit"], quantity="rate")["normalized_value"]
+           for side in ("lower", "upper")}}
+    problem["body"].update(dataset_id=dataset["id"], model="two_rate_concentration",
+        initial_concentration="0/1", observable="concentration", time_unit="h",
+        concentration_unit="mg/L", rate_unit="1/h", domain=domain, target=target)
+    dataset["body"].update(origin=fixture["origin"], time_origin=model["time_origin"], rows=[])
     dataset["body"]["change_reason"] = "Controlled synthetic reviewed mapping; no PDF extraction performed"
-    for target, raw in zip(dataset["body"]["rows"], source["rows"], strict=True):
-        target["source_asset_id"] = "source_controlled_paper"
-        target["original_values"] = {}
+    for raw in source["rows"]:
+        row = {"id": raw["id"], "included": raw["included"], "source_asset_id": "source_controlled_paper",
+               "original_values": {}, "notes": "Controlled authored synthetic paper row"}
         for field, quantity in (("time", "time"), ("concentration", "concentration"), ("hard_allowance", "concentration")):
             unit = source["units"][field]
             conversion = convert_scalar(raw[field], unit, quantity=quantity)
-            target[field] = conversion["normalized_value"]
-            target["original_values"].update({field: raw[field], field + "_unit": unit})
+            row[field] = conversion["normalized_value"]
+            row["original_values"].update({field: raw[field], field + "_unit": unit})
+        dataset["body"]["rows"].append(row)
     rebind(problem, dataset)
+    # Check the actual admitted application binding, not a second projection
+    # manufactured from expected values. Every expected scientific field must
+    # agree with independently derived source content, including row order.
+    projection = project_application(problem, dataset)
+    accepted_problem = projection["binding"]["problem"]["body"]
+    accepted_dataset = projection["binding"]["dataset"]["body"]
+    normalized = {"dataset_origin": projection["binding"]["dataset_origin"],
+        "time_origin": accepted_dataset["time_origin"],
+        **{key: accepted_problem[key] for key in ("model", "initial_concentration", "observable", "domain", "target")},
+        "units": {quantity: accepted_problem[quantity + "_unit"] for quantity in ("time", "concentration", "rate")},
+        "rows": [{key: row[key] for key in ("id", "time", "concentration", "hard_allowance", "included")}
+                 for row in accepted_dataset["rows"]]}
+    if normalized != fixture["expected_normalized"]:
+        raise AssertionError("Authored fixture source and actual application mapping disagree with expected_normalized")
     return problem, dataset
 
 
@@ -58,6 +92,58 @@ def mathematical_content(projection):
 
 
 class PaperMappingTests(unittest.TestCase):
+    def test_fixture_model_domain_claim_origin_and_row_semantics_cannot_drift_silently(self):
+        original = json.loads(FIXTURE.read_text())
+        mutations = {
+            "model": lambda f: f["model"].update(expression="C(t) = A * exp(-ke*t)"),
+            "initial_state": lambda f: f["model"].update(initial_state="C(0) = 1"),
+            "rate_meanings": lambda f: f["model"].update(rate_order="0 < ka < ke"),
+            "time_origin": lambda f: f["model"].update(time_origin="Elapsed hours after a different event"),
+            "domain": lambda f: f["canonical_source"]["domain"]["A"].update(lower="0.002"),
+            "claim": lambda f: f["canonical_source"]["claim"].update(upper="0.18"),
+            "origin": lambda f: f.update(origin="actual"),
+            "expected_normalized": lambda f: f["expected_normalized"]["target"].update(upper="9/50"),
+        }
+        for variant in (False, True):
+            for name, mutate in mutations.items():
+                changed = deepcopy(original)
+                mutate(changed)
+                with self.subTest(variant=variant, field=name), self.assertRaises(AssertionError):
+                    paper_records(unit_variant=variant, fixture=changed)
+            source = "unit_variant_source" if variant else "canonical_source"
+            for name, mutate in (
+                    ("row_id", lambda rows: rows[0].update(id="changed_row")),
+                    ("inclusion", lambda rows: rows[0].update(included=False)),
+                    ("order", lambda rows: rows.reverse())):
+                changed = deepcopy(original)
+                mutate(changed[source]["rows"])
+                with self.subTest(variant=variant, field=name), self.assertRaises(AssertionError):
+                    paper_records(unit_variant=variant, fixture=changed)
+        self.assertEqual(json.loads(FIXTURE.read_text()), original)
+
+    def test_consistently_reviewed_fixture_edits_enter_the_actual_application_projection(self):
+        original = json.loads(FIXTURE.read_text())
+        changed = deepcopy(original)
+        changed["model"]["time_origin"] = changed["expected_normalized"]["time_origin"] = "Elapsed hours from a separately reviewed event"
+        changed["canonical_source"]["domain"]["A"]["lower"] = "0.002"
+        changed["expected_normalized"]["domain"]["A"]["lower"] = "1/500"
+        changed["canonical_source"]["claim"]["upper"] = "0.18"
+        changed["expected_normalized"]["target"]["upper"] = "9/50"
+        for source in ("canonical_source", "unit_variant_source", "expected_normalized"):
+            changed[source]["rows"][0].update(id="reviewed_row", included=False)
+        for variant in (False, True):
+            with self.subTest(variant=variant):
+                before = project_application(*paper_records(unit_variant=variant, fixture=original))
+                p, d = paper_records(unit_variant=variant, fixture=changed)
+                after = project_application(p, d)
+                self.assertEqual(p["body"]["domain"]["A"]["lower"], "1/500")
+                self.assertEqual(p["body"]["target"]["upper"], "9/50")
+                self.assertEqual(d["body"]["time_origin"], changed["model"]["time_origin"])
+                self.assertEqual((after["problem"]["observations"][0]["id"], after["problem"]["observations"][0]["included"]),
+                                 ("reviewed_row", False))
+                self.assertNotEqual(after["projection_digest"], before["projection_digest"])
+                self.assertNotEqual(mathematical_content(after), mathematical_content(before))
+
     def test_exact_units_keep_accepted_spelling_without_rounding(self):
         cases = [("15", "min", "time", "1/4", "h"), ("900", "s", "time", "1/4", "h"),
                  ("4.80", "ug/mL", "concentration", "24/5", "mg/L"),
@@ -201,7 +287,9 @@ class PaperBridgeEquivalenceTests(unittest.TestCase):
         self.assertEqual(mathematical_content(projections[0]), mathematical_content(projections[2]))
         self.assertEqual(len({x["projection_digest"] for x in projections}), 3)
         results = [self.run_and_replay(p, d, "paper_equivalence_" + str(i)) for i, (p, d) in enumerate(pairs)]
-        vectors = lambda r: sorted(tuple(c["parameter_vector"][name] for name in ("A", "ke", "ka")) for c in r["result"]["candidates"])
+        def vectors(result):
+            return sorted(tuple(c["parameter_vector"][name] for name in ("A", "ke", "ka"))
+                          for c in result["result"]["candidates"])
         self.assertEqual(vectors(results[0]), vectors(results[1]))
         self.assertEqual(vectors(results[0]), vectors(results[2]))
         self.assertEqual(len({r["anchors"]["artifact_sha256"] for r in results}), 3)
@@ -224,8 +312,9 @@ class PaperBridgeEquivalenceTests(unittest.TestCase):
         self.assertNotEqual(d["digest"], original[1]["digest"])
         self.assertNotEqual(p["digest"], original[0]["digest"])
         self.assertNotEqual(mathematical_content(project_application(p, d)), old_math)
-        vectors = lambda result: sorted(tuple(c["parameter_vector"][key] for key in ("A", "ke", "ka"))
-                                         for c in result["result"]["candidates"])
+        def vectors(result):
+            return sorted(tuple(c["parameter_vector"][key] for key in ("A", "ke", "ka"))
+                          for c in result["result"]["candidates"])
         self.assertNotEqual(vectors(before), vectors(corrected))
         self.assertEqual(d["body"]["rows"][4]["original_values"]["concentration"], "5.70")
         self.assertEqual(before, preserved)

@@ -35,6 +35,32 @@ source candidate; its exact implementation digest, not the version string alone,
 must match the installed runtime. Historical 0.3.0 runtimes/artifacts are retained
 unchanged. Full regression and committed-candidate evidence follow separately.
 
+Clean implementation **`8b29b3fa802c8c10e9bb5d8bd0cd6a88a4289bcc`**, draft
+[PR #33](https://github.com/Arnav-M10/DrBean-hp26/pull/33): engine **304 tests**
+(one optional DTO skip, separately passed); all **619 unique backend cases**
+passed across the full run and explicit-PATH qualification supplement;
+**7/7 ordinary HTTP cases, 214 predicates, 22/22 native controls**, and the
+required offline scientific gate passed. Installed/source identity both
+`510580863d6dbb13a569f7f28ad9822111a50356981208e08608827fcef4ee69`.
+Backend remains Python 3.13.18, scientific/replay runtime CPython 3.11.17.
+Baseline/design/own-time-follow-up downloads and external anchors are retained;
+fresh valid replay preserves the follow-up's inconclusive scientific result.
+
+Review closed two meaningful coverage gaps: all authored fixture mathematical
+fields now enter/check the actual projection (two extra drift/edit regressions),
+and one optional HTTP/worker test establishes both-compatible without replacing
+the original pair. Targeted mapping **11/11** and HTTP **1/1** passed. A retained
+development capture is explicitly marked dirty, not substituted for clean
+acceptance. Current example packets were regenerated and freshly replayed to
+match the changed implementation manifest; prior archived evidence is unchanged
+and previous current-example bytes remain at immutable main `cbfa5ef`.
+
+[Exact qualification, limitations, owner handoffs and two-minute explanation](../../packages/groundwork_adapter/docs/PAPER_SCIENCE_QUALIFICATION.md)
+separate these Owner 1 checks from Claude's historical independent acceptance.
+This source is ready for paper-interface/browser assembly, not final paper
+release. No new provider call or key inspection was made. Final committed
+regression/replay results are recorded in PR #33.
+
 [Scientific contract and first compatibility checklist](../../packages/groundwork_adapter/docs/PAPER_SCIENCE_CONTRACT.md)
 and [synthetic PDF scientific content](../../packages/groundwork_adapter/docs/PAPER_FIXTURE_SPEC.md)
 are ready for Owners 2–4. Owner 2 owns shared schemas/application admission and

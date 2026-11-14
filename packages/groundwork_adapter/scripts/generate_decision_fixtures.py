@@ -374,17 +374,20 @@ implementation identity. Replay checks that identity and independently supplied
 anchors; a different source build cannot silently accept this packet.
 
 From this directory, prepare an isolated CPython 3.11 environment and install the
-matching released package when it is available:
+exact reviewed wheel. A matching version number alone is insufficient, especially
+for an unreleased source candidate. Obtain the wheel from the reviewed build;
+the packet cannot select or fetch a package for you.
 
 ```sh
 python3.11 -m venv .replay-env
-.replay-env/bin/python -m pip install --no-deps counterdex=={identity['adapter_version']}
+.replay-env/bin/python -m pip install --no-deps /path/to/reviewed/counterdex-{identity['adapter_version']}-py3-none-any.whl
 .replay-env/bin/python replay.py
 ```
 
-Before publication, install the matching reviewed wheel into that environment
-instead. The replay script never installs dependencies or selects a different
-executable: it invokes the caller's interpreter with `-I -m counterdex.bridge`.
+Compare the installed `counterdex.identity.implementation_identity()` source
+digest with `implementation.json`. The replay script enforces that identity;
+it never installs dependencies or selects a different executable: it invokes
+the caller's interpreter with `-I -m counterdex.bridge`.
 It reads `hero-baseline.native.json` unchanged and supplies
 `hero-baseline.anchors.json` independently. Keep both files; recomputing an
 expected anchor from changed bytes would discard the original identity check.

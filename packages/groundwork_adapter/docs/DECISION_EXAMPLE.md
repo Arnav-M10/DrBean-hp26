@@ -134,18 +134,18 @@ Owner 2 can use these paired request/response/native examples to wire the real w
 <!-- decision-run:start -->
 ## Recorded local execution
 
-The current fixtures were generated with Counterdex 0.3.0 on CPython 3.11.17. The engine source digest is `90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`. 8 scientific bridge subprocesses and 8 separate replay subprocesses completed; all replayed successfully. Three separately labeled fixed-pair controls also freshly replayed.
+The current fixtures were generated with Counterdex 0.3.0 on CPython 3.11.17. The engine source digest is `510580863d6dbb13a569f7f28ad9822111a50356981208e08608827fcef4ee69`. 8 scientific bridge subprocesses and 8 separate replay subprocesses completed; all replayed successfully. Three separately labeled fixed-pair controls also freshly replayed.
 
 | Operation | Observed bridge seconds | Observed separate replay seconds | Native bytes |
 |---|---:|---:|---:|
-| `hero-baseline` | 0.248512 | 0.061320 | 53814 |
-| `hero-design` | 0.123419 | 0.085150 | 110155 |
-| `hero-reference-survives` | 0.186701 | 0.120403 | 176887 |
-| `hero-outside-survives` | 0.187982 | 0.118107 | 176903 |
-| `hero-both-excluded` | 0.198816 | 0.120488 | 176847 |
-| `hero-own-time-recheck` | 0.193594 | 0.130803 | 178615 |
-| `alternate-baseline` | 0.246879 | 0.057049 | 54045 |
-| `alternate-design` | 0.123566 | 0.085169 | 110671 |
+| `hero-baseline` | 0.299753 | 0.072867 | 53950 |
+| `hero-design` | 0.148657 | 0.108617 | 110479 |
+| `hero-reference-survives` | 0.241014 | 0.181843 | 177459 |
+| `hero-outside-survives` | 0.237166 | 0.161284 | 177475 |
+| `hero-both-excluded` | 0.250072 | 0.146210 | 177419 |
+| `hero-own-time-recheck` | 0.237018 | 0.133656 | 179187 |
+| `alternate-baseline` | 0.284482 | 0.066284 | 54181 |
+| `alternate-design` | 0.129358 | 0.096051 | 110991 |
 
 These are measured local runs with no provider requests. The complete per-operation counters, source manifest and exact artifact hashes are retained in `fixtures/decision/manifest.json`; latencies are not an HTTP result or a general performance guarantee.
 <!-- decision-run:end -->

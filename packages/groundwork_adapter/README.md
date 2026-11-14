@@ -48,6 +48,14 @@ For source-only development, prefix commands with
 zero-dependency runtime. No network, account, numerical solver, or provider SDK
 is required for scientific work or replay.
 
+The paper sprint adds a library-only [scientific eligibility and exact conversion
+helper](docs/PAPER_SCIENCE_CONTRACT.md), with [authored synthetic paper content](docs/PAPER_FIXTURE_SPEC.md).
+It does not parse PDFs or authorize application inputs. This unreleased source
+candidate still uses version 0.3.0: install this reviewed source, and match the
+implementation digest in each packet. The version string alone is insufficient.
+Current generated examples use this candidate; historical packets remain bound
+to their original source. [Paper qualification and handoff](docs/PAPER_SCIENCE_QUALIFICATION.md).
+
 ## Run and replay the complete synthetic example
 
 All supplied examples are synthetic. Their workflow IDs are fixture IDs, not
