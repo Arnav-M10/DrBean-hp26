@@ -2,10 +2,12 @@
 
 Owner 1, November 14, 2026. Branch `codex/paper-science-mapping`,
 [draft PR #33](https://github.com/Arnav-M10/DrBean-hp26/pull/33), based on actual
-main `cbfa5ef0494bb681d4d8748cfd2d2487a1e0887d`. The first implementation and
-clean integrated-loop test commit is **`8b29b3fa802c8c10e9bb5d8bd0cd6a88a4289bcc`**.
-Subsequent fixture/test/evidence work is identified separately below; it does
-not change the numerical kernel, API, provider or browser implementation.
+main `cbfa5ef0494bb681d4d8748cfd2d2487a1e0887d`. Final scientific code/test
+candidate: **`ca77582e3fc59c800c88041f250bf12a8fd04a71`**. Its clean engine
+runner, both HTTP regressions, ordinary seven-case HTTP lane, 22 native controls
+and offline scientific gate all passed. [Final exact receipts and unresolved native evidence](review-evidence/paper-ca77582/README.md).
+The earlier implementation/full-backend checks retain their `8b29b3f` identity
+below. No numerical kernel, API, provider or browser implementation was changed.
 
 ## What is implemented
 
@@ -76,8 +78,11 @@ the ordinary HTTP/worker path: the separately reviewed reading is the reference
 candidate's computed center, with an allowance narrower than its checked
 enclosure. The reference remains `inconclusive/insufficient_enclosure`, the
 outside candidate is excluded, and successful packet verification/replay leaves
-the outcome inconclusive. Both HTTP tests passed before committing; final
-committed execution is reported separately rather than attributed to `1193a2f`.
+the outcome inconclusive. Both HTTP tests passed at clean `ca77582` in 4.258 s;
+a separate clean unresolved capture passed in 3.114 s and retains the actual
+bytes and eight external anchors. The full engine runner again reported
+306 tests, with the two optional dependency skip entries separately covered by
+the backend DTO and HTTP executions. Source and installed identity still match.
 
 After the clean acceptance, the two fixture-semantic regressions passed with
 the existing mapping controls (**11 tests**), and the new both-compatible HTTP
@@ -101,6 +106,26 @@ or reimplemented here. Claude's PR #22 (`ab67b71`) independently qualified
 `1bc3604` (application code matching main `22c9a24`) and reconciled the earlier
 checked-design positive fixture. Those are Claude's historical results, not
 independent acceptance of this new paper helper or a combined paper release.
+
+At the final fetch, Owner 2 published proposed interface handoffs on
+`backend/deepagents-durable` **`9ead08d3ab0aa23adce3da732fe27b88a1175adf`**,
+and Owner 3 published `LIVE_PROVIDER_HANDOFF.md` on
+`codex/gemini-metered-adapter` **`effe55e73e1c5fde2270b1a26724cb4fc5b20d34`**.
+Both deltas are handoff documents only. Reviewed their actual diffs: executable
+authoritative paper/page/conversion contracts and integration are still pending.
+Reconcile their proposed call-context fields before adopting them.
+
+Claude's latest branch **`0fa261648438001dcbe009e544c5330d39375418`** retains
+new independent lanes at clean **`f3ff76a72c0c3625314b220938d2f56e309f63f4`**,
+whose application paths equal main `cbfa5ef`: controlled callbacks 58 passed/
+27 expected failures; controlled science 15 passed; historical replay 96
+replayed plus one archived source-version mismatch. The science lane includes
+a separately identified diagnostic cancellation case; not every test is an
+ordinary nondiagnostic workflow. External-request counts were verified zero;
+live qualification remains `not_run`. That source has no `paper_mapping` module
+and does not independently qualify this branch or the final paper workflow.
+No new aggregate gate receipt accompanied those three lane reports; do not
+describe them as a freshly passing overall release gate.
 
 - **Owner 2:** publish/adopt authoritative paper/page/proposal/review and
   selected-claim fields. Derive helper facts from accepted records. Atomically

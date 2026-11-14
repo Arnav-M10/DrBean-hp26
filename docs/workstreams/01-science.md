@@ -4,6 +4,24 @@ Owner: Person 1 / Counterdex.
 
 ## Paper sprint — exact mapping and defensible scientific scope
 
+Final scientific code/test candidate **`ca77582e3fc59c800c88041f250bf12a8fd04a71`**
+passed the engine runner (306 tests; optional DTO/HTTP dependencies separately
+executed), both ordinary HTTP follow-up regressions, all seven ordinary workflow
+cases/214 predicates, 22 native controls and the offline scientific gate.
+[Final clean receipts and unresolved native bytes](../../packages/groundwork_adapter/docs/review-evidence/paper-ca77582/README.md).
+The valid replay preserves genuine unresolved feedback. This code is pushed in
+draft PR #33; final evidence-only commits preserve those exact execution labels.
+Counterdex's source identity remains `51058086…f4ee69` on CPython 3.11.17.
+
+Final remote refresh kept main at `cbfa5ef` and found Owner 2's `9ead08d` and
+Owner 3's `effe55e` proposed handoffs. Their branches contain documents only;
+executable paper contracts/materialization and the parser/UI/public experiment
+remain integration dependencies. Claude's new `0fa2616` evidence tests main's
+application at `f3ff76a`, not this mapping helper: controlled callbacks 58 pass/
+27 expected failures, controlled science 15 pass (including a diagnostic cancel
+case), 96 historical replays plus one archived source mismatch, zero external
+requests, live `not_run`. Those independent results are kept distinct from ours.
+
 Started an isolated `codex/paper-science-mapping` worktree from actual main
 `cbfa5ef0494bb681d4d8748cfd2d2487a1e0887d`. Inspected PR #32 (`754412c`),
 #28 (`4390836`) and Claude #22 (`ab67b71`); did not merge divergent provider or
