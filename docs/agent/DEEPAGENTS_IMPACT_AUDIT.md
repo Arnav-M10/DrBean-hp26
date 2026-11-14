@@ -125,6 +125,15 @@ Run with `BEAN_AI_MODE=placeholder`, a CPython 3.11 `.venv-engine` and a 3.13 `.
 - C's `tests/integration/langchain_demo_browser.mjs` fails the same way on `aa51f16` and on this
   branch. Its navigation predates the five-step UI (`#research` versus `#investigations`). This
   is for C to adapt, and is not a regression here.
+- After merging main `e0e4269` (PR #48, guided journey), I reran on the merged branch:
+  - **Still passing:** web unit tests 82/82; focused research and backend suites 314 passed;
+    the plan-chip assertions (Done, Done, Suggested, then Done ×3, Suggested).
+  - **Failing:** `check-research.mjs` passes 5/7 and then times out waiting for the native
+    download on the PR #48 Result/Next-measurement pages. It times out identically on
+    **unmodified `e0e4269`**, so this is a PR #48 regression for owner 3, not this change.
+  - **Main's own CI** has been red since PR #46/#48. The manual-editor browser smoke times out,
+    and `test_research_authority.py::test_concurrent_additive_migration_preserves_legacy_metadata`
+    fails intermittently with `database is locked` on CI (it passes locally).
 
 ## Two-minute sponsor walkthrough
 
