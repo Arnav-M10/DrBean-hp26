@@ -186,15 +186,16 @@
         </form>
       </section>
 
-      <!-- 2 · Check inputs: review & approve -->
+      <!-- 2 · Check inputs: review -->
       <section id="review" class="page" aria-labelledby="review-title" hidden>
         <header class="page-head">
           <p class="crumb">Step 2 of 5 · Check inputs</p>
-          <h1 id="review-title" tabindex="-1">Review and approve</h1>
-          <p class="lede">This is the last look before any computation. Saving freezes these exact inputs on the server. Approving lets one bounded check run on them, nothing more.</p>
+          <h1 id="review-title" tabindex="-1">Review inputs</h1>
+          <p class="lede">Confirm the readings and assumptions you want to use. You’ll review the exact operation before approving a check.</p>
         </header>
         <div class="block" id="review-summary"></div>
-        <div id="backend-review" class="block"></div>
+        <div id="investigation-path" class="block"></div>
+        <details class="block" id="manual-path"><summary>Run a manual check without the assistant</summary><div id="backend-review"></div></details>
       </section>
 
       <!-- 3 · Investigate -->
@@ -202,10 +203,10 @@
         <header class="page-head">
           <p class="crumb">Step 3 of 5</p>
           <h1 id="investigations-title" tabindex="-1">Investigate</h1>
-          <p class="lede">See what is running, what finished and anything waiting for you. Every entry here comes from a server record; nothing is simulated.</p>
+          <p class="lede">Review the proposed check, approve it when you’re ready, and follow its progress.</p>
         </header>
-        <div id="backend-investigations" class="block"></div>
         <div id="durable-research" class="block" aria-live="polite"></div>
+        <details class="block" id="manual-investigations"><summary>Manual check and run history</summary><div id="backend-investigations"></div></details>
       </section>
 
       <!-- 4 · Result -->
@@ -214,6 +215,7 @@
           <p class="crumb">Step 4 of 5</p>
           <h1 id="result-title" tabindex="-1">What the check found</h1>
         </header>
+        <div id="research-results"></div>
         <div id="backend-results"></div>
         <div id="backend-assistant"></div>
       </section>
@@ -225,15 +227,17 @@
           <h1 id="next-title" tabindex="-1">Choose the next measurement</h1>
           <p class="lede">When the check finds two different candidates that both fit, one new reading at the right time can rule one of them out. Give the times you could actually measure and how precise that reading would be.</p>
         </header>
+        <div id="research-next"></div>
         <div id="backend-next" class="block"></div>
         <section id="report" class="block" aria-labelledby="report-title">
           <h2 id="report-title" tabindex="-1">Report and evidence</h2>
+          <div id="research-report"></div>
           <div id="backend-report"></div>
         </section>
       </section>
 
       <footer class="workspace-status" aria-label="Draft storage">
-        <p><strong>Your draft is not saved.</strong> Measurements and claim text live only in this tab until you save them on the Review step. <button id="export-draft" type="button" class="linklike">Download draft</button></p>
+        <p><span id="draft-storage-text">Drafts live in this tab until you save reviewed inputs.</span> <button id="export-draft" type="button" class="linklike">Download draft</button></p>
         <p class="attribution">Investigation planning uses LangChain Deep Agents when the server enables it. Mathematical results come only from the Counterdex checker.</p>
       </footer>
       <div id="status" class="sr-only" role="status"></div>

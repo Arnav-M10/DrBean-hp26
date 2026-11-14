@@ -46,3 +46,12 @@ export function validateQuestion(question) {
 
   return { errors, exact };
 }
+
+export function studyContextErrors(context) {
+  const fields = [
+    ['experiment', 'experiment-id', 'Enter a name for this experiment.'],
+    ['timeOrigin', 'time-origin', 'Explain what elapsed time zero means.'],
+    ['origin', 'dataset-origin', 'Choose where the readings came from.'],
+  ];
+  return fields.filter(([key]) => !context[key]?.trim()).map(([, field, message]) => ({ field, message }));
+}

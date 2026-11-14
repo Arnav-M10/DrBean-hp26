@@ -91,7 +91,7 @@ try {
     allowanceOrigin: 'Explicit synthetic hard bound of0.50mg/L, not an SD or instrument claim', goal: 'Does this reviewed target range survive these corrected measurements, and what checked pair measurement could distinguish the computed candidates?' })) await page.fill(`#${id}`, value)
   await page.selectOption('#dataset-origin', 'synthetic')
   await page.click('#question-form button[type=submit]')
-  await page.goto(base + '#investigations')
+  await page.getByRole('link', { name: 'Research with the assistant', exact: true }).click()
   const panel = page.locator('#durable-research')
   await panel.getByText('Feasible next-measurement constraints (optional until design)', { exact: true }).click()
   for (const [name, value] of Object.entries({ times: '8, 6', allowance: '0.2', horizon: '8', allowanceReason: 'Explicit synthetic prospective hard bound; not a claim about an instrument' })) await panel.locator(`[name="${name}"]`).fill(value)
@@ -140,16 +140,21 @@ try {
   assert.ok(session.children.every(child => child.state === 'completed'))
   assert.equal(session.reports.length, 2)
   check('separate-design-approval-computes-design-and-accepts-evidence-bound-report')
-  const [download] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'Download research report snapshot', exact: true }).last().click()])
+  const navigate = async name => page.locator('.steps').getByRole('link', { name }).click()
+  await navigate(/^Next measurement/)
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#research-report').getByRole('button', { name: 'Download research report snapshot', exact: true }).last().click()])
   await download.saveAs(join(output, 'report.json'))
   const report = JSON.parse(await readFile(join(output, 'report.json'), 'utf8')).body
   assert.equal(report.report_profile, 'research-report.v2')
   assert.equal(report.evidence.length, 2)
   assert.equal(report.native_evidence.length, 2)
-  const nativeButtons = panel.getByRole('button', { name: 'Download native evidence', exact: true })
-  const anchorButtons = panel.getByRole('button', { name: 'Download independent replay anchors', exact: true })
+  const evidence = page.locator('#research-results, #research-next')
+  const nativeButtons = evidence.getByRole('button', { name: 'Download native evidence', exact: true })
+  const anchorButtons = evidence.getByRole('button', { name: 'Download independent replay anchors', exact: true })
   for (let index = 0; index < report.native_evidence.length; index++) {
     const entry = report.native_evidence[index]
+    const record = report.evidence.find(item => item.id === entry.evidence_id)
+    await navigate(record.kind === 'suggestion' ? /^Next measurement/ : /^Result/)
     const [native] = await Promise.all([page.waitForEvent('download'), nativeButtons.nth(index).click()])
     const [anchor] = await Promise.all([page.waitForEvent('download'), anchorButtons.nth(index).click()])
     const nativePath = join(output, entry.native_filename), anchorPath = join(output, entry.anchor_filename)
@@ -157,10 +162,9 @@ try {
     assert.equal(createHash('sha256').update(await readFile(nativePath)).digest('hex'), entry.artifact.sha256)
     const replay = JSON.parse(await command(engine, ['-I', '-m', 'counterdex', 'replay-native', nativePath, '--anchors', anchorPath]))
     assert.equal(replay.integrity, 'passed'); assert.equal(replay.expected_binding, 'matches')
-    const evidence = report.evidence.find(item => item.id === entry.evidence_id)
-    const result = evidence.body.result || evidence.body
+    const result = record.body.result || record.body
     assert.equal(replay.replay, result.replay)
-    if (evidence.kind === 'suggestion') assert.equal(replay.fresh_checked.tier, result.design_tier)
+    if (record.kind === 'suggestion') assert.equal(replay.fresh_checked.tier, result.design_tier)
     else assert.equal(replay.outcome.scientific_outcome, result.scientific_outcome)
     await writeFile(join(output, `${entry.artifact.id}.replay.json`), JSON.stringify(replay, null, 2))
   }
