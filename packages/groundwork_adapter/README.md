@@ -114,6 +114,9 @@ package preserves those normative values.
 ## Evidence and release
 
 - [Scientific integration contract](docs/INTEGRATION.md)
+- [Result semantics and permitted claims](docs/RESULT_SEMANTICS.md)
+- [Current backend adoption handoff](docs/OWNER2_BRIDGE_ADOPTION.md)
+- [Portable offline replay packet](fixtures/repro/README.md)
 - [Exact analytic argument](docs/ANALYTIC_ARGUMENT.md)
 - [Automated second-reader review](docs/REVIEW.md)
 - [Executed fixture ledger](fixtures/manifest.json)
@@ -129,7 +132,12 @@ python3.11 packages/groundwork_adapter/scripts/generate_decision_fixtures.py
 
 The generator writes current fixtures only. The initial published fixture
 archive retains its original bytes and requires its original prepared source
-for fresh replay. This sprint prepares version 0.2.0; it does not upload to PyPI.
+for fresh replay. The original 0.2.0 bridge evidence is also retained under
+`fixtures/archive/0.2.0-bridge/`. This sprint prepares version 0.3.0; it does not
+upload to PyPI. Explicit design requests preserve their reviewed tier, horizon
+and allowance provenance. The additive `recheck` operation binds an appended
+observation proposal and rechecks the original candidates at the reading's own
+time and allowance. See [the bridge contract](docs/BRIDGE.md).
 
 The partial fixture uses a deterministic cancellation callback; rerunning its
 request through the CLI without that callback produces a new completed result.

@@ -2,6 +2,58 @@
 
 Owner: Person 1 / Counterdex.
 
+## Completed owned continuation — integration handoff pending
+
+Started November 13, 2026 at 22:25 Eastern (33 hours 35 minutes before the
+supplied deadline). Baseline is clean `bc92855` on `codex/science-next`, based on
+integrated `main` at `adac945`. The source suite freshly ran 257 tests in 9.510
+seconds with one dependency-specific skip. All 30 application mapping controls
+passed separately on Python 3.13, and the legacy seven request/result fixtures
+still validate against the current authoritative DTOs.
+
+Inspected consumer: the integrated backend still deliberately returns
+`baseline_producer_unavailable` and probes baseline discovery as false. It uses
+its own `bean-to-counterdex.v1` projection and suggestion-only child protocol.
+This is a current G1 integration dependency, not missing package discovery.
+Owner 2 must adopt the existing package baseline/native-byte seam.
+
+Smallest owned correction: explicitly preserve the extended application's
+reviewed design tier, horizon, allowance provenance and artifact selection;
+the legacy package mapping ignored those optional new fields at the audit baseline.
+Acceptance: executable actual-schema requests showing numerical requests stay
+numerical, reviewed scope is never enlarged, and wrong/stale artifacts fail.
+Keep prior mapping semantics versioned. While the backend seam is pending,
+complete the required result truth table and an additive, provenance-preserving
+fixed-candidate recheck for actual/differently timed readings. Changes stay in
+the package and this log. No external model dispatch is authorized.
+
+### Completed and next dependency
+
+Prepared Counterdex **0.3.0** with explicit design mapping v2, authoritative
+per-candidate/scientific identity fields and an additive proposal-bound `recheck`
+operation. Historical v1 review/mapping remain supported; original archive bytes
+are unchanged. Current source digest:
+`90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
+
+Final isolated-wheel suite: 285 tests in 11.879 seconds, one dependency-specific
+skip covered by the Python 3.13 schema run (41 mapping tests). Eight normalized
+application requests/results pass the actual DTOs. Eight generated bridge jobs
+and eight independent replays pass; the same eight packets replay in the
+installed runtime through the Python 3.13 parent. All 13 parent-supervision tests
+pass. The numerical-only and empty-result DTO paths also round-trip exactly.
+Portable original-byte replay, source/wheel identity, Node canonicalization and
+all archived-byte comparisons pass. See package `docs/VALIDATION.md` for scope.
+
+Owner 2's concrete request is in package `docs/OWNER2_BRIDGE_ADOPTION.md`:
+adopt the existing bridge in dispatch, operation-specific qualification,
+independent anchors, complete native storage/download and follow-up review
+linkage. `docs/RESULT_SEMANTICS.md` supplies the downstream truth table;
+`fixtures/repro/` supplies a minimal portable reproduction packet. These are
+handoffs, not assertions that the backend/public HTTP gate passes. Owner 5's
+independent HTTP acceptance remains pending that integration. No additional
+scientific family or provider capability was started. Latest fetch still has
+`origin/main` at `adac945`; teammate branches were left untouched.
+
 ## Governing reference
 
 The user explicitly adopted **DB-MASTER-1**,
