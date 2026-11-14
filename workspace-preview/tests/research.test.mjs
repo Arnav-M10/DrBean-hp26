@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {safeCommentary,reportHTML,reviewedInputs} from '../research-view.mjs';
+import {safeCommentary,reportHTML,reviewedInputs,researchIssue,issueHTML,findings} from '../research-view.mjs';
 import {interpretResult,readable} from '../../apps/web/result-view.mjs';
 import {designExplanation} from '../../apps/web/design.mjs';
 const helpers={interpret:interpretResult,readable,design:designExplanation};
@@ -23,4 +23,45 @@ test('readable failed-parent export preserves scientific status, units, reviewed
 test('static CSV parser is the same reviewed production parser, and static manifest cannot execute',async()=>{
  assert.equal(await readFile(new URL('../exact-static.mjs',import.meta.url),'utf8'),await readFile(new URL('../../apps/web/exact.mjs',import.meta.url),'utf8'));
  const manifest=JSON.parse(await readFile(new URL('../research-service.json',import.meta.url),'utf8'));assert.equal(manifest.available,false);assert.equal(manifest.module,undefined);
+});
+test('terminal failures explain the specific interruption while retaining scientific findings and hiding raw codes in details',()=>{
+ const cases=[['provider_malformed_tool_call',/instruction.*could not safely use.*not run/],
+  ['provider_rate_limited',/service temporarily limited requests/],
+  ['provider_budget_exhausted',/approved limit/],['research_provider_allocation_exhausted',/approved limit/],
+  ['research_budget_exhausted',/approved limit/],['agent_context_budget_exhausted',/approved limit/],
+  ['explanation_unsupported_number',/number.*evidence did not support.*withheld/],
+  ['explanation_unsupported_claim',/claim.*evidence did not support.*withheld/]];
+ const original=structuredClone(evidence);
+ for(const [code,meaning] of cases){
+  const failed={...snapshot,action:{error_code:code}},issue=researchIssue(failed,evidence),html=findings(failed,evidence,null,helpers);
+  assert.match(issue.message,meaning,code);assert.match(issue.science,/Saved scientific results and available downloads are preserved/);
+  assert.match(html,/<details class="research-error-details"><summary>Technical failure details<\/summary><pre>/);
+  assert.ok(html.includes(code));assert.ok(!html.replace(/<details\b[\s\S]*?<\/details>/g,'').includes(code));
+  assert.ok(html.includes(interpretResult(evidence[0].body.result).statement));
+  assert.doesNotMatch(html,/try again automatically|refill|increase.*limit/i);
+ }
+ assert.deepEqual(evidence,original);
+});
+test('exhausted allocation does not relabel completed science or grant a retry',()=>{
+ const completed={...snapshot,state:'completed',action:{error_code:null},interaction:{quota_exhausted:true}};
+ const issue=researchIssue(completed,evidence),html=reportHTML(completed,evidence,null,helpers);
+ assert.match(issue.message,/approved limit/);assert.match(issue.next,/confirm authority and remaining capacity/);
+ assert.match(issue.next,/refreshing does not add capacity or repeat work/);
+ assert.match(html,/state completed/);assert.match(html,/not_performed/);
+ assert.equal(researchIssue({...completed,interaction:{quota_exhausted:false}},evidence),null);
+});
+test('uncertain request accounting takes priority over a normal failure and requires operator recovery',()=>{
+ const interrupted={...snapshot,action:{error_code:'provider_rate_limited'},interaction:{recovery:{required:true,code:'provider_outcome_unknown',can_reconcile:false},quota_exhausted:true}};
+ const issue=researchIssue(interrupted,evidence);
+ assert.equal(issue.code,'provider_outcome_unknown');assert.match(issue.message,/will not be requested again automatically/);
+ assert.match(issue.next,/inspect the retained request accounting/);assert.doesNotMatch(issue.next,/use the explicit reconciliation control/);
+ const permitted=researchIssue({...interrupted,interaction:{recovery:{required:true,code:'worker_lost',can_reconcile:true}}},evidence);
+ assert.match(permitted.next,/only the work the backend permits/);
+});
+test('failure before science does not promise results, and unknown technical codes remain escaped',()=>{
+ const failed={...snapshot,action:{error_code:'<img src=x onerror=alert(1)>'}};
+ const issue=researchIssue(failed,[]),html=issueHTML(failed,[]);
+ assert.equal(issue.science,'No scientific result has been returned yet.');
+ assert.doesNotMatch(html,/<img|<script/);assert.match(html,/&lt;img/);
+ assert.ok(!html.replace(/<details\b[\s\S]*?<\/details>/g,'').includes('onerror'));
 });

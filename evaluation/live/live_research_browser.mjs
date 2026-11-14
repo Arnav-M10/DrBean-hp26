@@ -9,7 +9,8 @@
 // and deleted with it; no credential value is read, printed or recorded.
 // Inputs are public synthetic readings only. No automatic retries: every
 // provider request is reserved by the product's ledger, and the operator grant
-// tool refuses grants beyond the 12-request sprint ceiling.
+// tool defaults to the frozen 12-request sprint ceiling. An explicitly recorded
+// follow-through authorization can enable one bounded qualification-only extension.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -29,7 +30,7 @@ assert.ok(['web', 'preview'].includes(UI), 'LIVE_UI must be web or preview')
 assert.ok(UI === 'web' || CASE !== 'clarification', 'The missing-input contrast uses the file-question path in apps/web')
 assert.ok(['dry-run', 'baseline', 'clarification'].includes(CASE), 'LIVE_CASE must be dry-run, baseline or clarification')
 assert.ok(CASE === 'dry-run' ? GRANT === 0 : GRANT >= 1 && GRANT <= 8, 'A live case needs LIVE_GRANT in 1..8; dry-run grants nothing')
-const commit = (await run('git', ['rev-parse', '--short', 'HEAD'])).trim()
+const commit = (await run('git', ['rev-parse', 'HEAD'])).trim()
 const appBase = (await run('git', ['merge-base', 'HEAD', 'origin/main'])).trim().slice(0, 7)
 const appDiff = (await run('git', ['diff', '--name-only', 'origin/main', '--', 'apps', 'packages', 'scripts', 'workspace-preview'])).trim()
 const output = resolve(process.env.LIVE_EVIDENCE_DIR || join(root, `evaluation/results/sprint/live-${CASE}-${appBase}`))
@@ -39,9 +40,10 @@ const apiPort = await freePort(), webPort = await freePort(), base = `http://127
 const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', DRBEAN_VAR_DIR: scratch, BEAN_AUTH_FILE: join(scratch, 'auth.json'),
   BEAN_DEV_API_PORT: String(apiPort), BEAN_DEV_WEB_PORT: String(webPort), BEAN_RESEARCH_MODE: 'live',
   PYTHONPATH: join(root, 'apps/api'), LANGSMITH_TRACING: 'false',
-  LIVE_BUDGET_FILE: process.env.LIVE_BUDGET_FILE || join(root, 'evaluation/results/sprint/live-budget.json') }
+  LIVE_BUDGET_FILE: process.env.LIVE_BUDGET_FILE || join(root, 'evaluation/results/sprint/live-budget.json'),
+  ...(process.env.LIVE_QUALIFICATION_EXTENSION ? { LIVE_QUALIFICATION_EXTENSION: process.env.LIVE_QUALIFICATION_EXTENSION } : {}) }
 const record = { schema_version: 'c-sprint-live-run.v1', lane: CASE === 'dry-run' ? 'live_gemini (dry run, zero requests)' : 'live_gemini',
-  case: CASE, ui: UI, harness_commit: commit, application_tree: appDiff ? `differs from origin/main: ${appDiff.split('\n').length} files` : `identical to origin/main ${appBase}`, grant: GRANT, started_at: new Date().toISOString(), checks: [], observations: {} }
+  case: CASE, ui: UI, qualification_extension: process.env.LIVE_QUALIFICATION_EXTENSION || null, harness_commit: commit, application_tree: appDiff ? `differs from origin/main: ${appDiff.split('\n').length} files` : `identical to origin/main ${appBase}`, grant: GRANT, started_at: new Date().toISOString(), checks: [], observations: {} }
 let browser, context, page, launched = false
 
 async function run(executable, args, extraEnv = null, timeout = 60000) {
@@ -134,7 +136,7 @@ try {
     } else {
       record.observations.grant = JSON.parse(await run(python, ['evaluation/live/operator_grant.py', join(scratch, 'bean.sqlite3'), session.id,
         String(GRANT), '64000', String(Math.min(16000, GRANT * 512)), `${CASE}-preview-${commit}`], env))
-      check('operator-granted-explicit-allocation', `${GRANT} requests; sprint total ${record.observations.grant.sprint_granted_total}/12`)
+      check('operator-granted-explicit-allocation', `${GRANT} requests; sprint total ${record.observations.grant.sprint_granted_total}/${record.observations.grant.ceiling}`)
       await page.locator('#refresh-research').click()
       await page.waitForFunction(() => !document.querySelector('#continue-plan')?.disabled, null, { timeout: 20000 })
       const beforeAdvance = (await api(`/research-sessions/${session.id}`)).revision
@@ -143,7 +145,7 @@ try {
       const settle = async (fromRevision, timeout) => { await poll(async () => { const s = await api(`/research-sessions/${session.id}`)
         return s.revision > fromRevision && !['queued', 'running', 'waiting_child'].includes(s.state) }, timeout); return api(`/research-sessions/${session.id}`) }
       session = await settle(beforeAdvance, 240000)
-      record.observations.after_first_advance = { state: session.state, pending_review: session.pending_review?.kind ?? null, error_code: session.action?.error_code ?? null, usage: session.usage }
+      record.observations.after_first_advance = { state: session.state, revision: session.revision, child_count: session.children.length, pending_review: session.pending_review?.kind ?? null, error_code: session.action?.error_code ?? null, usage: session.usage }
       if (session.pending_review?.kind === 'plan') {
         assert.equal(session.children.length, 0, 'No science before approval')
         assert.equal(await page.locator('#approve-science').isDisabled(), true)
@@ -158,6 +160,8 @@ try {
         children: session.children.map(child => ({ id: child.id, kind: child.kind, state: child.state, scientific_reservations: child.scientific_reservations })),
         plan_steps: session.plan?.body?.steps?.map(step => ({ title: step.title, status: step.status })) ?? [],
         interaction: session.interaction ?? null }
+      await page.locator('#refresh-research').click()
+      await page.waitForFunction(({state,revision}) => { const status=document.querySelector('#research-status'); return status?.dataset.state===state && Number(status.dataset.revision)>=revision }, {state:session.state,revision:session.revision}, {timeout:30000})
       record.observations.preferred_ui_text = { status: await page.locator('#research-status').innerText().catch(() => null),
         findings: await page.locator('#research-findings').innerText().catch(() => null), error: await page.locator('#research-error').innerText().catch(() => null) }
     }
@@ -229,7 +233,7 @@ try {
       const granted = JSON.parse(await run(python, ['evaluation/live/operator_grant.py', join(scratch, 'bean.sqlite3'), session.id,
         String(GRANT), '64000', String(Math.min(16000, GRANT * 512)), `${CASE}-${commit}`], env))
       record.observations.grant = granted
-      check('operator-granted-explicit-allocation', `${granted.granted} requests; sprint total ${granted.sprint_granted_total}/12`)
+      check('operator-granted-explicit-allocation', `${granted.granted} requests; sprint total ${granted.sprint_granted_total}/${granted.ceiling}`)
       await panel.getByRole('button', { name: 'Refresh saved state', exact: true }).first().click()
       const advance = panel.getByRole('button', { name: 'Advance research plan', exact: true })
       await page.waitForFunction(() => [...document.querySelectorAll('#durable-research button')].some(b => b.textContent === 'Advance research plan' && !b.disabled), null, { timeout: 15000 })
@@ -274,18 +278,29 @@ try {
   record.observations.events = events.map(event => ({ type: event.event_type, summary: event.summary, references: event.reference_ids,
     execution_mode: event.execution_mode ?? event.body?.execution_mode ?? null }))
   record.physical_requests = attempts.length
+  if (UI === 'preview' && session.state === 'completed' && session.reports?.length) {
+    await page.getByText('Persisted model commentary', { exact: true }).waitFor({ timeout: 30000 })
+    record.observations.preferred_ui_text.findings = await page.locator('#research-findings').innerText()
+  }
   if (session.reports?.length) {
     const report = await context.request.get(`${base}/api/bean/v1/reports/${session.reports.at(-1)}/download`)
+    assert.equal(report.status(), 200)
     const bytes = await report.body()
+    const reread = await context.request.get(`${base}/api/bean/v1/reports/${session.reports.at(-1)}/download`)
+    assert.equal(reread.status(), 200)
+    assert.equal(sha(await reread.body()), sha(bytes), 'Report snapshot is unchanged on a fresh download')
+    record.observations.report_snapshot_repeat_digest_matches = true
     await writeFile(join(output, 'research-report.json'), bytes)
     record.observations.report = { id: session.reports.at(-1), sha256: sha(bytes), fields: Object.keys(JSON.parse(bytes).body) }
     for (const entry of JSON.parse(bytes).body.native_evidence || []) {
       const native = await context.request.get(`${base}${entry.download_path}`), anchor = await context.request.get(`${base}${entry.anchor_path}`)
+      assert.equal(native.status(), 200); assert.equal(anchor.status(), 200)
       const nativePath = join(output, entry.native_filename), anchorPath = join(output, entry.anchor_filename)
       await writeFile(nativePath, await native.body()); await writeFile(anchorPath, await anchor.body())
       const replay = JSON.parse(await run(engine, ['-I', '-m', 'counterdex', 'replay-native', nativePath, '--anchors', anchorPath], null, 120000))
+      await writeFile(join(output, entry.native_filename + '.replay.json'), JSON.stringify(replay, null, 2) + '\n')
       record.observations.replay = [...(record.observations.replay || []), { evidence_id: entry.evidence_id, integrity: replay.integrity,
-        replay: replay.replay, expected_binding: replay.expected_binding, outcome: replay.outcome?.scientific_outcome ?? replay.fresh_checked?.tier }]
+        replay: replay.replay, expected_binding: replay.expected_binding, verification: replay.verification, outcome: replay.outcome?.scientific_outcome ?? replay.fresh_checked?.tier }]
     }
   }
   assert.deepEqual(errors, [])
@@ -302,5 +317,5 @@ try {
   await browser?.close()
   if (launched) await run(python, ['scripts/dev/launcher.py', 'stop'], env, 60000).catch(error => { console.error(error.message); process.exitCode = 1 })
   await rm(scratch, { recursive: true, force: true })
-  console.log(JSON.stringify({ status: record.status, case: CASE, physical_requests: record.physical_requests ?? 0, output }, null, 2))
+  console.log(JSON.stringify({ status: record.status, case: CASE, physical_requests: record.physical_requests ?? null, output }, null, 2))
 }
