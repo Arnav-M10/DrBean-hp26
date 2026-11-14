@@ -296,3 +296,14 @@ orders and verifies unchanged plan/proposal identities, one model call, no
 scientific child and unchanged tool admission. This is an offline recovery fix;
 it does not repair or reclassify the failed live `write_todos` response. No further
 live request was made, and PR #63 remains blocked on live qualification.
+
+## Explicit merge instruction after qualification disclosure
+
+After receiving the failed-live-run summary, the user explicitly instructed:
+"is it pushed and merged? if not do that". Integration is proceeding under that
+new instruction, without relabelling live qualification or independent Claude
+acceptance as passed. Main `d80c1ae` (PR #66) was incorporated cleanly; its
+application changes were already present in the verified `c4e9997` candidate,
+so the resulting application and test trees are unchanged. Historical failed
+receipts, all request accounting and the live-qualification blocker are retained.
+No further provider request or budget allocation is authorized by this merge.
