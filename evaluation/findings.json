@@ -2,7 +2,7 @@
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
   "updated_at": "2026-11-14",
-  "application_code_commit": "80f95a454ec95248690c6aeee1652886741340fc",
+  "application_code_commit": "55403ab",
   "observed_at_harness_commit": "f992b48",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
@@ -57,7 +57,7 @@
       "id": "F-AI-INTEGRATION-SEAM",
       "severity": "P1",
       "owner": "2 and 3",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane",
       "minimal_input": "origin/main 9cc90e0 merged locally with codex/gemini-offline-integration c95ab28 (clean merge)",
       "command": "in that worktree: BEAN_COUNTERDEX_PYTHON=<python3.11> .venv/bin/python -m pytest -q tests --ignore=tests/integration; .venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py",
@@ -72,6 +72,13 @@
           "result": "Resolved on that branch: the worker-boundary controlled-lane tests pass; zero-dispatch passes.",
           "evidence": {
             "results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"
+          }
+        },
+        {
+          "at_commit": "merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50",
+          "result": "Closed by retest on main: the worker-boundary controlled lane and real deepagents graph tests pass alongside the zero-dispatch suite (38 passed).",
+          "evidence": {
+            "pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"
           }
         }
       ]
@@ -567,7 +574,7 @@
       "id": "F-COORDINATOR-OPTIONAL-STATUS",
       "severity": "P2",
       "owner": "3",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow)",
       "minimal_input": "scripted model: execute baseline, then return_grounded_explanation",
       "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k optional_scenario_cannot_silently_vanish",
@@ -588,6 +595,13 @@
           "evidence": {
             "results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"
           }
+        },
+        {
+          "at_commit": "merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50",
+          "result": "Closed by retest: the coordinator no longer reports completed while a reviewed optional scenario is neither executed nor skipped; the strict-xfail test XPASSed and is now an ordinary regression.",
+          "evidence": {
+            "pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"
+          }
         }
       ]
     },
@@ -595,7 +609,7 @@
       "id": "F-COORDINATOR-PROVIDER-LABEL",
       "severity": "P2",
       "owner": "3",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "Coordinator attempt metadata names provider gemini for controlled-model turns",
       "minimal_input": "run_coordinator with a controlled chat_model",
       "command": ".venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k masquerade",
@@ -615,6 +629,13 @@
           "result": "Strict-xfail test XPASSes on this branch too; remove the marker when it merges.",
           "evidence": {
             "results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"
+          }
+        },
+        {
+          "at_commit": "merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50",
+          "result": "Closed by retest: controlled turns are no longer labelled as bare provider gemini attempts; the strict-xfail test XPASSed and is now an ordinary regression.",
+          "evidence": {
+            "pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"
           }
         }
       ]

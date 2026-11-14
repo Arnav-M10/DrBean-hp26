@@ -527,10 +527,8 @@ def test_exaggerated_final_explanation_is_rejected_but_evidence_is_preserved():
     assert [fact["id"] for fact in result.evidence] == ["evidence-baseline"]  # science survives bad prose
 
 
-@pytest.mark.xfail(strict=True, reason="F-COORDINATOR-OPTIONAL-STATUS (P2, Owner 3): the coordinator module still "
-                   "returns completed; the requirement is enforced at the worker/workflow boundary, proven by "
-                   "test_worker_refuses_completion_when_a_reviewed_optional_scenario_vanishes")
 def test_reviewed_optional_scenario_cannot_silently_vanish():
+    # Regression for F-COORDINATOR-OPTIONAL-STATUS (P2, Owner 3), fixed in main 55403ab (PR #10); was strict xfail.
     """Completion must account for every reviewed optional scenario: executed, skipped, or unresolved by failure."""
     def finish_early(observed):
         if not observed:
@@ -544,10 +542,8 @@ def test_reviewed_optional_scenario_cannot_silently_vanish():
         "neither executed nor explicitly skipped")
 
 
-@pytest.mark.xfail(strict=True, reason="F-COORDINATOR-PROVIDER-LABEL (P2, Owner 3): coordinator metadata names "
-                   "provider gemini for controlled turns; the worker stores it only inside controlled_attempt records, "
-                   "proven by test_worker_records_controlled_turns_outside_the_provider_ledger")
 def test_controlled_turns_never_masquerade_as_live_provider_attempts():
+    # Regression for F-COORDINATOR-PROVIDER-LABEL (P2, Owner 3), fixed in main 55403ab (PR #10); was strict xfail.
     tools = Tools("certified_counterexample")
     result, ledger = run_graph(scripted_model(adaptive), tools)
     # Either no provider-ledger attempt is written for a controlled turn (turns appear only as controlled trace

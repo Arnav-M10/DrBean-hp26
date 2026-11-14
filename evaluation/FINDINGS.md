@@ -1,11 +1,11 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `80f95a454ec9`, observed with harness `f992b48` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
 | F-ORPHAN-WORKER-KILL | P0 | 2 | open | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
-| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | fixed_pending_retest | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
+| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | retested | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
 | F-PLATFORM-RLIMIT | P0 | 2 | retested | Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected) |
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
 | F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | retested | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
@@ -19,8 +19,8 @@ Application code commit `80f95a454ec9`, observed with harness `f992b48` on macOS
 | F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
 | F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
 | F-MAC-NPROC | P0 | 2 | open | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
-| F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | fixed_pending_retest | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
-| F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | fixed_pending_retest | Coordinator attempt metadata names provider gemini for controlled-model turns |
+| F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | retested | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
+| F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | retested | Coordinator attempt metadata names provider gemini for controlled-model turns |
 | F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
 | F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | retested | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
 | F-SIBLING-FORKS | P2 | 2 | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
@@ -47,7 +47,7 @@ Application code commit `80f95a454ec9`, observed with harness `f992b48` on macOS
 - **Retest at merged main 80f95a4 via harness b827c61 and f992b48 (diagnostics relax_nproc + science_barrier):** Still reproduces on main, twice: the scientific child survives the worker SIGKILL and `worker --recover` (the run is correctly marked interrupted and not redispatched). Running cancellation still kills its child. Since f992b48 the harness terminates the orphan before releasing the barrier (H-ORPHAN-TEARDOWN). (evidence: {"attempts": ["att_d0b306605a744db4", "att_593e67a5ca214685"], "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier"})
 - **Retest at merged main 80f95a4, harness a1b28ae, tests/integration (science_barrier only; no product guard relaxed):** Reproduces without relax_nproc: the deterministic pytest test fails no_orphan_after_worker_kill (1 live scientific child after the worker SIGKILL). The barrier holds the child after setsid and the product's limits, so this is the product's own kill/recovery path. (evidence: {"pytest": "evaluation/results/integration/pytest-merged-main-a1b28ae.md"})
 
-## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, fixed_pending_retest)
+## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, retested)
 
 - **Input:** origin/main 9cc90e0 merged locally with codex/gemini-offline-integration c95ab28 (clean merge)
 - **Command:** `in that worktree: BEAN_COUNTERDEX_PYTHON=<python3.11> .venv/bin/python -m pytest -q tests --ignore=tests/integration; .venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py`
@@ -55,6 +55,7 @@ Application code commit `80f95a454ec9`, observed with harness `f992b48` on macOS
 - **Observed:** provider_placeholder_disabled from main's Worker._agent (it calls check_ready() on a placeholder config); failing: tests/test_worker.py::test_worker_actual_framework_uses_durable_attempts_and_frozen_evidence, tests/test_backend_offline.py::test_ordinary_provider_configuration_never_reads_provider_environment, ::test_http_intake_and_conversation_keep_provider_attempts_zero, and Workstream 5's three worker-boundary tests. Owner 3's own 74 tests and all zero-dispatch tests pass on the combination.
 - **Evidence:** {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"}
 - **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Resolved on that branch: the worker-boundary controlled-lane tests pass; zero-dispatch passes. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
+- **Retest at merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50:** Closed by retest on main: the worker-boundary controlled lane and real deepagents graph tests pass alongside the zero-dispatch suite (38 passed). (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"})
 
 ## F-PLATFORM-RLIMIT (P0, owner 2, retested)
 
@@ -189,7 +190,7 @@ Application code commit `80f95a454ec9`, observed with harness `f992b48` on macOS
 - **Retest at 3b55843 (app code = main 9cc90e0; engine runtime now Owner 4's .venv-engine, CPython 3.11.17):** Still fails on both launch paths: harness path and Owner 4's launcher both report scientific_runtime_unavailable for the hero and changed-input baselines. With only the process-limit guard relaxed (diagnostic), the same launcher runs discovery, changed input, design authority and zero dispatch to a pass. (evidence: {"attempts": ["att_92546adc9fac471e", "att_fe675c60b66a4801", "att_8e959bd4324c48f8"], "results": "evaluation/results, evaluation/results/owner4-launcher, evaluation/results/owner4-launcher/relax_nproc"})
 - **Retest at merged main 80f95a4 via harness b827c61:** Unchanged on both launch paths (harness and Owner 4's launcher): hero and changed-input baselines fail with scientific_runtime_unavailable. It is now the only blocker between this Mac and release acceptance of the hero, design and follow-up path, which pass in full when only this guard is relaxed. (evidence: {"attempts": ["att_568062c9c3434610", "att_98ac5a9ee88048d1", "att_1ace0e6c87124367"]})
 
-## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, fixed_pending_retest)
+## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, retested)
 
 - **Input:** scripted model: execute baseline, then return_grounded_explanation
 - **Command:** `.venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k optional_scenario_cannot_silently_vanish`
@@ -198,8 +199,9 @@ Application code commit `80f95a454ec9`, observed with harness `f992b48` on macOS
 - **Evidence:** {}
 - **Retest at preview: main 9cc90e0 + codex/gemini-offline-integration c95ab28 (local merge):** Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then. (evidence: {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"})
 - **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Strict-xfail test XPASSes on this branch too; remove the marker when it merges. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
+- **Retest at merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50:** Closed by retest: the coordinator no longer reports completed while a reviewed optional scenario is neither executed nor skipped; the strict-xfail test XPASSed and is now an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"})
 
-## F-COORDINATOR-PROVIDER-LABEL (P2, owner 3, fixed_pending_retest)
+## F-COORDINATOR-PROVIDER-LABEL (P2, owner 3, retested)
 
 - **Input:** run_coordinator with a controlled chat_model
 - **Command:** `.venv/bin/python -m pytest tests/integration/test_ai_boundaries.py -k masquerade`
@@ -208,6 +210,7 @@ Application code commit `80f95a454ec9`, observed with harness `f992b48` on macOS
 - **Evidence:** {}
 - **Retest at preview: main 9cc90e0 + codex/gemini-offline-integration c95ab28 (local merge):** Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then. (evidence: {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"})
 - **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Strict-xfail test XPASSes on this branch too; remove the marker when it merges. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
+- **Retest at merged main 55403ab (PR #10, Owner 3) via harness merge 98cef50:** Closed by retest: controlled turns are no longer labelled as bare provider gemini attempts; the strict-xfail test XPASSed and is now an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py -> 38 passed"})
 
 ## F-TEST-VAR-LEAK (P2, owner 2, open)
 
