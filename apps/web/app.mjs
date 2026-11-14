@@ -76,6 +76,24 @@ function renderRows() {
       cell.append(input)
       tr.append(cell)
     }
+    // Deliberate removal for rows typed here. Imported rows stay visible and are excluded instead,
+    // so the record of what the source contained is kept.
+    const actionCell = element('td')
+    if (row.sourceId === null) {
+      const remove = element('button', 'Remove', { type: 'button', class: 'secondary', 'aria-label': `Remove row ${number}` })
+      remove.addEventListener('click', () => {
+        rows = rows.filter(candidate => candidate !== row)
+        if (!rows.length) addRow()
+        renderRows()
+        measurementsChanged()
+        announce(`Removed row ${number}.`)
+        byId('add-row').focus()
+      })
+      actionCell.append(remove)
+    } else {
+      actionCell.append(element('span', 'Imported', { class: 'hint', title: 'Imported rows are kept. Untick Include to leave one out.' }))
+    }
+    tr.append(actionCell)
     body.append(tr)
   }
   renderSources()

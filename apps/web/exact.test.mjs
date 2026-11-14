@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compareExact, parseExact, parseMeasurementsCsv, validateMeasurements } from "./exact.mjs";
+import { compareExact, isBlankRow, MAX_ROWS, MAX_SPELLING_LENGTH, parseExact, parseMeasurementsCsv, validateMeasurements } from "./exact.mjs";
 
 test("canonicalizes finite decimals and fractions without floating-point rounding", () => {
   assert.equal(parseExact(" +000.1000 "), "1/10");
@@ -70,3 +70,23 @@ test("allows zero time while rejecting negative concentration and time", () => {
     distinctTimes: 3,
   });
 });
+
+test("an empty row is reported once with its repair, even when excluded, and never dropped silently", () => {
+  const good = [0, 1, 2].map((t) => ({ time: String(t), concentration: "1", epsilon: "0.1", included: true }));
+  const blank = { time: " ", concentration: "", epsilon: "", included: false };
+  assert.equal(isBlankRow(blank), true);
+  assert.equal(isBlankRow({ ...blank, epsilon: "0.1" }), false);
+  const result = validateMeasurements([...good, blank]);
+  assert.deepEqual(result.errors, [{ index: 3, field: "time", message: "This row is empty. Fill it in or remove it." }]);
+  assert.equal(validateMeasurements(good).errors.length, 0);
+});
+
+test("draft limits match the server contract before review", () => {
+  const row = (t) => ({ time: String(t), concentration: "1", epsilon: "0.1", included: true });
+  const many = Array.from({ length: MAX_ROWS + 1 }, (_, i) => row(i));
+  assert.match(validateMeasurements(many).errors[0].message, /at most 128 rows/);
+  assert.equal(validateMeasurements(many.slice(0, MAX_ROWS)).errors.length, 0);
+  const long = validateMeasurements([row(0), row(1), { ...row(2), concentration: "1." + "0".repeat(MAX_SPELLING_LENGTH) }]);
+  assert.deepEqual(long.errors.map((e) => [e.index, e.field]), [[2, "concentration"]]);
+});
+
