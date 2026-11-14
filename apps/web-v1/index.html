@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Dr. Bean · Research notebook</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+  <script type="module" src="./motion.mjs"></script>
+  <script type="module" src="./story.mjs"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to main content</a>
+  <header class="masthead">
+    <a class="brand" href="#research" aria-label="Dr. Bean, research notebook">
+      <svg class="brand-mark" viewBox="0 0 32 24" aria-hidden="true"><path d="M5 15c-2-6 3-12 10-12 6 0 12 3 12 9 0 7-7 10-13 10C9 22 6 19 5 15z"/><path class="brand-seam" d="M9 16c4-1 6-4 8-7s5-4 8-4"/></svg>
+      <span>Dr. Bean</span>
+    </a>
+    <span class="masthead-note">Research notebook · claims checked by Counterdex</span>
+  </header>
+  <section class="story" id="story" aria-labelledby="story-title">
+    <div class="story-intro">
+      <p class="eyebrow">A worked example</p>
+      <h1 id="story-title">Several explanations fit your measurements.</h1>
+      <p class="lede">Dr. Bean finds the ones your claim leaves out, checks them exactly, and tells you which next reading would tell them apart.</p>
+      <a class="scroll-cue" href="#notebook">Skip to your notebook</a>
+      <aside class="margin-note" aria-label="The question in this example">
+        <dl>
+          <dt>Model</dt><dd>C(t) = A (e<sup>−ke·t</sup> − e<sup>−ka·t</sup>)</dd>
+          <dt>Claim</dt><dd><mark>every compatible ke lies in [0.10, 0.17] per hour</mark></dd>
+          <dt>Question</dt><dd>Do the measurements force that, or does another explanation slip through?</dd>
+        </dl>
+      </aside>
+    </div>
+    <div class="story-body">
+      <figure class="story-figure" aria-labelledby="story-caption">
+        <svg id="story-plot" viewBox="0 0 640 420" role="img" aria-labelledby="story-caption"></svg>
+        <figcaption id="story-caption">Fig. 1 · Concentration (mg/L) against elapsed time (h). Synthetic worked example from the engine's documentation; your own results appear in your notebook below.</figcaption>
+      </figure>
+      <ol class="story-steps">
+        <li data-step="points"><h2>Five readings</h2><p>A small concentration study: five measurements over four hours.</p></li>
+        <li data-step="allowances"><h2>Each with a hard allowance</h2><p>±0.50 mg/L is the largest discrepancy you accept for each reading. It is a reviewed bound, not a standard deviation.</p></li>
+        <li data-step="reference"><h2>One curve fits</h2><p>Its elimination rate, ke ≈ 0.128 per hour, sits inside the claimed range of 0.10 to 0.17.</p></li>
+        <li data-step="outside"><h2>So does another</h2><p>This curve also stays within every allowance, but its ke ≈ 0.099 lies outside the claim. The engine checks this exactly: the data do not force the claim.</p></li>
+        <li data-step="bands"><h2>Where they disagree</h2><p>At 8 hours, with a 0.20 mg/L allowance, the two curves predict readings that cannot overlap. One measurement there can tell them apart.</p></li>
+        <li data-step="reading"><h2>A new reading decides</h2><p>A hypothetical 3.27 mg/L keeps the first curve and rules out the second. It does not prove the claim: other curves may still fit.</p></li>
+      </ol>
+    </div>
+  </section>
+  <div class="workspace" id="notebook">
+    <div class="workspace-heading">
+      <div>
+        <p class="eyebrow">Your notebook</p>
+        <p class="notebook-title">Concentration study</p>
+      </div>
+      <button id="export-draft" type="button" class="secondary">Download draft</button>
+    </div>
+    <nav aria-label="Notebook pages" class="workspace-nav">
+      <a href="#research">Add your data or paper</a>
+      <a href="#inputs">Inputs</a>
+      <a href="#question">Question</a>
+      <a href="#review">Review</a>
+      <a href="#investigations">Investigations</a>
+      <a href="#report">Report</a>
+    </nav>
+    <main id="main" tabindex="-1">
+      <section id="research" aria-labelledby="research-title">
+        <div class="section-heading"><h2 id="research-title" tabindex="-1"><span class="folio" aria-hidden="true">p. 1</span>Add your data or paper</h2><p>Inspect your files, ask a question, review what will be sent, and explore cited evidence. General AI analysis is separate from mathematical verification.</p></div>
+        <div id="general-workspace"></div>
+        <div id="durable-research" class="card" aria-live="polite"></div>
+      </section>
+      <details class="card" id="connection-panel"><summary>Advanced server connection</summary>
+          <p>Connect to this Dr. Bean server with your researcher access token. Gemini uses the server owner's key; you do not need a Gemini key. Your access token stays in memory until you disconnect or close this tab.</p>
+          <form id="connect-form">
+            <label class="stack">Researcher access token<input id="bearer" type="password" autocomplete="off" required></label>
+            <button type="submit">Connect</button><button id="disconnect" type="button" class="secondary">Disconnect</button>
+          </form>
+          <p id="connection-status" role="status">Disconnected. Investigation planning is unavailable.</p>
+          <div id="workspace-controls" hidden>
+            <label class="stack">Workspace<select id="workspace-select" aria-label="Workspace"></select></label>
+            <form id="new-workspace"><label class="stack">New workspace name<input id="workspace-name" type="text" maxlength="120" required></label><button>Create workspace</button></form>
+          </div>
+          <div id="backend-error" class="errors" role="alert" hidden></div>
+        </details>
+      <div class="card" id="backend-source-review"></div>
+      <section id="inputs" aria-labelledby="inputs-title">
+        <div class="section-heading">
+          <h2 id="inputs-title" tabindex="-1"><span class="folio" aria-hidden="true">p. 2</span>Measurements</h2>
+          <p>Import a CSV or enter your readings. Use elapsed hours and concentrations in mg/L.</p>
+        </div>
+        <div class="card import-card">
+          <div>
+            <h3>Bring in measurements</h3>
+            <p>CSV columns <code>time</code>, <code>concentration</code>, and <code>epsilon</code></p>
+          </div>
+          <div class="actions">
+            <label for="csv-file" class="button file-button">Choose CSV<input type="file" accept=".csv,text/csv" id="csv-file"></label>
+            <button class="secondary" type="button" id="example">Load synthetic example</button>
+          </div>
+          <div id="import-preview" class="import-preview" hidden></div>
+        </div>
+        <form id="measurements" class="card" novalidate>
+          <h3>Measurement table</h3>
+          <p id="allowance-help">A hard allowance is the maximum discrepancy accepted by this analysis. A standard deviation requires a separate rule before it can be used as a hard allowance.</p>
+          <div id="rows-errors" class="errors" tabindex="-1" hidden></div>
+          <div class="table-region" role="region" aria-label="Editable measurements" tabindex="0">
+            <table>
+              <thead><tr><th scope="col">Row</th><th scope="col">Include</th><th scope="col">Elapsed time (h)</th><th scope="col">Concentration (mg/L)</th><th scope="col">Hard allowance (mg/L)</th><th scope="col">Row action</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <p id="source-summary" class="source-summary"></p>
+          <details id="source-details" hidden><summary>Measurement provenance</summary><ul id="sources"></ul></details>
+          <footer class="actions spread">
+            <button class="secondary" type="button" id="add-row">Add row</button>
+            <button type="submit">Review question</button>
+          </footer>
+        </form>
+      </section>
+      <section id="question" aria-labelledby="question-title" hidden>
+        <div class="section-heading">
+          <h2 id="question-title" tabindex="-1"><span class="folio" aria-hidden="true">p. 3</span>Research question</h2>
+          <p>Under the reviewed model and allowances, do all compatible elimination rates lie within your target interval?</p>
+        </div>
+        <form id="question-form" class="card" novalidate>
+          <div id="question-errors" class="errors" tabindex="-1" hidden></div>
+          <h3>Two-rate concentration model</h3>
+          <p>Concentration starts at zero. The absorption rate <var>ka</var> is greater than the elimination rate <var>ke</var>.</p>
+          <details><summary>Model equation</summary><p><code>C(t) = A × (exp(−ke × t) − exp(−ka × t))</code></p></details>
+          <label class="stack">Experiment identifier<input id="experiment-id" type="text" required></label>
+          <label class="stack">Elapsed-time origin<input id="time-origin" type="text" required placeholder="Describe the experiment’s t=0"></label>
+          <label class="stack">Dataset origin<select id="dataset-origin"><option value="">Choose origin</option><option value="actual">Actual measurements</option><option value="hypothetical">Hypothetical</option><option value="synthetic">Synthetic</option></select></label>
+          <div id="bounds"></div>
+          <label class="stack">Origin of historical hard allowances <textarea id="allowanceOrigin" rows="2" required></textarea></label>
+          <label class="stack">Methods or source notes <span class="optional">Optional</span><textarea id="methods" rows="3"></textarea></label>
+          <label class="stack">Research goal <span class="optional">Optional: the closed-interval question above is used when blank.</span><textarea id="goal" rows="2" maxlength="2000"></textarea></label>
+          <footer class="actions spread"><a href="#inputs">Back to measurements</a><button type="submit">Review draft</button></footer>
+        </form>
+      </section>
+      <section id="review" aria-labelledby="review-title" hidden>
+        <div class="section-heading"><h2 id="review-title" tabindex="-1"><span class="folio" aria-hidden="true">p. 4</span>Review draft</h2><p>Check the measurements, allowances, and model bounds before preparing an investigation plan.</p></div>
+        <div class="card" id="review-summary"></div>
+        <div id="backend-review" class="card"></div>
+      </section>
+      <section id="investigations" aria-labelledby="investigations-title" hidden>
+        <div class="section-heading"><h2 id="investigations-title" tabindex="-1"><span class="folio" aria-hidden="true">p. 5</span>Investigations</h2></div>
+        <div id="backend-investigations" class="card"></div>
+      </section>
+      <section id="report" aria-labelledby="report-title" hidden>
+        <div class="section-heading"><h2 id="report-title" tabindex="-1"><span class="folio" aria-hidden="true">p. 6</span>Reviewer report</h2></div>
+        <div id="backend-report" class="card"></div>
+      </section>
+      <aside class="workspace-status" aria-label="Workspace storage">This draft is held in this tab. Download a copy before reloading or closing it.</aside>
+      <div id="status" class="sr-only" role="status"></div>
+    </main>
+  </div>
+</body>
+</html>
