@@ -24,6 +24,9 @@ const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODUL
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const CASE = process.env.LIVE_CASE || 'dry-run'
 const GRANT = Number(process.env.LIVE_GRANT || 0)
+const UI = process.env.LIVE_UI || 'web'  // 'preview' = the preferred workspace at /workspace-preview/
+assert.ok(['web', 'preview'].includes(UI), 'LIVE_UI must be web or preview')
+assert.ok(UI === 'web' || CASE !== 'clarification', 'The missing-input contrast uses the file-question path in apps/web')
 assert.ok(['dry-run', 'baseline', 'clarification'].includes(CASE), 'LIVE_CASE must be dry-run, baseline or clarification')
 assert.ok(CASE === 'dry-run' ? GRANT === 0 : GRANT >= 1 && GRANT <= 8, 'A live case needs LIVE_GRANT in 1..8; dry-run grants nothing')
 const commit = (await run('git', ['rev-parse', '--short', 'HEAD'])).trim()
@@ -38,7 +41,7 @@ const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', DRBEAN_VAR_DIR: scratch, 
   PYTHONPATH: join(root, 'apps/api'), LANGSMITH_TRACING: 'false',
   LIVE_BUDGET_FILE: process.env.LIVE_BUDGET_FILE || join(root, 'evaluation/results/sprint/live-budget.json') }
 const record = { schema_version: 'c-sprint-live-run.v1', lane: CASE === 'dry-run' ? 'live_gemini (dry run, zero requests)' : 'live_gemini',
-  case: CASE, harness_commit: commit, application_tree: appDiff ? `differs from origin/main: ${appDiff.split('\n').length} files` : `identical to origin/main ${appBase}`, grant: GRANT, started_at: new Date().toISOString(), checks: [], observations: {} }
+  case: CASE, ui: UI, harness_commit: commit, application_tree: appDiff ? `differs from origin/main: ${appDiff.split('\n').length} files` : `identical to origin/main ${appBase}`, grant: GRANT, started_at: new Date().toISOString(), checks: [], observations: {} }
 let browser, context, page, launched = false
 
 async function run(executable, args, extraEnv = null, timeout = 60000) {
@@ -63,6 +66,12 @@ async function api(path) {
   return response.json()
 }
 const check = (id, detail = '') => { record.checks.push({ id, detail }); console.log(`ok ${id}${detail ? ': ' + detail : ''}`) }
+// Node-side polling: Playwright's waitForFunction treats a returned promise as already truthy.
+async function poll(predicate, timeout, every = 2000) {
+  const end = Date.now() + timeout
+  while (Date.now() < end) { if (await predicate()) return; await new Promise(yes => setTimeout(yes, every)) }
+  throw new Error(`Timed out after ${timeout} ms`)
+}
 const list = value => Array.isArray(value) ? value : (value.items || [])
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
 
@@ -91,104 +100,170 @@ try {
   page = await context.newPage()
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
+  if (UI === 'preview') {
+    // The preferred workspace: same private access, its own controls, the production ResearchController.
+    await page.goto(base + '/workspace-preview/')
+    await page.locator('#research-example').waitFor({ state: 'visible', timeout: 30000 })
+    await page.waitForFunction(() => !document.querySelector('#research-mode')?.textContent.includes('Static'), null, { timeout: 30000 })
+    await page.locator('#research-example').click()
+    await page.goto(base + '/workspace-preview/#question')
+    await page.locator('#accept-inputs').check()
+    await page.locator('#start-research').click()
+    await page.locator('#save-provider-consent').waitFor({ state: 'visible', timeout: 30000 })
+    const sessions = await page.evaluate(async () => {
+      const ws = await (await fetch('/api/bean/v1/workspaces', { credentials: 'same-origin' })).json()
+      const list = Array.isArray(ws) ? ws : (ws.items || [])
+      const out = []
+      for (const w of list) { const r = await (await fetch(`/api/bean/v1/workspaces/${w.id}/research-sessions`, { credentials: 'same-origin' })).json(); out.push(...(r.items || []).map(s => ({ ...s, workspace: w.id }))) }
+      return out
+    })
+    assert.equal(sessions.length, 1, 'Exactly one session created by the preferred workspace')
+    let session = sessions[0]
+    const workspace = session.workspace_id || session.workspace
+    assert.equal(session.mode, 'live'); assert.equal(session.provider_allocation.physical_requests, 0)
+    check('live-session-created-from-the-preferred-workspace-with-zero-default-allocation', session.id)
+    assert.equal(await page.locator('#continue-plan').isDisabled(), true, 'Continue must stay disabled before consent and capacity')
+    await page.locator('#provider-consent').check()
+    await page.locator('#save-provider-consent').click()
+    await poll(async () => (await api(`/research-sessions/${session.id}`)).interaction?.provider_consent_required === false || /consent saved/i.test(await page.locator('body').innerText()), 30000)
+    check('consent-recorded-through-the-preferred-workspace')
+    assert.equal(list(await api(`/workspaces/${workspace}/provider-attempts`)).length, 0, 'Saving inputs or consent must not call the provider')
+    if (CASE === 'dry-run') {
+      assert.equal(await page.locator('#continue-plan').isDisabled(), true, 'Continue must stay disabled with no operator allocation')
+      check('preferred-workspace-continue-disabled-without-allocation')
+    } else {
+      record.observations.grant = JSON.parse(await run(python, ['evaluation/live/operator_grant.py', join(scratch, 'bean.sqlite3'), session.id,
+        String(GRANT), '64000', String(Math.min(16000, GRANT * 512)), `${CASE}-preview-${commit}`], env))
+      check('operator-granted-explicit-allocation', `${GRANT} requests; sprint total ${record.observations.grant.sprint_granted_total}/12`)
+      await page.locator('#refresh-research').click()
+      await page.waitForFunction(() => !document.querySelector('#continue-plan')?.disabled, null, { timeout: 20000 })
+      const beforeAdvance = (await api(`/research-sessions/${session.id}`)).revision
+      await page.locator('#continue-plan').click()
+      // Wait until the click has reached the server (revision moves) and the action is no longer moving.
+      const settle = async (fromRevision, timeout) => { await poll(async () => { const s = await api(`/research-sessions/${session.id}`)
+        return s.revision > fromRevision && !['queued', 'running', 'waiting_child'].includes(s.state) }, timeout); return api(`/research-sessions/${session.id}`) }
+      session = await settle(beforeAdvance, 240000)
+      record.observations.after_first_advance = { state: session.state, pending_review: session.pending_review?.kind ?? null, error_code: session.action?.error_code ?? null, usage: session.usage }
+      if (session.pending_review?.kind === 'plan') {
+        assert.equal(session.children.length, 0, 'No science before approval')
+        assert.equal(await page.locator('#approve-science').isDisabled(), true)
+        check('live-plan-stops-for-approval-with-no-child-in-the-preferred-workspace')
+        await page.locator('#approve-scope').check()
+        const beforeDecision = session.revision
+        await page.locator('#approve-science').click()
+        session = await settle(beforeDecision, 300000)
+      }
+      record.observations.final = { state: session.state, pending_review: session.pending_review?.kind ?? null, error_code: session.action?.error_code ?? null,
+        usage: session.usage, provider_allocation: session.provider_allocation, reports: session.reports,
+        children: session.children.map(child => ({ id: child.id, kind: child.kind, state: child.state, scientific_reservations: child.scientific_reservations })),
+        plan_steps: session.plan?.body?.steps?.map(step => ({ title: step.title, status: step.status })) ?? [],
+        interaction: session.interaction ?? null }
+      record.observations.preferred_ui_text = { status: await page.locator('#research-status').innerText().catch(() => null),
+        findings: await page.locator('#research-findings').innerText().catch(() => null), error: await page.locator('#research-error').innerText().catch(() => null) }
+    }
+    globalThis.__live = { session, workspace }
+  } else {
   // Automatic private access: the browser gets its own private workspace without a pasted credential.
-  await page.goto(base + (CASE === 'clarification' ? '#research' : '#inputs'))
-  await page.waitForFunction(() => document.querySelector('#workspace-select').value !== '', null, { timeout: 30000 })
-  const workspace = await page.locator('#workspace-select').inputValue()
-  const panel = page.locator('#durable-research')
+    await page.goto(base + (CASE === 'clarification' ? '#research' : '#inputs'))
+    await page.waitForFunction(() => document.querySelector('#workspace-select').value !== '', null, { timeout: 30000 })
+    const workspace = await page.locator('#workspace-select').inputValue()
+    const panel = page.locator('#durable-research')
 
-  if (CASE === 'clarification') {
-    // Missing reviewed model: only an untrusted file and a question, no measurements or claim.
-    const file = join(scratch, 'synthetic-notes.csv')
-    await writeFile(file, 'note\nSynthetic public example: concentration readings were not supplied.\n')
-    await page.locator('#research-files').setInputFiles(file)
-    await page.locator('#general-assets article').first().waitFor()
-    await page.locator('#general-assets input[type=checkbox]').first().check()
-    await page.locator('#research-question').fill('Does a one-compartment oral model with ke between 0.10 and 0.17 per hour fit my readings?')
-    await page.evaluate(() => { location.hash = 'investigations' })
-    await panel.getByRole('button', { name: 'Save selected files and research question', exact: true }).click()
-  } else {
-    const file = join(scratch, 'public-synthetic-readings.csv')
-    await writeFile(file, 'time,concentration,epsilon\n0.25,4.80,0.50\n0.5,7.20,0.50\n1,8.00,0.50\n2,6.80,0.50\n4,5.70,0.50\n')
-    await page.locator('#csv-file').setInputFiles(file)
-    await page.getByRole('button', { name: 'Use these rows', exact: true }).click()
-    await page.getByLabel('Row 1, concentration', { exact: true }).fill('4.81')
-    await page.click('#measurements button[type=submit]')
-    for (const [id, value] of Object.entries({ 'experiment-id': 'c-live-sprint-public-synthetic', 'time-origin': 'Synthetic elapsed hours from t=0',
-      aMin: '0.001', aMax: '30', keMin: '0.015', keMax: '0.35', kaMin: '0.4', kaMax: '8', targetMin: '0.10', targetMax: '0.17',
-      allowanceOrigin: 'Synthetic hard bound of 0.50 mg/L for a public example, not an instrument claim',
-      goal: 'Do these synthetic readings challenge the claimed ke range of 0.10 to 0.17 per hour, and what should be measured next?' })) await page.fill(`#${id}`, value)
-    await page.selectOption('#dataset-origin', 'synthetic')
-    await page.click('#question-form button[type=submit]')
-    await page.goto(base + '#investigations')
-    await panel.getByText('Feasible next-measurement constraints (optional until design)', { exact: true }).click()
-    for (const [name, value] of Object.entries({ times: '8, 6', allowance: '0.2', horizon: '8', allowanceReason: 'Synthetic prospective hard bound for a public example' }))
-      await panel.locator(`[name="${name}"]`).fill(value)
-    await panel.getByLabel('I reviewed the exact measurement values, units, time origin, hard allowances, parameter bounds and question assumptions.', { exact: true }).check()
-    await panel.getByRole('button', { name: 'Save reviewed inputs and research question', exact: true }).click()
-  }
-  await panel.getByRole('button', { name: 'Save provider consent', exact: true }).waitFor({ timeout: 30000 })
-  let session = (await api(`/workspaces/${workspace}/research-sessions`)).items[0]
-  assert.equal(session.mode, 'live')
-  assert.equal(session.provider_allocation.physical_requests, 0)
-  check('live-session-created-from-the-browser-with-zero-default-allocation', session.id)
-
-  // Consent through the UI: the exact disclosure, explicitly accepted.
-  await panel.getByLabel('I consent to sending this research question, reviewed inputs, plan, retained evidence and source references to the disclosed Gemini model.', { exact: true }).check()
-  await panel.getByRole('button', { name: 'Save provider consent', exact: true }).click()
-  await page.waitForFunction(() => document.querySelector('#durable-research').textContent.match(/(Provider consent|Consent) saved/), null, { timeout: 30000 })
-  check('consent-recorded-through-the-browser')
-  const attemptsBefore = list(await api(`/workspaces/${workspace}/provider-attempts`)).length
-  assert.equal(attemptsBefore, 0, 'Saving inputs or consent must not call the provider')
-
-  if (CASE === 'dry-run') {
-    const advance = panel.getByRole('button', { name: 'Advance research plan', exact: true })
-    assert.equal(await advance.isDisabled(), true, 'Advance must stay disabled with no operator allocation')
-    const revision = (await api(`/research-sessions/${session.id}`)).revision
-    const refused = await page.evaluate(async ({ id, revision }) => {
-      const response = await fetch(`/api/bean/v1/research-sessions/${id}/advance`, { method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'c-dry-run' }, body: JSON.stringify({ expected_revision: revision }) })
-      return { status: response.status, text: await response.text() }
-    }, { id: session.id, revision })
-    record.observations.unallocated_advance = { status: refused.status, code: (() => { try { return JSON.parse(refused.text).code } catch { return refused.text.slice(0, 200) } })() }
-    assert.equal(refused.status, 409, JSON.stringify(record.observations.unallocated_advance))
-    check('unallocated-live-advance-refused-before-any-request', record.observations.unallocated_advance.code)
-  } else {
-    const granted = JSON.parse(await run(python, ['evaluation/live/operator_grant.py', join(scratch, 'bean.sqlite3'), session.id,
-      String(GRANT), '64000', String(Math.min(16000, GRANT * 512)), `${CASE}-${commit}`], env))
-    record.observations.grant = granted
-    check('operator-granted-explicit-allocation', `${granted.granted} requests; sprint total ${granted.sprint_granted_total}/12`)
-    await panel.getByRole('button', { name: 'Refresh saved state', exact: true }).first().click()
-    const advance = panel.getByRole('button', { name: 'Advance research plan', exact: true })
-    await page.waitForFunction(() => [...document.querySelectorAll('#durable-research button')].some(b => b.textContent === 'Advance research plan' && !b.disabled), null, { timeout: 15000 })
-    await advance.click()
-    const settled = async (timeout) => {
-      await page.waitForFunction(() => {
-        const text = document.querySelector('#durable-research').textContent
-        return /Review the investigation operation|Review the separate|The assistant needs more information|State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped/.test(text)
-      }, null, { timeout })
-      return api(`/research-sessions/${session.id}`)
+    if (CASE === 'clarification') {
+      // Missing reviewed model: only an untrusted file and a question, no measurements or claim.
+      const file = join(scratch, 'synthetic-notes.csv')
+      await writeFile(file, 'note\nSynthetic public example: concentration readings were not supplied.\n')
+      await page.locator('#research-files').setInputFiles(file)
+      await page.locator('#general-assets article').first().waitFor()
+      await page.locator('#general-assets input[type=checkbox]').first().check()
+      await page.locator('#research-question').fill('Does a one-compartment oral model with ke between 0.10 and 0.17 per hour fit my readings?')
+      await page.evaluate(() => { location.hash = 'investigations' })
+      await panel.getByRole('button', { name: 'Save selected files and research question', exact: true }).click()
+    } else {
+      const file = join(scratch, 'public-synthetic-readings.csv')
+      await writeFile(file, 'time,concentration,epsilon\n0.25,4.80,0.50\n0.5,7.20,0.50\n1,8.00,0.50\n2,6.80,0.50\n4,5.70,0.50\n')
+      await page.locator('#csv-file').setInputFiles(file)
+      await page.getByRole('button', { name: 'Use these rows', exact: true }).click()
+      await page.getByLabel('Row 1, concentration', { exact: true }).fill('4.81')
+      await page.click('#measurements button[type=submit]')
+      for (const [id, value] of Object.entries({ 'experiment-id': 'c-live-sprint-public-synthetic', 'time-origin': 'Synthetic elapsed hours from t=0',
+        aMin: '0.001', aMax: '30', keMin: '0.015', keMax: '0.35', kaMin: '0.4', kaMax: '8', targetMin: '0.10', targetMax: '0.17',
+        allowanceOrigin: 'Synthetic hard bound of 0.50 mg/L for a public example, not an instrument claim',
+        goal: 'Do these synthetic readings challenge the claimed ke range of 0.10 to 0.17 per hour, and what should be measured next?' })) await page.fill(`#${id}`, value)
+      await page.selectOption('#dataset-origin', 'synthetic')
+      await page.click('#question-form button[type=submit]')
+      await page.goto(base + '#investigations')
+      await panel.getByText('Feasible next-measurement constraints (optional until design)', { exact: true }).click()
+      for (const [name, value] of Object.entries({ times: '8, 6', allowance: '0.2', horizon: '8', allowanceReason: 'Synthetic prospective hard bound for a public example' }))
+        await panel.locator(`[name="${name}"]`).fill(value)
+      await panel.getByLabel('I reviewed the exact measurement values, units, time origin, hard allowances, parameter bounds and question assumptions.', { exact: true }).check()
+      await panel.getByRole('button', { name: 'Save reviewed inputs and research question', exact: true }).click()
     }
-    session = await settled(240000)
-    record.observations.after_first_advance = { state: session.state, pending_review: session.pending_review?.kind ?? null,
-      error_code: session.action?.error_code ?? null, usage: session.usage }
-    if (CASE === 'baseline' && session.pending_review?.kind === 'plan') {
-      assert.equal(session.children.length, 0, 'No science before approval')
-      const approve = panel.getByRole('button', { name: 'Approve exact operation and continue', exact: true })
-      assert.equal(await approve.isDisabled(), true)
-      check('live-plan-stops-for-approval-with-no-child')
-      await panel.getByLabel('I approve only this frozen scientific scope and its limits.', { exact: true }).check()
-      await approve.click()
-      await page.waitForFunction(() => /State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped|Review the separate/.test(
-        document.querySelector('#durable-research').textContent), null, { timeout: 300000 })
-      session = await api(`/research-sessions/${session.id}`)
-    }
-    record.observations.final = { state: session.state, pending_review: session.pending_review?.kind ?? null,
-      error_code: session.action?.error_code ?? null, usage: session.usage, provider_allocation: session.provider_allocation,
-      children: session.children.map(child => ({ id: child.id, kind: child.kind, state: child.state, scientific_reservations: child.scientific_reservations })),
-      reports: session.reports, plan_steps: session.plan?.body?.steps?.map(step => ({ title: step.title, status: step.status })) ?? [] }
-  }
+    await panel.getByRole('button', { name: 'Save provider consent', exact: true }).waitFor({ timeout: 30000 })
+    let session = (await api(`/workspaces/${workspace}/research-sessions`)).items[0]
+    assert.equal(session.mode, 'live')
+    assert.equal(session.provider_allocation.physical_requests, 0)
+    check('live-session-created-from-the-browser-with-zero-default-allocation', session.id)
 
+    // Consent through the UI: the exact disclosure, explicitly accepted.
+    await panel.getByLabel('I consent to sending this research question, reviewed inputs, plan, retained evidence and source references to the disclosed Gemini model.', { exact: true }).check()
+    await panel.getByRole('button', { name: 'Save provider consent', exact: true }).click()
+    await page.waitForFunction(() => document.querySelector('#durable-research').textContent.match(/(Provider consent|Consent) saved/), null, { timeout: 30000 })
+    check('consent-recorded-through-the-browser')
+    const attemptsBefore = list(await api(`/workspaces/${workspace}/provider-attempts`)).length
+    assert.equal(attemptsBefore, 0, 'Saving inputs or consent must not call the provider')
+
+    if (CASE === 'dry-run') {
+      const advance = panel.getByRole('button', { name: 'Advance research plan', exact: true })
+      assert.equal(await advance.isDisabled(), true, 'Advance must stay disabled with no operator allocation')
+      const revision = (await api(`/research-sessions/${session.id}`)).revision
+      const refused = await page.evaluate(async ({ id, revision }) => {
+        const response = await fetch(`/api/bean/v1/research-sessions/${id}/advance`, { method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'c-dry-run' }, body: JSON.stringify({ expected_revision: revision }) })
+        return { status: response.status, text: await response.text() }
+      }, { id: session.id, revision })
+      record.observations.unallocated_advance = { status: refused.status, code: (() => { try { return JSON.parse(refused.text).code } catch { return refused.text.slice(0, 200) } })() }
+      assert.equal(refused.status, 409, JSON.stringify(record.observations.unallocated_advance))
+      check('unallocated-live-advance-refused-before-any-request', record.observations.unallocated_advance.code)
+    } else {
+      const granted = JSON.parse(await run(python, ['evaluation/live/operator_grant.py', join(scratch, 'bean.sqlite3'), session.id,
+        String(GRANT), '64000', String(Math.min(16000, GRANT * 512)), `${CASE}-${commit}`], env))
+      record.observations.grant = granted
+      check('operator-granted-explicit-allocation', `${granted.granted} requests; sprint total ${granted.sprint_granted_total}/12`)
+      await panel.getByRole('button', { name: 'Refresh saved state', exact: true }).first().click()
+      const advance = panel.getByRole('button', { name: 'Advance research plan', exact: true })
+      await page.waitForFunction(() => [...document.querySelectorAll('#durable-research button')].some(b => b.textContent === 'Advance research plan' && !b.disabled), null, { timeout: 15000 })
+      await advance.click()
+      const settled = async (timeout) => {
+        await page.waitForFunction(() => {
+          const text = document.querySelector('#durable-research').textContent
+          return /Review the investigation operation|Review the separate|The assistant needs more information|State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped/.test(text)
+        }, null, { timeout })
+        return api(`/research-sessions/${session.id}`)
+      }
+      session = await settled(240000)
+      record.observations.after_first_advance = { state: session.state, pending_review: session.pending_review?.kind ?? null,
+        error_code: session.action?.error_code ?? null, usage: session.usage }
+      if (CASE === 'baseline' && session.pending_review?.kind === 'plan') {
+        assert.equal(session.children.length, 0, 'No science before approval')
+        const approve = panel.getByRole('button', { name: 'Approve exact operation and continue', exact: true })
+        assert.equal(await approve.isDisabled(), true)
+        check('live-plan-stops-for-approval-with-no-child')
+        await panel.getByLabel('I approve only this frozen scientific scope and its limits.', { exact: true }).check()
+        await approve.click()
+        await page.waitForFunction(() => /State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped|Review the separate/.test(
+          document.querySelector('#durable-research').textContent), null, { timeout: 300000 })
+        session = await api(`/research-sessions/${session.id}`)
+      }
+      record.observations.final = { state: session.state, pending_review: session.pending_review?.kind ?? null,
+        error_code: session.action?.error_code ?? null, usage: session.usage, provider_allocation: session.provider_allocation,
+        children: session.children.map(child => ({ id: child.id, kind: child.kind, state: child.state, scientific_reservations: child.scientific_reservations })),
+        reports: session.reports, plan_steps: session.plan?.body?.steps?.map(step => ({ title: step.title, status: step.status })) ?? [] }
+    }
+
+    globalThis.__live = { session, workspace }
+  }
+  const { session, workspace } = globalThis.__live
   // Provider ledger, events and evidence: public fields only.
   const attempts = list(await api(`/workspaces/${workspace}/provider-attempts`))
   // Whole attempt records: ids, states, budgets, prompt hashes and provider-reported usage; never prompts or keys.

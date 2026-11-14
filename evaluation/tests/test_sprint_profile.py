@@ -24,6 +24,8 @@ class SprintProfileTests(unittest.TestCase):
         ids = {item["id"] for item in self.profile["items"]}
         for path in sorted((ROOT / "results" / "sprint").glob("*.json")):
             observation = json.loads(path.read_text(encoding="utf-8"))
+            if observation.get("schema_version") != "coordinator-sprint-observation.v1":
+                continue  # e.g. the live grant ledger
             self.assertEqual(observation["profile_canonical_sha256"], self.frozen["canonical_sha256"], path.name)
             for item in observation["items"]:
                 self.assertIn(item["id"], ids, path.name)

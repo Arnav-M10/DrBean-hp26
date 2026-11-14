@@ -34,7 +34,8 @@ def main(argv: list[str]) -> int:
     if "var/bean.sqlite3" in db.replace("\\", "/") and "/tmp" not in db and "/private/" not in db:
         raise SystemExit("Refusing: operator grants in this harness are for isolated temporary stores only.")
     budget = json.loads(BUDGET.read_text()) if BUDGET.exists() else {"ceiling": SPRINT_CEILING, "grants": []}
-    granted = sum(g["physical_requests"] for g in budget["grants"])
+    # A grant whose isolated store was deleted with zero recorded attempts can never dispatch; it is released with evidence.
+    granted = sum(g["physical_requests"] for g in budget["grants"]) - sum(r["physical_requests"] for r in budget.get("released", []))
     if granted + physical > SPRINT_CEILING:
         raise SystemExit(f"Refusing: {granted} already granted; {physical} more would exceed the sprint ceiling of {SPRINT_CEILING}.")
     from bean_api.research import ResearchService
