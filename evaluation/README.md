@@ -38,7 +38,7 @@ provider requests were made.
 
 | Command | What it does | Exit |
 |---|---|---|
-| `python3.11 -m unittest discover -s evaluation/tests -v` | harness unit tests (125; Node comparison skips when Node is absent) | 0 = pass |
+| `python3.11 -m unittest discover -s evaluation/tests -v` | harness unit tests (131; Node comparison skips when Node is absent) | 0 = pass |
 | `python3.11 evaluation/cli.py verify` | frozen manifest v3 + archived ancestry + science packets | 0 = OK, 1 = drift |
 | `python3.11 evaluation/cli.py selftest` | grader exemplars (24 compliant, 62 violating). Harness only, never product evidence | 0 / raises |
 | `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch` | launches an isolated API + worker (fresh temp SQLite, blobs, in-memory tokens, allowlisted env, egress guard) and drives the real HTTP routes; appends attempts | 0 only if every entry passed; 2 otherwise |
