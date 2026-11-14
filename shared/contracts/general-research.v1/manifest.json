@@ -1,0 +1,108 @@
+{
+  "contract_version": "general-research.v1",
+  "prefix": "/api/bean/v1",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/bean/v1/research-capabilities",
+      "response": "capabilities"
+    },
+    {
+      "method": "POST",
+      "path": "/api/bean/v1/workspaces/{workspace_id}/research-assets",
+      "status": 201,
+      "request": "raw file bytes; Content-Type required; X-Source-Name optional (percent-encoded UTF-8); query origin=real_observation|public_source|synthetic_example|hypothetical|unspecified; Idempotency-Key optional",
+      "response": "ResearchAsset"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bean/v1/workspaces/{workspace_id}/research-assets",
+      "response": "ResearchAsset[]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bean/v1/research-assets/{asset_id}",
+      "response": "ResearchAsset"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bean/v1/research-assets/{asset_id}/content",
+      "response": "original bytes (images inline, other types as attachment), X-Artifact-SHA256"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bean/v1/research-assets/{asset_id}/pages/{page_index}/image",
+      "response": "bounded PNG/JPEG page image (PDF pages, image previews)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bean/v1/research-assets/{asset_id}/pages/{page_index}/text",
+      "response": "PageText"
+    },
+    {
+      "method": "POST",
+      "path": "/api/bean/v1/workspaces/{workspace_id}/research-analysis-estimates",
+      "status": 200,
+      "request": "AnalysisEstimateRequest",
+      "response": "AnalysisEstimate",
+      "side_effects": "none"
+    },
+    {
+      "method": "POST",
+      "path": "/api/bean/v1/workspaces/{workspace_id}/research-analyses",
+      "status": 201,
+      "request": "ResearchAnalysisRequest; Idempotency-Key must equal client_operation_id",
+      "response": "ResearchAnalysis"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bean/v1/workspaces/{workspace_id}/research-analyses",
+      "response": "ResearchAnalysis[]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bean/v1/research-analyses/{analysis_id}",
+      "response": "ResearchAnalysis",
+      "side_effects": "none; never calls a model"
+    }
+  ],
+  "schemas": [
+    "AnalysisEstimate.schema.json",
+    "AnalysisEstimateRequest.schema.json",
+    "ModelAnalysisOutput.schema.json",
+    "PageText.schema.json",
+    "ResearchAnalysis.schema.json",
+    "ResearchAnalysisRequest.schema.json",
+    "ResearchAsset.schema.json"
+  ],
+  "examples": [
+    "examples/analysis.json",
+    "examples/capabilities.json",
+    "examples/error-stale-digest.json",
+    "examples/estimate.json",
+    "examples/page-text.json",
+    "examples/upload-csv.json",
+    "examples/upload-scanned-pdf.json"
+  ],
+  "limits": {
+    "max_asset_bytes": 5242880,
+    "min_assets_per_analysis": 1,
+    "max_assets_per_analysis": 5,
+    "max_analysis_bytes": 10485760,
+    "max_pdf_pages": 10,
+    "max_question_chars": 4000,
+    "max_source_name_chars": 255,
+    "max_table_rows": 200000,
+    "max_table_columns": 512,
+    "max_image_pixels": 50000000,
+    "page_image_max_side_px": 1600
+  },
+  "conventions": {
+    "page_index": "zero-based; page_number = page_index + 1 for display",
+    "bbox": "[x0, y0, x1, y1] normalized 0-1, origin top-left of the displayed (rotated) page; bbox_space = page_normalized_top_left; null when no character boxes exist",
+    "citation": "binds source_sha256 + page_index + exact quote; status verified only for one admissible occurrence after citation-normalization.v1",
+    "verification": "every analysis is not_mathematically_verified; checked results are separate records",
+    "errors": "standard envelope {code, message, field_paths, retryable, current_revision_id, request_id}"
+  },
+  "generator": "python -m bean_api.general_research.contract"
+}

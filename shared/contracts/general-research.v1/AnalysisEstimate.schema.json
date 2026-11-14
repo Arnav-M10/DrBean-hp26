@@ -1,0 +1,219 @@
+{
+  "$defs": {
+    "BudgetView": {
+      "additionalProperties": false,
+      "properties": {
+        "accounting": {
+          "enum": [
+            "shared_global_ledger",
+            "controlled_zero_spend"
+          ],
+          "title": "Accounting",
+          "type": "string"
+        },
+        "remaining_requests": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remaining Requests"
+        },
+        "remaining_input_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remaining Input Tokens"
+        },
+        "remaining_output_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remaining Output Tokens"
+        },
+        "billing_verified": {
+          "const": false,
+          "title": "Billing Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "accounting",
+        "remaining_requests",
+        "remaining_input_tokens",
+        "remaining_output_tokens",
+        "billing_verified"
+      ],
+      "title": "BudgetView",
+      "type": "object"
+    },
+    "SentPage": {
+      "additionalProperties": false,
+      "properties": {
+        "page_index": {
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "sent_as": {
+          "enum": [
+            "text",
+            "image"
+          ],
+          "title": "Sent As",
+          "type": "string"
+        },
+        "text_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Text Sha256"
+        },
+        "image_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Image Sha256"
+        }
+      },
+      "required": [
+        "page_index",
+        "sent_as",
+        "text_sha256",
+        "image_sha256"
+      ],
+      "title": "SentPage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "available": {
+      "title": "Available",
+      "type": "boolean"
+    },
+    "unavailable_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Unavailable Reason"
+    },
+    "execution_mode": {
+      "enum": [
+        "live",
+        "controlled",
+        "disabled"
+      ],
+      "title": "Execution Mode",
+      "type": "string"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Model"
+    },
+    "estimated_input_tokens": {
+      "title": "Estimated Input Tokens",
+      "type": "integer"
+    },
+    "reserved_output_tokens": {
+      "title": "Reserved Output Tokens",
+      "type": "integer"
+    },
+    "max_input_tokens": {
+      "title": "Max Input Tokens",
+      "type": "integer"
+    },
+    "fits_context": {
+      "title": "Fits Context",
+      "type": "boolean"
+    },
+    "fits_budget": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Fits Budget"
+    },
+    "budget": {
+      "$ref": "#/$defs/BudgetView"
+    },
+    "pages_sent": {
+      "additionalProperties": {
+        "items": {
+          "$ref": "#/$defs/SentPage"
+        },
+        "type": "array"
+      },
+      "title": "Pages Sent",
+      "type": "object"
+    },
+    "blocking_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocking Reasons",
+      "type": "array"
+    },
+    "estimate_method": {
+      "title": "Estimate Method",
+      "type": "string"
+    }
+  },
+  "required": [
+    "available",
+    "unavailable_reason",
+    "execution_mode",
+    "model",
+    "estimated_input_tokens",
+    "reserved_output_tokens",
+    "max_input_tokens",
+    "fits_context",
+    "fits_budget",
+    "budget",
+    "pages_sent",
+    "blocking_reasons",
+    "estimate_method"
+  ],
+  "title": "AnalysisEstimate",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:general-research.v1:AnalysisEstimate"
+}
