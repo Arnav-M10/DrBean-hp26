@@ -1,0 +1,379 @@
+[
+  {
+    "at": "2026-11-14T06:38:46+00:00",
+    "interpreter": {
+      "implementation": "CPython",
+      "machine": "arm64",
+      "system": "Darwin",
+      "version": "3.11.17"
+    },
+    "results": [
+      {
+        "expected": {
+          "margin_positive": true,
+          "selected_time": "8",
+          "tier": "checked_pair_separation"
+        },
+        "id": "fixed_pair:grid-6-8-allowance-0.2",
+        "observed": {
+          "candidates": {
+            "outside": "valid",
+            "reference": "valid"
+          },
+          "problem_digest": "d184aae5601989796d299c6c020277938103b0288459133033414b73179bf7c2",
+          "replay": "passed",
+          "selected_margin_approx": 0.7671899221964492,
+          "selected_time": "8/1",
+          "suggestion_digest": "1b8e9b9a875057dbd025448317727dcf74d9c2f9c3499c17bcb9c10a68a0967e",
+          "tier": "checked_pair_separation"
+        },
+        "passed": true,
+        "scope": "fixed audit pair on this exact grid and allowance; not a global optimum or instrument claim"
+      },
+      {
+        "expected": {
+          "margin_positive": true,
+          "selected_time": "6",
+          "tier": "checked_pair_separation"
+        },
+        "id": "fixed_pair:grid-6-allowance-0.2",
+        "observed": {
+          "candidates": {
+            "outside": "valid",
+            "reference": "valid"
+          },
+          "problem_digest": "d184aae5601989796d299c6c020277938103b0288459133033414b73179bf7c2",
+          "replay": "passed",
+          "selected_margin_approx": 0.5553485658343366,
+          "selected_time": "6/1",
+          "suggestion_digest": "fe1cd8404e05f42e1e5be888a6bb6ec98928e465c5727d92d9a7a8801c8ba196",
+          "tier": "checked_pair_separation"
+        },
+        "passed": true,
+        "scope": "fixed audit pair on this exact grid and allowance; not a global optimum or instrument claim"
+      },
+      {
+        "expected": {
+          "pair_compatible": true,
+          "selected_time": null,
+          "tier": "no_separation_established"
+        },
+        "id": "fixed_pair:grid-6-8-allowance-0.6",
+        "observed": {
+          "candidates": {
+            "outside": "valid",
+            "reference": "valid"
+          },
+          "problem_digest": "d184aae5601989796d299c6c020277938103b0288459133033414b73179bf7c2",
+          "replay": "passed",
+          "selected_margin_approx": null,
+          "selected_time": null,
+          "suggestion_digest": "d3fbcdb0dfb6062555dce18348171f728944e113b52a0a492ce9fc7eda3dce0c",
+          "tier": "no_separation_established"
+        },
+        "passed": true,
+        "scope": "fixed audit pair on this exact grid and allowance; not a global optimum or instrument claim"
+      },
+      {
+        "expected": "binding_failure",
+        "id": "defense:wrong_expected_identity",
+        "observed": "binding_failure",
+        "passed": true,
+        "scope": "expected identity supplied separately from the bundle"
+      },
+      {
+        "expected": "integrity_failure",
+        "id": "defense:changed_byte",
+        "observed": "integrity_failure",
+        "passed": true,
+        "scope": "one byte changed; original anchors"
+      },
+      {
+        "expected": "integrity_failure",
+        "id": "defense:mutation_rejected_by_original_anchor",
+        "observed": "integrity_failure",
+        "passed": true,
+        "scope": "false enclosure (+1/10 at 6 h) with internal hashes recomputed; real original anchor"
+      },
+      {
+        "expected": "mathematical_failure",
+        "id": "defense:mutation_rejected_by_fresh_mathematics",
+        "observed": {
+          "class": "mathematical_failure",
+          "field_paths": [
+            "pair/candidates/0/samples/5"
+          ]
+        },
+        "passed": true,
+        "scope": "DIAGNOSTIC ONLY: a deliberately changed test anchor isolates the mathematical check. It sacrifices packet authentication on purpose and authenticates nothing; real releases use the original anchor"
+      },
+      {
+        "expected": "no selection; exact margin <= 0",
+        "id": "semantics:touching_bands_do_not_separate",
+        "observed": {
+          "error": null,
+          "margin": "-6167420579173/21267647932558653966460912964485513216000000000000",
+          "selected_time": null,
+          "tier": "no_separation_established"
+        },
+        "passed": true,
+        "scope": "allowance set to half the computed centre gap at 8 h: closed bands touch, equality fails"
+      },
+      {
+        "expected": "rejected (not passed, not a crash)",
+        "id": "defense:truncated_packet",
+        "observed": {
+          "class": "unsupported_format",
+          "code": "invalid_input"
+        },
+        "passed": true,
+        "scope": "packet cut in half; original anchors"
+      },
+      {
+        "expected": "exhausted (byte cap) before any parsing work",
+        "id": "defense:oversized_packet",
+        "observed": {
+          "class": "exhausted",
+          "code": "resource_exhaustion"
+        },
+        "passed": true,
+        "scope": "packet padded past the 4 MiB admitted limit"
+      },
+      {
+        "expected": "integrity or binding failure",
+        "id": "defense:another_runs_valid_packet",
+        "observed": {
+          "class": "integrity_failure",
+          "code": "artifact_mismatch"
+        },
+        "passed": true,
+        "scope": "a valid packet of a different reviewed design replayed against this design's anchors"
+      },
+      {
+        "expected": {
+          "diagnostic_anchor": [
+            "incomplete_evidence",
+            "unsupported_format",
+            "integrity_failure"
+          ],
+          "original_anchor": [
+            "integrity_failure",
+            "unsupported_format"
+          ]
+        },
+        "id": "defense:drop_artifacts",
+        "observed": {
+          "code": "incomplete_export",
+          "diagnostic_anchor": "incomplete_evidence",
+          "original_anchor": "integrity_failure",
+          "reason": null
+        },
+        "passed": true,
+        "scope": "edited packet with recomputed suggestion digest: the real anchor rejects it first; a test-only anchor then isolates format/dependency handling (it authenticates nothing)"
+      },
+      {
+        "expected": {
+          "diagnostic_anchor": [
+            "unsupported_format",
+            "integrity_failure",
+            "incomplete_evidence"
+          ],
+          "original_anchor": [
+            "integrity_failure",
+            "unsupported_format"
+          ]
+        },
+        "id": "defense:duplicate_artifact",
+        "observed": {
+          "code": "invalid_input",
+          "diagnostic_anchor": "unsupported_format",
+          "original_anchor": "integrity_failure",
+          "reason": null
+        },
+        "passed": true,
+        "scope": "edited packet with recomputed suggestion digest: the real anchor rejects it first; a test-only anchor then isolates format/dependency handling (it authenticates nothing)"
+      },
+      {
+        "expected": {
+          "diagnostic_anchor": [
+            "unsupported_format"
+          ],
+          "original_anchor": [
+            "integrity_failure",
+            "unsupported_format"
+          ]
+        },
+        "id": "defense:unknown_profile",
+        "observed": {
+          "code": "unsupported_model",
+          "diagnostic_anchor": "unsupported_format",
+          "original_anchor": "unsupported_format",
+          "reason": null
+        },
+        "passed": true,
+        "scope": "edited packet with recomputed suggestion digest: the real anchor rejects it first; a test-only anchor then isolates format/dependency handling (it authenticates nothing)"
+      },
+      {
+        "expected": {
+          "engine_equals_independent_oracle": {
+            "outside": "excluded",
+            "reference": "excluded"
+          }
+        },
+        "id": "metamorphic:tightened_row_allowance",
+        "observed": {
+          "baseline": {
+            "outside": "compatible",
+            "reference": "compatible"
+          },
+          "engine": {
+            "outside": "excluded",
+            "reference": "excluded"
+          }
+        },
+        "passed": true,
+        "scope": "row 3 allowance 0.5 -> 0.05; verdicts recomputed, compared with the independent decimal oracle"
+      },
+      {
+        "expected": "every previously compatible candidate stays compatible",
+        "id": "metamorphic:widened_allowances_keep_compatibility",
+        "observed": {
+          "baseline": {
+            "outside": "compatible",
+            "reference": "compatible"
+          },
+          "widened": {
+            "outside": "compatible",
+            "reference": "compatible"
+          }
+        },
+        "passed": true,
+        "scope": "all historical allowances 0.5 -> 0.6 (monotonicity); identities change, conclusions may not regress"
+      },
+      {
+        "expected": {
+          "problem_digest": "changes (complete-body identity)",
+          "verdicts": "unchanged"
+        },
+        "id": "metamorphic:excluded_row_is_not_a_constraint",
+        "observed": {
+          "digest_changed": true,
+          "verdicts": {
+            "outside": "compatible",
+            "reference": "compatible"
+          }
+        },
+        "passed": true,
+        "scope": "an excluded row with value 100 mg/L must not exclude any candidate, yet it is part of the reviewed record"
+      },
+      {
+        "expected": {
+          "margin": "identical",
+          "selected_time": "8/1",
+          "verdicts_by_id": "identical"
+        },
+        "id": "metamorphic:swapped_pair_order",
+        "observed": {
+          "margins_equal": true,
+          "selected": [
+            "8/1",
+            "8/1"
+          ],
+          "verdicts": {
+            "outside": "compatible",
+            "reference": "compatible"
+          }
+        },
+        "passed": true,
+        "scope": "candidate order reversed; results keyed by candidate id, not position"
+      },
+      {
+        "expected": {
+          "is_counterexample": false,
+          "outside_closed_claim": false
+        },
+        "id": "semantics:closed_endpoint_is_inside",
+        "observed": {
+          "is_counterexample": false,
+          "outside_closed_claim": false,
+          "verification": "invalid"
+        },
+        "passed": true,
+        "scope": "ke = 1/10 equals the closed claim's lower endpoint; whether it fits the data does not matter here"
+      },
+      {
+        "expected": {
+          "aggregate": "scientific_exclusion",
+          "per_candidate": {
+            "outside": "excluded",
+            "reference": "compatible"
+          }
+        },
+        "id": "followup:3.4",
+        "observed": {
+          "aggregate": "scientific_exclusion",
+          "independent_oracle": {
+            "outside": "excluded",
+            "reference": "compatible"
+          },
+          "per_candidate": {
+            "outside": "excluded",
+            "reference": "compatible"
+          }
+        },
+        "passed": true,
+        "scope": "hypothetical 8 h reading, allowance 0.2: candidate-specific feedback; proves nothing about the original interval or every possible model"
+      },
+      {
+        "expected": {
+          "aggregate": "scientific_exclusion",
+          "per_candidate": {
+            "outside": "compatible",
+            "reference": "excluded"
+          }
+        },
+        "id": "followup:4.57",
+        "observed": {
+          "aggregate": "scientific_exclusion",
+          "independent_oracle": {
+            "outside": "compatible",
+            "reference": "excluded"
+          },
+          "per_candidate": {
+            "outside": "compatible",
+            "reference": "excluded"
+          }
+        },
+        "passed": true,
+        "scope": "hypothetical 8 h reading, allowance 0.2: candidate-specific feedback; proves nothing about the original interval or every possible model"
+      },
+      {
+        "expected": {
+          "aggregate": "scientific_exclusion",
+          "per_candidate": {
+            "outside": "excluded",
+            "reference": "excluded"
+          }
+        },
+        "id": "followup:4.0",
+        "observed": {
+          "aggregate": "scientific_exclusion",
+          "independent_oracle": {
+            "outside": "excluded",
+            "reference": "excluded"
+          },
+          "per_candidate": {
+            "outside": "excluded",
+            "reference": "excluded"
+          }
+        },
+        "passed": true,
+        "scope": "hypothetical 8 h reading, allowance 0.2: candidate-specific feedback; proves nothing about the original interval or every possible model"
+      }
+    ],
+    "schema": "drbean-engine-controls/v1",
+    "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker",
+    "tested_commit": "f71363589ad5370cabbf99bfaf96c8a2d11e57db",
+    "worktree_dirty": false
+  }
+]
