@@ -179,11 +179,28 @@ Every finding in `evaluation/findings.json` carries the exact commit, minimal in
 
 ## Future live activation checklist (documentation only — do NOT execute now)
 
-1. A new explicit user instruction authorizing live testing, with a named person and spending allowance.
-2. One shared, accounted allocation in the single authoritative dispatch ledger agreed by Owners 2, 3 and 5.
-3. Owner 3's deliberate operator path to switch the provider mode (no key-presence activation).
-4. Independent grading of predeclared cases by a grader without access to the holdout definitions.
-Until then live lanes stay `NOT_RUN`, `budget open` refuses, and placeholder-assisted runs are never described as Gemini-powered evidence.
+Live Gemini qualification is one coordinated run, and it starts only after the **user** enables both the product's explicit provider consent and a bounded live budget. A saved key alone authorizes nothing. Until then, `live_gemini` is `not_run` in every lane report and gate.
+
+1. **Preconditions, verified before any request:**
+   - the exact combined commit has passed every offline lane and `gate --require release`;
+   - Owner 2's atomic research-session accounting is advertised (`session_accounting_ready`);
+   - the configured model is the one the user named. The configuration is checked, never a key, and nothing is switched automatically to another or billed model;
+   - the live opt-in (Owner 4's `var/gemini.local.json`, mode `live`) was created by the user, not by any agent.
+2. **Budget:** one user-enabled allocation in the single authoritative ledger. The product ceilings are 12 model requests per action and 24 per session, plus 16/32 auxiliary operations with cleanup reserved. No agent or specialist gets a separate allowance.
+3. **Predeclared subset** (`evaluation/corpus/manifest.json`):
+   - **L1:** the development native-text supported paper, as one complete ordinary-user loop in one session.
+   - **L2:** the development scan, only with explicit extra budget.
+   - **L3:** held-aside H3, only after the freeze and only with explicit extra budget; afterwards it is regression data.
+4. **What is recorded per case:**
+   - the run, session and attempt ids from the application ledger;
+   - the actual request count and usage, with unknown kept unknown;
+   - latency;
+   - `paper_scoring.py` measures against gold written from renderings;
+   - human corrections;
+   - Deep Agents actions taken against the returned evidence.
+   The report names the actual denominator, and every case not run is listed as `not_run`.
+5. **Stop rules:** any provider error, model mismatch, budget exhaustion or unexpected attempt stops the run. Exhausted access leaves live qualification pending and is never retried on another model. Credentials are never logged, and no key is inspected by the evaluator.
+6. **Historical use:** a later replay of a live run is labelled `historical_replay`, with the original model and usage metadata. It is never fresh Gemini inference.
 
 ## Privacy
 
