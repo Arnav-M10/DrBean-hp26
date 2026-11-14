@@ -91,8 +91,16 @@ Test log prefixes in this workspace: `/tmp/integration-final-*`.
 - Owner 1's actual Mac candidate execution is reported above. The requested
   supplementary run of Claude's unchanged ledger file on Mac is pending; its 15
   assertions already passed on Linux, and candidate-owned ledger regressions
-  passed in both complete backend suites. No newer Claude branch commit than
-  526f15a was observed at the final fetch; his tests/findings remain untouched.
+  passed in both complete backend suites. Claude then pushed `896bfe0`; its
+  updated EPERM/ledger findings were read and preserved. Its ledger test file
+  is byte-identical to 526f15a (same SHA-256 above), so the 15/15 result applies
+  to the latest assertions. No validation-owned files or markers were changed.
+- Owner 1 subsequently pushed test/evidence-only PR #23 at `5d66354`, stacked
+  on #21 and incorporating c44b010/main 4b5f1f5. He reports an additional exact
+  clean Mac run: ordinary HTTP 7/7, controls 22/22, unresolved native recheck 1
+  passed, web 30 passed, and engine 292 tests (one dependency skip, checked
+  separately). Production backend/engine source remains unchanged. Preserve
+  that owned regression and portable example as a separate review; do not rebuild it.
 - Next: review/merge #21 and supersede obsolete #13/#14 as recommended above;
   preserve any subsequent independent findings. No new numerical or cleanup
   rebuild. Backend checks alone do not establish whole-release readiness.
