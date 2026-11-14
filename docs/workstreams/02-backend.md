@@ -6,15 +6,30 @@ pair, with browser review and independently replayable native design evidence.
 Completed: backend HTTP subset of master §2.13 milestone 5: a separately
 reviewed hypothetical follow-up checks the original selected pair and exports
 independently replayable lineage. Actual-observation support remains blocked.
-Current task: release integration; design PR #9 and follow-up PR #11 are merged
-into main. Supported backend implementation and acceptance are complete.
+Current task: master §2.13 milestone 6, controlled AI with actual scientific
+evidence and strict future-provider accounting. Auditing and testing now.
 
-Branch: `backend/followup`, based on design `8451c1f`; integrated `main` at
-`f6ab24a` (PRs #9 and #11 merged). Release checks remain outstanding.
+Branch: `backend/controlled-acceptance`, based on `main` at `80f95a4`.
+PRs #9 and #11 are merged. Release checks remain outstanding.
 Verified on Linux, backend Python 3.12.14, scientific CPython 3.11.18.
 Interfaces: DB-SC-1 / GF-2, `counterdex.bridge.v1`,
 `DB-SC-1-to-groundwork-v1`, `counterdex.application-bundle.v1`.
 Model providers remain disabled; no calls or credential checks were performed.
+
+## Current work and estimate
+
+- Milestones 1–4: implemented; prior Linux runtime, HTTP science, native evidence,
+  source-review and approval checks are retained below.
+- Milestone 5: design and hypothetical follow-up backend complete; actual-reading
+  support is blocked on Owner 1, follow-up browser controls on Owner 4.
+- Milestone 6, in progress: qualify evidence-dependent controlled Deep Agents
+  branches using actual Counterdex output; preserve evidence if narration fails;
+  reject malformed/conflicting usage and reconciliation in the future ledger.
+- Milestone 7, remaining: release stabilization and independent acceptance.
+- Working estimate: 30–60 minutes for the current slice; 1–3 hours of active
+  backend work remaining including verification/handoff, assuming no new major
+  defects. This excludes waiting for Owners 1/4/5 and is not a release-date promise.
+  Full section sign-off remains dependency-bound; revise this estimate after tests.
 
 ## Works / verified now
 
