@@ -1,12 +1,28 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T05:00:00Z",
+  "updated_at": "2026-11-14T05:20:00Z",
   "application_code_commit": "9cc90e0 (origin/main incl. PR #6 browser-baseline, #7 Owner 4, #8 this branch to 4ea7cb3)",
   "observed_at_harness_commit": "8bb1fbe",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
+    {
+      "id": "F-ORPHAN-WORKER-KILL",
+      "severity": "P0",
+      "owner": "2",
+      "status": "open",
+      "title": "A scientific child survives its worker's death and keeps computing after the job is marked interrupted",
+      "minimal_input": "hero-v2 baseline on main 9cc90e0; scientific child held inside the adapter by the harness barrier (after setsid and limits); SIGKILL the worker process group",
+      "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --diagnostic science_barrier --results evaluation/results/previews/x --only RS-CANCEL-RESTART",
+      "expected": "no scientific computation outlives its job: the child detects parent death and ends its session, or recovery kills sessions recorded at dispatch",
+      "observed": "child pid alive 1 s after the worker was killed and still alive after worker --recover marked the run interrupted; only the harness teardown removed it. API cancellation of a running job does kill the child (passes).",
+      "evidence": {
+        "results": "evaluation/results/previews/main-d6a71c2/science_barrier (RS-CANCEL-RESTART no_orphan_after_worker_kill)",
+        "context": "packages/groundwork_adapter/docs/BRIDGE.md requires the launching parent to kill the session before its own exit; a SIGKILLed parent cannot",
+        "suggested_seam": "parent-death watchdog in science._child (poll os.getppid() or pipe EOF, then killpg own session), plus persisting the child pgid so worker --recover can kill leftovers"
+      }
+    },
     {
       "id": "F-PLATFORM-RLIMIT",
       "severity": "P0",
@@ -316,7 +332,7 @@
       "id": "F-RESTART-UNOBSERVABLE",
       "severity": "P1",
       "owner": "2 (after F-PLATFORM-RLIMIT)",
-      "status": "open",
+      "status": "retested",
       "title": "Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet",
       "minimal_input": "RS-CANCEL-RESTART",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --only RS-CANCEL-RESTART",
@@ -335,6 +351,13 @@
             "attempts": [
               "att_e1326b12871140f2"
             ]
+          }
+        },
+        {
+          "at_commit": "main 9cc90e0 with diagnostic science_barrier (harness d6a71c2)",
+          "result": "Made observable with a deterministic diagnostic barrier inside the scientific child. Queued and running cancellation pass (held child killed, run cancelled); recovery marks the killed worker's run interrupted and never redispatches it. The worker-kill orphan this exposed is tracked as F-ORPHAN-WORKER-KILL.",
+          "evidence": {
+            "results": "evaluation/results/previews/main-d6a71c2/science_barrier"
           }
         }
       ]
@@ -396,6 +419,14 @@
           "result": "Still present on the merged main (browser-baseline integrated): RS-HERO-FULL and RS-CHANGED-INPUT fail with scientific_runtime_unavailable on this Mac without diagnostics. Owner 1 recorded an isolated reproduction on codex/science-next (bad5e9f); Owner 4's CI adds scripts/release/user_conditions_check.py for it.",
           "evidence": {
             "attempts": "evaluation/results/attempts.jsonl at 8bb1fbe"
+          }
+        },
+        {
+          "at_commit": "main 9cc90e0 (science.py now passes processes=256)",
+          "result": "Insufficient on the team's Mac: this user owns 649 processes, above 256, so spawning the engine still fails with EAGAIN (measured: caps 32 and 64 fail, 4000 succeeds). A per-user count cannot be a per-job cap.",
+          "evidence": {
+            "user_processes": 649,
+            "code": "apps/api/bean_api/science.py _child apply_limits(..., processes=256)"
           }
         }
       ]

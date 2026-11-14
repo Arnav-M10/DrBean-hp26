@@ -96,16 +96,16 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | followup:4.57 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "compatible", "reference": "excluded"}, "per_candidate": {"outside": "compatible", "refe |
 | followup:4.0 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "excluded"}, "per_candidate": {"outside": "excluded", "referenc |
 
-## Release gates at 8bb1fbeb13 (overall: failed)
+## Release gates at d6a71c212d (overall: failed)
 
 | Gate | Status |
 |---|---|
 | harness_integrity | passed |
-| real_science_http | failed |
-| essential_negative_controls_http | failed |
-| zero_external_model_dispatch | passed |
+| real_science_http | blocked |
+| essential_negative_controls_http | blocked |
+| zero_external_model_dispatch | blocked |
 | native_engine_controls | blocked |
-| supported_machine_subprocesses | failed |
+| supported_machine_subprocesses | blocked |
 | no_unresolved_p0 | failed |
 | live_gemini_qualification | not_run |
 
@@ -113,6 +113,7 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
+| F-ORPHAN-WORKER-KILL | P0 | 2 | open | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
 | F-PLATFORM-RLIMIT | P0 | 2 | retested | Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected) |
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
 | F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | fixed_pending_retest | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
@@ -123,7 +124,7 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | F-OPTIONAL-VANISHES | P1 | 3 (graph) and 2 (callbacks) | retested | The actual deepagents graph completes while a reviewed optional scenario is neither executed nor skipped |
 | F-CONTROLLED-PROVENANCE | P1 | 3 | retested | Controlled-model turns are reserved as provider 'gemini' attempts with no placeholder marker |
 | F-REVIEW-MATERIALIZATION | P1 | 2 | fixed_pending_retest | An accepted intake review creates no dataset association (source values never reach execution) |
-| F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | open | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
+| F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
 | F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
 | F-MAC-NPROC | P0 | 2 | open | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | open | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |

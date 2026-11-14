@@ -69,7 +69,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 ## Next exact actions
 
 1. Preview Owner 3's `codex/gemini-offline-integration` against the zero-dispatch and controlled-boundary tests.
-2. Make cancellation observable: a heavier admitted input (more rows / 64-time design grid) or an Owner 2 deterministic barrier; until then F-RESTART-UNOBSERVABLE stays open.
+2. Cancellation is now observable with `--diagnostic science_barrier` (a harness-side barrier inside the scientific child): running cancellation passes; a worker SIGKILL leaves an orphan computation (P0 F-ORPHAN-WORKER-KILL, Owner 2). Ask Owner 2 for a product-side test barrier so this can become acceptance evidence.
 3. Remaining master-brief gaps in my lane: stale-approval-after-revision HTTP check, extended native negative controls (truncation, missing dependency, wrong profile, duplicate member, oversized, another run's packet), endpoint-level admission goldens from `shared/contracts/DB-SC-1/fixtures/admission-golden.json`, guard coverage for the CLI process and credential-read detection, ledger corruption handling, metamorphic engine controls, and grading C08/C09 from the real graph at the controlled tier.
 4. Retest F-MAC-NPROC, F-BASELINE-DISCOVERY, F-NATIVE-BYTES and F-FOLLOWUP-FEEDBACK whenever `main` moves.
 

@@ -4,6 +4,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
+| F-ORPHAN-WORKER-KILL | P0 | 2 | open | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
 | F-PLATFORM-RLIMIT | P0 | 2 | retested | Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected) |
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
 | F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | fixed_pending_retest | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
@@ -14,7 +15,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 | F-OPTIONAL-VANISHES | P1 | 3 (graph) and 2 (callbacks) | retested | The actual deepagents graph completes while a reviewed optional scenario is neither executed nor skipped |
 | F-CONTROLLED-PROVENANCE | P1 | 3 | retested | Controlled-model turns are reserved as provider 'gemini' attempts with no placeholder marker |
 | F-REVIEW-MATERIALIZATION | P1 | 2 | fixed_pending_retest | An accepted intake review creates no dataset association (source values never reach execution) |
-| F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | open | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
+| F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
 | F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
 | F-MAC-NPROC | P0 | 2 | open | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | open | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
@@ -29,6 +30,14 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 | H-DIRTY-FLAG | P1 | 5 | retested | git_state stripped porcelain output and marked every record dirty (since harness 0.1.0) |
 | H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
 | H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
+
+## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
+
+- **Input:** hero-v2 baseline on main 9cc90e0; scientific child held inside the adapter by the harness barrier (after setsid and limits); SIGKILL the worker process group
+- **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --diagnostic science_barrier --results evaluation/results/previews/x --only RS-CANCEL-RESTART`
+- **Expected:** no scientific computation outlives its job: the child detects parent death and ends its session, or recovery kills sessions recorded at dispatch
+- **Observed:** child pid alive 1 s after the worker was killed and still alive after worker --recover marked the run interrupted; only the harness teardown removed it. API cancellation of a running job does kill the child (passes).
+- **Evidence:** {"context": "packages/groundwork_adapter/docs/BRIDGE.md requires the launching parent to kill the session before its own exit; a SIGKILLed parent cannot", "results": "evaluation/results/previews/main-d6a71c2/science_barrier (RS-CANCEL-RESTART no_orphan_after_worker_kill)", "suggested_seam": "parent-death watchdog in science._child (poll os.getppid() or pipe EOF, then killpg own session), plus persisting the child pgid so worker --recover can kill leftovers"}
 
 ## F-PLATFORM-RLIMIT (P0, owner 2, retested)
 
@@ -125,7 +134,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Evidence:** {"audit": "AUDIT_AND_NEXT_STEPS P1 'Bind reviewed source values to execution'"}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** main adds POST /workspaces/{id}/intake-reviews/{review_id}/materialize and refuses direct datasets citing a source (source_review_required, verified over HTTP in RS-HERO-FULL). Materialization itself not yet exercised by this harness. (evidence: {"attempts": ["att_87537746fa40470d (source_linked_values_require_review passed)"]})
 
-## F-RESTART-UNOBSERVABLE (P1, owner 2 (after F-PLATFORM-RLIMIT), open)
+## F-RESTART-UNOBSERVABLE (P1, owner 2 (after F-PLATFORM-RLIMIT), retested)
 
 - **Input:** RS-CANCEL-RESTART
 - **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --only RS-CANCEL-RESTART`
@@ -133,6 +142,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Observed:** queued cancellation and recovery semantics pass; running-child checks not_observed (child dies at setup)
 - **Evidence:** {"attempts": ["att_ea42f9e1c5bf4b23"]}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** Still unobservable on this Mac: no scientific child survives setup (F-MAC-NPROC). Queued cancellation passes. (evidence: {"attempts": ["att_e1326b12871140f2"]})
+- **Retest at main 9cc90e0 with diagnostic science_barrier (harness d6a71c2):** Made observable with a deterministic diagnostic barrier inside the scientific child. Queued and running cancellation pass (held child killed, run cancelled); recovery marks the killed worker's run interrupted and never redispatches it. The worker-kill orphan this exposed is tracked as F-ORPHAN-WORKER-KILL. (evidence: {"results": "evaluation/results/previews/main-d6a71c2/science_barrier"})
 
 ## F-LINT-CHECKLIST (P2, owner 4, open)
 
@@ -152,6 +162,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Evidence:** {"attempts": ["att_87537746fa40470d", "att_adf816f75f9b4d1a"], "backend_tests": ["test_science_boundary.py::test_cancellation_terminates_descendants", "test_science_boundary.py::test_descendant_cannot_escape_by_outliving_adapter", "test_scientific_http.py::test_ordinary_http_baseline_is_honestly_blocked_without_a_producer", "test_scientific_http.py::test_explicit_seed_pair_real_design_download_and_independent_replay"], "suggested_seam": "treat RLIMIT_NPROC on Darwin like RLIMIT_AS (report unavailable) or set it to current user process count + a small margin; keep the owned-session kill and wall clock"}
 - **Retest at backend/browser-baseline cc779bf (preview, no diagnostic):** Also present on Owner 2's newer branch: the plain preview's hero baseline fails the same way. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/plain"})
 - **Retest at main 9cc90e0 (merged as 7be805a, harness 8bb1fbe):** Still present on the merged main (browser-baseline integrated): RS-HERO-FULL and RS-CHANGED-INPUT fail with scientific_runtime_unavailable on this Mac without diagnostics. Owner 1 recorded an isolated reproduction on codex/science-next (bad5e9f); Owner 4's CI adds scripts/release/user_conditions_check.py for it. (evidence: {"attempts": "evaluation/results/attempts.jsonl at 8bb1fbe"})
+- **Retest at main 9cc90e0 (science.py now passes processes=256):** Insufficient on the team's Mac: this user owns 649 processes, above 256, so spawning the engine still fails with EAGAIN (measured: caps 32 and 64 fail, 4000 succeeds). A per-user count cannot be a per-job cap. (evidence: {"code": "apps/api/bean_api/science.py _child apply_limits(..., processes=256)", "user_processes": 649})
 
 ## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, open)
 
