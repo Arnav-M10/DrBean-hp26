@@ -1,4 +1,5 @@
 import { setupSourceWorkflow } from './source-workflow.mjs'
+import { setupPaperWorkflow } from './paper-workflow.mjs'
 import { BeanApi, baselineAvailable, baselineExplanation } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 import { setupDesignWorkflow } from './design-workflow.mjs'
@@ -13,7 +14,7 @@ function save(bytes, name) {
   const a = document.createElement('a'); a.href = url; a.download = name; a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
-export function setupWorkflow(getDraft, applyReviewedFields) {
+export function setupWorkflow(getDraft, applyReviewedFields, attachPaper = () => {}) {
   let api, capabilities, workspace = '', plan, approval, run, report, frozen, inputs, busy = false, pollTimer
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
@@ -23,7 +24,8 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
     const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(materialized.problem))
     inputs = materialized; plan = prepared; frozen = fingerprint(); approval = undefined
   } })
-  function reset() { sources.reset(); clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
+  const paperReview = setupPaperWorkflow({ context: () => ({ api, workspace, busy, capabilities, perform, rerender: () => render() }), getDraft, button, node, exactRecord, attachPaper })
+  function reset() { sources.reset(); paperReview.reset(); clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
   function button(parent, label, action, disabled = false) {
     const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy
     b.addEventListener('click', () => perform(action)); parent.append(b); return b
@@ -155,7 +157,7 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
     }
     designs.render(investigations)
     investigations.append(node('p', 'Adding and checking a follow-up observation is a separate workflow. A design approval does not authorize a new observation or investigation.'))
-    const sourcePanel = byId('backend-source-review'); sourcePanel.replaceChildren(); sources.render(sourcePanel)
+    const sourcePanel = byId('backend-source-review'); sourcePanel.replaceChildren(); sources.render(sourcePanel); paperReview.render(sourcePanel)
     const reports = byId('backend-report'); reports.replaceChildren(node('h3', 'Reviewer snapshot'))
     reports.append(node('p', 'A report freezes the selected run, inputs and evidence inventory at creation. Download native scientific evidence and its separate replay anchors from Investigations. A report JSON byte hash is not scientific replay. Public reviewer sharing is unavailable.'))
     button(reports, 'Create report for selected run', async () => { report = await api.json(`/runs/${run.id}/reports`, {}) }, !api || !run)

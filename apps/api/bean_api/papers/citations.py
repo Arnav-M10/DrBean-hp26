@@ -26,7 +26,8 @@ def match_quotation(manifest: dict, page_text: dict, page: int, excerpt: str) ->
         return {"status": "text_occurrence", "label": "This text occurs on the cited page. That locates the words; it does not confirm how they were interpreted."}
     elsewhere = [n for n, text in page_text.items() if n != page and needle in _normalize(text)]
     if elsewhere:
-        return {"status": "wrong_page", "label": f"This text does not occur on page {page}; it occurs on page(s) {elsewhere}.", "found_on": elsewhere}
+        found = ", ".join(str(n) for n in elsewhere)
+        return {"status": "wrong_page", "label": f"This text does not occur on page {page}; it occurs on page(s) {found}.", "found_on": elsewhere}
     return {"status": "not_found", "label": "This text was not found in the native text of the cited page. Treat the citation as unverified."}
 
 

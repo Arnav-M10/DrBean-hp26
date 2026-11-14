@@ -95,3 +95,9 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 pre, dd, .digest, #review-summary p, #backend-review p, #backend-investigations p { overflow-wrap: anywhere; }
 pre { max-width: 100%; overflow-x: auto; white-space: pre-wrap; }
 :focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+/* Paper review: rendered page beside its native text; columns stack on narrow screens. */
+.paper-page { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .8rem; margin-top: .6rem; }
+.paper-page img { max-width: 100%; border: 1px solid var(--border); }
+.paper-page pre { max-height: 32rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.paper-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+@media (max-width: 760px) { .paper-page, .paper-columns { grid-template-columns: minmax(0, 1fr); } }

@@ -2,7 +2,7 @@
 // The server validates semantics and owns every record identity and digest.
 
 export const MAX_JSON_BYTES = 8 * 1024 * 1024       // largest JSON body this client will parse
-export const MAX_DOWNLOAD_BYTES = 16 * 1024 * 1024  // largest artifact this client will hold in memory
+export const MAX_DOWNLOAD_BYTES = 21 * 1024 * 1024  // largest artifact this client will hold in memory (a 20 MiB paper)
 
 // kind 'rejected': the server answered and refused; nothing was accepted.
 // kind 'uncertain': a mutation was sent and no answer arrived; it may have been accepted.
@@ -83,6 +83,12 @@ export class BeanApi {
     if (!['image/png', 'image/jpeg'].includes(file.type) || file.size < 1 || file.size > 5242880) throw new Error('Choose a PNG or JPEG up to 5 MiB.')
     if (!['synthetic', 'public'].includes(origin)) throw new Error('Declare synthetic or public source origin.')
     return parseJson(await readBounded(await this.request(`/workspaces/${encodeURIComponent(workspace)}/source-assets?origin=${origin}&retention=retain`, await file.arrayBuffer(), file.type), MAX_JSON_BYTES))
+  }
+  // Upload keeps the paper on the server; it is never sent to a model by this call.
+  async uploadPaper(workspace, file, origin) {
+    if (!['synthetic', 'public'].includes(origin)) throw new Error('Declare synthetic or public paper origin.')
+    const name = encodeURIComponent((file.name || 'paper.pdf').slice(0, 200))
+    return parseJson(await readBounded(await this.request(`/workspaces/${encodeURIComponent(workspace)}/papers?origin=${origin}&retention=retain&filename=${name}`, await file.arrayBuffer(), 'application/pdf'), MAX_JSON_BYTES))
   }
   // A matching digest shows the bytes arrived intact and are the selected object; it is not a scientific check.
   async download(path, expected = {}) {

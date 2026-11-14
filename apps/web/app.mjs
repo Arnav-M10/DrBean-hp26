@@ -351,6 +351,14 @@ renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
   rowsReviewed = false; questionReviewed = false
   byId('dataset-origin').value = source.body.origin === 'synthetic' ? 'synthetic' : ''
   renderRows(); location.hash = 'inputs'; announce('Reviewed source values copied to the measurement draft. Review missing fields and the question before preparing science.')
+}, (paper, pages) => {
+  // The person still types and reviews every value; this records where the draft's values came from.
+  const source = { id: paper.id, name: `Paper: ${paper.body.filename}`, digest: paper.body.sha256,
+    description: `Values transcribed and reviewed by hand from physical page(s) ${pages.join(', ')} of retained paper ${paper.id} (${paper.body.origin}). Not model-extracted.` }
+  sources = [...sources.filter(existing => existing.id !== paper.id), source]
+  for (const row of rows) if (row.sourceId === null) { row.sourceId = paper.id; row.original = { time: row.time, concentration: row.concentration, epsilon: row.epsilon } }
+  if (paper.body.origin === 'synthetic') byId('dataset-origin').value = 'synthetic'
+  renderRows(); announce('The measurement draft now cites this paper as its source.')
 })
 addRow()
 renderRows()
