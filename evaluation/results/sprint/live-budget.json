@@ -36,6 +36,16 @@
       "physical_requests": 4,
       "input_tokens": 64000,
       "output_tokens": 2048
+    },
+    {
+      "at": "2026-11-14T22:01:48Z",
+      "purpose": "baseline-preview-08a0bf75bda81aaecd46f38713b6ff18508bdd23",
+      "research_session_id": "research_session_615696b8c14f4bcc8ebdbab2f0c221b2",
+      "allocation_record": "research_provider_allocation_68ffd047ced24a51b77e783c3ee4482f",
+      "physical_requests": 6,
+      "input_tokens": 64000,
+      "output_tokens": 3072,
+      "qualification_extension": "user-followthrough-2026-11-14"
     }
   ],
   "released": [
@@ -56,9 +66,10 @@
     "research_session_ab587b10aac348f0b328096940aa02e5": 5,
     "research_session_e226923e4221467f8984eb1269ad8905": 0,
     "research_session_06ba9e94df9747debe0d02eb07f9514e": 0,
-    "research_session_7233afd76ccb49a98c99017392f0b6d6": 3
+    "research_session_7233afd76ccb49a98c99017392f0b6d6": 3,
+    "research_session_615696b8c14f4bcc8ebdbab2f0c221b2": 2
   },
-  "sprint_physical_requests_total": 8,
+  "sprint_physical_requests_total": 10,
   "note": "Grants bound dispatch; failed and uncertain attempts count. Live traffic stopped after the 8th request (provider_malformed_tool_call) per the stop-on-defect rule.",
   "qualification_extensions": [
     {
@@ -72,5 +83,17 @@
       "actor": "root",
       "decision_note": "User delegated the decision with \"idk do wtv is best\" after being asked explicitly about one additional live run capped at six requests, a qualification ceiling of 16, and who should run it. Root selected one reproduction using C's harness; this is not independent Claude execution."
     }
-  ]
+  ],
+  "qualification_followthrough": {
+    "operator": "root",
+    "tested_commit": "08a0bf75bda81aaecd46f38713b6ff18508bdd23",
+    "receipt": "live-followthrough-08a0bf7/record.json",
+    "status": "failed",
+    "code": "research_references_invalid",
+    "physical_requests": 2,
+    "total_physical_requests_after_run": 10,
+    "remaining_extension_requests_released": false,
+    "next_live_run_authorized": false,
+    "note": "Stopped after the observed defect. No retry or second extension grant. The isolated store is deleted; four unused request slots are not released or replenished."
+  }
 }

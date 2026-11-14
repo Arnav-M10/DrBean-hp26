@@ -65,3 +65,17 @@ test('failure before science does not promise results, and unknown technical cod
  assert.doesNotMatch(html,/<img|<script/);assert.match(html,/&lt;img/);
  assert.ok(!html.replace(/<details\b[\s\S]*?<\/details>/g,'').includes('onerror'));
 });
+test('rejected reference request with no scientific child does not claim findings or downloads exist',()=>{
+ const empty={...snapshot,children:[],reports:[],action:{error_code:'research_references_invalid'}};
+ const issue=researchIssue(empty,[]),html=findings(empty,[],null,helpers);
+ assert.match(issue.message,/did not identify the reviewed inputs or evidence/);
+ assert.match(issue.message,/That step was not carried out/);
+ assert.match(issue.next,/requires its own reviewed scope and approval/);
+ assert.match(html,/No scientific findings or downloads are available yet/);
+ assert.doesNotMatch(html,/findings and downloads remain usable|Saved scientific results remain available/);
+ const later=findings({...empty,children:[{state:'completed'}]},evidence,null,helpers);
+ assert.match(later,/Saved scientific results remain available/);
+ assert.match(later,/Downloads are shown when an artifact was produced/);
+ assert.doesNotMatch(later,/No scientific findings or downloads are available yet|No operation was prepared/);
+ assert.ok(later.includes(interpretResult(evidence[0].body.result).statement));
+});

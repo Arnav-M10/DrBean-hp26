@@ -142,3 +142,48 @@ these diagnostics do not claim to identify or repair that historical response.
 Claude explicitly authorized adopting the DEMO-09 R1 oracle from `9229150`; that
 exact test update is included. The coordinator action stays failed if required
 commentary fails. Completed science and commentary availability remain separate.
+
+## Integrated browser and bounded live follow-through (2026-11-14)
+
+Integrated main `9aac876`, backend PR #60, preferred workspace PR #61, and
+Claude's qualification PR #62 through `387c203` in PR #63. The original user
+worktree and shared running services were preserved. The preferred browser
+passed all 12 predicates at `1832b8b`, including fresh native replay, separate
+approvals, changed-input behavior, private-session recovery and retained
+results after a model failure. All 24 installed Counterdex source files match
+this source under qualified CPython 3.11.17; backend runtime is CPython 3.13.18.
+
+The user delegated one additional live run capped at six requests. The explicit
+qualification-only extension retained the earlier ten effective grants/eight
+attempts, permitting a single six-request grant with ceiling 16. Application
+quotas, free-tier admission, consent and no-retry behavior stayed unchanged.
+Root executed Claude's harness; this is not independent Claude execution.
+
+At `08a0bf75bda81aaecd46f38713b6ff18508bdd23`, Gemini made two real requests:
+`write_todos`, then `prepare_scientific_proposal(kind=investigation, reference_ids=[])`.
+The backend rejected the latter as `research_references_invalid`, before any
+review, scientific child or report. The browser settled to an honest stopped
+state. The harness's `completed` flag describes its execution, not acceptance:
+live baseline acceptance **failed**. Retained receipts are in
+[`live-followthrough-08a0bf7`](../../evaluation/results/sprint/live-followthrough-08a0bf7/qualification.json).
+
+Accounting: reserved/accounted input 15,472/output 1,024; provider-reported
+input 3,539/output 57/total 3,596; unresolved 0. Cumulative actual requests are 10,
+with 16 effective grants. The four unused slots are not released or replenished.
+No automatic retry or second live run occurred.
+
+The observed gap was a tool-schema mismatch: a public unconstrained list
+allowed an empty reference set while the backend required 1-16 IDs. The repair
+exposes those bounds and tells the model to copy the reviewed dataset ID or
+a retained design-evidence ID. Scope/approval checks remain intact; no IDs are
+filled in automatically. Two signed substituted-SDK regressions verify the
+empty-list refusal and a valid reference reaching canonical review after a
+standalone planning turn. A second UI fix stops promising downloads when no
+scientific result exists. The baseline-plus-design metered regression still
+completes in 6 requests, 63,937 conservative input tokens and 3,072 output tokens
+under the existing 6/64,000/3,072 allocation; this is one offline strategy, not
+a guarantee about a live model's request shape.
+
+The repaired candidate needs a fresh authorized live qualification. No live
+pass or independent Claude acceptance is inferred from offline checks, and
+PR #63 remains unmerged while this blocker is open.

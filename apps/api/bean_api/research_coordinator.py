@@ -19,6 +19,7 @@ from langchain.agents.middleware.types import hook_config
 from langchain.tools import ToolRuntime
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.types import Command, interrupt
+from pydantic import Field
 
 from .ai_prompts import COMMENTARY_POLICY_VERSION
 from .canonical import canonical_bytes
@@ -599,8 +600,8 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
                                        "graph_version": GRAPH_VERSION, **event}))
 
     async def prepare_scientific_proposal(kind: Literal["investigation", "design", "followup"],
-                                         reference_ids: list[str]) -> dict[str, Any]:
-        """Prepare an unaccepted scientific proposal from reviewed references."""
+                                         reference_ids: Annotated[list[str], Field(min_length=1, max_length=16)]) -> dict[str, Any]:
+        """Prepare only. Investigation: [reviewed_context.dataset.id]. Design: [evidence ID]. Never empty."""
         _references(reference_ids)
         result = _bounded(await _await(ports.prepare_proposal(kind, reference_ids)), 8000)
         if isinstance(result, dict) and "available" in result:
@@ -705,7 +706,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     async def publish_research_report(evidence_ids: list[str], text: str,
             next_action: Literal["stop", "clarify", "review_design", "review_observation", "review_plan"],
             runtime: ToolRuntime) -> Command:
-        """Publish evidence + next_action. text must be exactly 'The evidence has a conditional scope.'."""
+        """Report evidence/next_action; text exactly 'The evidence has a conditional scope.'."""
         _references(evidence_ids)
         # Validate commentary against the complete bounded facts, not the view.
         facts = {ref: await complete_fact(ref) for ref in evidence_ids}
@@ -829,12 +830,12 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     # tool/schema while supplying the research-specific instruction once. This
     # reduces charged context without dropping any reviewed input or evidence.
     planning = TodoListMiddleware(
-        system_prompt="Maintain evidence-based todos; preserve completed steps; no authority.",
-        tool_description="Update proposed steps; preserve completed ones. No authority.")
+        system_prompt="Plan from evidence; preserve completed steps; no authority.",
+        tool_description="Plan only; preserve completed steps.")
     graph = create_deep_agent(model=model, tools=typed, middleware=[NoFilesystem(), planning, Boundary()],
         state_schema=ResearchState, backend=StateBackend(), checkpointer=checkpointer,
         subagents=[], skills=None, memory=None, store=None, cache=None, debug=False,
-        system_prompt=("Canonical IDs. Plan; prepare; human approve; run; use canonical_evidence; report/clarify. "
+        system_prompt=("Use canonical IDs/evidence. Plan; prepare; human approve; run; report/clarify. "
             "Batch only independent todos+prepare/report. Clarify missing assumptions; invent nothing. "
             "A counterexample is compatible and strictly outside the CLOSED claim. Bounded misses prove nothing. "
             "Design: distinct checked candidates, reviewed times/allowance, separate approval, positive checked margin. "
