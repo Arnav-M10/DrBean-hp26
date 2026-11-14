@@ -33,6 +33,15 @@ LangGraph 1.2.21/checkpoint 4.3.1. Isolated worktree; old dirty prototypes prese
   admission; default allocation0, explicit operator-only grant method (no browser
   allocation route), scope-bound consent, unknown outcomes stay reserved. Offline
   substituted-transport checks pass. Live qualification remains **not_run**.
+- UI slice: question/input saving, maintained-plan display, exact scientific
+  approvals, observation/clarification review, retained native/anchor/report
+  downloads, private reopen and explicit same-key uncertain retries are wired.
+  **78 web units passed**, including7 new research-controller checks. Actual
+  parent-driven browser acceptance remains pending the controlled factory.
+- A051b4d6 adapter/prompt corrections adopted; complete immutable evidence
+  envelopes are returned for A's validated bounded projection. Latest focused
+  integration/native/authority/commentary set: **129 passed**; after adapter
+  envelope correction, native/authority/A-integration subset: **61 passed**.
 - Producer #40 now exists: inspect/reuse/register it and cross-review its carried
   parsing/citation/resource code; it is no longer a departed-owner dependency.
 - Larger-paper profile and delegates follow the durable parent/real-child loop.

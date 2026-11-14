@@ -98,7 +98,7 @@ export class BeanApi {
     }
     return response
   }
-  async json(path, body) { return parseJson(await readBounded(await this.request(path, body), MAX_JSON_BYTES)) }
+  async json(path, body, operationKey) { return parseJson(await readBounded(await this.request(path, body, 'application/json', operationKey), MAX_JSON_BYTES)) }
   async assistantTurn(workspace, body) {
     if (typeof body.client_operation_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.client_operation_id)) throw new Error('A bounded assistant operation identity is required.')
     return parseJson(await readBounded(await this.request(`/workspaces/${encodeURIComponent(workspace)}/assistant-turns`, body, 'application/json', body.client_operation_id), MAX_JSON_BYTES))

@@ -75,8 +75,9 @@ def execute(client, ports, prepared):
     assert done["state"] == "completed", done
     assert done["job_id"] == first["job_id"] and len(done["evidence_ids"]) == 1
     record = client.get(PREFIX + "/records/" + done["evidence_ids"][0]).json()
-    fact = run(ports.read_evidence(record["id"]))
-    assert fact["id"] == record["id"]
+    observed = run(ports.read_evidence(record["id"]))
+    assert observed == record
+    fact = {"id": record["id"], **record["body"].get("result", record["body"])}
     return done, record, fact
 
 

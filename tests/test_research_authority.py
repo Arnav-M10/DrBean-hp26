@@ -247,3 +247,17 @@ def test_revoked_membership_blocks_saved_research_and_checkpoint_history(researc
         conn.execute("DELETE FROM memberships WHERE actor_id='alice'")
     code("not_found", lambda: service.get("alice", context.research_session_id))
     code("not_found", lambda: ResearchCheckpointer(service, context).get_tuple({"configurable": {"thread_id": context.thread_id}}))
+
+
+def test_stale_queued_action_stops_without_crashing_worker_or_retrying(research):
+    from bean_api.config import Settings
+    from bean_api.research_runtime import ResearchRunner
+    service, session, _ = research
+    service.advance("alice", session["id"], {"expected_revision": session["revision"]}, "advance")
+    data = session["reviewed_context"]["dataset"]
+    service.workflow.create_dataset("alice", session["workspace_id"], {**data["body"], "parent_id": data["id"], "change_reason": "New user review while queued"}, "changed")
+    runner = ResearchRunner(service.workflow, Settings(), "worker-stale-test")
+    assert runner.tick() == 1
+    stopped = service.get("alice", session["id"])
+    assert stopped["state"] == "failed" and stopped["action"]["error_code"] == "stale_research_inputs"
+    assert runner.tick() == 0

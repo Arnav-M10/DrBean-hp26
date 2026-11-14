@@ -2,6 +2,7 @@ import { parseMeasurementsCsv, validateMeasurements } from './exact.mjs'
 import { validateQuestion } from './question.mjs'
 import { setupWorkflow } from './workflow.mjs'
 import { setupGeneralWorkspace } from './general-workspace.mjs'
+import { setupResearch } from './research.mjs'
 
 const byId = id => document.getElementById(id)
 const sections = ['research', 'inputs', 'question', 'review', 'investigations', 'report']
@@ -340,6 +341,7 @@ byId('export-draft').addEventListener('click', () => {
 let renderWorkflow
 createBounds()
 const general = setupGeneralWorkspace({ root: byId('general-workspace') })
+const research = setupResearch({ root: byId('durable-research'), getDraft: currentDraft, getSources: () => general.controller.state.assets })
 renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
   const accepted = new Map()
   for (const field of review.body.reviewed_fields) {
@@ -355,7 +357,7 @@ renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
   rowsReviewed = false; questionReviewed = false
   byId('dataset-origin').value = source.body.origin === 'synthetic' ? 'synthetic' : ''
   renderRows(); location.hash = 'inputs'; announce('Reviewed source values copied to the measurement draft. Review missing fields and the question before preparing science.')
-}, { onConnectionChange: connection => general.connectionChanged(connection) })
+}, { onConnectionChange: async connection => { await Promise.all([general.connectionChanged(connection), research.connectionChanged(connection)]) } })
 addRow()
 renderRows()
 route(false)

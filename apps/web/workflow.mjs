@@ -21,6 +21,18 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   let connectionIdentity
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
+  async function saveReviewedInputs() {
+    if (!api || !workspace) throw new Error('Connect to a private workspace first.')
+    if (inputs && frozen === fingerprint()) return inputs
+    const draft = getDraft(), snapshot = fingerprint(), client = api, scope = workspace
+    const datasetPayload = datasetBody(draft, draft.context)
+    problemBody(draft, { id: '', digest: '' })
+    const dataset = await client.json(`/workspaces/${scope}/datasets`, datasetPayload)
+    const problem = await client.json(`/workspaces/${scope}/problems`, problemBody(draft, dataset))
+    if (client !== api || scope !== workspace) throw new Error('The private workspace connection changed while saving inputs. Reopen the original workspace to inspect the saved records.')
+    inputs = { dataset, problem }; frozen = snapshot
+    return inputs
+  }
   const available = () => baselineAvailable(capabilities)
   const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save, openRun: async id => { await refreshRun(id); location.hash = 'investigations' } })
   const assistant = setupAssistantWorkflow({ context: () => ({ api, workspace, run, busy, capabilities }), button, node, exactRecord })
@@ -54,7 +66,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     run = { ...loaded, evidence }; report = undefined
   }
   function render() {
-    Promise.resolve(onConnectionChange({ api, capabilities, workspaceId: workspace, mode: connectionMode, identityId: connectionIdentity })).catch(error => {
+    Promise.resolve(onConnectionChange({ api, capabilities, workspaceId: workspace, mode: connectionMode, identityId: connectionIdentity, saveReviewedInputs })).catch(error => {
       byId('backend-error').textContent = error.message; byId('backend-error').hidden = false
     })
     const review = byId('backend-review'); review.replaceChildren(node('h3', 'Manual investigation plan'))
@@ -63,14 +75,8 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     byId('workspace-select').disabled = busy
     review.append(node('p', !api ? 'Investigation planning is unavailable. Connect to the local backend above.' : !workspace ? 'Choose a workspace above.' : available() ? 'Save reviewed inputs to prepare a baseline investigation. Counterdex will search and check these exact inputs. No model-provider calls are used.' : `Plan review is available. Baseline execution is unavailable: ${capabilities?.science?.reason || 'the configured runtime does not offer baseline discovery'}.`))
     button(review, 'Save inputs and prepare plan', async () => {
-      const draft = getDraft(), snapshot = fingerprint()
-      const datasetPayload = datasetBody(draft, draft.context)
-      // Validate the question before creating any records.
-      problemBody(draft, { id: '', digest: '' })
-      const dataset = await api.json(`/workspaces/${workspace}/datasets`, datasetPayload)
-      const problem = await api.json(`/workspaces/${workspace}/problems`, problemBody(draft, dataset))
-      const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(problem, draft.question.goal))
-      plan = prepared; inputs = { dataset, problem }; frozen = snapshot; approval = undefined
+      const reviewed = await saveReviewedInputs()
+      plan = await api.json(`/workspaces/${workspace}/plans`, planRequest(reviewed.problem, getDraft().question.goal)); approval = undefined
     }, !api || !workspace)
     if (plan) {
       review.append(node('p', `Plan ${plan.id} · server digest ${plan.digest}`), node('h4', 'Question for this investigation'), node('p', plan.body.objective.question), node('p', plan.body.objective.success_criterion), node('p', 'One baseline; no optional scenario. Provider: none; no source transmission. Limits: 0 provider turns, 2 tool calls, 1 scientific reservation, 120 seconds. Design work requires a separate approval.'), exactRecord('Exact frozen dataset and problem', inputs), exactRecord('Exact frozen plan', plan))

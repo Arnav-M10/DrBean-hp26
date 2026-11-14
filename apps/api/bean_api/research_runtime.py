@@ -7,6 +7,8 @@ import json
 import threading
 
 from .coordinator import CoordinatorFailure
+from .ledger import LedgerBudgetExceeded
+from .providers import ProviderFailure
 from .research import ResearchService
 from .research_checkpoints import ResearchCheckpointer
 from .research_integration import create_application_research_coordinator
@@ -110,7 +112,7 @@ class ResearchRunner:
                 self.service.release(context, "waiting_observation" if reading else "waiting_review")
             else:
                 self.service.release(context, "completed")
-        except (DomainError, CoordinatorFailure, asyncio.TimeoutError, ValueError, ImportError) as error:
+        except (DomainError, CoordinatorFailure, ProviderFailure, LedgerBudgetExceeded, asyncio.TimeoutError, ValueError, ImportError) as error:
             code = getattr(error, "code", "research_timeout" if isinstance(error, asyncio.TimeoutError) else "research_runtime_failure")
             try:
                 self.service.release(context, "needs_reconciliation" if "reconcil" in code else "failed", error_code=code)
@@ -125,5 +127,15 @@ class ResearchRunner:
         self.service.wake_children()
         rows = self.service.queued()
         for row in rows:
-            asyncio.run(self.execute(row))
+            try:
+                asyncio.run(self.execute(row))
+            except DomainError as error:
+                # Input/lease/version refusal before acquisition must not crash
+                # the scientific worker or repeatedly retry a stale action.
+                with self.service.store.transaction() as conn:
+                    action = self.service._action(conn, row["actor_id"], row["id"])
+                    if action["state"] == "queued" and not action["lease_owner"]:
+                        from .store import utc_now
+                        conn.execute("UPDATE research_actions SET state='failed',error_code=?,updated_at=? WHERE id=?", (error.code, utc_now(), action["id"]))
+                        conn.execute("UPDATE research_sessions SET state='failed',revision=revision+1,updated_at=? WHERE active_action_id=? AND state='queued'", (utc_now(), action["id"]))
         return len(rows)

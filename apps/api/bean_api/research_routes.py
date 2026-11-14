@@ -15,10 +15,14 @@ def register_research_routes(app):
     @app.post(PREFIX + "/workspaces/{workspace_id}/research-sessions")
     def create(workspace_id: str, body: ResearchCreate, actor: Actor, key: OperationKey):
         caps = research_capabilities(app.state.settings, app.state.provider.config)
-        if not caps["dispatch_enabled"]:
-            raise DomainError("research_unavailable", caps["unavailable_reason"], 503)
-        if body.mode != caps["execution_mode"]:
+        # Saving a question/context never dispatches a model or scientific job.
+        # It remains useful while the graph or scientific runtime is unavailable.
+        if app.state.settings.research_mode == "disabled":
+            raise DomainError("research_unavailable", "research_disabled", 503)
+        if body.mode != app.state.settings.research_mode:
             raise DomainError("research_mode_mismatch", "Choose the explicitly configured research mode.", 409)
+        if body.mode == "live" and not caps["dispatch_enabled"]:
+            raise DomainError("research_unavailable", caps["unavailable_reason"], 503)
         return service.create(actor, workspace_id, body, key)
 
     @app.get(PREFIX + "/workspaces/{workspace_id}/research-sessions")
@@ -31,6 +35,10 @@ def register_research_routes(app):
 
     @app.post(PREFIX + "/research-sessions/{session_id}/advance")
     def advance(session_id: str, body: ResearchAdvance, actor: Actor, key: OperationKey):
+        service.get(actor, session_id)  # Authorize before reporting feature state.
+        caps = research_capabilities(app.state.settings, app.state.provider.config)
+        if not caps["dispatch_enabled"]:
+            raise DomainError("research_unavailable", caps["unavailable_reason"], 503)
         return service.advance(actor, session_id, body, key)
 
     @app.post(PREFIX + "/research-sessions/{session_id}/decisions")

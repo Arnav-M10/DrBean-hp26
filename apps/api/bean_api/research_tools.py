@@ -192,19 +192,9 @@ class ApplicationResearchPorts:
             if not linked or record["kind"] not in {"evidence", "suggestion"}:
                 raise DomainError("evidence_not_in_scope", "This evidence is not linked to the research session.", 403)
             self.service._event(conn, session, "evidence_observed", "Actual scientific evidence was read; its verification axes remain unchanged.", [record["id"]], self.runtime.action_id)
-            if record["kind"] == "evidence":
-                from .agent_evidence import project_evidence_fact
-                return project_evidence_fact(record)
-            # Keep exact admitted design facts, without copying full proof rows
-            # into each graph checkpoint/model prompt. Original result/native
-            # bytes remain separately retrievable and digest-bound.
-            from copy import deepcopy
-            result = deepcopy(record["body"])
-            result.pop("native_replay", None)
-            fact = {"id": record["id"], "evidence_digest": record["digest"], "fact_projection": "research-design-facts.v1", **result}
-            if len(json.dumps(fact, allow_nan=False).encode()) > 12_000:
-                raise DomainError("agent_evidence_limit", "The exact selected design facts exceed the model context; retained evidence is available.", 409)
-            return fact
+            # A's canonical adapter validates this complete immutable envelope
+            # and produces its bounded scientific projection for the model.
+            return record
 
     async def request_clarification(self, fields, reason):
         if not isinstance(fields, list) or not 1 <= len(fields) <= 16 or any(not isinstance(v, str) or not 1 <= len(v) <= 128 for v in fields) or not isinstance(reason, str) or not 1 <= len(reason) <= 1000:
