@@ -122,7 +122,7 @@ def owned(name: str) -> dict | None:
             record = json.load(handle)
     except (OSError, ValueError):
         return None
-    return record if started_at(record["pid"]) == record["started_at"] else None
+    return record if record.get("started_at") and started_at(record["pid"]) == record["started_at"] else None
 
 
 def spawn(name: str, command: list[str], env: dict) -> dict:
@@ -375,10 +375,16 @@ def cmd_start(_args) -> int:
               "Nothing was started and nothing was killed. Free the port and retry.")
         return 1
     env = child_env()
-    spawn("api", [BACKEND_PY, "-m", "uvicorn", "bean_api.main:create_app", "--factory", "--host", HOST,
-                  "--port", str(API_PORT), "--no-access-log"], env)
-    spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], env)
-    spawn("web", ["node", os.path.join("apps", "web", "serve.mjs"), str(WEB_PORT)], env)
+    try:
+        spawn("api", [BACKEND_PY, "-m", "uvicorn", "bean_api.main:create_app", "--factory", "--host", HOST,
+                      "--port", str(API_PORT), "--no-access-log"], env)
+        spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], env)
+        spawn("web", ["node", os.path.join("apps", "web", "serve.mjs"), str(WEB_PORT)], env)
+    except (OSError, KeyboardInterrupt) as error:
+        for name in reversed(SERVICES):
+            stop_one(name)
+        print(f"Start interrupted ({type(error).__name__}); started services were stopped. See logs in {RUN}.")
+        return 1
     deadline = time.monotonic() + 30
     service = service_facts()
     while time.monotonic() < deadline:
