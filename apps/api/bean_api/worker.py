@@ -153,7 +153,7 @@ class Worker:
             if "design_tier" in result:
                 from .design_evidence import design_result_checked
                 return design_result_checked(result)
-            if (result.get("native_replay") or {}).get("operation") == "review":
+            if (result.get("native_replay") or {}).get("operation") in {"review", "recheck"}:
                 from .followup_evidence import followup_result_checked
                 return followup_result_checked(result)
             return baseline_result_checked(result)
@@ -219,7 +219,8 @@ class Worker:
             raise DomainError("binding_mismatch", "Retained design anchors must match the reviewed follow-up history.")
         return {"historical_artifact": {"id": artifact_id, "sha256": reference["sha256"],
             "bytes_base64": base64.b64encode(content).decode("ascii"), "anchors": expected},
-            "design_request": request}
+            "design_request": request,
+            "observation_proposal": {key: context["observation_proposal"][key] for key in ("id", "digest", "body")}}
 
     async def _scenario(self, actor, run_id, scenario_id):
         scope = self.workflow.check_run_scope(actor, run_id)
@@ -253,7 +254,7 @@ class Worker:
             if plan["body"].get("followup"):
                 followup_context = self._followup_history(actor, job, plan)
                 execution.update(followup_context)
-                operation = "review"
+                operation = "recheck"
             args += (execution,)
         elif plan["body"].get("followup"):
             raise DomainError("followup_unavailable", "Fixed-pair review requires the qualified native adapter.")
@@ -399,9 +400,13 @@ class Worker:
         historical_artifact = None
         native_design = evidence["body"]["result"].get("projection_version") == "DB-SC-1-to-groundwork-v1"
         historical_refs = {item["id"]: item for item in evidence["body"]["result"].get("artifacts", [])}
-        if native_design and (len(historical_refs) != 1 or request["source_artifact_ids"] != list(historical_refs)):
-            raise DomainError("historical_artifact_required", "Native design requires the original baseline evidence bytes.")
-        for artifact_id in request.get("source_artifact_ids", []):
+        if native_design:
+            if request.get("source_artifact_ids"):
+                raise DomainError("unsupported_artifact_reuse", "Prospective reuse must be separately admitted; baseline lineage is resolved from the selected evidence.")
+            if len(historical_refs) != 1:
+                raise DomainError("historical_artifact_required", "Native design requires one original baseline evidence artifact.")
+        artifact_ids = list(historical_refs) if native_design else request.get("source_artifact_ids", [])
+        for artifact_id in artifact_ids:
             record, content = self.artifacts.read(actor, artifact_id)
             if record["workspace_id"] != job["workspace_id"]:
                 raise DomainError("not_found", "Artifact was not found.", 404)

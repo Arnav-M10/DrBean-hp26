@@ -2,6 +2,70 @@
 
 Owner: Person 1 / Counterdex.
 
+## Current integration repair — user-directed scope extension
+
+After the next checkpoint was identified as backend mapping, recheck routing
+and runtime fixes, the user instructed: "sure do that". This slice explicitly
+extends the earlier science-only edit boundary to those consumer fixes and the
+minimal browser request correction they require. Work is isolated on
+`codex/science-integration-fixes`, based on `54cc9f1` / main `80f95a4`;
+teammate checkouts and progress logs remain untouched. Scientific source and
+archived evidence stay unchanged. No live provider activation is authorized.
+
+Adopted the already authored ESRCH observer and CI runtime-wiring fixes as
+attributed cherry-picks `8b8529c` and `f0b90ba`. The backend now preserves the
+exact reviewed v2 design, resolves mandatory history separately from prospective
+reuse, and routes accepted observation proposals to existing `recheck`. Both
+design tiers retain their reviewed meaning, horizon and allowance provenance;
+nonempty unsupported reuse fails before approval. The browser sends the same
+empty reuse scope while the server independently resolves baseline bytes.
+
+Rechecks carry the complete normalized accepted proposal and original design
+history. Actual, transcription and hypothetical declarations retain their own
+time/allowance and conservative dataset provenance. Freshly checked separation
+and no-separation parents are supported; numerical-only parents, changed prior
+rows/models, wrong proposal lineage and reused approvals remain rejected.
+Archived `review` semantics are unchanged. Independent review exposed three
+publication gaps: report vectors could disagree with the declared pair, row
+statuses could disagree with candidate summaries, and numerical approval could
+be presented as checked output. Narrow binding/declared-fact checks and resealed
+mutation regressions close those gaps without adding another mathematical checker.
+
+`process-guards-v3` preserves inherited account-wide process ceilings on both
+Linux and Darwin and explicitly reports that no per-job process-count quota is
+enforced. CPU/open-file limits, Linux address-space controls and owned-session
+wall/output supervision remain. Actual Mac nested backend/engine launch and
+baseline HTTP/download/installed replay pass; Linux inheritance is covered by
+injected policy tests. Worker-loss recovery is a separate teammate change.
+
+The actual Chrome browser check passed review/approval/dispatch, two baseline
+inputs, positive and no-separation design, exact native/anchor downloads,
+installed replay, retained earlier evidence and reopened history. All 29 web
+tests passed; 39 schema exports have no drift; eight current request/result
+examples validate; the tracked-file secret scan reports zero findings.
+
+Final combined backend suite: **424 passed in 57.34 s**, with no skips, using
+sanitized pinned backend Python **3.13.18** and installed Counterdex **0.3.0** /
+CPython **3.11.17**. This includes the real Mac worker and installed CLI replay,
+both design tiers, genuine legacy review, proposal-bound rechecks, cancellation,
+expiry and resealed mutation controls. The final focused follow-up suite passed
+53 tests in 21.91 s; design adapter/binding passed 44 in 3.04 s and design
+HTTP/publication passed 7 in 8.46 s. Ruff across `apps tests scripts` and
+whitespace checks pass. The complete science package is unchanged from
+`54cc9f1`, so no new scientific package build/version or PyPI upload is needed.
+
+Independent `tests/integration` on this branch: **39 passed, 4 failed, 2 xfailed
+in 20.87 s**. Three tests still submit baseline IDs as prospective reuse and
+correctly receive `unsupported_artifact_reuse`. The cancellation/restart test
+reports its required interruption checks **not observed** because computation
+finished before interruption. Neither condition was skipped or reclassified as
+passed. Evaluator code/records and other owners' logs remain untouched. Remote
+`c231be4` now supplies teammate worker-loss recovery; evaluator `bff9cfa` and
+release `23e1f1d` remain separate branches. Their integration and qualification
+are the next checkpoint, including `FollowupScope`/`recheck` adoption and exact
+inconclusive assertions for excluded fixed candidates. No release acceptance,
+live-provider qualification, deployment or PyPI upload is claimed.
+
 ## Current continuation — controlled fact consumer qualification
 
 Resumed clean `f6a647d`; integrated main remains `80f95a4`. Proposed backend

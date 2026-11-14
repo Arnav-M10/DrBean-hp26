@@ -6,12 +6,12 @@ export with the immutable application records and independently retained history
 from __future__ import annotations
 
 import base64
-from fractions import Fraction
 import hashlib
 
 from .baseline_evidence import MAPPING_POLICY, NATIVE_PROFILE, expected_baseline_anchor
 from .canonical import parse_json_strict, semantic_digest
 from .workflow import DomainError
+from .scientific_projection import native_design_mapping_policy, project_native_design
 
 DESIGN_BINDING = "counterdex.application-design-binding.v1"
 CHECKED_POLICY = "positive-margin-descending-time-ids.v1"
@@ -45,37 +45,9 @@ def _decode(encoded, digest):
 
 
 def _approved_scientific_scope(design, *, projection, request, request_digest):
-    """Compare declared constraints, never compute an experimental-design score."""
-    problem = projection["problem"]
-    expected_candidates = [{"id": identity, "parameters": vector,
-                            "problem_digest": projection["projection_digest"], "source_artifact_digest": None}
-                           for identity, vector in zip(request["candidate_ids"], request["candidate_vectors"], strict=True)]
-    expected_grid = [{"time": time, "feasible": True, "reason": "Reviewed application feasible time"}
-                     for time in sorted(request["feasible_times"], key=Fraction)]
-    horizon = max([Fraction(row["time"]) for row in problem["observations"] if row["included"]]
-                  + [Fraction(time) for time in request["feasible_times"]])
-    budget = request["budget"]
-    expected_limits = {"wall_seconds": budget["wall_seconds"], "max_times": len(expected_grid),
-                       "max_constructions": budget["fixed_vector_constructions"],
-                       "max_pair_verifications": budget["pair_verifications"],
-                       "max_bundle_bytes": budget["bundle_bytes"],
-                       "max_certificate_bytes": min(2 * 1024 * 1024, budget["bundle_bytes"])}
-    _require(design.get("schema_version") == "groundwork.design.v1"
-             and design.get("problem_digest") == projection["projection_digest"]
-             and design.get("scenario_id") == request["scenario_id"]
-             and design.get("candidates") == expected_candidates
-             and design.get("grid") == expected_grid
-             and design.get("observable") == "c" and design.get("time_origin") == problem["time_origin"]
-             and design.get("future_allowance") == request["future_hard_allowance"]
-             and design.get("allowance_origin") == {"kind": "reviewed_hard_bound",
-                 "description": f"Approved DB-SC-1 design request {request_digest}; future_hard_allowance"}
-             and design.get("requested_tier") == request["requested_tier"] == "checked_pair_separation"
-             and design.get("checked_policy") == CHECKED_POLICY
-             and design.get("numerical_policy") == NUMERICAL_POLICY
-             and design.get("limits") == expected_limits
-             and horizon <= Fraction(request["maximum_horizon"])
-             and design.get("horizon_policy") == {"allow_construction": request["allow_construction"],
-                 "allow_extension": request["allow_continuation"], "maximum_horizon": str(horizon.numerator) + "/" + str(horizon.denominator)},
+    """Compare the complete projection derived from approved application input."""
+    expected = project_native_design(request, projection["problem"], request_digest)
+    _require(design == expected,
              "The scientific design changes the approved pair, grid, allowance, policy, horizon or resource scope.")
 
 
@@ -84,6 +56,16 @@ def _faithful_result(result, science, request):
     checked = fresh.get("fresh_checked") or {}
     verified = checked.get("verification") == "valid" and fresh.get("replay") == "passed"
     report = science["report"]
+    if request.get("requested_tier") == "numerical_guidance":
+        _require(not verified and result.get("design_tier") == report.get("tier")
+                 and report.get("tier") in {"numerical_guidance", "unavailable"}
+                 and result.get("verification") == fresh.get("verification") == "not_checked"
+                 and result.get("replay") == fresh.get("replay") == "unsupported"
+                 and report["checked"].get("verification") == "not_checked"
+                 and report["checked"].get("construction_attempts") == 0
+                 and report["checked"].get("pair_verification_passes") == 0
+                 and science.get("artifacts") == [],
+                 "Numerical-only approval cannot publish checked facts or consume exact pair work.")
     rows = checked["rows"] if verified else report["numerical"]["rows"]
     by_time = {row["time"]: row for row in rows}
     _require(len(by_time) == len(rows) == len(request["feasible_times"])
@@ -124,7 +106,7 @@ def validate_design_packet(content, anchor, *, projection, job, request, request
                  "The design replay anchor must exactly identify its approved scope and native bytes.")
         _require(packet.get("schema_version") == NATIVE_PROFILE and packet.get("operation") == "design"
                  and packet.get("run_id") == job["id"] and packet.get("scenario_id") == request["scenario_id"]
-                 and binding == {"schema_version": DESIGN_BINDING, "mapping_policy": MAPPING_POLICY,
+                 and binding == {"schema_version": DESIGN_BINDING, "mapping_policy": native_design_mapping_policy(request),
                      "application": projection["binding"], "request": request, "request_digest": request_digest,
                      "historical_evidence": historical_evidence, "design_digest": design_digest,
                      "approved_grid_order": request["feasible_times"]}
@@ -145,7 +127,7 @@ def validate_design_packet(content, anchor, *, projection, job, request, request
                  and historical_evidence["scenario_id"] == request["scenario_id"]
                  and historical_evidence["problem_id"] == request["problem_id"]
                  and historical_evidence["expected_problem_digest"] == request["problem_digest"]
-                 and request["source_artifact_ids"] == [historical_artifact["id"]]
+                 and request.get("source_artifact_ids", []) == []
                  and any(ref["id"] == historical_artifact["id"] and ref["sha256"] == historical_artifact["sha256"]
                          and ref["byte_size"] == len(raw_parent)
                          for ref in historical_evidence["result"]["artifacts"]),
