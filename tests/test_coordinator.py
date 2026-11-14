@@ -13,6 +13,9 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 from bean_api.coordinator import CoordinatorScope, ScopedCallbacks, run_coordinator
 from bean_api.providers import AttemptContext, ProviderConfig
+import test_scientific_http as scientific_http
+
+scientific_client = scientific_http.scientific_client
 
 
 class Ledger:
@@ -261,7 +264,7 @@ def test_controlled_provenance_never_claims_gemini_authorship_or_provider_billin
 def test_agent_cannot_finish_by_silently_omitting_reviewed_optional_work():
     result, _, harness, _ = run("certified_counterexample", "omit_optional")
     assert result.status == "failed"
-    assert result.error_code == "agent_scenario_accounting_incomplete"
+    assert result.error_code == "scenario_accounting_incomplete"
     assert result.explanation is None
     assert harness.executed == ["baseline"] and harness.skipped == []
     assert [fact["id"] for fact in result.evidence] == ["evidence-baseline"]
@@ -346,13 +349,25 @@ def test_scoped_read_cannot_substitute_a_different_evidence_identity():
     assert [fact["id"] for fact in result.evidence] == ["evidence-baseline"]
 
 
-def test_scoped_read_cannot_rewrite_facts_under_an_existing_evidence_identity():
+@pytest.mark.parametrize("change", ["scientific_outcome", "omitted_replay_transcript"])
+def test_scoped_read_cannot_rewrite_facts_under_an_existing_evidence_identity(change):
     harness, ledger = ToolHarness("inconclusive"), Ledger()
     original = harness.read
+    execute = harness.execute
+
+    async def replay_fact(scenario_id):
+        value = await execute(scenario_id)
+        value["native_replay"] = {"replay": "passed", "integrity": "passed",
+            "candidate_results": [{"candidate_id": "fixed", "rows": [{"observation_id": "r1", "value": "1/1"}]}]}
+        return value
 
     def changed_fact(evidence_id):
-        return {**original(evidence_id), "scientific_outcome": "certified_counterexample"}
+        value = original(evidence_id)
+        if change == "scientific_outcome":
+            return {**value, "scientific_outcome": "certified_counterexample"}
+        return {**value, "native_replay": {**value["native_replay"], "candidate_results": []}}
 
+    harness.execute = replay_fact
     harness.read = changed_fact
     model = EvidenceModel(mode="loop")
     config = ProviderConfig(api_key="controlled", model=model.model_name,
@@ -362,3 +377,102 @@ def test_scoped_read_cannot_rewrite_facts_under_an_existing_evidence_identity():
     assert result.error_code == "agent_evidence_changed"
     assert result.evidence[0]["scientific_outcome"] == "inconclusive"
     assert result.explanation is None
+
+
+def test_controlled_graph_runs_http_approved_counterdex_and_replays_bound_native_bytes(scientific_client):
+    """Controlled orchestration with real science, never live Gemini reasoning."""
+    import base64
+    import hashlib
+
+    from bean_api.contracts import PlanBody
+    from bean_api.main import PREFIX
+    from bean_api.worker import Worker
+    from test_counterdex_adapter import reviewed_history
+    from test_scientific_http import post
+
+    client, history = scientific_client, reviewed_history()
+    workspace = post(client, "/workspaces", {"name": "Controlled agent real-science acceptance"}, "workspace")["id"]
+    dataset = post(client, f"/workspaces/{workspace}/datasets", history["dataset"]["body"], "dataset")
+    problem = post(client, f"/workspaces/{workspace}/problems", {
+        **history["problem"]["body"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]}, "problem")
+    model = EvidenceModel()
+    disclosure = {"provider": "gemini", "model": model.model_name,
+                  "source_asset_ids": [], "context_fields": ["problem", "dataset"]}
+    consent = post(client, f"/workspaces/{workspace}/provider-consents", {
+        **disclosure, "problem_id": problem["id"], "accepted": True}, "controlled-consent")
+    body = PlanBody(problem_id=problem["id"], problem_digest=problem["digest"], dataset_id=dataset["id"],
+        scientific_profile="counterdex.v1", objective={
+            "question": "Which checked outside witness remains compatible with the reviewed synthetic data?",
+            "success_criterion": "Retain real native evidence with controlled commentary and zero provider dispatch."},
+        scenarios=[{"id": "baseline", "kind": "baseline", "label": "Real bounded discovery",
+                    "problem_id": problem["id"], "problem_digest": problem["digest"]}],
+        provider_disclosure={**disclosure, "permission_id": consent["id"]}).model_dump(mode="json")
+    plan = post(client, f"/workspaces/{workspace}/plans", {
+        "expected_current_revision_id": problem["id"], "plan": body}, "plan")
+    approval = post(client, f"/plans/{plan['id']}/approvals", {
+        "expected_current_revision_id": problem["id"], "expected_plan_digest": plan["digest"],
+        "accepted": True}, "approval")
+    run = post(client, f"/plans/{plan['id']}/runs", {
+        "approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "run")
+    config = ProviderConfig(api_key="nonsecret-controlled-placeholder", model=model.model_name,
+                            account_gate_passed=True, account_decision_id="controlled-local-test-policy")
+    worker = Worker(client.app.state.workflow, settings=client.app.state.settings,
+                    adapter=client.app.state.adapter, provider_config=config, controlled_model=model)
+    assert worker.tick() == 1
+    finished = client.get(PREFIX + f"/runs/{run['id']}").json()
+    assert finished["state"] == "completed", finished
+    assert len(finished["scenarios"]) == finished["scientific_reservations"] == 1
+    scenario = finished["scenarios"][0]
+    assert scenario["scenario_id"] == "baseline" and scenario["state"] == "completed"
+    evidence_record = client.get(PREFIX + f"/records/{scenario['result_id']}").json()
+    assert evidence_record["body"]["run_id"] == run["id"]
+    evidence = evidence_record["body"]["result"]
+    assert evidence["problem_id"] == problem["id"] and evidence["problem_digest"] == problem["digest"]
+    assert evidence["scientific_outcome"] == "certified_counterexample"
+    assert evidence["verification"] == "valid" and evidence["expected_binding"] == "matches"
+    assert evidence["baseline_search"]["attempted_count"] > 0
+    summary = client.get(PREFIX + f"/records/{finished['result_id']}").json()["body"]
+    assert summary["explanation"]["authorship"] == "controlled_commentary"
+    assert summary["explanation"]["fact_ids"] == [evidence_record["id"]]
+    assert summary["runtime"]["active_mode"] == "controlled_offline"
+    assert summary["external_provider_calls"] == summary["actual_model_tokens"] == 0
+    assert summary["model_turns"] == finished["provider_turns"] == 2
+
+    reference, = evidence["artifacts"]
+    downloaded = client.get(PREFIX + f"/artifacts/{reference['id']}")
+    assert downloaded.status_code == 200
+    assert hashlib.sha256(downloaded.content).hexdigest() == reference["sha256"]
+    anchors = client.get(PREFIX + f"/artifacts/{reference['id']}/anchor?download=true").json()
+    assert anchors["run_id"] == run["id"] and anchors["scenario_id"] == "baseline"
+    assert anchors["dataset_digest"] == dataset["digest"] and anchors["problem_digest"] == problem["digest"]
+    assert anchors["projection_digest"] == evidence["scientific_problem_digest"]
+    packet = downloaded.json()
+    native = json.loads(base64.b64decode(packet["scientific"]["bytes_base64"], validate=True))
+    assert native["operation"] == "bounded_discovery"
+    assert native["workflow"]["plan_id"] == plan["id"]
+    assert native["workflow"]["approval_id"] == approval["id"]
+    assert native["workflow"]["execution_id"] == run["id"]
+    fresh = client.app.state.adapter.replay_native(downloaded.content, expected=anchors)
+    assert fresh["replay"] == fresh["integrity"] == "passed", fresh
+    assert fresh["expected_binding"] == "matches" and fresh["verification"] == "valid"
+    assert fresh["search_replayed"] is False
+    assert {row["candidate_id"] for row in fresh["candidate_results"]} == {row["id"] for row in evidence["candidates"]}
+    wrong = client.app.state.adapter.replay_native(downloaded.content, expected={**anchors, "run_id": "another_run"})
+    assert wrong["worker_error"] == "wrong_scenario_binding"
+    response = post(client, f"/workspaces/{workspace}/assistant-turns", {
+        "operation": "explain", "client_operation_id": "explain-real-evidence",
+        "expected_conversation_revision": 0, "text": "Explain the selected checked result and its limits.",
+        "problem_id": problem["id"], "run_id": run["id"]}, "explain-real-evidence")["body"]
+    assert response["author"] == "server" and response["model_commentary"] is None
+    assert response["provider_attempt_id"] is None and response["execution_approved"] is False
+    assert response["code"] == "provider_consent_required"
+    facts = {fact["field"]: fact["value"] for fact in response["facts"] if fact["record_id"] == evidence_record["id"]}
+    assert facts["scientific_outcome"] == "certified_counterexample"
+    assert facts["baseline_search"]["attempted_count"] > 0
+    assert facts["scientific_problem_digest"] == evidence["scientific_problem_digest"]
+    assert any(fact["record_id"] == dataset["id"] and fact["field"] == "origin" and fact["value"] == "synthetic"
+               for fact in response["facts"])
+    assert any("strictly outside the reviewed interval" in text for text in response["critical_statements"])
+    assert any("synthetic examples" in text for text in response["critical_statements"])
+    assert client.get(PREFIX + f"/workspaces/{workspace}/provider-attempts").json() == []
+    assert worker.tick() == 0

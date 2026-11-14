@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 from .contracts import GroundedExplanation
+from .canonical import canonical_bytes
 
 from .providers import (
     AttemptContext, AttemptLedger, ProviderConfig, ProviderFailure, SYSTEM_INSTRUCTION,
@@ -108,7 +109,7 @@ async def _await(value: Any) -> Any:
 
 
 def _safe_fact(evidence: dict[str, Any]) -> dict[str, Any]:
-    """Bound typed records from trusted callbacks; never pass arbitrary exception text."""
+    """Bound trusted facts, keeping replay states rather than proof transcripts."""
     encoded = json.dumps(evidence, ensure_ascii=False, allow_nan=False)
     if len(encoded.encode()) > 12_000:
         raise CoordinatorFailure("agent_evidence_limit")
@@ -116,7 +117,26 @@ def _safe_fact(evidence: dict[str, Any]) -> dict[str, Any]:
         raise CoordinatorFailure("agent_evidence_identity_missing")
     # A trusted callback can retain and later mutate its own response object.
     # Keep the bounded serialized value, not that shared mutable reference.
-    return json.loads(encoded)
+    fact = json.loads(encoded)
+    replay = fact.get("native_replay")
+    if isinstance(replay, dict):
+        # The authoritative top-level candidate results, vectors, artifacts and
+        # verification record remain intact. Native replay can duplicate those
+        # vectors with long per-observation proof rows, which are unnecessary
+        # for an agent choosing a permitted action. Full bytes remain available
+        # through the evidence/artifact routes, not conversational context.
+        fact["native_replay"] = {key: replay[key] for key in (
+            "replay", "scope", "integrity", "verification", "expected_binding",
+            "recorded_result_matches", "reason_code", "dataset_origin", "operation",
+            "packet_profile", "anchors", "baseline_digest", "problem_digest",
+            "design_digest", "suggestion_digest", "outcome", "historical_compatibility",
+            "search_replayed",
+        ) if key in replay}
+        # Bind the complete callback record, including omitted transcript
+        # fields, so rereading one immutable ID cannot replace hidden content.
+        fact["source_fact_digest"] = hashlib.sha256(canonical_bytes(evidence)).hexdigest()
+        fact["fact_projection_version"] = "coordinator-facts.v1"
+    return fact
 
 
 def _require_controlled_model(model: Any) -> None:
@@ -268,7 +288,7 @@ class _Invocation:
         if self.scope.baseline_scenario_id not in self.executed:
             raise CoordinatorFailure("baseline_must_execute_first")
         if set(self.scope.optional_scenario_ids) - self.executed - self.skipped:
-            raise CoordinatorFailure("agent_scenario_accounting_incomplete")
+            raise CoordinatorFailure("scenario_accounting_incomplete")
         _validate_explanation(value, self.facts)
         self.explanation = {**value.model_dump(), "authorship": "controlled_commentary", "scientific_authority": False}
         return {"accepted": True, "fact_ids": value.fact_ids, "scientific_state_changed": False}

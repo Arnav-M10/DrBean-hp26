@@ -191,7 +191,8 @@ FACT_KEYS = {
     "candidate_ids", "target", "hard_allowance", "horizon", "selected_time", "future_hard_allowance",
     "margin", "problem_id", "problem_digest", "state", "reason", "code", "observable",
     "reason_code", "candidates", "selected_option", "candidate_results", "native_replay",
-    "origin", "dataset_origin", "experiment_id", "time_origin",
+    "origin", "dataset_origin", "experiment_id", "time_origin", "baseline_search",
+    "scientific_problem_digest", "scientific_design_digest",
 }
 NUMBERS = re.compile(r"(?<![A-Za-z_])[-+]?\d+(?:/\d+|\.\d+)?")
 
