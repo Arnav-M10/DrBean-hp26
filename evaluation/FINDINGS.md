@@ -1,6 +1,6 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `070b697`, observed with harness `c6307df` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `cdb9d69`, observed with harness `7eaf257` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
@@ -57,8 +57,8 @@ Application code commit `070b697`, observed with harness `c6307df` on macOS 26.7
 | H-LAUNCHER-OPTIN-FORMAT | P3 | C (harness) | retested | The launcher opt-in doctor test assumed PR #36's opt-in file format and wording, so it failed against main's stricter launcher |
 | H-REPLAY-CLASS-RECORDED-MISMATCH | P3 | C (harness) | retested | The engine-control replay classifier called a recorded-result mismatch a scientific exclusion when the fresh verdict was itself an exclusion |
 | F-UPLOAD-LIMIT-MESSAGE | P3 | B (upload boundary and general-file admission) | open | An oversized research upload is refused with a generic message that names neither the size limit nor the other limits the file exceeds |
-| F-CI-BROWSER-CHECK-INTERMITTENT | P3 | B (apps/web/check-backend.mjs and CI wiring) | fixed_pending_retest | B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s |
-| F-RESEARCH-WORKER-UNGUARDED | P2 | B (worker loop and ResearchRunner) | open | An exception outside ResearchRunner's handled types escapes Worker.tick; the unguarded worker loop then exits, and the research action stays 'running' with no error recorded |
+| F-CI-BROWSER-CHECK-INTERMITTENT | P3 | B (apps/web/check-backend.mjs and CI wiring) | retested | B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s |
+| F-RESEARCH-WORKER-UNGUARDED | P2 | B (worker loop and ResearchRunner) | retested | An exception outside ResearchRunner's handled types escapes Worker.tick; the unguarded worker loop then exits, and the research action stays 'running' with no error recorded |
 | F-RESEARCH-PLAN-PROGRESS-PENDING | P3 | B (plan projection) with A (planning tool output) | open | After a completed investigation every maintained plan step is shown as pending, including steps the agent marked completed |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
@@ -532,7 +532,7 @@ Application code commit `070b697`, observed with harness `c6307df` on macOS 26.7
 - **Observed:** 413 request_too_large 'Request exceeds the admitted byte limit.' for both papers, from the RequestBoundary middleware; the advertised capabilities state max_file_bytes 5242880 and max_pdf_pages 10. Nothing is truncated or analysed (honest). The merged UI pre-validates selection and shows a clear 5 MiB message, so only API callers see the generic text
 - **Evidence:** {"candidate": "PR #40 producer (author check: Claude authored PR #40; production maintenance is B's)", "measurements": "zolleral_26: 9.39 MiB, 12 pages; sokolowskial_25: 18.19 MiB, 11 pages (local only, not committed)"}
 
-## F-CI-BROWSER-CHECK-INTERMITTENT (P3, owner B (apps/web/check-backend.mjs and CI wiring), fixed_pending_retest)
+## F-CI-BROWSER-CHECK-INTERMITTENT (P3, owner B (apps/web/check-backend.mjs and CI wiring), retested)
 
 - **Input:** CI job 'browser review, approved design and native replay' (node apps/web/check-backend.mjs, BEAN_AI_MODE=placeholder) on the application tree of main 299a356
 - **Command:** `GitHub Actions run 43599924443 (pull_request event, head d6d2792), job 132462300488`
@@ -540,14 +540,16 @@ Application code commit `070b697`, observed with harness `c6307df` on macOS 26.7
 - **Observed:** locator.click: Timeout 30000ms exceeded while waiting for getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }) at apps/web/check-backend.mjs:156. The same application tree passed in the other 6 runs: d6d2792 push, be3d18d push and PR, 8580d3e push and PR, and main 299a356 push. That is 1 failure in 7 runs. It also passed locally on bb503a7. The cause is not determined, because no screenshot or page state is captured on failure.
 - **Evidence:** {"failed_run": "43599924443 job 132462300488", "passing_runs_same_application_tree": ["43599921100", "43600308045", "43600313049", "43598913026", "43598918655", "43594992900"]}
 - **Retest at main 070b697:** B added a deterministic wait (button enabled or backend error visible) and failure diagnostics (screenshot, visible status text, last API response, credential redacted) to apps/web/check-backend.mjs. Main's merge CI browser job passed. C closes this after consecutive passing runs on the final merge. (evidence: {})
+- **Retest at CI since main 070b697 through main cdb9d69:** Since B's deterministic wait and failure diagnostics, the browser job passed 16 of 16 completed CI runs on 9 distinct heads (070b697, 39930b8, 0491939, 101b7d4, db7098b, c2e0743, 685e42d, 9acbb2d, cdb9d69). Two superseded runs were cancelled; there were no failures. Before the fix: 1 failure in 7. Closed by retest. An intermittent cause cannot be proven absent, but failures now leave diagnostics. (evidence: {})
 
-## F-RESEARCH-WORKER-UNGUARDED (P2, owner B (worker loop and ResearchRunner), open)
+## F-RESEARCH-WORKER-UNGUARDED (P2, owner B (worker loop and ResearchRunner), retested)
 
 - **Input:** after an approved child completes, the coordinator's model raises RuntimeError (any type other than DomainError, CoordinatorFailure, ProviderFailure, LedgerBudgetExceeded, TimeoutError, ValueError, ImportError)
 - **Command:** `in-process create_app + ordinary Worker on A's PR #44 39930b8 (main 070b697 + factory); bean_api.research_controlled.build_controlled_research_model patched to a test double`
 - **Expected:** the action fails or is marked for reconciliation with an error code, and the worker keeps serving other jobs; the completed child evidence is kept
 - **Observed:** Worker.tick raises RuntimeError. Every later tick shows the session and action 'running' with error_code null and nothing executing. worker.main() runs 'while True: worker.tick()' without a guard, so in the launched process the same exception would end the worker and stop all queued science until a restart; the process exit follows from code inspection and was not run. The completed child and its evidence are kept. A ProviderFailure, which is what the metered gateway raises, is handled correctly: the action fails with provider_request_failed_unknown_outcome.
 - **Evidence:** {"reproducer": "C scratch probe at overlay 39ab35f (A 39930b8 + C db7098b); demo check DEMO-09 uses the handled ProviderFailure path"}
+- **Retest at final merge main cdb9d69 (B 9b7ee31), observed on C 7eaf257:** Fixed by B: ResearchRunner contains unexpected exceptions, and worker.main guards each tick and logs only the error class. With the same reproducer (RuntimeError after the child completed) the session ends failed with research_runtime_failure, the child stays completed, and Worker.tick does not raise. A ProviderFailure still ends failed with provider_request_failed_unknown_outcome. Closed by retest. (evidence: {"outputs": "evaluation/results/previews/demo-main-cdb9d69/worker-retest-runtime.txt, worker-retest-provider.txt"})
 
 ## F-RESEARCH-PLAN-PROGRESS-PENDING (P3, owner B (plan projection) with A (planning tool output), open)
 
@@ -556,6 +558,7 @@ Application code commit `070b697`, observed with harness `c6307df` on macOS 26.7
 - **Expected:** the plan shows progress honestly: steps with linked completed evidence can show completed; others stay proposals
 - **Observed:** A's policy rewrites its todos with the first two steps 'completed' and the evidence-dependent next step 'pending', but the projected research-plan.v1 shows all three as 'pending' while the session is 'completed' with a report
 - **Evidence:** {}
+- **Retest at final merge main cdb9d69:** Still present: after completion all maintained plan steps show pending. (evidence: {"output": "evaluation/results/previews/demo-main-cdb9d69/plan-progress.txt"})
 
 ## Check-level finding ids (raised only when the check fails)
 
