@@ -119,11 +119,14 @@ try {
     check('browser_shows_the_exact_pending_review', shown && shown[1] === snapshot.pending_review.id
       && shown[2] === snapshot.pending_review_digest && snapshot.children.length === 0,
       `ui ${shown && shown.slice(1)}; server ${snapshot.pending_review?.id} ${snapshot.pending_review_digest}; children ${snapshot.children.length}`)
-    await panel.getByRole('button', { name: 'Approve exact operation and continue', exact: true }).click()
-    await page.waitForTimeout(500)
+    // Without the explicit checkbox the approve control is either disabled or refuses; either way nothing changes.
+    const approve = panel.getByRole('button', { name: 'Approve exact operation and continue', exact: true })
+    const disabledBeforeCheckbox = await approve.isDisabled()
+    if (!disabledBeforeCheckbox) { await approve.click(); await page.waitForTimeout(500) }
     const unapproved = await json(`/research-sessions/${session}`)
     check('approval_requires_the_explicit_checkbox', unapproved.state === 'waiting_review' && unapproved.children.length === 0
-      && unapproved.revision === snapshot.revision, `state ${unapproved.state}, children ${unapproved.children.length}`)
+      && unapproved.revision === snapshot.revision,
+      `approve ${disabledBeforeCheckbox ? 'disabled' : 'enabled but refused'} before the checkbox; state ${unapproved.state}, children ${unapproved.children.length}`)
     await panel.getByLabel('I approve only this frozen scientific scope and its limits.').check()
     await panel.getByRole('button', { name: 'Approve exact operation and continue', exact: true }).click()
     for (let i = 0; i < 300; i++) {
