@@ -1,0 +1,58 @@
+{
+  "code_commit": "c5c750b170d73b810b66c76cd163de0e5ee7e938",
+  "branch": "codex/ai-grounded-explanations",
+  "base_main": "4b5f1f5b4f3e08223422106d8c6e8c6554611d76",
+  "merged_pr19": "37d8f6f6010e2fe8be3e55323bd6cc18f9112760",
+  "independent_report_reference": "526f15a6f4be5aac81232badaba2893ac9fc4aa6",
+  "commentary_policy_version": "evidence-bound-statements.v2",
+  "backend_python": "3.12.14",
+  "scientific_runtime": {
+    "python": "3.11.18",
+    "counterdex": "0.3.0",
+    "path": "/tmp/drbean-counterdex-runtime/bin/python"
+  },
+  "backend": {
+    "passed": 630,
+    "skipped": 0,
+    "command": "PATH=<prepared-python311>:$PATH BEAN_COUNTERDEX_PYTHON=<counterdex-runtime-python> BEAN_COUNTERDEX_REPLAY_PYTHON=<counterdex-runtime-python> .venv/bin/python /tmp/drbean-offline-tests.py -q tests --ignore=tests/integration",
+    "runner_source": "\"\"\"Test runner denying socket connections in parent and spawned workers.\"\"\"\nimport socket\nimport sys\n\ndef deny_connect(*args, **kwargs):\n    raise AssertionError(\"Network dispatch forbidden during offline checks\")\n\nsocket.socket.connect = deny_connect\nsocket.socket.connect_ex = deny_connect\n\nif __name__ == \"__main__\":\n    import pytest\n    raise SystemExit(pytest.main(sys.argv[1:]))\n",
+    "guard_scope": "socket.connect/connect_ex in the pytest process; independent application guard and science process qualification are separate controls"
+  },
+  "focused": {
+    "passed": 179,
+    "command": ".venv/bin/python /tmp/drbean-offline-tests.py -q tests/test_explanation_guards.py tests/test_coordinator.py tests/test_conversation.py"
+  },
+  "independent_main_ai": {
+    "passed": 38,
+    "command": ".venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py tests/integration/test_zero_dispatch.py",
+    "expectations_modified": false
+  },
+  "unchanged_independent_report": {
+    "passed": 22,
+    "failed": 1,
+    "xfail_assertions_executed_with_runxfail": true,
+    "command": "PYTHONPATH=apps/api:tests/integration .venv/bin/python /tmp/drbean-offline-tests.py -q --runxfail /tmp/test_drbean_independent_explanation_526f15a.py",
+    "fixture_disagreement": "Positive checked-design sentence has quantities but no cited verification/binding/replay/tier. The fix withholds it; owner test/fixture review remains open.",
+    "all14_reported_attacks_refused": true,
+    "both_http_bypass_controls_refused": true,
+    "graph_invented_time_refused": true
+  },
+  "offline_preflight": {
+    "passed": true,
+    "external_dispatch_attempts": 0,
+    "observation_scope": "socket.connect/connect_ex in this preflight process"
+  },
+  "ruff": "All checks passed!",
+  "git_diff_check": true,
+  "provider_calls": 0,
+  "credentials_inspected": false,
+  "live_qualification": "not_run",
+  "public_schema_changes": [],
+  "owned_behavior_tightening": "One owned opaque-ID prose example now expects unsupported_claim: opaque ID digits still do not authorize quantities, while unrestricted identity prose is withheld. No independent/scored assertion was edited.",
+  "limitations": [
+    "Bounded complete-statement language; arbitrary English may be suppressed.",
+    "Independent report positive checked-design fixture disagreement remains open.",
+    "No live model reasoning/extraction qualification claimed.",
+    "Existing current-main science/checker states remain authoritative; assistance failures retain evidence."
+  ]
+}

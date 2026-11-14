@@ -1,0 +1,43 @@
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+.......................................................F................ [ 31%]
+........................................................................ [ 41%]
+........................................................................ [ 51%]
+........................................................................ [ 62%]
+........................................................................ [ 72%]
+........................................................................ [ 82%]
+........................................................................ [ 93%]
+................................................                         [100%]
+=================================== FAILURES ===================================
+____ test_separately_approved_design_has_one_completed_callback_observation ____
+
+    def test_separately_approved_design_has_one_completed_callback_observation():
+        class DesignModel(EvidenceModel):
+            def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+                observed = [message for message in messages if isinstance(message, ToolMessage)]
+                if not observed:
+                    name, args = "execute_approved_design", {}
+                else:
+                    name, args = "return_grounded_explanation", {
+                        "fact_ids": ["design-evidence"], "text": "The returned design remains numerical guidance.", "next_action": "stop"}
+                message = AIMessage(content="", tool_calls=[{
+                    "id": f"design-call-{len(observed)}", "name": name, "args": args, "type": "tool_call"}])
+                return ChatResult(generations=[ChatGeneration(message=message)])
+
+        harness = ToolHarness("inconclusive")
+        callbacks = harness.callbacks()
+        callbacks.execute_design = lambda: {"id": "design-evidence", "problem_id": "problem", "design_tier": "numerical_guidance"}
+        harness.callbacks = lambda: callbacks
+        result = asyncio.run(observed_invocation(harness, DesignModel(),
+            CoordinatorScope("run", "plan", "problem", "baseline", kind="design", max_scientific_reservations=1, wall_seconds=120)))
+>       assert result.status == "completed", result.error_code
+E       AssertionError: explanation_unsupported_claim
+E       assert 'failed' == 'completed'
+E
+E         - completed
+E         + failed
+
+tests/test_coordinator.py:369: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_coordinator.py::test_separately_approved_design_has_one_completed_callback_observation
+1 failed, 695 passed in 143.17s (0:02:23)
