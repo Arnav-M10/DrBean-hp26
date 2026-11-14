@@ -1,8 +1,10 @@
-"""Bounded official Gemini adapter; configuration never counts as live qualification.
+"""Bounded offline provider boundaries and controlled source previews.
 
 Inspected interfaces: googleapis/python-genai (google-genai 3.3.0),
 https://ai.google.dev/gemini-api/docs/structured-output and image-understanding.
-Each dispatch has a durable attempt before networking. SDK retries are disabled.
+Only an explicitly injected controlled transport may execute requests in this
+release. Credentials and historical account decisions cannot enable live SDK
+construction. Controlled attempts are simulations, never live qualification.
 No provider key, prompt, source bytes, raw exception or model reasoning enters logs.
 """
 from __future__ import annotations
@@ -85,6 +87,23 @@ class ProviderResult:
     model: str
     usage: dict[str, int | None] | None
     finish_reason: str | None
+    execution_mode: Literal["controlled", "unqualified"] = "unqualified"
+    simulated_usage: dict[str, int | None] | None = None
+
+
+def _hosted_sdk_object(value: Any) -> bool:
+    """Reject common accidental live injection, including inherited SDK clients.
+
+    Arbitrary injected Python remains trusted test code, not a sandbox. The
+    socket-deny preflight independently observes the local test transport.
+    """
+    candidates = (value, *getattr(value, "__mro__", ()), *type(value).__mro__)
+    return any(
+        getattr(candidate, "__module__", "") == prefix
+        or getattr(candidate, "__module__", "").startswith(prefix + ".")
+        for candidate in candidates
+        for prefix in ("google.genai", "google.generativeai", "google.cloud", "vertexai", "openai", "anthropic")
+    )
 
 
 def utc_now() -> str:
@@ -163,9 +182,11 @@ class GeminiProvider:
     def __init__(self, config: ProviderConfig, ledger: AttemptLedger, *, client_factory: Any = None):
         self.config = config
         self.ledger = ledger
-        self._client_factory = client_factory  # Explicit controlled-test injection; production uses SDK.
+        self._client_factory = client_factory  # Trusted in-process test seam, never a request option.
+        self._transport_provenance = "not_observed"
 
     def capabilities(self) -> dict[str, Any]:
+        controlled = self._client_factory is not None and not _hosted_sdk_object(self._client_factory)
         try:
             self.config.check_ready()
             gate = True
@@ -176,8 +197,12 @@ class GeminiProvider:
                 "configured": bool(self.config.api_key and self.config.model),
                 "account_gate_passed": gate, "model": self.config.model,
                 "reachable": None, "verified_in_environment": False,
-                "unavailable_reason": reason, "sdk_version": package_version("google-genai"),
-                "image_budget_configured": self.config.image_token_upper_bound is not None}
+                "unavailable_reason": reason or (None if controlled else "provider_dispatch_disabled"),
+                "sdk_version": package_version("google-genai"),
+                "image_budget_configured": self.config.image_token_upper_bound is not None,
+                "execution_mode": "controlled" if controlled else "disabled",
+                "dispatch_enabled": False, "live_qualification": "not_run",
+                "transport_provenance": self._transport_provenance}
 
     async def generate(self, operation: Operation, prompt: str, schema: type[T], *,
                        context: AttemptContext, image_bytes: bytes | None = None,
@@ -185,6 +210,11 @@ class GeminiProvider:
         if operation not in {"intake", "explanation", "design_proposal", "observation_proposal"}:
             raise ProviderFailure("provider_operation_unsupported")
         self.config.check_ready()
+        if self._client_factory is None or _hosted_sdk_object(self._client_factory):
+            # Enforce the current mode at this public boundary as well as startup
+            # and worker selection. Do not import/build a network-capable client,
+            # reserve a billable attempt, or let old consent enable this path.
+            raise ProviderFailure("provider_dispatch_disabled")
         checked_context = context.checked_dict()
         if not isinstance(prompt, str) or not prompt or len(prompt.encode("utf-8")) > 48_000:
             raise ProviderFailure("provider_context_limit")
@@ -206,7 +236,7 @@ class GeminiProvider:
         if input_reservation > self.config.max_input_tokens:
             raise ProviderFailure("provider_input_budget_exceeded")
         wall_cap = min(self.config.request_timeout_seconds, 60 if operation == "intake" else 30)
-        metadata = {"provider": "gemini", "model": self.config.model,
+        metadata = {"provider": "controlled", "intended_provider": "gemini", "model": self.config.model,
                     "sdk_version": package_version("google-genai"), "adapter_version": "gemini-v1",
                     "prompt_version": "gf2-proposal-v1", "schema_version": "DB-SC-1",
                     "operation": operation, "modality": "image" if image_bytes is not None else "text",
@@ -214,21 +244,25 @@ class GeminiProvider:
                     "account_decision_id": self.config.account_decision_id,
                     "started_at": utc_now(), "reserved_input_tokens": input_reservation,
                     "reserved_output_tokens": self.config.max_output_tokens, "max_requests": 1,
-                    "timeout_seconds": wall_cap, "retry_policy": "none", "api_surface": "Gemini Developer API v1beta",
-                    "test_transport": self._client_factory is not None}
+                    "timeout_seconds": wall_cap, "retry_policy": "none", "request_schema": "Gemini Developer API v1beta",
+                    "test_transport": True, "execution_mode": "controlled",
+                    "external_provider_calls": 0, "actual_model_tokens": 0,
+                    "usage_provenance": "controlled_simulation"}
         attempt_id = self.ledger.begin_attempt(checked_context, metadata)
         started = time.monotonic()
         client = None
         usage = None
         try:
-            from google import genai
             from google.genai import types
-            kwargs = {"api_key": self.config.api_key, "vertexai": False,
+            kwargs = {"api_key": "nonsecret-controlled-placeholder", "vertexai": False,
                       "http_options": types.HttpOptions(api_version="v1beta",
                                                          base_url="https://generativelanguage.googleapis.com",
                                                          timeout=wall_cap * 1000,
                                                          retry_options=types.HttpRetryOptions(attempts=1))}
-            client = (self._client_factory or genai.Client)(**kwargs)
+            client = self._client_factory(**kwargs)
+            if _hosted_sdk_object(client):
+                raise ProviderFailure("provider_dispatch_disabled")
+            self._transport_provenance = "controlled_injected_transport"
             parts = [types.Part.from_text(text=prompt)]
             if image_bytes is not None:
                 parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
@@ -260,9 +294,11 @@ class GeminiProvider:
                     raise ProviderFailure("provider_usage_exceeded_reservation")
             self.ledger.finish_attempt(attempt_id, {"status": "validated", "finished_at": utc_now(),
                 "duration_ms": int((time.monotonic() - started) * 1000), "usage": usage,
-                "provider_request_id": _request_id(response), "finish_reason": finish_reason,
+                "provider_request_id": None, "simulated_provider_request_id": _request_id(response),
+                "finish_reason": finish_reason,
                 "validation_outcome": "schema_valid_unaccepted"})
-            return ProviderResult(value, attempt_id, self.config.model or "", usage, finish_reason)
+            return ProviderResult(value, attempt_id, self.config.model or "", None, finish_reason,
+                                  execution_mode="controlled", simulated_usage=usage)
         except asyncio.CancelledError:
             self.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome", "code": "provider_cancelled_unknown_outcome",
                 "finished_at": utc_now(), "duration_ms": int((time.monotonic() - started) * 1000), "usage": None})
@@ -278,3 +314,183 @@ class GeminiProvider:
                     await client.aio.aclose()
                 except Exception:
                     pass  # Cleanup failure cannot cause a hidden retry or alter scientific data.
+
+
+class ControlledSourceProposer:
+    """Internal authored preview, deliberately not an IntakeService provider.
+
+    The registry is trusted local development data. It is frozen on construction
+    and keyed only by original bytes, never filenames or instructions in content.
+    Existing candidate/locator validation is reused, with manually authored
+    fields explicitly wrapped as controlled examples. No `.generate` adapter,
+    review operation, persistence, approval or provider ledger is supplied here.
+    Owner 2 must admit controlled provenance before ordinary intake can use it.
+    """
+
+    schema_version = "controlled-source-preview.v1"
+
+    def __init__(self, manifest: dict[str, Any]):
+        from .canonical import canonical_bytes
+        from .contracts import IntakeProposalBody, SourceAssetMetadata
+        from .intake import FIELD_PATH
+
+        self._fixtures: dict[str, bytes] = {}
+        try:
+            if (set(manifest) != {"schema_version", "review_status", "purpose", "fixtures"}
+                    or manifest["schema_version"] != "controlled-source-fixtures.v1"
+                    or manifest["review_status"] != "pending_independent_owner_review"
+                    or not isinstance(manifest["purpose"], str) or len(manifest["purpose"]) > 1000
+                    or not isinstance(manifest["fixtures"], list) or not 1 <= len(manifest["fixtures"]) <= 16):
+                raise ValueError("Invalid controlled registry")
+            for packet in manifest["fixtures"]:
+                if set(packet) != {"fixture_id", "sha256", "byte_size", "media_type", "width", "height",
+                                   "status", "fields", "diagnostics"}:
+                    raise ValueError("Invalid controlled packet")
+                metadata = SourceAssetMetadata.model_validate({
+                    **{key: packet[key] for key in ("sha256", "byte_size", "width", "height")},
+                    "declared_media_type": packet["media_type"], "observed_media_type": packet["media_type"],
+                    "origin": "synthetic", "retention": "retain", "upload_actor_id": "controlled_author"})
+                if (not isinstance(packet["fixture_id"], str)
+                        or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", packet["fixture_id"])
+                        or packet["status"] not in {"controlled_example", "unavailable"}
+                        or not isinstance(packet["fields"], list) or len(packet["fields"]) > 50
+                        or metadata.sha256 in self._fixtures):
+                    raise ValueError("Invalid controlled identity")
+                fields = []
+                for field_value in packet["fields"]:
+                    if set(field_value) - {"field_path", "original_value", "candidate_exact", "unit", "locator", "ambiguity"}:
+                        raise ValueError("A fixture cannot supply authority metadata")
+                    fields.append({**field_value, "source_asset_id": "controlled_template",
+                                   "method": "manual", "grounding": "unreviewed_visual"})
+                body = IntakeProposalBody.model_validate({"source_asset_id": "controlled_template",
+                    "source_digest": metadata.sha256, "fields": fields, "diagnostics": packet["diagnostics"]})
+                for field_value in body.fields:
+                    if not FIELD_PATH.fullmatch(field_value.field_path):
+                        raise ValueError("Unsupported proposed field")
+                    rectangle = field_value.locator.bbox
+                    if rectangle and (rectangle[2] > metadata.width or rectangle[3] > metadata.height):
+                        raise ValueError("Out-of-bounds locator")
+                    if (field_value.ambiguity or field_value.original_value is None) and field_value.candidate_exact is not None:
+                        raise ValueError("An ambiguous fixture must abstain on its exact candidate")
+                if packet["status"] == "unavailable" and body.fields:
+                    raise ValueError("Unavailable extraction cannot supply invented values")
+                frozen = {**packet, "fields": body.model_dump()["fields"],
+                          "diagnostics": body.model_dump()["diagnostics"]}
+                encoded = canonical_bytes(frozen)
+                if len(encoded) > 128 * 1024:
+                    raise ValueError("Controlled packet limit")
+                self._fixtures[metadata.sha256] = encoded
+        except (TypeError, ValueError, KeyError):
+            raise ProviderFailure("controlled_fixture_invalid") from None
+
+    def capabilities(self) -> dict[str, Any]:
+        return {"provider": "controlled_source_fixtures", "execution_mode": "controlled",
+                "dispatch_enabled": False, "live_qualification": "not_run",
+                "application_review_integration": "unavailable_pending_contract"}
+
+    def prepare(self, *, source_asset_id: str, metadata: dict[str, Any], source_bytes: bytes,
+                current_revision_id: str | None = None, notes: str = "",
+                existing_values: dict[str, str] | None = None) -> dict[str, Any]:
+        """Prepare only from an already authorized source; never accepts it."""
+        from .canonical import canonical_bytes
+        from .ai_prompts import SOURCE_PROPOSAL_PROMPT_VERSION, source_proposal_prompt
+        from .contracts import Identifier, IntakeProposalBody, SourceAssetMetadata
+        from .intake import MAX_CONTEXT_CHARS, MAX_SOURCE_BYTES, SUPPORTED_UNITS, _normalize_scalar, _scalar_path
+        from .workflow import DomainError
+        from pydantic import TypeAdapter
+
+        try:
+            source_asset_id = TypeAdapter(Identifier).validate_python(source_asset_id)
+            if current_revision_id is not None:
+                TypeAdapter(Identifier).validate_python(current_revision_id)
+            admitted = SourceAssetMetadata.model_validate(metadata)
+            if not isinstance(source_bytes, bytes) or not 1 <= len(source_bytes) <= MAX_SOURCE_BYTES:
+                raise ValueError("Retained original bytes required")
+            existing = {} if existing_values is None else existing_values
+            if (not isinstance(notes, str) or len(notes) > 4000 or not isinstance(existing, dict)
+                    or len(existing) > 50 or any(not isinstance(k, str) or not isinstance(v, str)
+                    or len(k) > 256 or len(v) > 1000 for k, v in existing.items())
+                    or len(notes) + sum(len(k) + len(v) for k, v in existing.items()) > MAX_CONTEXT_CHARS):
+                raise ValueError("Invalid review context")
+            existing = dict(existing)
+            context = {"source_asset_id": source_asset_id, "metadata": admitted.model_dump(),
+                       "current_revision_id": current_revision_id, "notes": notes, "existing_values": existing}
+            context_digest = hashlib.sha256(canonical_bytes(context)).hexdigest()
+            prepared_prompt = source_proposal_prompt(context)
+        except (TypeError, ValueError):
+            raise ProviderFailure("controlled_preview_context_invalid") from None
+        observed_digest = hashlib.sha256(source_bytes).hexdigest()
+        result = {"schema_version": self.schema_version, "prompt_version": SOURCE_PROPOSAL_PROMPT_VERSION,
+            "prompt_sha256": hashlib.sha256(prepared_prompt.encode("utf-8")).hexdigest(),
+            "status": "unavailable", "code": "controlled_source_unavailable", "fixture_id": None, "fixture_digest": None,
+            "authorship": "controlled_fixture", "label": "Controlled example; not Gemini transcription.",
+            "review_state": "unaccepted", "execution_approved": False, "external_provider_calls": 0,
+            "live_qualification": "not_run", "lookup_method": "frozen_fixture_lookup",
+            "fixture_version": "controlled-source-fixtures.v1",
+            "fixture_review_status": "pending_independent_owner_review",
+            "application_review_integration": "unavailable_pending_contract",
+            "source_asset_id": source_asset_id, "source_digest": admitted.sha256,
+            "observed_source_digest": observed_digest, "width": admitted.width, "height": admitted.height,
+            "current_revision_id": current_revision_id, "context_digest": context_digest,
+            "fields": [], "diagnostics": [], "conflicts": [], "next_action": "manual_review"}
+        if admitted.sha256 != observed_digest or admitted.byte_size != len(source_bytes):
+            result["code"] = "controlled_source_binding_mismatch"
+            return result
+        frozen = self._fixtures.get(observed_digest)
+        if frozen is None:
+            return result
+        packet = json.loads(frozen)
+        if (packet["width"] != admitted.width or packet["height"] != admitted.height
+                or packet["media_type"] != admitted.observed_media_type or packet["byte_size"] != admitted.byte_size):
+            result["code"] = "controlled_source_binding_mismatch"
+            return result
+        result.update(status=packet["status"], fixture_id=packet["fixture_id"],
+                      fixture_digest=hashlib.sha256(frozen).hexdigest(), diagnostics=packet["diagnostics"],
+                      code="controlled_preview_ready" if packet["status"] == "controlled_example" else "controlled_fixture_abstained")
+        if packet["status"] == "unavailable":
+            return result
+        fields = packet["fields"]
+        for field_value in fields:
+            field_value["source_asset_id"] = source_asset_id
+            path = field_value["field_path"]
+
+            def diagnostic(code: str, message: str) -> None:
+                if not any(d["code"] == code and d["field_path"] == path and d["blocking"] for d in result["diagnostics"]):
+                    result["diagnostics"].append({"code": code, "field_path": path, "message": message, "blocking": True})
+
+            if field_value["ambiguity"] or field_value["original_value"] is None:
+                diagnostic("source_ambiguity", "A person must resolve this missing or ambiguous source value.")
+            if _scalar_path(path) and field_value["candidate_exact"] is None:
+                diagnostic("missing_exact_value", "Review the source and enter an exact value manually.")
+            if _scalar_path(path) and field_value["unit"] is None:
+                diagnostic("missing_unit", "Review the missing unit before using this proposed quantity.")
+            if field_value["unit"] is not None and field_value["unit"] not in SUPPORTED_UNITS:
+                diagnostic("unsupported_unit", "Resolve the unit explicitly; the preview does not convert it.")
+            if field_value["candidate_exact"] is not None and field_value["original_value"] is not None:
+                try:
+                    matches_original = _normalize_scalar(field_value["original_value"]) == field_value["candidate_exact"]
+                except DomainError:
+                    matches_original = False
+                if not matches_original:
+                    diagnostic("transcription_mismatch", "The proposed exact value differs from its original spelling.")
+            proposed = field_value["candidate_exact"] or field_value["original_value"]
+            prior = existing.get(path)
+            equal = prior == proposed
+            if prior is not None and proposed is not None and _scalar_path(path):
+                try:
+                    equal = _normalize_scalar(prior) == _normalize_scalar(proposed)
+                except (ValueError, DomainError):
+                    equal = False
+            if prior is not None and not equal:
+                result["conflicts"].append({"field_path": path, "existing_value": prior, "proposed_value": proposed})
+                diagnostic("existing_value_conflict", "Choose explicitly between the retained existing value and controlled proposal.")
+        if len(result["diagnostics"]) > 50:
+            raise ProviderFailure("controlled_preview_diagnostic_limit")
+        # Reuse the existing candidate/locator validation, without pretending the
+        # manual authored fixture can enter today's Gemini-only intake route.
+        checked = IntakeProposalBody.model_validate({"source_asset_id": source_asset_id,
+            "source_digest": admitted.sha256, "current_revision_id": current_revision_id,
+            "fields": fields, "diagnostics": result["diagnostics"]})
+        result.update(fields=checked.model_dump()["fields"], diagnostics=checked.model_dump()["diagnostics"])
+        result["next_action"] = "review_controlled_preview"
+        return result
