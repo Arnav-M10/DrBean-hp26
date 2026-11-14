@@ -368,6 +368,11 @@ class BridgeTests(unittest.TestCase):
              {ref_id: "invalid", out_id: "valid"}, "certified_counterexample"),
             ("both_excluded", Fraction(100), allowance,
              {ref_id: "invalid", out_id: "invalid"}, "inconclusive"),
+            # This is a separately declared reading scope, not the positive
+            # design's selected time/allowance. A wider reviewed hard band can
+            # legitimately retain both original candidates.
+            ("both_compatible_changed_allowance", (centers[ref_id] + centers[out_id]) / 2, Fraction(100),
+             {ref_id: "valid", out_id: "valid"}, "certified_counterexample"),
             ("reference_unresolved", centers[ref_id], unresolved_allowance,
              {ref_id: "inconclusive", out_id: "invalid"}, "inconclusive"),
         )
