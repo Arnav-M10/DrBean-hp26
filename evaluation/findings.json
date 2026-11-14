@@ -1,9 +1,9 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T13:30:28Z",
-  "application_code_commit": "b8c5952",
-  "observed_at_harness_commit": "c51bbae",
+  "updated_at": "2026-11-14T13:55:53Z",
+  "application_code_commit": "299a356",
+  "observed_at_harness_commit": "bb503a7",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -1675,7 +1675,7 @@
       "id": "F-NARRATION-OVERSUPPRESSION",
       "severity": "P2",
       "owner": "A (narration guard in conversation/coordinator; was Owner 3)",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "title": "The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record",
       "minimal_input": "commentary_rejection('The returned design remains numerical guidance.', [{'id': 'design-evidence', 'problem_id': 'problem', 'design_tier': 'numerical_guidance'}]) and three similar limiting statements",
       "command": "local merge of PR #20 f3d424f + PR #28 623ae19: .venv/bin/python -m pytest tests/test_coordinator.py::test_separately_approved_design_has_one_completed_callback_observation",
@@ -1699,6 +1699,14 @@
           "evidence": {
             "pytest": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept: 4 xfailed (strict)",
             "backend": "704 passed"
+          }
+        },
+        {
+          "at_commit": "A's PR #42 head 051b4d6 (component branch on main 299a356; not merged), as local overlay fbc08ee = 051b4d6 + C harness f278de6, not pushed; isolated uv-locked .venv CPython 3.13.18; macOS 26.7 arm64; controlled, no provider",
+          "result": "Fix reproduced on the component branch. Policy evidence-bound-statements.v3 keeps all four correct limiting statements: the strict xfails turn into XPASS(strict), and with --runxfail 37/37 pass. C's 14 new converse cases are all withheld under v3 and under main's v2: wrong or absent status, split or conflicting records, context-only support, appended overclaims and a replay upgrade. The suite gives 51 passed on the overlay and 47 passed plus 4 strict xfails on main. Still present on main 299a356 (v2). This finding closes only after a retest on B's integrated candidate once the fix is merged.",
+          "evidence": {
+            "tests": "tests/integration/test_explanation_guard.py at f278de6 (marker scoped to v1/v2; converse cases test_limiting_statements_without_matching_cited_support_are_withheld)",
+            "preview": "evaluation/results/previews/pr42-051b4d6/README.md"
           }
         }
       ]
@@ -1919,9 +1927,34 @@
         "measurements": "zolleral_26: 9.39 MiB, 12 pages; sokolowskial_25: 18.19 MiB, 11 pages (local only, not committed)"
       },
       "retests": []
+    },
+    {
+      "id": "F-CI-BROWSER-CHECK-INTERMITTENT",
+      "severity": "P3",
+      "owner": "B (apps/web/check-backend.mjs and CI wiring)",
+      "status": "open",
+      "title": "B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s",
+      "minimal_input": "CI job 'browser review, approved design and native replay' (node apps/web/check-backend.mjs, BEAN_AI_MODE=placeholder) on the application tree of main 299a356",
+      "command": "GitHub Actions run 43599924443 (pull_request event, head d6d2792), job 132462300488",
+      "expected": "the browser check passes deterministically on an unchanged tree, or its failure names the state the page was in",
+      "observed": "locator.click: Timeout 30000ms exceeded while waiting for getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }) at apps/web/check-backend.mjs:156. The same application tree passed in the other 6 runs: d6d2792 push, be3d18d push and PR, 8580d3e push and PR, and main 299a356 push. That is 1 failure in 7 runs. It also passed locally on bb503a7. The cause is not determined, because no screenshot or page state is captured on failure.",
+      "impact": "a required CI job is intermittent, which can block or mask a merge decision. The step fails before source review, so later scientific steps were not exercised in that run. No data or authority impact was observed.",
+      "suggested_fix": "capture page state on timeout (screenshot, visible status text, last API response); check whether the button waits on an asynchronous source preview that can exceed 30 s on a loaded runner; then choose a deterministic wait condition or a longer bounded timeout",
+      "evidence": {
+        "failed_run": "43599924443 job 132462300488",
+        "passing_runs_same_application_tree": [
+          "43599921100",
+          "43600308045",
+          "43600313049",
+          "43598913026",
+          "43598918655",
+          "43594992900"
+        ]
+      },
+      "retests": []
     }
   ],
-  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed). 2026-11-14T13:30:28Z: added F-UPLOAD-LIMIT-MESSAGE (P3, B) from the PR #40 producer refusing both supplied papers with a generic boundary message.",
+  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed). 2026-11-14T13:30:28Z: added F-UPLOAD-LIMIT-MESSAGE (P3, B) from the PR #40 producer refusing both supplied papers with a generic boundary message. 2026-11-14T13:55:53Z: F-NARRATION-OVERSUPPRESSION fix reproduced on A's PR #42 051b4d6 (component overlay, not on main) and set to fixed_pending_retest; C's converse cases at f278de6 hold on v2 and v3. Added F-CI-BROWSER-CHECK-INTERMITTENT (P3, B). Header now names the 299a356 baseline (observed at bb503a7).",
   "check_catalog": {
     "note": "Finding ids that a check names when it fails. They are not observed findings: an id appears in `findings` only after a check actually failed or was blocked. Every id cited by evaluation/drbean_eval or tests/integration must be a finding or listed here (enforced by evaluation/tests).",
     "ids": {

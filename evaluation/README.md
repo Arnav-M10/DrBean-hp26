@@ -8,7 +8,10 @@ Standard-library Python, run with CPython 3.11. Owner: Workstream 5 (independent
 
 Frozen predicates: [coordinator/](coordinator/README.md). Baseline on main `299a356`:
 [results/integration/baseline-299a356.md](results/integration/baseline-299a356.md) (12 passed, 7 not_run, 35
-not_available, 0 failed; the durable coordinator and general-file producer do not exist yet).
+not_available, 0 failed; the durable coordinator and general-file producer do not exist yet). Revision 2
+([results/coordinator/baseline-299a356-r2.json](results/coordinator/baseline-299a356-r2.json)) re-observes the same
+tree at harness `f278de6` and corrects SCI-06's missing parts. Previews of unmerged A/B branches live under
+`results/previews/` (for example `pr42-051b4d6/`) and are never acceptance.
 
 ## Integrated acceptance checkpoint
 

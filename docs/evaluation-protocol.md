@@ -89,6 +89,12 @@ the exact reason), `historical_only` or `author_check` (a Claude-authored compon
 A missing producer is never a pass. Adaptivity is graded as acceptable sets of permitted next actions per
 tool-return condition. The four lanes and their permitted conclusions are unchanged.
 
+A corrected observation of the same candidate is a new revision file (`baseline-<candidate>-r<n>.json`) that
+names the file it supersedes and lists each correction; the earlier file is kept. The compiled-graph probe
+(`tests/integration/test_research_graph_inventory.py`) derives its forbidden tools and middleware from a default
+deep agent of the pinned SDK and compares the factory's actual `create_agent` input, compiled tool node and
+per-turn bound tools with the declared allowlist.
+
 ## Paper corpus, scoring and attack matrix
 
 - **Corpus (`evaluation/corpus/`).**

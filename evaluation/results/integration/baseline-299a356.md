@@ -103,3 +103,30 @@ sessions isolate the exercisable resources.
 2. Author the missing scientific cases: SCI-02, 05, 06, 07 and 08.
 3. Retest F-SESSION-CAPACITY-EXHAUSTION and the paper findings when fixes arrive; evaluate the producer B registers.
 4. Gate 6: qualify B's frozen integrated commit; then rehearse the evidence-bound demo.
+
+## Re-observation at f278de6 and erratum (revision 2)
+
+C harness commit `f278de6` added the research-graph inventory probe and 14 narration converse cases, and then re-ran
+the whole batch on the same application tree (clean):
+
+- acceptance 7/7;
+- controls 22/22;
+- `controlled_callbacks` `lane_0e9bd73a317346b8`: 102 passed, 5 xfail, 47 NOT_AVAILABLE;
+- `controlled_science` `lane_1d03512824e84417`: 18 passed, 11 NOT_AVAILABLE, 2 not_run;
+- `historical_replay` `lane_4105b81de56a45e3`: 176 replayed, 1 incompatible;
+- `gate --require release`: exit 0 (`evaluation/results/gates-latest.json`).
+
+Machine-readable: `evaluation/results/coordinator/baseline-299a356-r2.json`. Every predicate status is unchanged:
+12 passed, 7 not_run, 35 not_available.
+
+**Erratum (SCI-06).** The table above lists "inconclusive" among SCI-06's missing parts. That is wrong. RS-FOLLOWUP's
+`unresolved-reference` branch already exercised a genuinely inconclusive candidate check (verification
+`inconclusive`, reason `insufficient_enclosure`). It passed at `bb503a7` (attempt `att_a72b24cfeae847d7`). SCI-06
+stays `not_run` because only two parts are still missing: a legitimate both-compatible follow-up and the
+contradiction flag. Revision 2 records the correction; this file keeps the original table.
+
+**Preview of A's PR #42 `051b4d6`** (component branch, not a candidate): see
+`evaluation/results/previews/pr42-051b4d6/README.md`.
+- The F-NARRATION-OVERSUPPRESSION fix is reproduced there; the finding is now `fixed_pending_retest`.
+- The inventory probe passes 4/4 there.
+- New P3 finding for B: F-CI-BROWSER-CHECK-INTERMITTENT, one browser-check timeout in seven runs on this tree.

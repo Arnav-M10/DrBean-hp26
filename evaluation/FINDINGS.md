@@ -1,6 +1,6 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `299a356`, observed with harness `bb503a7` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
@@ -44,7 +44,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 | F-LEDGER-MALFORMED | P2 | 2 | retested | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
 | F-EXPLANATION-CHECKED-GATES | P2 | 3 | retested | 'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates |
 | H-GATE-CONTROLS-DIRTY | P1 | 5 | retested | native_engine_controls gate admitted dirty (and otherwise unqualified) control records |
-| F-NARRATION-OVERSUPPRESSION | P2 | A (narration guard in conversation/coordinator; was Owner 3) | open | The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record |
+| F-NARRATION-OVERSUPPRESSION | P2 | A (narration guard in conversation/coordinator; was Owner 3) | fixed_pending_retest | The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record |
 | H-SOURCE-RETRY-KEY | P2 | 5 | retested | Harness source-review test treated a new idempotency key as a retry |
 | F-PAPER-CITATION-SUBSTRING | P1 | A (PR #35 paper proposal validator; was Owner 3) | open | A paper citation that is only a fragment of a longer printed number is accepted as the exact cited value (4.6 for 4.62; 538 ng/mL for 5380 ng/mL) |
 | F-PAPER-QUOTE-NORMALIZATION | P2 | A (PR #35 validator) with B (file services; was Owners 3 and 4) | open | An authentic quote that crosses a text-layer line break, or uses an NFKC-equivalent character (µ U+00B5 vs μ U+03BC), discards the whole paper proposal |
@@ -56,6 +56,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 | F-SESSION-CAPACITY-EXHAUSTION | P2 | B (private browser sessions, shared gateway) | open | Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors |
 | H-LAUNCHER-OPTIN-FORMAT | P3 | C (harness) | retested | The launcher opt-in doctor test assumed PR #36's opt-in file format and wording, so it failed against main's stricter launcher |
 | F-UPLOAD-LIMIT-MESSAGE | P3 | B (upload boundary and general-file admission) | open | An oversized research upload is refused with a generic message that names neither the size limit nor the other limits the file exceeds |
+| F-CI-BROWSER-CHECK-INTERMITTENT | P3 | B (apps/web/check-backend.mjs and CI wiring) | open | B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -422,7 +423,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** The candidate's control record is clean, executed acceptance, CPython 3.11.17, engine 0.3.0 imported from the repository with a matching source digest; the fixed gate admits it (22/22). (evidence: {"controls": "evaluation/results/controls.jsonl (tested_commit e791e91)"})
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls. (evidence: {"attempts": ["att_b6fc5431663f4693", "att_f66513d7ec274c82", "att_917faf93b8a14f96", "att_17ae63064bb84863"]})
 
-## F-NARRATION-OVERSUPPRESSION (P2, owner A (narration guard in conversation/coordinator; was Owner 3), open)
+## F-NARRATION-OVERSUPPRESSION (P2, owner A (narration guard in conversation/coordinator; was Owner 3), fixed_pending_retest)
 
 - **Input:** commentary_rejection('The returned design remains numerical guidance.', [{'id': 'design-evidence', 'problem_id': 'problem', 'design_tier': 'numerical_guidance'}]) and three similar limiting statements
 - **Command:** `local merge of PR #20 f3d424f + PR #28 623ae19: .venv/bin/python -m pytest tests/test_coordinator.py::test_separately_approved_design_has_one_completed_callback_observation`
@@ -431,6 +432,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Evidence:** {"combined_backend": "1 failed, 688 passed at local merge 6a69a55", "tests": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept (strict xfail under the declared policy; passes on main)"}
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Main 22c9a24 has PR #27's source review but neither PR #20's coordinator change nor PR #28; the conflict between those two open PRs is unchanged. (evidence: {})
 - **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Still present on main b8c5952: the evidence-bound guard withholds all four correct limiting statements (4 strict xfails hold). The cross-PR coordinator failure is resolved: PR #32 changed the coordinator fixture to neutral narration (eaa9d809), and the backend suite passes (704). The finding is narrowed to useful narration being suppressed; nothing is overclaimed. (evidence: {"backend": "704 passed", "pytest": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept: 4 xfailed (strict)"})
+- **Retest at A's PR #42 head 051b4d6 (component branch on main 299a356; not merged), as local overlay fbc08ee = 051b4d6 + C harness f278de6, not pushed; isolated uv-locked .venv CPython 3.13.18; macOS 26.7 arm64; controlled, no provider:** Fix reproduced on the component branch. Policy evidence-bound-statements.v3 keeps all four correct limiting statements: the strict xfails turn into XPASS(strict), and with --runxfail 37/37 pass. C's 14 new converse cases are all withheld under v3 and under main's v2: wrong or absent status, split or conflicting records, context-only support, appended overclaims and a replay upgrade. The suite gives 51 passed on the overlay and 47 passed plus 4 strict xfails on main. Still present on main 299a356 (v2). This finding closes only after a retest on B's integrated candidate once the fix is merged. (evidence: {"preview": "evaluation/results/previews/pr42-051b4d6/README.md", "tests": "tests/integration/test_explanation_guard.py at f278de6 (marker scoped to v1/v2; converse cases test_limiting_statements_without_matching_cited_support_are_withheld)"})
 
 ## F-PAPER-CITATION-SUBSTRING (P1, owner A (PR #35 paper proposal validator; was Owner 3), open)
 
@@ -514,6 +516,14 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Expected:** an accurate, useful refusal (brief S8, predicate FILE-02): name the 5 MiB per-file limit and, for these papers, that they also exceed the 10-page limit; nothing truncated
 - **Observed:** 413 request_too_large 'Request exceeds the admitted byte limit.' for both papers, from the RequestBoundary middleware; the advertised capabilities state max_file_bytes 5242880 and max_pdf_pages 10. Nothing is truncated or analysed (honest). The merged UI pre-validates selection and shows a clear 5 MiB message, so only API callers see the generic text
 - **Evidence:** {"candidate": "PR #40 producer (author check: Claude authored PR #40; production maintenance is B's)", "measurements": "zolleral_26: 9.39 MiB, 12 pages; sokolowskial_25: 18.19 MiB, 11 pages (local only, not committed)"}
+
+## F-CI-BROWSER-CHECK-INTERMITTENT (P3, owner B (apps/web/check-backend.mjs and CI wiring), open)
+
+- **Input:** CI job 'browser review, approved design and native replay' (node apps/web/check-backend.mjs, BEAN_AI_MODE=placeholder) on the application tree of main 299a356
+- **Command:** `GitHub Actions run 43599924443 (pull_request event, head d6d2792), job 132462300488`
+- **Expected:** the browser check passes deterministically on an unchanged tree, or its failure names the state the page was in
+- **Observed:** locator.click: Timeout 30000ms exceeded while waiting for getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }) at apps/web/check-backend.mjs:156. The same application tree passed in the other 6 runs: d6d2792 push, be3d18d push and PR, 8580d3e push and PR, and main 299a356 push. That is 1 failure in 7 runs. It also passed locally on bb503a7. The cause is not determined, because no screenshot or page state is captured on failure.
+- **Evidence:** {"failed_run": "43599924443 job 132462300488", "passing_runs_same_application_tree": ["43599921100", "43600308045", "43600313049", "43598913026", "43598918655", "43594992900"]}
 
 ## Check-level finding ids (raised only when the check fails)
 
