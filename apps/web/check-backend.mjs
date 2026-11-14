@@ -134,7 +134,8 @@ try {
   await page.locator('#source-image-file').setInputFiles(join(root, 'evaluation/sources/c01a.png'))
   await page.selectOption('#source-origin', 'synthetic')
   await page.getByRole('button', { name: 'Upload source for inspection', exact: true }).click()
-  await page.waitForFunction(() => /Retained source source_/.test(document.querySelector('#source-review').textContent))
+  await page.waitForFunction(() => /Retained source /.test(document.querySelector('#source-review').textContent) || !document.querySelector('#backend-error').hidden)
+  assert.equal(await page.locator('#backend-error').isVisible(), false, await page.locator('#backend-error').textContent())
   const sourceId = (await page.locator('#source-review').textContent()).match(/Retained source (source_[a-zA-Z0-9_]+)/)[1]
   const fixture = start(python, ['scripts/release/controlled_source_proposal.py', 'web-test', workspace, sourceId])
   assert.equal(await waitForExit(fixture), 0, fixture.output)

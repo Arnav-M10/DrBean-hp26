@@ -13,10 +13,11 @@ function assumptionValues(dataset, problem) {
 }
 
 export function setupSourceWorkflow({ context, getDraft, button, node, exactRecord, useInputs }) {
-  let source, imageUrl, proposal, review, fields = [], resolved = new Set(), proposalId = '', explanation = '', prepared, materialized
+  let source, imageUrl, proposal, review, fields = [], resolved = new Set(), proposalId = '', explanation = '', prepared, materialized, selectedFile, selectedOrigin = '', previewDraft
   function reset() {
     if (imageUrl) URL.revokeObjectURL(imageUrl)
     source = imageUrl = proposal = review = prepared = materialized = undefined
+    selectedFile = previewDraft = undefined; selectedOrigin = ''
     fields = []; resolved = new Set(); proposalId = explanation = ''
   }
   async function showSource(record) {
@@ -33,15 +34,19 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
     section.append(node('h3', 'Source and value review'), node('p', 'Gemini is a disabled placeholder. Upload retains a source locally without extraction or scientific approval. Enter measurements manually when no reviewed proposal is available.'))
     const fileLabel = node('label', 'Public or synthetic source image'); fileLabel.className = 'stack'
     const file = node('input', ''); file.type = 'file'; file.accept = 'image/png,image/jpeg'; file.id = 'source-image-file'; file.disabled = busy
+    file.addEventListener('change', () => { selectedFile = file.files[0] })
+    if (selectedFile) fileLabel.append(node('span', selectedFile.name))
     fileLabel.append(file); section.append(fileLabel)
     const originLabel = node('label', 'Source origin'); originLabel.className = 'stack'
     const origin = node('select', ''); origin.id = 'source-origin'
     for (const [value, text] of [['', 'Choose origin'], ['synthetic', 'Synthetic'], ['public', 'Public']]) { const option = node('option', text); option.value = value; origin.append(option) }
+    origin.value = selectedOrigin; origin.disabled = busy
+    origin.addEventListener('change', () => { selectedOrigin = origin.value })
     originLabel.append(origin); section.append(originLabel)
     button(section, 'Upload source for inspection', async () => {
-      const selected = file.files[0]
+      const selected = selectedFile
       if (!selected) throw new Error('Choose a source image first.')
-      const record = await api.uploadSource(workspace, selected, origin.value)
+      const record = await api.uploadSource(workspace, selected, selectedOrigin)
       reset(); await showSource(record)
     }, !api || !workspace)
     if (source) {
@@ -70,7 +75,7 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
         control.addEventListener('input', () => { field[key] = control.value }); label.append(control); section.append(label)
       }
       const label = node('label', `${field.field_path} value origin`); label.className = 'stack'
-      const select = node('select', ''); select.disabled = busy || Boolean(review)
+      const select = node('select', ''); select.setAttribute('aria-label', field.field_path + ' value origin'); select.disabled = busy || Boolean(review)
       for (const [value, text] of [['confirmed_transcription', 'Confirmed transcription'], ['corrected_transcription', 'Corrected transcription'], ['human_assumption', 'Human assumption']]) { const option = node('option', text); option.value = value; select.append(option) }
       select.value = field.origin; select.addEventListener('change', () => { field.origin = select.value }); label.append(select); section.append(label)
     })
@@ -92,6 +97,7 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
     button(section, 'Preview source-bound inputs', () => {
       if (!explanation.trim()) throw new Error('Explain the remaining manually reviewed inputs and assumptions.')
       const draft = getDraft(), dataset = datasetBody(draft, draft.context), complete = problemBody(draft, { id: '', digest: '' })
+      previewDraft = JSON.stringify(draft)
       const { schema_version, dataset_id, dataset_digest, ...problem } = complete
       prepared = { expected_review_digest: review.digest, dataset, problem, human_assumptions: Object.fromEntries(Object.keys(assumptionValues(dataset, problem)).map(path => [path, explanation.trim()])) }
     }, Boolean(prepared))
@@ -99,6 +105,7 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
     button(section, 'Revise source-bound input preview', () => { prepared = materialized = undefined })
     section.append(exactRecord('Exact source-bound input preview and assumption explanations', prepared))
     button(section, 'Accept preview and prepare investigation plan', async () => {
+      if (JSON.stringify(getDraft()) !== previewDraft) throw new Error('Measurements or question changed. Revise the source-bound input preview before continuing.')
       materialized = materialized ?? await api.json(`/workspaces/${workspace}/intake-reviews/${review.id}/materialize`, prepared)
       await useInputs(materialized)
     })

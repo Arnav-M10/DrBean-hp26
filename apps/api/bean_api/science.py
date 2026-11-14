@@ -205,16 +205,24 @@ def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], 
         # Closing the sole writer also lets the guard clean up if signalling
         # from this parent fails unexpectedly.
         parent_lifeline.close()
-        if owned_session:
-            _kill_owned_session(process)
-        elif process.is_alive():
+        try:
+            if owned_session:
+                _kill_owned_session(process)
+            elif process.is_alive():
+                try:
+                    if os.getpgid(process.pid) == process.pid:
+                        _kill_owned_session(process)
+                    else:
+                        process.kill()
+                except ProcessLookupError:
+                    pass
+        finally:
+            # Retain the real signalling error, but still release transport
+            # handles. Closing a still-live Process would mask that error with
+            # ValueError; leave it registered for explicit reconciliation.
             try:
-                if os.getpgid(process.pid) == process.pid:
-                    _kill_owned_session(process)
-                else:
-                    process.kill()
-            except ProcessLookupError:
-                pass
-        process.join(timeout=2)
-        receiver.close()
-        process.close()
+                process.join(timeout=2)
+            finally:
+                receiver.close()
+                if not process.is_alive():
+                    process.close()

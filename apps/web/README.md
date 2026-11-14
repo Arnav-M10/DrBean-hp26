@@ -34,7 +34,7 @@ python3.11 -m counterdex replay-native dr-bean-ARTIFACT.native.json --anchors dr
 
 The anchors provide separately retained expected application/run identities. A matching hash establishes byte integrity, not mathematical validity. Native replay recomputes the supported predicates using the matching engine source. This is fresh checking by the same mathematical implementation, not an independently implemented checker. Browser replay remains unavailable.
 
-Keep a run identifier to reopen authenticated history after reconnecting. A report freezes the selected run and its evidence inventory. Measurement/question drafts remain tab-local; **Download draft** preserves them before closing the tab. Design drafts remain in memory until prepared as an immutable server plan. Follow-up observations and public sharing remain outside this screen.
+Keep a run identifier to reopen authenticated history after reconnecting. A report freezes the selected run and its evidence inventory. Measurement/question drafts remain tab-local; **Download draft** preserves them before closing the tab. Design drafts remain in memory until prepared as an immutable server plan. Hypothetical follow-up observations are supported below. Public sharing remains unavailable.
 
 ## Next-measurement design
 
@@ -63,3 +63,11 @@ Playwright is found through Node's normal resolution or `NODE_PATH`; `PLAYWRIGHT
 ## Hypothetical follow-up
 
 Open a completed checked-separation design, enter a hypothetical concentration and explain its choice. Prepare and inspect the observation, explicitly accept it as a new dataset revision, then prepare and separately approve the follow-up plan before queueing. The flow retains the selected design time and allowance and rechecks the original pair. Open the returned run identifier to retrieve candidate-specific feedback and native evidence. Actual acquisition and changed time/allowance remain outside this admitted flow. The original evidence remains immutable.
+
+## Retained source review
+
+Upload a public or synthetic PNG/JPEG and choose its origin explicitly. The retained image is displayed for inspection; upload does not extract values or approve science. Gemini remains disabled. If no controlled proposal exists, continue with manual entry.
+
+Open an existing intake proposal from this workspace. Compare every original/proposed value and locator against the displayed image, record corrections and reasons, and resolve blocking diagnostics. Accept the source review, then complete the Measurements and Question draft with matching values. Explain the remaining manual assumptions and inspect the exact source-bound preview before accepting it. Changing the draft requires a new preview. The resulting investigation plan still requires separate approval.
+
+The browser regression creates a clearly labeled controlled intake proposal using a test-only CLI. Subsequent source review, input materialization, discovery, design, follow-up, and replay use the real application and engine; no scientific result is supplied by the fixture.

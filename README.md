@@ -6,7 +6,7 @@ This README states what the repository does at the tested commit. Status by gate
 
 ## Current state in one paragraph
 
-The API, worker and web workspace start with one command and survive a restart. An approved baseline runs the real engine and returns scoped results with native evidence that replays in a separate process. The browser supports reviewed exact inputs, frozen plans, separate approvals, actual baseline and next-measurement design, history and native downloads. Backend follow-up checks retain the original pair and a separately reviewed reading. Source-review and follow-up browser controls remain pending, so the full usable-release gate is incomplete. The independent HTTP suite is delivered; qualification depends on its retained results for the current commit. Counterdex also works offline on CPython 3.11. **Gemini remains a disabled placeholder. The launcher removes provider configuration, and offline acceptance checks verify zero model-provider dispatch.**
+The API, worker and web workspace start with one command and survive a restart. An approved baseline runs the real engine and returns scoped results with native evidence that replays in a separate process. The browser supports reviewed exact inputs, frozen plans, separate approvals, actual baseline and next-measurement design, history and native downloads. Backend follow-up checks retain the original pair and a separately reviewed reading. The browser also supports retained-source inspection, controlled proposal correction/materialization and hypothetical follow-up revisions. Strict clean-checkout release qualification is tracked separately. The independent HTTP suite is delivered; qualification depends on its retained results for the current commit. Counterdex also works offline on CPython 3.11. **Gemini remains a disabled placeholder. The launcher removes provider configuration, and offline acceptance checks verify zero model-provider dispatch.**
 
 ## Run it
 
@@ -45,14 +45,14 @@ If a start fails, the launcher prints the log tail and stops what it started. Po
 | Area | State | Check |
 |---|---|---|
 | One-command launch, restart, reopen evidence, credential and origin refusal | works | `python3 scripts/release/stack_smoke.py` (31 checks, isolated store) |
-| Manual HTTP path: dataset, problem, plan, approval, one run, report | works; result is `unsupported` | same smoke; `uv run pytest -q` (264 backend tests) |
+| Manual HTTP path: dataset, problem, plan, approval, one run, report | works with real Counterdex discovery | `stack_smoke.py --require-science`; backend and HTTP tests |
 | Browser to API: plan, approval, run retrieval, downloads | works | `node apps/web/check-backend.mjs` |
 | Web editor: exact entry, validation, export | works | `node --test` in `apps/web`; `tests/integration/web_manual_smoke.mjs` |
 | Counterdex engine standalone: candidate discovery, exact check, fixed-pair design, native replay | works on CPython 3.11 | 257 engine tests; replay of the prepared synthetic bundle |
 | Source intake and review, deepagents graph | backend-tested with **controlled placeholder** models only | backend tests |
-| Baseline discovery through the API and browser | works (as root locally; CI is the non-root lane) | `stack_smoke.py --require-science`; `node apps/web/check-backend.mjs` |
-| Design, native export and replay through the API (gate G2) | backend-tested from a seeded regression pair only; unreachable over ordinary HTTP until discovery exists | backend tests |
-| Browser controls for source review, design and follow-up | **not built** (waits for G1) | |
+| Baseline discovery through the API and browser | works with the prepared engine interpreter | `stack_smoke.py --require-science`; `node apps/web/check-backend.mjs` |
+| Design, native export and replay through the API (gate G2) | real discovered pair, separate approval, native replay | backend tests |
+| Browser controls for source review, design and follow-up | implemented; controlled source proposal, real science and hypothetical follow-up | `node apps/web/check-backend.mjs` |
 | Live Gemini | **not run; disabled** | |
 
 ```sh

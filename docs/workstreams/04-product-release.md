@@ -109,3 +109,10 @@ Base `4b5f1f5`. Added a dedicated browser job using the existing pinned integrat
 ## Hypothetical follow-up browser checkpoint
 
 Added a browser path from a checked design to an explicitly hypothetical observation, reviewed dataset revision, new fixed-pair plan, separate approval and queued run. Existing run lookup renders candidate feedback and downloads. Extended the real browser CI check through this path and checks preserved design identity. Thirty existing web tests pass locally; full browser qualification is delegated to the existing clean CI job. Actual acquisition and off-design readings remain unsupported by this flow.
+
+
+## 2026-11-14 — source review integration
+
+PR #27 adds retained-source inspection and explicit controlled proposal review, correction, assumption preview and accepted input materialization. Upload selections survive action rendering; changed drafts require a new source-bound preview. The real local browser/API/worker check passed on the target Mac environment with prepared interpreters and Chromium, including real discovery, separately approved positive/no-separation design, hypothetical follow-up and native replay. All 31 web unit tests passed.
+
+Release automation now consumes that actual browser outcome for source and follow-up gates (fast mode remains unrun). Independent clean-checkout qualification is next. Actual acquisition UI remains pending. Consultation, observed task and device rehearsal are explicitly not performed; software comes first per user direction.

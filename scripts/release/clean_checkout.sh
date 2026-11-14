@@ -61,4 +61,13 @@ else
   run_clean node tests/integration/node_modules/playwright/cli.js install chromium
 fi
 git status --porcelain | grep -q . && { echo "setup modified tracked files or left untracked ones:"; git status --porcelain; exit 1; }
-run_clean python3 scripts/release/checklist.py "$@"
+# Retain a new qualification record outside the disposable clone when requested.
+status=0
+run_clean python3 scripts/release/checklist.py "$@" --record || status=$?
+if [ -n "${DRBEAN_RELEASE_EVIDENCE_DIR:-}" ]; then
+  mkdir -p "$DRBEAN_RELEASE_EVIDENCE_DIR"
+  evidence="$DRBEAN_RELEASE_EVIDENCE_DIR/clean-checkout-$commit-$(date -u +%Y%m%dT%H%M%SZ)-$$.json"
+  cp docs/release-evidence/release-checklist.json "$evidence"
+  echo "Retained qualification: $evidence"
+fi
+exit "$status"
