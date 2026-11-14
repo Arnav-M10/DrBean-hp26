@@ -76,3 +76,23 @@ Test log prefixes in this workspace: `/tmp/integration-final-*`.
 - Next: preserve any newer Claude tests/findings, resolve concrete matrix failures,
   and update this record with the actual Mac SHA/runtime/results. Backend checks
   alone do not establish whole-release readiness. No automatic merge authorized here.
+# Current task: source handoff integration
+
+Branch `backend/source-handoff`, base main `2d2993d`. New researcher features
+are paused. Main already contains the reconciled recovery, handle cleanup,
+conservative ledger and current native science routing; they are reused.
+
+- Works on the inspected branches: PR #20 implements controlled-source intake,
+  ordinary review/materialization, and truthful fixture authorship. Its intake
+  commit `c20d849` and standalone metadata correction `e4c3c20` are reused here.
+- Contract published: [source handoff](../../shared/contracts/SOURCE_HANDOFF.md).
+  Owners 3/4 retain proposal-generation/browser ownership respectively.
+- Current: challenge source/revision binding, diagnostics, immutable acceptance,
+  retries/interruption, corrected inputs → real science → fresh native replay.
+- Blocked/pending: new candidate tests and exact macOS qualification; Claude's
+  combined acceptance remains separate. No provider calls or credential reads.
+- PR audit: #21's production fixes are already in main; #14 is obsolete. #20
+  has unique controlled intake and separate coordinator accounting work; #22
+  has evaluator work, #27 browser work, and #28 explanation work. Do not merge
+  those stacks wholesale to obtain this backend seam.
+
