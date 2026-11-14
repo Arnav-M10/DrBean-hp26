@@ -160,3 +160,35 @@ DRBEAN_RELEASE_EVIDENCE_DIR=/absolute/path/to/release-evidence \
 The command installs locked dependencies in a fresh clone, runs the offline gates with isolated state, and copies a timestamped report for the exact tested commit before cleanup, including on gate failure. Existing historical reports are not rewritten. Inspect `offline_release_ready`, individual checks, platform facts and tested commit together. A source fixture is controlled intake output; the science and replay checks execute the actual engine. The release verdict does not qualify live Gemini or substitute for a human consultation, observed task, or presentation rehearsal.
 
 The source-example option configures only the packaged trusted local manifest. The web action uses the ordinary intake route; unsupported images offer manual entry. Omit the flag to keep source proposals disabled. No hosted provider is enabled.
+
+## Papers (PDF) — Owner 4 slice, requires Owner 2's routes
+
+Status at `owner4/papers`: parser, storage service, browser panel and checks are committed. The routes are a **proposed patch** (`docs/proposals/owner2-paper-routes.patch`) that Owner 2 must review and apply together with pinning `pypdf==7.1.0` and `pypdfium2==5.15.2` in `uv.lock`. Until then the paper panel says the server does not accept papers, and the paper tests and browser check report skip or unrun, never pass.
+
+To try the whole path before Owner 2 merges it (scratch only, do not push):
+
+```sh
+git apply docs/proposals/owner2-paper-routes.patch
+```
+
+```sh
+uv pip install --python .venv/bin/python pypdf==7.1.0 pypdfium2==5.15.2
+```
+
+```sh
+.venv/bin/python -m pytest -q tests/test_papers_admission.py tests/test_papers_service.py tests/test_papers_http.py
+```
+
+```sh
+BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python" node apps/web/check-paper.mjs
+```
+
+Limits: one PDF up to 20 MiB and 50 pages; 8 pages per model batch. Uploading, reading pages and selecting pages send nothing to a model. Scanned pages are reported as having no text layer; there is no OCR. Document scripts, attachments and links are reported and never run.
+
+Fixtures: `fixtures/papers/` (synthetic native-text paper, its scan, a statistical trap, an unsupported study with injected approval text) with `manifest.json`. All are authored test papers, not publications. Regenerate with `node fixtures/papers/build/render_papers.mjs` and update the digests together.
+
+## Live Gemini opt-in (launcher side only)
+
+Copy `scripts/dev/gemini.local.example.json` to `var/gemini.local.json`, `chmod 600` it, fill in the key and model, and set `"mode": "live"`. It is read as JSON with an allowlist of keys, never shell-sourced. The key reaches only the API and worker. `scripts/dev/doctor.py` reports: absent, invalid, disabled, missing key, or configured, whether the server itself enables dispatch, and a live check only from a recorded completed run.
+
+**The current server still disables dispatch in code** (`providers.py`, `main.py`): opting in at the launcher does not make any provider call until Owners 2 and 3 land the live path, the research-session budget and consent. A live qualification is `not_run`.

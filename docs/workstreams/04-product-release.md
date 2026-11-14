@@ -137,3 +137,34 @@ Fresh combined strict clean checkout and CI are running. Earlier reports remain 
 Final combined qualification: c4d1ad6 / published 31a8ed3, all 5 gates and 12 boundaries passed. Full immutable report and code/tree mapping are in docs/release-evidence/offline-c4d1ad6-macos.json and product-candidate.json. Exact commands for Claude are in product-qualification-handoff.md. Only evidence/docs change after this code candidate; independent acceptance, consultation, observed task and device rehearsal remain pending.
 
 CI on the documentation follow-up 129408e exposed a Playwright response-body race after automatic navigation. Runner-only correction d55ff94 reads the visible run status instead and preserves every scientific assertion. The actual browser rerun passed locally and in CI. Latest exact qualification commands name d55ff94; earlier reports retain their original identities.
+
+## Paper sprint (14 November, from `main` `cbfa5ef`), branch `owner4/papers` → pushed to `claude/dreamy-lamport-dsttgm`
+
+Delivered (owned files only):
+
+- `apps/api/bean_api/papers/`: bounded PDF admission in a separate process (20 MiB, 50 pages, CPU/memory/time/output limits, minimal environment), deterministic manifest (source digest, physical pages apart from printed labels, page sizes, coordinate conventions, per-page text hashes, text-layer coverage, warnings), page previews (4 MP cap), selected-page subsets (8 per batch) with their own digest and mapping, citation checks (text occurrence, wrong page, not found, no text layer; box validation; render transform including rotation), and `PaperService` using existing Workflow primitives only.
+- Tests: `test_papers_admission.py` 25, `test_papers_service.py` 7, `test_papers_http.py` 4 (skip until routes). Launcher tests 16.
+- Fixtures: four authored PDFs and `fixtures/papers/manifest.json`.
+- Web: paper panel (`paper-workflow.mjs`, `paper.mjs`, 5 unit tests); `check-paper.mjs` real-browser check.
+- Launcher: live opt-in file, key to API and worker only, doctor states.
+- Requests: `docs/proposals/owner2-paper-interface.md` and `owner2-paper-routes.patch`.
+
+Fresh results (Linux x86_64, root):
+
+| Command | Result |
+|---|---|
+| `.venv/bin/python -m pytest -q tests/test_papers_admission.py tests/test_papers_service.py` (pypdf/pypdfium2 installed locally, not locked) | 32 passed |
+| same plus `tests/test_papers_http.py` on a scratch tree with the patch applied | 36 passed; full backend suite there: 655 passed |
+| `node --test apps/web/*.test.mjs` | 41 passed |
+| `node apps/web/check-paper.mjs` on the patched scratch tree | 31/31 (real certified counterexample from paper-cited, hand-entered inputs; zero provider attempts) |
+| `node apps/web/check-paper.mjs` on this branch alone | unrun: no paper routes |
+| `node apps/web/check-backend.mjs` on the patched scratch tree | passed |
+| `python3 -m unittest scripts/dev/test_launcher.py` | 16 passed |
+
+Not done (and why):
+
+- Model-assisted paper extraction, paper proposals and paper-review materialization: need Owner 2's paper proposal contract and Owner 3's gateway (interface request §5). The browser offers page-cited manual entry instead.
+- `research_session_id`, shared 12/24 request ceilings, live consent UI: Owner 2/3 contracts not published yet.
+- Agent progress, next measurement and follow-up for papers: unchanged existing flows; not yet linked to a paper claim record.
+- Real public paper: not fetched; this session's network allows package registries only.
+- Live qualification: `not_run`.
