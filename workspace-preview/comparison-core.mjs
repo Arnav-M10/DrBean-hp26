@@ -55,5 +55,5 @@ export class ComparisonState{
  begin(){if(this.busy)throw new Error('A comparison is already in progress.');if(!this.reviewed||this.reviewed.revision!==this.revision||canonical(this.reviewed.input)!==canonical(approved(this.draft)))throw new Error('Review the current inputs before comparing.');const r=this.reviewed;const key=this.pending.get(r.digest)||crypto.randomUUID();this.pending.set(r.digest,key);this.operation={...clone(r),key};this.busy=true;this.error='';return this.operation;}
  accept(record,operation){if(this.operation!==operation)return false;validateRecord(record,operation.input,operation.digest);this.keep(record);this.record=clone(record);this.busy=false;return true;}
  keep(record){validateRecord(record);const earlier=this.history.find(r=>r.id===record.id);if(earlier&&canonical(earlier)!==canonical(record))throw new Error('An immutable comparison identity changed. Earlier evidence is retained.');if(!earlier)this.history.push(clone(record));}
- clearIdentity(){this.history=[];this.record=null;this.pending.clear();this.operation=null;this.busy=false;this.reviewed=null;}
+ clearIdentity(){this.history=[];this.record=null;this.pending.clear();this.operation=null;this.busy=false;this.reviewed=null;this.error='';}
 }

@@ -66,7 +66,7 @@ async function connect({startNew=false}={}){
  finally{if(epoch===connectionEpoch){$('connect').disabled=false;sync();}}
 }
 function renderResult(){
- const record=state.record;$('result-empty').hidden=!!record;$('result-content').hidden=!record;if(!record)return;
+ const record=state.record;$('result-empty').hidden=!!record;$('result-content').hidden=!record;if(!record){$('result-panel').replaceChildren();$('result-history').replaceChildren();$('result-binding').textContent='';return;}
  const b=record.body;noiseIndex=Math.max(0,Math.min(noiseIndex,b.noise_sweep.length-1));$('result-status').textContent=`Numerical comparison — ${b.status}`;
  document.querySelectorAll('[data-result]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.result===resultTab)));
  let html=failureView(b);
