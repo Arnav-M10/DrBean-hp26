@@ -128,12 +128,21 @@ Run with `BEAN_AI_MODE=placeholder`, a CPython 3.11 `.venv-engine` and a 3.13 `.
 - After merging main `e0e4269` (PR #48, guided journey), I reran on the merged branch:
   - **Still passing:** web unit tests 82/82; focused research and backend suites 314 passed;
     the plan-chip assertions (Done, Done, Suggested, then Done ×3, Suggested).
-  - **Failing:** `check-research.mjs` passes 5/7 and then times out waiting for the native
-    download on the PR #48 Result/Next-measurement pages. It times out identically on
-    **unmodified `e0e4269`**, so this is a PR #48 regression for owner 3, not this change.
-  - **Main's own CI** has been red since PR #46/#48. The manual-editor browser smoke times out,
-    and `test_research_authority.py::test_concurrent_additive_migration_preserves_legacy_metadata`
-    fails intermittently with `database is locked` on CI (it passes locally).
+  - **Failing at that point:** `check-research.mjs` passed 5/7 and then timed out waiting for
+    the native download on the PR #48 Result/Next-measurement pages. It timed out identically on
+    **unmodified `e0e4269`**, so this was a PR #48 regression, not this change.
+  - **Main's own CI** was red after PR #46/#48. The manual-editor browser smoke timed out, and
+    `test_research_authority.py::test_concurrent_additive_migration_preserves_legacy_metadata`
+    failed intermittently with `database is locked` on CI (it passes locally).
+- **Final integrated main `198337f`:**
+  - This PR merged as `64b6fcd`, and owner 1 then integrated PR #47 on top.
+  - **Main CI is green on all 8 jobs**, including the research browser walkthrough, the backend
+    suite and automatic private sessions.
+  - On that exact commit, the agent suites give 316 passed and the predeclared live sample
+    again completes at 57,206 reserved input tokens through the metered path.
+  - During integration, owner 1 made the completed-step reason neutral ("after it read the cited
+    evidence"), since the evidence can be inconclusive. They also added a check that reading
+    unresolved or numerical-only results never makes them checked.
 
 ## Two-minute sponsor walkthrough
 
