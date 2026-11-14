@@ -4,7 +4,7 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 
 - Manifest version 3 (ancestry: v1, v2), contract GF-2 / DB-SC-1
 - Holdouts: prepared and sealed by digest; not used for prompt tuning; ungraded
-- Attempts recorded: 76; history verification: OK
+- Attempts recorded: 77; history verification: OK
 - Live activation: disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared accounted allocation, Owner 3's operator path and independent grading of predeclared cases. The CLI has no switch for it.
 
 ## Lanes
@@ -15,13 +15,13 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 | live_intake | 1 | NOT_RUN (disabled) | live | any | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | live_agent_controlled_tools | 1 | NOT_RUN (disabled) | live | controlled | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | actual_full_stack | 1 | NOT_RUN (disabled) | live | real | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
-| offline_real_science | 1 | yes | none/controlled | real | 7 | 42 | 13 | 15 | 14 | 0 | 0 | 0 | 0 | 0 |
+| offline_real_science | 1 | yes | none/controlled | real | 7 | 43 | 14 | 15 | 14 | 0 | 0 | 0 | 0 | 0 |
 
 Records with manifest_version 1 / harness 0.1.0 are the pre-merge inventory: 34 entries recorded before the backend and science package were merged, all `unrun` with a stale reason. They are kept byte-for-byte and interpreted as written, never relabelled as current results.
 
 Evidence classes: `executed_acceptance` (the runner executed the subject against a stack it launched and re-verified the evidence), `imported_claim` (recorded observations; never qualification).
 
-Evidence class counts (harness >= 0.2.0): executed_acceptance: 42.
+Evidence class counts (harness >= 0.2.0): executed_acceptance: 43.
 
 ## Latest attempt per scheduled entry
 
@@ -66,13 +66,13 @@ Evidence class counts (harness >= 0.2.0): executed_acceptance: 42.
 | offline_real_science | RS-DESIGN-AUTHORITY | unrun | 8bb1fbeb13 | False | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
 | offline_real_science | RS-FOLLOWUP | unrun | 8bb1fbeb13 | False | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
 | offline_real_science | RS-HERO-FULL | failed | 8bb1fbeb13 | False | failed: baseline_completed_with_evidence |
-| offline_real_science | RS-RETRY-CONCURRENT | passed | 8bb1fbeb13 | False |  |
+| offline_real_science | RS-RETRY-CONCURRENT | passed | f8cf08a60a | False |  |
 | offline_real_science | RS-ZERO-DISPATCH | passed | 8bb1fbeb13 | False |  |
 
 ## Scientific jobs and external model requests (separate counts)
 
-- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 33. These are actual local computations attempted by the real worker; at this commit they fail before scientific computation (see findings).
-- External model requests: verified zero by the egress guard in 42 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
+- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 34. These are actual local computations attempted by the real worker; at this commit they fail before scientific computation (see findings).
+- External model requests: verified zero by the egress guard in 43 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
 - Synthetic budget-ledger reservations in unit tests use temporary stores and are not provider charges.
 - Durations are harness wall time on loopback; they are not provider latency.
 - Harness budget ledger: no cohort opened; none may be opened now.
@@ -96,7 +96,7 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | followup:4.57 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "compatible", "reference": "excluded"}, "per_candidate": {"outside": "compatible", "refe |
 | followup:4.0 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "excluded"}, "per_candidate": {"outside": "excluded", "referenc |
 
-## Release gates at 219dc0ceba (overall: failed)
+## Release gates at 7e8d196c5a (overall: failed)
 
 | Gate | Status |
 |---|---|
@@ -114,7 +114,7 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
 | F-ORPHAN-WORKER-KILL | P0 | 2 | open | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
-| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | open | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
+| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | fixed_pending_retest | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
 | F-PLATFORM-RLIMIT | P0 | 2 | retested | Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected) |
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
 | F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | fixed_pending_retest | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
@@ -131,7 +131,7 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | fixed_pending_retest | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | fixed_pending_retest | Coordinator attempt metadata names provider gemini for controlled-model turns |
 | F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
-| F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | open | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
+| F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | fixed_pending_retest | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
 | F-SIBLING-FORKS | P2 | 2 | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
 | H-ORACLE-BOUNDARIES | P1 | 5 | retested | Harness contract oracle accepted inputs the API rejects (trailing newline, -0, depth 64, digit caps) |
 | H-BUDGET-USAGE | P1 | 5 | retested | Harness JSONL budget accepted negative usage and counted one request per reservation |
@@ -221,3 +221,4 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | 74 | RS-FOLLOWUP | offline_real_science | 6 | unrun | executed_acceptance | 8bb1fbeb13 | False | 0.476 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
 | 75 | RS-CANCEL-RESTART | offline_real_science | 6 | unrun | executed_acceptance | 8bb1fbeb13 | False | 3047.256 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
 | 76 | RS-ZERO-DISPATCH | offline_real_science | 6 | passed | executed_acceptance | 8bb1fbeb13 | False | 73.821 |  |
+| 77 | RS-RETRY-CONCURRENT | offline_real_science | 7 | passed | executed_acceptance | f8cf08a60a | False | 998.018 |  |

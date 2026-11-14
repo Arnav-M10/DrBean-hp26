@@ -1,7 +1,7 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T05:40:00Z",
+  "updated_at": "2026-11-14T06:00:00Z",
   "application_code_commit": "9cc90e0 (origin/main incl. PR #6 browser-baseline, #7 Owner 4, #8 this branch to 4ea7cb3)",
   "observed_at_harness_commit": "8bb1fbe",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
@@ -27,7 +27,7 @@
       "id": "F-AI-INTEGRATION-SEAM",
       "severity": "P1",
       "owner": "2 and 3",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "title": "Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane",
       "minimal_input": "origin/main 9cc90e0 merged locally with codex/gemini-offline-integration c95ab28 (clean merge)",
       "command": "in that worktree: BEAN_COUNTERDEX_PYTHON=<python3.11> .venv/bin/python -m pytest -q tests --ignore=tests/integration; .venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py",
@@ -35,7 +35,16 @@
       "observed": "provider_placeholder_disabled from main's Worker._agent (it calls check_ready() on a placeholder config); failing: tests/test_worker.py::test_worker_actual_framework_uses_durable_attempts_and_frozen_evidence, tests/test_backend_offline.py::test_ordinary_provider_configuration_never_reads_provider_environment, ::test_http_intake_and_conversation_keep_provider_attempts_zero, and Workstream 5's three worker-boundary tests. Owner 3's own 74 tests and all zero-dispatch tests pass on the combination.",
       "evidence": {
         "results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"
-      }
+      },
+      "retests": [
+        {
+          "at_commit": "codex/ai-offline-milestones c6f04c2 (preview)",
+          "result": "Resolved on that branch: the worker-boundary controlled-lane tests pass; zero-dispatch passes.",
+          "evidence": {
+            "results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"
+          }
+        }
+      ]
     },
     {
       "id": "F-PLATFORM-RLIMIT",
@@ -203,6 +212,13 @@
           "result": "Lineage now verified for all three what-if branches (new hypothetical dataset, parent link, old approval refused, new approval required); candidate-specific outcomes for the prior pair still have no route. Independent oracle expectations are recorded per branch for the eventual route.",
           "evidence": {
             "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-FOLLOWUP)"
+          }
+        },
+        {
+          "at_commit": "backend/browser-design 8451c1f (preview)",
+          "result": "Still no candidate-specific result for the prior pair after a hypothetical reading (lineage passes).",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"
           }
         }
       ]
@@ -442,6 +458,14 @@
             "user_processes": 649,
             "code": "apps/api/bean_api/science.py _child apply_limits(..., processes=256)"
           }
+        },
+        {
+          "at_commit": "backend/browser-design 8451c1f and codex/ai-offline-milestones c6f04c2 (previews)",
+          "result": "Present on both newer branches: plain hero baseline fails on the Mac; Owner 3's new real-Counterdex coordinator test fails with scientific_runtime_unavailable. This is now the single blocker between the Mac and a passing acceptance hero run.",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc",
+            "ai": "evaluation/results/previews/ai-offline-milestones-c6f04c2"
+          }
         }
       ]
     },
@@ -462,6 +486,13 @@
           "result": "Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then.",
           "evidence": {
             "results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"
+          }
+        },
+        {
+          "at_commit": "codex/ai-offline-milestones c6f04c2 (preview)",
+          "result": "Strict-xfail test XPASSes on this branch too; remove the marker when it merges.",
+          "evidence": {
+            "results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"
           }
         }
       ]
@@ -484,6 +515,13 @@
           "evidence": {
             "results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"
           }
+        },
+        {
+          "at_commit": "codex/ai-offline-milestones c6f04c2 (preview)",
+          "result": "Strict-xfail test XPASSes on this branch too; remove the marker when it merges.",
+          "evidence": {
+            "results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"
+          }
         }
       ]
     },
@@ -505,7 +543,7 @@
       "id": "F-DESIGN-SOURCE-ARTIFACTS",
       "severity": "P1",
       "owner": "2 (projection) and 1 (engine reuse format)",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "title": "A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation",
       "minimal_input": "hero-v2 on backend/browser-baseline cc779bf: discovered pair, grid [6,8] h, allowance 1/5, horizon 8, construction+continuation, source_artifact_ids=[baseline native artifact]",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <worktree of backend/browser-baseline> --diagnostic relax_nproc --results evaluation/results/previews/x --only RS-HERO-FULL",
@@ -521,6 +559,13 @@
           "result": "Reproduced on main: documented request with source_artifact_ids -> numerical_guidance/invalid_input; without them -> checked separation at 8 h with fresh replay.",
           "evidence": {
             "results": "evaluation/results/previews/main-8bb1fbe/relax_nproc"
+          }
+        },
+        {
+          "at_commit": "backend/browser-design 8451c1f (preview, diagnostic relax_nproc)",
+          "result": "Fixed on that branch: the documented design with source artifact ids reaches checked_pair_separation (selected 8 h, strictly positive exact margin) and both native packets pass fresh replay; RS-HERO-FULL passes with 33/33 qualifier re-checks. Close after merge and a non-diagnostic run.",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"
           }
         }
       ]

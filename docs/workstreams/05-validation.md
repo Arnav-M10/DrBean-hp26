@@ -64,6 +64,8 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
+| `backend/browser-design` | `8451c1f` | plain: hero fails (F-MAC-NPROC). diagnostic: **RS-HERO-FULL passes** — discovery, checked design with documented source ids (8 h, positive exact margin), both native packets replay fresh, 33/33 qualifier re-checks; follow-up per-candidate still blocked. |
+| `codex/ai-offline-milestones` | `c6f04c2` | worker-boundary controlled lane passes (F-AI-INTEGRATION-SEAM resolved); both coordinator P2 residuals XPASS; all 5 backend failures are F-MAC-NPROC. |
 | `main` + `codex/gemini-offline-integration` (local merge) | `9cc90e0` + `c95ab28` | zero-dispatch passes; Owner 3 fixes both coordinator P2 residuals (strict xfail XPASS); the worker's controlled lane breaks with `provider_placeholder_disabled` until Owner 2 selects mode=controlled (F-AI-INTEGRATION-SEAM). |
 | `backend/browser-baseline` (now merged as PR #6) | `cc779bf` | plain: hero fails (F-MAC-NPROC). diagnostic: discovery + baseline replay pass; changed input, concurrency, design authority, zero dispatch pass; hero blocked by F-DESIGN-SOURCE-ARTIFACTS; follow-up per-candidate blocked (F-FOLLOWUP-FEEDBACK); cancel/restart unobservable (computation < 1 s). |
 

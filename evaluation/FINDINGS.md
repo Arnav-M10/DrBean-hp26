@@ -5,7 +5,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
 | F-ORPHAN-WORKER-KILL | P0 | 2 | open | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
-| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | open | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
+| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | fixed_pending_retest | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
 | F-PLATFORM-RLIMIT | P0 | 2 | retested | Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected) |
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
 | F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | fixed_pending_retest | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
@@ -22,7 +22,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | fixed_pending_retest | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | fixed_pending_retest | Coordinator attempt metadata names provider gemini for controlled-model turns |
 | F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
-| F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | open | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
+| F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | fixed_pending_retest | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
 | F-SIBLING-FORKS | P2 | 2 | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
 | H-ORACLE-BOUNDARIES | P1 | 5 | retested | Harness contract oracle accepted inputs the API rejects (trailing newline, -0, depth 64, digit caps) |
 | H-BUDGET-USAGE | P1 | 5 | retested | Harness JSONL budget accepted negative usage and counted one request per reservation |
@@ -40,13 +40,14 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Observed:** child pid alive 1 s after the worker was killed and still alive after worker --recover marked the run interrupted; only the harness teardown removed it. API cancellation of a running job does kill the child (passes).
 - **Evidence:** {"context": "packages/groundwork_adapter/docs/BRIDGE.md requires the launching parent to kill the session before its own exit; a SIGKILLed parent cannot", "results": "evaluation/results/previews/main-d6a71c2/science_barrier (RS-CANCEL-RESTART no_orphan_after_worker_kill)", "suggested_seam": "parent-death watchdog in science._child (poll os.getppid() or pipe EOF, then killpg own session), plus persisting the child pgid so worker --recover can kill leftovers"}
 
-## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, open)
+## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, fixed_pending_retest)
 
 - **Input:** origin/main 9cc90e0 merged locally with codex/gemini-offline-integration c95ab28 (clean merge)
 - **Command:** `in that worktree: BEAN_COUNTERDEX_PYTHON=<python3.11> .venv/bin/python -m pytest -q tests --ignore=tests/integration; .venv/bin/python -m pytest -q tests/integration/test_ai_boundaries.py`
 - **Expected:** one agreed controlled-lane selection: Worker._agent uses ProviderConfig(mode='controlled') with an OfflineChatModel for the disclosed offline AI lane; Owner 2's worker/offline tests updated together (Owner 3's scripts/ai/HANDOFF.md asks for this)
 - **Observed:** provider_placeholder_disabled from main's Worker._agent (it calls check_ready() on a placeholder config); failing: tests/test_worker.py::test_worker_actual_framework_uses_durable_attempts_and_frozen_evidence, tests/test_backend_offline.py::test_ordinary_provider_configuration_never_reads_provider_environment, ::test_http_intake_and_conversation_keep_provider_attempts_zero, and Workstream 5's three worker-boundary tests. Owner 3's own 74 tests and all zero-dispatch tests pass on the combination.
 - **Evidence:** {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"}
+- **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Resolved on that branch: the worker-boundary controlled-lane tests pass; zero-dispatch passes. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
 
 ## F-PLATFORM-RLIMIT (P0, owner 2, retested)
 
@@ -97,6 +98,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Evidence:** {"attempts": ["att_003a52ad356c4088"], "engine_controls": "followup:3.4/4.57/4.0 pass at engine level"}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** ScientificResult now carries candidate_results; Owner 1's unmerged codex/science-next adds original-candidate observation rechecks. No integrated HTTP route yet exercised here (blocked behind the hero run). (evidence: {"attempts": ["att_86aae8c45eb24619"]})
 - **Retest at preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance):** Lineage now verified for all three what-if branches (new hypothetical dataset, parent link, old approval refused, new approval required); candidate-specific outcomes for the prior pair still have no route. Independent oracle expectations are recorded per branch for the eventual route. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-FOLLOWUP)"})
+- **Retest at backend/browser-design 8451c1f (preview):** Still no candidate-specific result for the prior pair after a hypothetical reading (lineage passes). (evidence: {"results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"})
 
 ## F-PLACEHOLDER-AUTO (P0, owner 3, retested)
 
@@ -172,6 +174,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Retest at backend/browser-baseline cc779bf (preview, no diagnostic):** Also present on Owner 2's newer branch: the plain preview's hero baseline fails the same way. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/plain"})
 - **Retest at main 9cc90e0 (merged as 7be805a, harness 8bb1fbe):** Still present on the merged main (browser-baseline integrated): RS-HERO-FULL and RS-CHANGED-INPUT fail with scientific_runtime_unavailable on this Mac without diagnostics. Owner 1 recorded an isolated reproduction on codex/science-next (bad5e9f); Owner 4's CI adds scripts/release/user_conditions_check.py for it. (evidence: {"attempts": "evaluation/results/attempts.jsonl at 8bb1fbe"})
 - **Retest at main 9cc90e0 (science.py now passes processes=256):** Insufficient on the team's Mac: this user owns 649 processes, above 256, so spawning the engine still fails with EAGAIN (measured: caps 32 and 64 fail, 4000 succeeds). A per-user count cannot be a per-job cap. (evidence: {"code": "apps/api/bean_api/science.py _child apply_limits(..., processes=256)", "user_processes": 649})
+- **Retest at backend/browser-design 8451c1f and codex/ai-offline-milestones c6f04c2 (previews):** Present on both newer branches: plain hero baseline fails on the Mac; Owner 3's new real-Counterdex coordinator test fails with scientific_runtime_unavailable. This is now the single blocker between the Mac and a passing acceptance hero run. (evidence: {"ai": "evaluation/results/previews/ai-offline-milestones-c6f04c2", "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"})
 
 ## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, fixed_pending_retest)
 
@@ -181,6 +184,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Observed:** status completed (strict xfail)
 - **Evidence:** {}
 - **Retest at preview: main 9cc90e0 + codex/gemini-offline-integration c95ab28 (local merge):** Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then. (evidence: {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"})
+- **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Strict-xfail test XPASSes on this branch too; remove the marker when it merges. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
 
 ## F-COORDINATOR-PROVIDER-LABEL (P2, owner 3, fixed_pending_retest)
 
@@ -190,6 +194,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Observed:** metadata provider=gemini; the worker wraps it in controlled_attempt records, so no live-looking row reaches the provider ledger (strict xfail)
 - **Evidence:** {}
 - **Retest at preview: main 9cc90e0 + codex/gemini-offline-integration c95ab28 (local merge):** Fixed on Owner 3's branch: the strict-xfail test XPASSes (coordinator refuses completion with an unaccounted optional scenario / controlled turns write no bare gemini provider attempts). Remove the xfail marker when the branch merges; the strict marker will fail the suite until then. (evidence: {"results": "evaluation/results/previews/ai-main-9cc90e0-plus-gemini-offline-c95ab28"})
+- **Retest at codex/ai-offline-milestones c6f04c2 (preview):** Strict-xfail test XPASSes on this branch too; remove the marker when it merges. (evidence: {"results": "evaluation/results/previews/ai-offline-milestones-c6f04c2"})
 
 ## F-TEST-VAR-LEAK (P2, owner 2, open)
 
@@ -199,7 +204,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Observed:** an empty var/artifacts appeared in the working tree (removed)
 - **Evidence:** {"note": "Workstream 5's own fixture had the same omission and now sets artifact_dir"}
 
-## F-DESIGN-SOURCE-ARTIFACTS (P1, owner 2 (projection) and 1 (engine reuse format), open)
+## F-DESIGN-SOURCE-ARTIFACTS (P1, owner 2 (projection) and 1 (engine reuse format), fixed_pending_retest)
 
 - **Input:** hero-v2 on backend/browser-baseline cc779bf: discovered pair, grid [6,8] h, allowance 1/5, horizon 8, construction+continuation, source_artifact_ids=[baseline native artifact]
 - **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <worktree of backend/browser-baseline> --diagnostic relax_nproc --results evaluation/results/previews/x --only RS-HERO-FULL`
@@ -207,6 +212,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Observed:** design_tier numerical_guidance, reason invalid_input; engine report.checked.error invalid_input at field ['pair']: 'Missing or unknown fields in this version' - candidates get source_artifact_digest = the baseline application packet, which the engine tries to reuse as a pair certificate. The same pair without source_artifact_ids, separately approved: checked_pair_separation, verification valid, fresh replay passed, selected 8 h with a positive exact margin
 - **Evidence:** {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-HERO-FULL isolation checks)", "suggested_seam": "do not project the baseline application packet as a pair-reuse source_artifact_digest (pass it as historical context), or teach the engine to accept baseline certificates; and return a specific reason code instead of a silent numerical fallback"}
 - **Retest at main 9cc90e0 (merged as 7be805a, harness 8bb1fbe) with diagnostic relax_nproc:** Reproduced on main: documented request with source_artifact_ids -> numerical_guidance/invalid_input; without them -> checked separation at 8 h with fresh replay. (evidence: {"results": "evaluation/results/previews/main-8bb1fbe/relax_nproc"})
+- **Retest at backend/browser-design 8451c1f (preview, diagnostic relax_nproc):** Fixed on that branch: the documented design with source artifact ids reaches checked_pair_separation (selected 8 h, strictly positive exact margin) and both native packets pass fresh replay; RS-HERO-FULL passes with 33/33 qualifier re-checks. Close after merge and a non-diagnostic run. (evidence: {"results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"})
 
 ## F-SIBLING-FORKS (P2, owner 2, open)
 
