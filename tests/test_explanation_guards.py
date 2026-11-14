@@ -128,7 +128,7 @@ def test_only_cited_assistant_facts_can_support_a_field_specific_quantity():
     assert commentary_rejection("The selected time is 8 h.", []) == "unsupported_numeric_claim"
 
 
-@pytest.mark.parametrize("text,value", [("1½", "11/2"), ("1 ½", "11/2"), ("1²", "12/1")])
+@pytest.mark.parametrize("text,value", [("1½", "11/2"), ("1 ½", "11/2"), ("1²", "12/1"), ("½0", "1/20")])
 def test_numeric_normalization_cannot_change_the_mathematical_value(text, value):
     assert commentary_rejection(f"The margin is {text} mg/L.", [{"exact_margin": value}]) == "unsupported_numeric_claim"
 
@@ -136,6 +136,15 @@ def test_numeric_normalization_cannot_change_the_mathematical_value(text, value)
 @pytest.mark.parametrize("text", ["½h", "0.5 hrs", "one half hour"])
 def test_standalone_fraction_and_documented_unit_aliases_keep_exact_meaning(text):
     assert commentary_rejection(f"The selected time is {text}.", [{"selected_time": "1/2"}]) is None
+
+
+@pytest.mark.parametrize("unit", ["Mg/L", "MG/L", "mG/L", "g/L", "mg"])
+def test_si_prefix_case_and_dimensions_cannot_change_during_narration(unit):
+    assert commentary_rejection(f"The future hard allowance is 0.2{unit}.", FACTS) == "unsupported_numeric_claim"
+
+
+def test_uppercase_h_is_not_silently_treated_as_the_time_unit_h():
+    assert commentary_rejection("The selected time is 8H.", FACTS) == "unsupported_numeric_claim"
 
 
 def test_global_nonoptimality_is_not_inferred_from_absent_global_evidence():

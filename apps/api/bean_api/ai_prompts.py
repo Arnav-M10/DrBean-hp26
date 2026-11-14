@@ -48,7 +48,7 @@ _WORD_VALUES = {word: Fraction(index) for index, word in enumerate(
 _WORD_VALUES.update({"half": Fraction(1, 2), "one half": Fraction(1, 2), "one twentieth": Fraction(1, 20)})
 _WORD_NUMBER = re.compile(r"\b(?:" + "|".join(map(re.escape, _WORD_VALUES)) + r")\b")
 _UNITS = {"h": "h", "hr": "h", "hrs": "h", "hour": "h", "hours": "h",
-          "mg/l": "mg/L", "1/h": "1/h", "/h": "1/h", "per hour": "1/h"}
+          "mg/L": "mg/L", "mg/l": "mg/L", "1/h": "1/h", "/h": "1/h", "per hour": "1/h"}
 _VALUE = r"(?:" + _NUMERIC_SPELLING + "|" + "|".join(sorted(map(re.escape, _WORD_VALUES), key=len, reverse=True)) + ")"
 _QUANTITY = re.compile(r"(" + _VALUE + r")(?:\s*([^\d].*))?\Z", re.I)
 _NEUTRAL = frozenset({
@@ -162,14 +162,16 @@ def _from_fields(value: dict, fields: set[str] | frozenset[str], *, scalar: bool
 def _normalize(text: str) -> str:
     # Normalize only admitted standalone fractions and mathematical minus.
     # Blanket NFKC would misread mixed fractions or exponent-like superscripts.
-    return " ".join(text.translate(_FRACTIONS).replace("−", "-").split()).lower()
+    # Unit case is significant: Mg and mg are not interchangeable quantities.
+    return " ".join(text.translate(_FRACTIONS).replace("−", "-").split())
 
 
 def _quantity(text: str, unit: str) -> Fraction | None:
     match = _QUANTITY.fullmatch(text.strip())
     if match is None:
         return None
-    value = _WORD_VALUES.get(match[1]) if match[1] in _WORD_VALUES else _exact(match[1])
+    spelling = match[1].lower()
+    value = _WORD_VALUES.get(spelling) if spelling in _WORD_VALUES else _exact(match[1])
     supplied_unit = match[2]
     if supplied_unit is not None and _UNITS.get(supplied_unit.strip()) != unit:
         return None
@@ -300,27 +302,28 @@ class _Vocabulary:
 
 
 def _statement(text: str, vocabulary: _Vocabulary) -> CommentaryRejection | None:
-    if text in _NEUTRAL:
+    lower = text.lower()
+    if lower in _NEUTRAL:
         return None
-    if text == "this is controlled commentary about a synthetic tool result" and vocabulary.controlled_tool_result:
+    if lower == "this is controlled commentary about a synthetic tool result" and vocabulary.controlled_tool_result:
         return None
     # A complete labeled quantity, including its entire suffix, must match.
-    match = re.fullmatch(r"the (?:reviewed )?(" + "|".join(map(re.escape, _LABELS)) + r") is (.+)", text)
+    match = re.fullmatch(r"the (?:reviewed )?(" + "|".join(map(re.escape, _LABELS)) + r") is (.+)", text, re.I)
     if match:
-        return None if vocabulary.scalar(*match.groups()) else "unsupported_numeric_claim"
-    match = re.fullmatch(r"the (?:reviewed )?interval is \[(.+), (.+)\]", text)
+        return None if vocabulary.scalar(match[1].lower(), match[2]) else "unsupported_numeric_claim"
+    match = re.fullmatch(r"the (?:reviewed )?interval is \[(.+), (.+)\]", text, re.I)
     if match:
         pair = tuple(_quantity(value, "1/h") for value in match.groups())
         return None if pair in vocabulary.targets else "unsupported_numeric_claim"
-    match = re.fullmatch(r"at elapsed time (.+), the margin is (.+)", text)
+    match = re.fullmatch(r"at elapsed time (.+), the margin is (.+)", text, re.I)
     if match:
         pair = (_quantity(match[1], "h"), _quantity(match[2], "mg/L"))
         return None if pair in vocabulary.options else "unsupported_numeric_claim"
-    match = re.fullmatch(r"the search evaluated (.+) assignments using (.+) rate grid points", text)
+    match = re.fullmatch(r"the search evaluated (.+) assignments using (.+) rate grid points", text, re.I)
     if match:
         pair = (_quantity(match[1], "count"), _quantity(match[2], "count"))
         return None if pair in vocabulary.search else "unsupported_numeric_claim"
-    match = re.fullmatch(r"the checked design selects (.+) with a hard allowance of (.+) for this reviewed pair", text)
+    match = re.fullmatch(r"the checked design selects (.+) with a hard allowance of (.+) for this reviewed pair", text, re.I)
     if match:
         pair = (_quantity(match[1], "h"), _quantity(match[2], "mg/L"))
         if pair not in vocabulary.designs:
@@ -328,9 +331,9 @@ def _statement(text: str, vocabulary: _Vocabulary) -> CommentaryRejection | None
         return None
     # Approximation, arithmetic and other unstructured quantitative relations
     # cannot borrow an existing number to create a new scientific assertion.
-    if _WORD_NUMBER.search(text) or re.search(r"\b(?:about|near|approximately)\b", text):
+    if _WORD_NUMBER.search(lower) or re.search(r"\b(?:about|near|approximately)\b", lower):
         return "unsupported_numeric_claim"
-    if re.match(r"the (?:outside |inside )?candidate.*\b(?:ke|ka|rate)\b", text) or text.startswith("the allowable margin"):
+    if re.match(r"the (?:outside |inside )?candidate.*\b(?:ke|ka|rate)\b", lower) or lower.startswith("the allowable margin"):
         return "unsupported_numeric_claim"
     return "unsupported_claim"
 
@@ -344,7 +347,7 @@ def commentary_rejection(text: str, facts: list[dict], *, context_facts: list[di
     """
     if not isinstance(text, str) or len(text) > 4000:
         return "unsupported_claim"
-    if re.search(r"\d\s*[" + _VULGAR + "]", text):
+    if re.search(r"\d\s*[" + _VULGAR + "]|[" + _VULGAR + r"]\s*\d", text):
         return "unsupported_numeric_claim"
     allowed: set[Fraction] = set()
     for fact in facts:
@@ -362,7 +365,7 @@ def commentary_rejection(text: str, facts: list[dict], *, context_facts: list[di
         if value is None or value not in allowed:
             return "unsupported_numeric_claim"
     vocabulary = _Vocabulary(facts, context_facts or [])
-    match = re.fullmatch(r"the selected time is (.+); (.+) is the same exact value\.?", normalized)
+    match = re.fullmatch(r"the selected time is (.+); (.+) is the same exact value\.?", normalized, re.I)
     if match:
         left, right = (_quantity(value.rstrip("."), "h") for value in match.groups())
         return None if left is not None and left == right and left in vocabulary.values["selected_time"] else "unsupported_numeric_claim"
