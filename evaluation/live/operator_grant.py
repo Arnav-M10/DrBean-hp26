@@ -9,7 +9,8 @@ product's own.
 It also enforces the default sprint ceiling of 12. A separately recorded,
 explicitly selected qualification extension permits one additional grant of
 at most six requests. The first has an overall ceiling of 16; the separately
-authorized repaired-run extension has a ceiling of 22. Grants bound the
+authorized repaired-run extension has a ceiling of 22; a separate final-run
+authorization has a ceiling of 28. Grants bound the
 physical requests that can be dispatched, and failed or uncertain attempts are
 charged against them, so the ceiling holds for attempts too.
 
@@ -38,8 +39,20 @@ REPAIRED_QUALIFICATION_EXTENSION_POLICY = {
     "max_new_requests": 6, "max_runs": 1, "actor": "root",
     "authorization": "User replied 'idk upto u whatevers best' to the explicit fresh run of at most 6 requests, qualification ceiling 22, and merge only if it passes.",
 }
+FINAL_QUALIFICATION_EXTENSION_POLICY = {
+    "id": "user-final-handoff-2026-11-14", "previous_ceiling": 22, "ceiling": 28,
+    "max_new_requests": 6, "max_runs": 1, "actor": "root",
+    "authorization": "User replied 'idk do whatever is best in ur opinion' to one final live qualification of at most 6 requests, qualification ceiling 28, and merge only if it passes.",
+}
 QUALIFICATION_EXTENSION_POLICIES = {
-    policy["id"]: policy for policy in (QUALIFICATION_EXTENSION_POLICY, REPAIRED_QUALIFICATION_EXTENSION_POLICY)
+    policy["id"]: policy for policy in (QUALIFICATION_EXTENSION_POLICY, REPAIRED_QUALIFICATION_EXTENSION_POLICY,
+                                        FINAL_QUALIFICATION_EXTENSION_POLICY)
+}
+QUALIFICATION_HISTORY = {
+    QUALIFICATION_EXTENSION_POLICY["id"]: (10, 8, ()),
+    REPAIRED_QUALIFICATION_EXTENSION_POLICY["id"]: (16, 10, ((QUALIFICATION_EXTENSION_POLICY["id"], 2),)),
+    FINAL_QUALIFICATION_EXTENSION_POLICY["id"]: (22, 14, ((QUALIFICATION_EXTENSION_POLICY["id"], 2),
+                                                       (REPAIRED_QUALIFICATION_EXTENSION_POLICY["id"], 4))),
 }
 # One canonical sprint ledger, wherever the harness runs (LIVE_BUDGET_FILE overrides the default).
 BUDGET = Path(os.environ.get("LIVE_BUDGET_FILE") or Path(__file__).resolve().parents[1] / "results" / "sprint" / "live-budget.json")
@@ -84,23 +97,21 @@ def check_grant(budget: dict, physical: int, extension: str | None = None) -> di
         if any(grant["qualification_extension"] == extension for grant in tagged):
             raise SystemExit("Refusing: the single qualification extension grant has already been used.")
         used = budget.get("physical_requests_used")
-        expected_granted, expected_used = (10, 8) if extension == QUALIFICATION_EXTENSION_POLICY["id"] else (16, 10)
+        expected_granted, expected_used, prior_runs = QUALIFICATION_HISTORY[extension]
         if (granted != expected_granted or type(used) is not dict
                 or any(type(count) is not int or count < 0 for count in used.values())
                 or sum(used.values()) != expected_used or type(budget.get("sprint_physical_requests_total")) is not int
                 or budget["sprint_physical_requests_total"] != expected_used):
             raise SystemExit("Refusing: retain all historical effective grants and physical attempts for this authorization.")
-        if extension == QUALIFICATION_EXTENSION_POLICY["id"]:
-            if tagged:
-                raise SystemExit("Refusing: the first qualification extension cannot follow another extension.")
-        else:
-            first_id = QUALIFICATION_EXTENSION_POLICY["id"]
-            prior = [grant for grant in tagged if grant["qualification_extension"] == first_id]
-            if (first_id not in known_receipts or len(prior) != 1 or prior[0]["physical_requests"] != 6
+        if len(tagged) != len(prior_runs):
+            raise SystemExit("Refusing: retain exactly the preceding authorized qualification grants.")
+        for prior_id, prior_attempts in prior_runs:
+            prior = [grant for grant in tagged if grant["qualification_extension"] == prior_id]
+            if (prior_id not in known_receipts or len(prior) != 1 or prior[0]["physical_requests"] != 6
                     or not isinstance(prior[0].get("research_session_id"), str)
-                    or used.get(prior[0]["research_session_id"]) != 2
+                    or used.get(prior[0]["research_session_id"]) != prior_attempts
                     or any(row.get("research_session_id") == prior[0]["research_session_id"] for row in released)):
-                raise SystemExit("Refusing: retain the unreleased first six-request grant and its two actual attempts.")
+                raise SystemExit("Refusing: retain each unreleased preceding six-request grant and its actual attempts.")
         if physical > policy["max_new_requests"]:
             raise SystemExit("Refusing: this qualification extension permits at most six new requests.")
         ceiling = policy["ceiling"]

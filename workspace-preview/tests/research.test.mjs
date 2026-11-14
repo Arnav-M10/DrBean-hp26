@@ -50,6 +50,24 @@ test('exhausted allocation does not relabel completed science or grant a retry',
  assert.match(html,/state completed/);assert.match(html,/not_performed/);
  assert.equal(researchIssue({...completed,interaction:{quota_exhausted:false}},evidence),null);
 });
+test('successful completion at capacity keeps the evidence-bound next step and a separate capacity warning',()=>{
+ const completed={...snapshot,state:'completed',mode:'gemini',action:{error_code:null},interaction:{quota_exhausted:true,recovery:{required:false}}};
+ const report={id:'report_unit',body:{agent_commentary:{...comment,authorship:'model_commentary',next_action:'review_design'}}};
+ const original=structuredClone({completed,evidence,report}),html=reportHTML(completed,evidence,report,helpers);
+ assert.match(html,/<h3>What should you do next\?<\/h3><p>Review feasible measurement settings for a separate pair-design operation\.<\/p><p class="helper research-capacity">/);
+ assert.match(html,/approved limit/);assert.match(html,/confirm authority and remaining capacity/);
+ assert.match(html,/refreshing does not add capacity or repeat work/);assert.match(html,/Persisted model commentary/);
+ assert.match(html,/state completed/);assert.match(html,/no_counterexample_found/);assert.match(html,/not_performed/);
+ assert.ok(html.includes(interpretResult(evidence[0].body.result).statement));
+ assert.deepEqual({completed,evidence,report},original);
+ const invalid={...report,body:{agent_commentary:{...report.body.agent_commentary,fact_ids:['missing_evidence']}}};
+ assert.doesNotMatch(findings(completed,evidence,invalid,helpers),/Review feasible measurement settings|research-capacity/);
+ for(const patch of [{state:'failed'}, {action:{error_code:'provider_malformed_tool_call'}}, {interaction:{quota_exhausted:true,recovery:{required:true,code:'provider_outcome_unknown',can_reconcile:false}}}]){
+  const interrupted=findings({...completed,...patch},evidence,report,helpers);
+  assert.doesNotMatch(interrupted,/Review feasible measurement settings|research-capacity/);
+  assert.ok(interrupted.includes(researchIssue({...completed,...patch},evidence).next));
+ }
+});
 test('uncertain request accounting takes priority over a normal failure and requires operator recovery',()=>{
  const interrupted={...snapshot,action:{error_code:'provider_rate_limited'},interaction:{recovery:{required:true,code:'provider_outcome_unknown',can_reconcile:false},quota_exhausted:true}};
  const issue=researchIssue(interrupted,evidence);
