@@ -209,6 +209,12 @@ def static_facts() -> dict:
             engine = None
     facts["engine"] = engine
     facts["auth_file_present"] = os.path.isfile(os.path.join(VAR, "auth.json"))  # presence only; never read
+    facts["store_dir"] = VAR
+    facts["store_writable"] = os.access(VAR if os.path.isdir(VAR) else os.path.dirname(VAR), os.W_OK)
+    try:
+        facts["store_free_mb"] = shutil.disk_usage(VAR if os.path.isdir(VAR) else os.path.dirname(VAR)).free // 2**20
+    except OSError:
+        facts["store_free_mb"] = None
     facts["database_present"] = os.path.isfile(os.path.join(VAR, "bean.sqlite3"))
     return facts
 
@@ -259,7 +265,13 @@ def summarize(static: dict, service: dict | None) -> tuple[list[tuple[str, str, 
     row(False, "browser replay", "unsupported: no browser runtime is qualified", required=False)
     row(static["auth_file_present"], "local auth file", "var/auth.json present (private; not read here)"
         if static["auth_file_present"] else "missing. Run scripts/dev/setup.sh")
-    row(True, "AI mode", "placeholder. Provider credentials are removed from every launched process.")
+    free = static.get("store_free_mb")
+    row(static.get("store_writable", True) and (free is None or free >= 64), "storage",
+        f"{static.get('store_dir', 'var')} writable, {free} MiB free; database "
+        f"{'present' if static.get('database_present') else 'not created yet'}"
+        if static.get("store_writable", True) else f"{static.get('store_dir')} is not writable")
+    row(True, "AI mode", "controlled placeholder only. Provider credentials are removed from every launched "
+        "process; no model provider is contacted.")
     if service is None:
         return rows, ok
     caps = service["capabilities"] or {}

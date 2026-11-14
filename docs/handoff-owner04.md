@@ -4,7 +4,7 @@ Current handoff for the integrated tree. The pre-merge handoff (when only the we
 
 ## Runnable commit and command
 
-Branch `claude/dreamy-lamport-dsttgm`, merged with default branch `main` at `fa91e13` (includes PR #3, the scientific integration). After `scripts/dev/setup.sh`:
+Branch `claude/dreamy-lamport-dsttgm`, merged with default branch `main` at `adac945` (includes PR #3, the backend scientific integration, and PR #4, engine discovery). After `scripts/dev/setup.sh`:
 
 ```sh
 scripts/dev/start.sh
@@ -12,7 +12,7 @@ scripts/dev/start.sh
 
 ## Gate status
 
-G0 passed (Linux). G1 to G4 not passed. See [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md). The one blocker for G1 and G2 is baseline discovery, [issue I-013](issue-ledger.md): the engine is now connected, but nothing yet produces candidates.
+G0 passed (Linux). G1 to G4 not passed. See [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md). The one blocker for G1 and G2 is baseline discovery through the application, [issue I-013](issue-ledger.md): the engine can now discover candidates, but the backend does not call that operation yet.
 
 ## Manual demo steps that work today (placeholder AI, no science)
 
@@ -31,11 +31,11 @@ The domain, claim and any future times are team-selected assumptions for review,
 
 | Lane | Result |
 |---|---|
-| Launch path (stack smoke, isolated store) | 25 of 25 checks passed |
+| Launch path and transport boundary (stack smoke, isolated store) | 31 of 31 checks passed |
 | Gate G1 through the API | not passed: Counterdex adapter available, baseline discovery unavailable, outcome `unsupported` |
 | Backend unit and HTTP tests (controlled AI; real engine from a seeded regression pair) | 264 passed |
 | Backend lint and schema export | clean; exported schemas match committed |
-| Engine tests (CPython 3.11) | 138 passed; on 3.13: 4 failures, 23 errors |
+| Engine tests (CPython 3.11) | 257 passed, 2 skipped |
 | Engine native replay of prepared bundle | replay passed, binding matches, verification valid |
 | Web unit tests | 16 passed |
 | Browser to real API (`check-backend.mjs`) | passed |

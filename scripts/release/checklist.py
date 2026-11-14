@@ -6,8 +6,9 @@
   add --record to write docs/release-evidence/release-checklist.json
   add --fast to skip the stack and browser checks (they need ports 8000 and 4173)
 
-Inventory mode exits 1 only when a check that ran has FAILED. It is a status
-report: exit 0 does NOT mean release-ready.
+Inventory mode is a status report and says so in its last line. It exits 1
+when a check that ran has FAILED and 0 otherwise; its exit status is never a
+release verdict. Use --strict-offline for a verdict.
 
 Strict offline mode exits 1 unless every offline gate (G0-G4) has all of its
 required evidence present and passing. Missing evidence fails the gate. Future
@@ -238,9 +239,14 @@ def main(argv):
     ready = all(gate["status"] == "passed" for gate in gates) and not failed
     tally = {s: sum(r["status"] == s for r in boundaries) for s in ("passed", "partial", "failed", "unrun")}
     print(f"\nboundaries: {tally}; gates passed: {sum(g['status'] == 'passed' for g in gates)}/{len(gates)}")
-    print("OFFLINE RELEASE-READY (live Gemini still not run)." if ready else
-          "NOT RELEASE-READY for the offline sprint: " + "; ".join(
-              f"{g['id']} needs {', '.join(g['blocked_by'])}" for g in gates if g["status"] != "passed"))
+    verdict = ("OFFLINE RELEASE-READY (live Gemini still not run)." if ready else
+               "NOT RELEASE-READY for the offline release: " + "; ".join(
+                   f"{g['id']} needs {', '.join(g['blocked_by'])}" for g in gates if g["status"] != "passed"))
+    if strict:
+        print(f"STRICT OFFLINE GATE: {'PASS' if ready else 'FAIL'}. {verdict}")
+    else:
+        print(f"INVENTORY ONLY: this exit status is not a release verdict. The strict offline gate would "
+              f"{'pass' if ready else 'FAIL'}. {verdict}")
     if "--record" in argv:
         out = os.path.join(REPO, "docs", "release-evidence", "release-checklist.json")
         os.makedirs(os.path.dirname(out), exist_ok=True)

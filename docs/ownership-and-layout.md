@@ -10,6 +10,8 @@ Five coding workstreams, disjoint files. These are workstreams, not five human e
 | 4 Product/release | `scripts/dev/**`, `scripts/release/**`, `.github/**`, root `README.md`, `docs/INTEGRATION_STATUS.md`, `docs/ownership-and-layout.md`, `docs/issue-ledger.md`, `docs/release-runbook.md`, `docs/handoff-owner04.md`, `docs/demo/**`, `docs/human-task/**`, `docs/submission-draft.md`, `docs/provenance-and-eligibility.md`, `docs/release-evidence/**`; `apps/web/**` for the minimal functional connection; in `tests/integration/`: `web_manual_smoke.mjs`, `package.json`, `release_checklist.json` |
 | 5 Validation | `evaluation/**`, `docs/evaluation-protocol.md`, `evaluation/README.md`, `scripts/evaluate.py`, `tests/test_evaluation.py`, new Python HTTP/invariant tests `tests/integration/test_*.py` |
 
+Each workstream also owns exactly one progress log and does not edit the others: `docs/workstreams/01-science.md`, `02-backend.md`, `03-ai.md`, `04-product-release.md`, `05-validation.md`. Workstream 4 maintains this ownership page, the issue ledger and the integration status as the shared index.
+
 Shared rules:
 
 - A defect in another workstream's files goes to the [issue ledger](issue-ledger.md) with exact input and logs. Nobody copies or patches another owner's subsystem.

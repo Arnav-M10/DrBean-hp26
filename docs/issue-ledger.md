@@ -18,7 +18,7 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 | I-010 | 2, 3 | open | Conditional objective for harness cases C08/C09 versus the real plan contract |
 | I-011 | 2 | open, minor | Float in JSON is refused without naming the field |
 | I-012 | 3 | **closed on `main` at `fa91e13`** | Provider stays unconfigured with key, model and gate variables set; API reports `ai_mode: disabled_placeholder` |
-| I-013 | 1 | **open, blocks G1 and G2** (narrowed) | Adapter bridge landed in PR #3; baseline discovery is still unavailable, so no candidates exist to design on |
+| I-013 | 2 | **open, blocks G1 and G2** (now Owner 2) | The engine has discovery and a prepared bridge since PR #4; the backend child still reports `baseline_discovery: false` and never calls it. Interface request below. |
 | I-014 | 1, 2 | **closed** | Two runtimes; the backend calls the engine in a child process on CPython 3.11 |
 | I-015 | 2, 4 | open, target platform | `resource_policy.py` now omits `RLIMIT_AS` on macOS; still unverified on the Mac |
 | I-016 | 5 | open, blocks strict gate | HTTP/invariant suite and offline real-science lane not delivered |
@@ -48,6 +48,17 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 - **Retest:** the command above exits 0.
 
 **Update after PR #3:** capabilities now report `available: true`, adapter Counterdex 0.1.0, `native_replay: true`, `baseline_discovery: false`, reason `baseline_producer_unavailable`. The approved baseline on the shared five-row example completes with `scientific_outcome: unsupported`, reason `baseline_producer_unavailable`, 0 candidates, 0 artifacts. Design proposals take their two candidates from the historical run's result, and no public route can seed them, which is correct; so design cannot begin over ordinary HTTP. Backend tests exercise real design, native download and replay only from an explicitly seeded regression pair. The remaining work is Owner 1's discovery producer.
+
+**Update after PR #4 (`main` at `adac945`), interface request to Owner 2:**
+
+- **Blocking gate:** G1, then G2.
+- **Current behaviour:** `apps/api/bean_api/counterdex_child.py` returns `"baseline_discovery": False` unconditionally; `counterdex_adapter.py` therefore answers every baseline with `unsupported` / `baseline_producer_unavailable`. Reproduce: `python3 scripts/release/stack_smoke.py --require-science` (exit 1; launch path 31 of 31).
+- **Available since PR #4 (Owner 1):** `counterdex bridge` (protocol `counterdex.bridge.v1`, one bounded request on stdin, one response), `counterdex/application.py` (`project_application`, `project_design`, binding verifiers), `counterdex/search.py` and `baseline.py` (bounded discovery plus exact check), `replay-baseline` and `replay-native`; parent-side example `packages/groundwork_adapter/scripts/supervise_bridge.py`; mapping in `packages/groundwork_adapter/docs/APPLICATION_MAPPING.md` and `BRIDGE.md`. Engine tests: 257 pass on CPython 3.11.
+- **Needed behaviour:** the worker's baseline call goes through that bridge with the frozen problem and dataset records; the result carries the discovered candidates, per-candidate checks, native bytes stored before any artifact reference is published, and `baseline_discovery: true` in capabilities.
+- **Acceptance example:** on the shared five-row example the engine's own fixture (`fixtures/decision/hero-baseline.*`) finds a reference with ke 1631/12700 inside the claim and an outside candidate with ke 101/1016 < 1/10. The application must reach scientific predicates like these by real search, not by returning those constants.
+- **Stale or invalid example:** a design proposal naming candidates that are not in that run's result must still be refused.
+- **Runtime:** the launcher already passes `BEAN_COUNTERDEX_PYTHON` pointing at `.venv-engine` (CPython 3.11, counterdex installed from the tree by setup).
+- **Consuming check:** `python3 scripts/release/stack_smoke.py --require-science` exits 0; then Owner 5's HTTP suite.
 
 ## I-014: two interpreters (Owners 1 and 2)
 

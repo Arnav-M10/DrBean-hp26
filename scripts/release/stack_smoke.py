@@ -95,12 +95,21 @@ def main(argv):
                                     capture_output=True, text=True).returncode, ""
         if not check("isolated-auth-created", code == 0, "bootstrap in a temporary store"):
             raise RuntimeError("backend runtime missing: run scripts/dev/setup.sh")
+        # A second synthetic actor in this smoke's own throwaway auth file, for wrong-workspace checks.
+        auth_path = os.path.join(var_dir, "auth.json")
+        with open(auth_path, encoding="utf-8") as handle:
+            actors = json.load(handle)
+        actors["smoke-other-actor"] = uuid.uuid4().hex + uuid.uuid4().hex
+        with open(auth_path, "w", encoding="utf-8") as handle:
+            json.dump(actors, handle)
         code, text = launcher("start", var_dir)
         started = code == 0
         if not check("start-one-command", started, text.strip().splitlines()[-1] if text.strip() else ""):
             raise RuntimeError(text[-1500:])
         with open(os.path.join(var_dir, "auth.json"), encoding="utf-8") as handle:
-            client = Client(next(iter(json.load(handle).values())))  # this smoke's own throwaway token
+            tokens = json.load(handle)  # this smoke's own throwaway tokens
+        client = Client(next(v for k, v in tokens.items() if k != "smoke-other-actor"))
+        outsider = Client(tokens["smoke-other-actor"])
 
         _, caps, _ = Client(None).call("GET", PREFIX + "/capabilities")
         science, gemini = caps["science"], caps["gemini"]
@@ -115,8 +124,22 @@ def main(argv):
         status, _, _ = Client(None).call("GET", PREFIX + "/workspaces")
         check("unauthenticated-request-refused", status == 401, status)
 
+        status, _, _ = Client("x" * 48).call("GET", PREFIX + "/workspaces")
+        check("invalid-credential-refused", status == 401, status)
         _, workspace, _ = client.call("POST", PREFIX + "/workspaces", {"name": "stack smoke (synthetic)"})
         w = workspace["id"]
+        status, _, _ = outsider.call("GET", f"{PREFIX}/workspaces/{w}")
+        check("other-actor-cannot-read-this-workspace", status in (403, 404), status)
+        # The web server's fixed loopback proxy: same-origin passes, a foreign origin is refused.
+        web = "http://127.0.0.1:4173" + PREFIX + "/capabilities"
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(urllib.request.Request(web), timeout=10) as response:
+            check("web-proxy-reaches-api", response.status == 200, response.status)
+        try:
+            opener.open(urllib.request.Request(web, headers={"Origin": "http://evil.example"}), timeout=10)
+            check("web-proxy-refuses-foreign-origin", False, "request was accepted")
+        except urllib.error.HTTPError as error:
+            check("web-proxy-refuses-foreign-origin", error.code == 403, error.code)
         dataset_body = {
             "schema_version": "DB-SC-1", "experiment_id": "synthetic_shared_example",
             "time_origin": "Elapsed hours from the synthetic experiment's declared t=0", "origin": "synthetic",
@@ -197,6 +220,12 @@ def main(argv):
         status, report, _ = client.call("POST", f"{PREFIX}/runs/{run['id']}/reports", None)
         status_d, report_bytes, headers = client.call("GET", f"{PREFIX}/reports/{report['id']}/download", raw=True)
         digest = hashlib.sha256(report_bytes).hexdigest() if status_d == 200 else None
+        status, _, _ = outsider.call("GET", f"{PREFIX}/runs/{run['id']}")
+        check("other-actor-cannot-read-this-run", status in (403, 404), status)
+        status, _, _ = outsider.call("GET", f"{PREFIX}/reports/{report['id']}/download", raw=True)
+        check("other-actor-cannot-download-this-report", status in (403, 404), status)
+        facts["report_download"] = {"object": "application report JSON (byte integrity only, not a native "
+                                              "scientific packet)", "content_type": headers.get("content-type")}
         check("report-bytes-match-declared-hash", digest and digest == headers.get("x-artifact-sha256",
               headers.get("X-Artifact-SHA256")), digest)
         _, attempts, _ = client.call("GET", f"{PREFIX}/workspaces/{w}/provider-attempts")
