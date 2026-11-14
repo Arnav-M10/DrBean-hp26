@@ -11,7 +11,17 @@ What a result can and cannot say:
 - Grid ranking orders only the supplied times for fixed parameter vectors. It is **not** a globally optimal design and **not** certified discrimination.
 - Noise standard deviation, detection threshold and hard allowance are different inputs. Hard allowances are refused here (`hard_allowance_not_accepted`); they belong to the exact checker.
 
+## Install
+
+```sh
+pip install counterdex-models
+```
+
+No runtime dependencies; Python 3.11 or newer. The exact checker is a separate package: `pip install counterdex`.
+
 ## Run the demonstration
+
+From a checkout of [the repository](https://github.com/Arnav-M10/DrBean-hp26):
 
 ```sh
 python3.11 packages/counterdex_models/examples/demo.py
@@ -37,13 +47,13 @@ python3.11 -m counterdex_models run examples/requests/fit_early.request.json --o
 python3.11 -m counterdex_models --registry my_plasma_models:registry run my.request.json
 ```
 
-Requests (`counterdex-models.request.v1`) are strict JSON: unknown fields are refused, models are named by registered id, and values may be numbers, decimal strings or exact `n/d` strings (rounded to binary64). `analysis` is one of `fit`, `sensitivity`, `scenarios`, `monte_carlo` or `grid_ranking`. See `examples/requests/` for one of each. `examples/build_examples.py` regenerates all of them, and a test checks that the committed files match byte for byte.
+Requests (`counterdex-models.request.v1`) are strict JSON: unknown fields are refused, models are named by registered id, and values may be numbers, decimal strings or exact `n/d` strings (rounded to binary64). `analysis` is one of `fit`, `sensitivity`, `scenarios`, `monte_carlo` or `grid_ranking`. See [`examples/requests/`](https://github.com/Arnav-M10/DrBean-hp26/tree/main/packages/counterdex_models/examples/requests) for one of each. `examples/build_examples.py` regenerates all of them, and a test checks that the committed files match byte for byte.
 
 Each result carries `certification: "none"`, the inputs it used, the evaluation budget it consumed, an interpretation stating its limits, the runtime (package, Python, fit method, `provider_calls: 0`) and SHA-256 digests of the canonical request and result.
 
 ## Adding models
 
-See [docs/INTERFACE.md](docs/INTERFACE.md) and `examples/registry_plugin.py`. Models are Python code registered by the operator; request data can only name them.
+See the [interface contract](https://github.com/Arnav-M10/DrBean-hp26/blob/main/packages/counterdex_models/docs/INTERFACE.md) and [`examples/registry_plugin.py`](https://github.com/Arnav-M10/DrBean-hp26/blob/main/packages/counterdex_models/examples/registry_plugin.py). Models are Python code registered by the operator; request data can only name them.
 
 ## Method and bounds
 
