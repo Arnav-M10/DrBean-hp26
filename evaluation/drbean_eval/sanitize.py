@@ -76,9 +76,11 @@ def scan(paths, sentinels=SENTINELS, max_bytes=8 * 1024 * 1024) -> list[dict]:
             if os.path.getsize(path) > max_bytes:
                 continue
             with open(path, "rb") as handle:
-                text = handle.read().decode("utf-8", errors="ignore")
+                data = handle.read()
         except OSError:
             continue
-        for hit in find_leaks(text, sentinels):
-            findings.append({"path": path, **hit})
+        binary = b"\0" in data  # compressed bytes match the email shape by chance; other shapes still apply
+        for hit in find_leaks(data.decode("utf-8", errors="ignore"), sentinels):
+            if not (binary and hit["kind"] == "email"):
+                findings.append({"path": path, **hit})
     return findings
