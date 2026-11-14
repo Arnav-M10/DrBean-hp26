@@ -2,9 +2,11 @@
   "ai_mode": "placeholder",
   "boundaries": [
     {
-      "blocked_by": [],
+      "blocked_by": [
+        "science_boundary_as_ordinary_user"
+      ],
       "id": "B01",
-      "status": "passed"
+      "status": "failed"
     },
     {
       "blocked_by": [
@@ -37,11 +39,12 @@
     },
     {
       "blocked_by": [
+        "science_boundary_as_ordinary_user",
         "stack_g1_real_science",
         "owner5_http_suite"
       ],
       "id": "B06",
-      "status": "partial"
+      "status": "failed"
     },
     {
       "blocked_by": [
@@ -92,23 +95,23 @@
     }
   ],
   "boundary_tally": {
-    "failed": 0,
-    "partial": 11,
-    "passed": 1,
+    "failed": 2,
+    "partial": 10,
+    "passed": 0,
     "unrun": 0
   },
   "checks": {
     "backend_lint": {
       "command": "/home/user/DrBean-hp26/.venv/bin/python -m ruff check apps tests scripts",
       "detail": "All checks passed!",
-      "duration_s": 0.05,
+      "duration_s": 0.04,
       "exit_code": 0,
       "status": "passed"
     },
     "backend_tests": {
       "command": "/home/user/DrBean-hp26/.venv/bin/python -m pytest -q -p no:cacheprovider tests --ignore=tests/integration",
-      "detail": "264 passed in 11.93s",
-      "duration_s": 13.08,
+      "detail": "264 passed in 12.95s",
+      "duration_s": 14.27,
       "exit_code": 0,
       "status": "passed"
     },
@@ -119,49 +122,49 @@
     "contracts_current": {
       "command": "/home/user/DrBean-hp26/.venv/bin/python scripts/export_contracts.py",
       "detail": "exported schemas match the committed ones",
-      "duration_s": 0.26,
+      "duration_s": 0.27,
       "exit_code": 0,
       "status": "passed"
     },
     "engine_native_replay_fixture": {
       "command": "/home/user/DrBean-hp26/.venv-engine/bin/python -m counterdex replay packages/groundwork_adapter/fixtures/checked_success.bundle.json --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json",
       "detail": "replay=passed binding=matches verification=valid (prepared synthetic fixture, engine CLI only)",
-      "duration_s": 0.06,
+      "duration_s": 0.1,
       "exit_code": 0,
       "status": "passed"
     },
     "engine_tests": {
       "command": "/home/user/DrBean-hp26/.venv-engine/bin/python -m unittest discover -s packages/groundwork_adapter/tests",
       "detail": "OK (skipped=2)",
-      "duration_s": 21.28,
+      "duration_s": 21.4,
       "exit_code": 0,
       "status": "passed"
     },
     "harness_grader_selftest": {
       "command": "/usr/local/bin/python3 evaluation/cli.py selftest",
       "detail": "grader self-test (harness only, not product evidence): {\"variants\": 24, \"passing_exemplars\": 24, \"failing_exemplars\": 62, \"assertions\": 289, \"exercised\": 106}",
-      "duration_s": 0.07,
+      "duration_s": 0.08,
       "exit_code": 0,
       "status": "passed"
     },
     "harness_manifest_verify": {
       "command": "/usr/local/bin/python3 evaluation/cli.py verify",
       "detail": "manifest v1: 12 cases, 24 fixture entries, 12 sources, 2 holdouts; OK",
-      "duration_s": 0.06,
+      "duration_s": 0.07,
       "exit_code": 0,
       "status": "passed"
     },
     "harness_unit_tests": {
       "command": "/usr/local/bin/python3 -W error -m unittest discover -s evaluation/tests",
       "detail": "OK",
-      "duration_s": 0.65,
+      "duration_s": 0.8,
       "exit_code": 0,
       "status": "passed"
     },
     "launcher_tests": {
       "command": "/usr/local/bin/python3 -m unittest scripts/dev/test_launcher.py",
       "detail": "OK",
-      "duration_s": 0.14,
+      "duration_s": 0.13,
       "exit_code": 0,
       "status": "passed"
     },
@@ -177,10 +180,17 @@
       "detail": "backend .venv and engine .venv-engine qualified",
       "status": "passed"
     },
+    "science_boundary_as_ordinary_user": {
+      "command": "/usr/local/bin/python3 scripts/release/user_conditions_check.py",
+      "detail": "2 failed, 3 passed in 1.23s as uid 65534 owning 64 processes (issue I-018)",
+      "duration_s": 2.37,
+      "exit_code": 1,
+      "status": "failed"
+    },
     "secret_scan": {
       "command": "/usr/local/bin/python3 scripts/release/secret_scan.py",
       "detail": "secret scan: 0 finding(s)",
-      "duration_s": 0.42,
+      "duration_s": 0.46,
       "exit_code": 0,
       "status": "passed"
     },
@@ -196,14 +206,14 @@
     "web_backend_browser_check": {
       "command": "node apps/web/check-backend.mjs",
       "detail": "Passed: real API plan/approval, explicit unsupported worker lifecycle, run retrieval, evidence/report bytes, stale draft, narrow layout, memory-only credentials, proxy origin rejection. No real scient",
-      "duration_s": 3.39,
+      "duration_s": 3.47,
       "exit_code": 0,
       "status": "passed"
     },
     "web_manual_smoke": {
       "command": "node tests/integration/web_manual_smoke.mjs",
       "detail": "}",
-      "duration_s": 1.03,
+      "duration_s": 1.25,
       "exit_code": 0,
       "status": "passed"
     },
@@ -213,8 +223,8 @@
     },
     "web_unit_tests": {
       "command": "node --test",
-      "detail": "# duration_ms 105.468328",
-      "duration_s": 0.14,
+      "detail": "# duration_ms 151.013542",
+      "duration_s": 0.2,
       "exit_code": 0,
       "status": "passed"
     }
@@ -222,17 +232,20 @@
   "fast": false,
   "gates": [
     {
-      "blocked_by": [],
+      "blocked_by": [
+        "science_boundary_as_ordinary_user"
+      ],
       "id": "G0",
-      "status": "passed"
+      "status": "failed"
     },
     {
       "blocked_by": [
+        "science_boundary_as_ordinary_user",
         "stack_g1_real_science",
         "owner5_http_suite"
       ],
       "id": "G1",
-      "status": "partial"
+      "status": "failed"
     },
     {
       "blocked_by": [
@@ -258,7 +271,7 @@
     }
   ],
   "live_gemini": "not run",
-  "mode": "strict-offline",
+  "mode": "inventory",
   "offline_release_ready": false,
   "platform": {
     "arch": "x86_64",
@@ -290,11 +303,11 @@
     "os": "Linux",
     "os_release": "6.18.44-fc-v470",
     "store_dir": "/home/user/DrBean-hp26/var",
-    "store_free_mb": 30360,
+    "store_free_mb": 30357,
     "store_writable": true,
     "uv": "uv 0.11.32 (x86_64-unknown-linux-gnu)"
   },
-  "recorded_at": "2026-11-14T03:32:59+00:00",
-  "tested_commit": "a516943d7a531bfbb2b54eca2419e0604f6be349",
+  "recorded_at": "2026-11-14T03:47:04+00:00",
+  "tested_commit": "88cbe882b9cabe7e6d15e2fb288f5e3fefc0bf0f",
   "uncommitted_files": 0
 }
