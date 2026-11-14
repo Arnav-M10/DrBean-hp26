@@ -6,11 +6,11 @@ Run these commands from the repository root. Executed qualification belongs to t
 
 | Component | Version |
 |---|---|
-| OS and architecture | Earlier qualification used Linux x86_64. Full target-Mac release qualification remains pending; retain its separate command results. |
+| OS and architecture | Linux CI and Darwin 25.5 arm64. Clean Mac candidate 366dfe1 passed strict offline qualification; retained report names exact environment. Presentation-device rehearsal is separate. |
 | uv | 0.11.32 |
-| Backend runtime `.venv` | Python 3.13.18; fastapi 0.141.1, uvicorn 0.52.1, pydantic 2.13.4, deepagents 0.7.38, langchain 1.5.0, langchain-google-genai 4.5.0, google-genai 3.3.0 (from `uv.lock`) |
+| Backend runtime `.venv` | CI uses Python 3.13; Mac qualification uses Python 3.12.13. Locked dependencies: fastapi 0.141.1, uvicorn 0.52.1, pydantic 2.13.4, deepagents 0.7.38, langchain 1.5.0, langchain-google-genai 4.5.0, google-genai 3.3.0 (from `uv.lock`) |
 | Engine runtime `.venv-engine` | Qualified CPython 3.11; current Counterdex 0.3.0, no dependencies. Doctor reports the installed patch version. |
-| Node | 22.23.4 |
+| Node | CI 22; Mac qualification 25.9.0 |
 | Playwright (tests only) | 1.63.0 |
 
 ## Setup
@@ -24,7 +24,7 @@ Needs uv and Node. Installs the backend from `uv.lock`, creates the CPython 3.11
 ## Start, check, stop
 
 ```sh
-scripts/dev/start.sh
+scripts/dev/start.sh --controlled-source-examples
 ```
 
 ```sh
@@ -158,3 +158,5 @@ DRBEAN_RELEASE_EVIDENCE_DIR=/absolute/path/to/release-evidence \
 ```
 
 The command installs locked dependencies in a fresh clone, runs the offline gates with isolated state, and copies a timestamped report for the exact tested commit before cleanup, including on gate failure. Existing historical reports are not rewritten. Inspect `offline_release_ready`, individual checks, platform facts and tested commit together. A source fixture is controlled intake output; the science and replay checks execute the actual engine. The release verdict does not qualify live Gemini or substitute for a human consultation, observed task, or presentation rehearsal.
+
+The source-example option configures only the packaged trusted local manifest. The web action uses the ordinary intake route; unsupported images offer manual entry. Omit the flag to keep source proposals disabled. No hosted provider is enabled.

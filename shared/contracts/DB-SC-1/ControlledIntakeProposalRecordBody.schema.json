@@ -1,0 +1,585 @@
+{
+  "$defs": {
+    "ControlledIntakeConflict": {
+      "additionalProperties": false,
+      "properties": {
+        "field_path": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "existing_value": {
+          "maxLength": 1000,
+          "title": "Existing Value",
+          "type": "string"
+        },
+        "proposed_value": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Proposed Value"
+        }
+      },
+      "required": [
+        "field_path",
+        "existing_value",
+        "proposed_value"
+      ],
+      "title": "ControlledIntakeConflict",
+      "type": "object"
+    },
+    "ControlledIntakeField": {
+      "additionalProperties": false,
+      "description": "A fixture-authored candidate, never Gemini transcription.",
+      "properties": {
+        "field_path": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "original_value": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Original Value"
+        },
+        "candidate_exact": {
+          "anyOf": [
+            {
+              "maxLength": 514,
+              "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Exact"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "source_asset_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Source Asset Id",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/SourceLocator"
+        },
+        "method": {
+          "const": "controlled_fixture",
+          "title": "Method",
+          "type": "string"
+        },
+        "grounding": {
+          "const": "unreviewed_visual",
+          "default": "unreviewed_visual",
+          "title": "Grounding",
+          "type": "string"
+        },
+        "ambiguity": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ambiguity"
+        }
+      },
+      "required": [
+        "field_path",
+        "original_value",
+        "source_asset_id",
+        "locator",
+        "method"
+      ],
+      "title": "ControlledIntakeField",
+      "type": "object"
+    },
+    "ControlledIntakeProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "local_attempt_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Local Attempt Id",
+          "type": "string"
+        },
+        "preview_schema_version": {
+          "const": "controlled-source-preview.v1",
+          "title": "Preview Schema Version",
+          "type": "string"
+        },
+        "prompt_version": {
+          "const": "controlled-source-proposal.v1",
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "prompt_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prompt Digest",
+          "type": "string"
+        },
+        "context_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Context Digest",
+          "type": "string"
+        },
+        "fixture_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fixture Id"
+        },
+        "fixture_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fixture Digest"
+        },
+        "fixture_version": {
+          "const": "controlled-source-fixtures.v1",
+          "title": "Fixture Version",
+          "type": "string"
+        },
+        "fixture_review_status": {
+          "const": "pending_independent_owner_review",
+          "title": "Fixture Review Status",
+          "type": "string"
+        },
+        "lookup_method": {
+          "const": "frozen_fixture_lookup",
+          "title": "Lookup Method",
+          "type": "string"
+        },
+        "source_metadata": {
+          "$ref": "#/$defs/SourceAssetMetadata"
+        }
+      },
+      "required": [
+        "local_attempt_id",
+        "preview_schema_version",
+        "prompt_version",
+        "prompt_digest",
+        "context_digest",
+        "fixture_id",
+        "fixture_digest",
+        "fixture_version",
+        "fixture_review_status",
+        "lookup_method",
+        "source_metadata"
+      ],
+      "title": "ControlledIntakeProvenance",
+      "type": "object"
+    },
+    "FieldDiagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Code",
+          "type": "string"
+        },
+        "field_path": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2000,
+          "title": "Message",
+          "type": "string"
+        },
+        "blocking": {
+          "default": true,
+          "title": "Blocking",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "field_path",
+        "message"
+      ],
+      "title": "FieldDiagnostic",
+      "type": "object"
+    },
+    "IntakeInputContext": {
+      "additionalProperties": false,
+      "description": "Server-captured workspace heads; null also identifies an exact state.",
+      "properties": {
+        "current_dataset_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Dataset Id"
+        },
+        "current_problem_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Problem Id"
+        }
+      },
+      "required": [
+        "current_dataset_id",
+        "current_problem_id"
+      ],
+      "title": "IntakeInputContext",
+      "type": "object"
+    },
+    "SourceAssetMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "declared_media_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg"
+          ],
+          "title": "Declared Media Type",
+          "type": "string"
+        },
+        "observed_media_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg"
+          ],
+          "title": "Observed Media Type",
+          "type": "string"
+        },
+        "byte_size": {
+          "maximum": 5242880,
+          "minimum": 1,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "width": {
+          "maximum": 12000000,
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 12000000,
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "origin": {
+          "enum": [
+            "synthetic",
+            "public"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "retention": {
+          "enum": [
+            "retain",
+            "digest_only"
+          ],
+          "title": "Retention",
+          "type": "string"
+        },
+        "upload_actor_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Upload Actor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "declared_media_type",
+        "observed_media_type",
+        "byte_size",
+        "width",
+        "height",
+        "origin",
+        "retention",
+        "upload_actor_id"
+      ],
+      "title": "SourceAssetMetadata",
+      "type": "object"
+    },
+    "SourceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "const": 1,
+          "default": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "label": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "excerpt": {
+          "maxLength": 1000,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "maximum": 12000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        }
+      },
+      "required": [
+        "label",
+        "excerpt"
+      ],
+      "title": "SourceLocator",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Separate additive wire type; legacy Gemini record bytes stay unchanged.",
+  "properties": {
+    "source_asset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Source Asset Id",
+      "type": "string"
+    },
+    "source_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Digest",
+      "type": "string"
+    },
+    "current_revision_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Revision Id"
+    },
+    "fields": {
+      "items": {
+        "$ref": "#/$defs/ControlledIntakeField"
+      },
+      "maxItems": 50,
+      "title": "Fields",
+      "type": "array"
+    },
+    "diagnostics": {
+      "items": {
+        "$ref": "#/$defs/FieldDiagnostic"
+      },
+      "maxItems": 50,
+      "title": "Diagnostics",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "controlled-intake.v1",
+      "default": "controlled-intake.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "execution_mode": {
+      "const": "controlled",
+      "default": "controlled",
+      "title": "Execution Mode",
+      "type": "string"
+    },
+    "authorship": {
+      "const": "controlled_fixture",
+      "default": "controlled_fixture",
+      "title": "Authorship",
+      "type": "string"
+    },
+    "label": {
+      "const": "Controlled example; not Gemini transcription.",
+      "default": "Controlled example; not Gemini transcription.",
+      "title": "Label",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "controlled_example",
+        "unavailable"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "code": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Code",
+      "type": "string"
+    },
+    "next_action": {
+      "enum": [
+        "review_controlled_preview",
+        "manual_review"
+      ],
+      "title": "Next Action",
+      "type": "string"
+    },
+    "conflicts": {
+      "items": {
+        "$ref": "#/$defs/ControlledIntakeConflict"
+      },
+      "maxItems": 50,
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "provenance": {
+      "$ref": "#/$defs/ControlledIntakeProvenance"
+    },
+    "input_context": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IntakeInputContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "review_state": {
+      "const": "unaccepted",
+      "default": "unaccepted",
+      "title": "Review State",
+      "type": "string"
+    },
+    "execution_approved": {
+      "const": false,
+      "default": false,
+      "title": "Execution Approved",
+      "type": "boolean"
+    },
+    "external_provider_calls": {
+      "const": 0,
+      "default": 0,
+      "title": "External Provider Calls",
+      "type": "integer"
+    },
+    "actual_model_tokens": {
+      "const": 0,
+      "default": 0,
+      "title": "Actual Model Tokens",
+      "type": "integer"
+    },
+    "live_qualification": {
+      "const": "not_run",
+      "default": "not_run",
+      "title": "Live Qualification",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_asset_id",
+    "source_digest",
+    "fields",
+    "status",
+    "code",
+    "next_action",
+    "provenance"
+  ],
+  "title": "ControlledIntakeProposalRecordBody",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ControlledIntakeProposalRecordBody"
+}

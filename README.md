@@ -19,10 +19,10 @@ scripts/dev/setup.sh
 Installs both runtimes, creates the private local auth file if absent, and prints the doctor report. It never deletes data in `var/`.
 
 ```sh
-scripts/dev/start.sh
+scripts/dev/start.sh --controlled-source-examples
 ```
 
-Starts the API (`127.0.0.1:8000`), the durable worker and the web workspace (`127.0.0.1:4173`) on one SQLite store under `var/`, waits until they answer, and prints service facts. Loopback only.
+Starts the API (`127.0.0.1:8000`), the durable worker and the web workspace (`127.0.0.1:4173`) on one SQLite store under `var/`, waits until they answer, and prints service facts. Loopback only. This explicit option enables the packaged synthetic source examples; Gemini remains disabled. Omit the option for manual-only source intake.
 
 ```sh
 scripts/dev/stop.sh

@@ -4,7 +4,7 @@ Nothing here has been published, posted or submitted. Publication, enrolment and
 
 ## Project
 
-**Name:** Dr. Bean (powered by Groundwork)
+**Name:** Dr. Bean (powered by Counterdex)
 
 **One line:** Dr. Bean helps a researcher see what their measurements actually constrain and choose a defensible next measurement, with a person reviewing every value and approving every computation.
 
@@ -20,9 +20,9 @@ Nothing here has been published, posted or submitted. Publication, enrolment and
 
 True today:
 
-> Dr. Bean takes a concentration time series, checks every number exactly as a fraction, and has the researcher state a two-rate model, parameter bounds and a claimed range for the elimination rate. The inputs are frozen into an immutable plan that a person must explicitly approve before one bounded run is accepted. Records survive restarts and reports download with verified hashes. The Counterdex engine, on its own, compares two candidate explanations at feasible future times with exact arithmetic and replays its evidence.
+> Dr. Bean takes a concentration time series, checks every number exactly as a fraction, and has the researcher state a two-rate model, parameter bounds and a claimed range for the elimination rate. The inputs are frozen into an immutable plan that a person must explicitly approve before one bounded run is accepted. Records survive restarts and reports download with verified hashes. The application runs Counterdex discovery, separately approved fixed-pair measurement design, and reviewed follow-up rechecking. Native evidence downloads and replays in a separate prepared interpreter. Source review uses clearly labeled controlled intake proposals; live extraction remains disabled.
 
-Becomes true only with the listed evidence:
+Implemented claims must be demonstrated from the named qualified build; do not substitute a test result for a human observation:
 
 | Sentence | Evidence required first |
 |---|---|
@@ -39,9 +39,9 @@ No judging weights, required models or win probabilities are known or claimed. O
 | Intended entry | Evidence available now | Still needed before claiming |
 |---|---|---|
 | Gemini | Production adapter in code, disabled; controlled-model tests of intake, constraints and the tool graph; zero provider requests, verified | A later authorized live run. Until then the entry says "integration prepared, not exercised". |
-| Amazon Practical AI (creativity, usefulness, technical implementation, user experience, equally weighted; no AWS required) | Technical: exact inputs, explicit approval, idempotent runs, restart recovery, one-command launch | A complete useful decision (G1, G2); observed user feedback; the minimal readable flow |
-| LangChain | Installed real deepagents graph with a bounded tool inventory, tested with a controlled model | Real scientific tools behind it (G1); Gemini-driven adaptive behaviour remains untested |
-| Science and Discovery (main track, confirmed) | Engine standalone: exact fixed-pair check and native replay on a synthetic example | Real counterexample, pair-specific measurement, follow-up and replay through the application |
+| Amazon Practical AI (creativity, usefulness, technical implementation, user experience, equally weighted; no AWS required) | Technical: exact inputs, explicit approval, idempotent runs, restart recovery, one-command launch | Observed user feedback and a completed real user decision; the offline software flow is qualified |
+| LangChain | Installed real deepagents graph with a bounded tool inventory, tested with a controlled model | Gemini-driven adaptive behaviour remains untested; controlled traces are not live AI qualification |
+| Science and Discovery (main track, confirmed) | Actual application discovery, separate pair design, follow-up and native replay on synthetic examples | Presentation-device rehearsal and an observed user task |
 | Peri | none | A genuine event-time consultation with a qualifying organization, with permitted evidence |
 | Overall / Rookie | n/a | Actual roster and eligibility per the organizers |
 

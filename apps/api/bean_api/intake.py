@@ -18,7 +18,10 @@ import uuid
 from pydantic import ValidationError
 
 from .canonical import parse_decimal, validate_rational
-from .contracts import IntakeProposalBody, IntakeProposalRecordBody, IntakeRequest, IntakeReviewRequest
+from .contracts import (
+    ControlledIntakeProposalRecordBody, ControlledIntakeRequest,
+    IntakeProposalBody, IntakeProposalRecordBody, IntakeRequest, IntakeReviewRequest,
+)
 from .workflow import DomainError
 
 MAX_SOURCE_BYTES = 5 * 1024 * 1024
@@ -180,13 +183,16 @@ def _normalize_scalar(value: str) -> str:
 
 
 class IntakeService:
-    def __init__(self, workflow, sources: SourceService, provider):
+    def __init__(self, workflow, sources: SourceService, provider, *, controlled_source_proposer=None):
         self.workflow = workflow
         self.sources = sources
         self.provider = provider
+        self.controlled_source_proposer = controlled_source_proposer
 
-    async def create(self, actor: str, workspace_id: str, request: IntakeRequest, key: str) -> dict:
+    async def create(self, actor: str, workspace_id: str, request: IntakeRequest | ControlledIntakeRequest, key: str) -> dict:
         self.workflow.authorize(actor, workspace_id)
+        if isinstance(request, ControlledIntakeRequest):
+            return self._create_controlled(actor, workspace_id, request, key)
         source, raw = self.sources.read(actor, request.source_id)
         if source["workspace_id"] != workspace_id:
             raise _error("not_found", "The source was not found in this workspace.", status=404)
@@ -269,7 +275,90 @@ class IntakeService:
                 raise
             raise _error(code, "The intake did not produce a usable proposal. Continue manually or inspect the recorded attempt.", status=503) from exc
 
-    def _validate_proposal(self, body: dict, source: dict, request: IntakeRequest) -> None:
+    def _create_controlled(self, actor: str, workspace_id: str, request: ControlledIntakeRequest, key: str) -> dict:
+        """Use the ordinary proposal/review path without a provider reservation."""
+        if self.controlled_source_proposer is None:
+            raise _error("controlled_intake_disabled", "Controlled source preparation is disabled; continue manually.", status=503)
+        source, raw = self.sources.read(actor, request.source_id)
+        if source["workspace_id"] != workspace_id:
+            raise _error("not_found", "The source was not found in this workspace.", status=404)
+        if source["body"]["sha256"] != request.expected_source_digest:
+            raise _error("source_binding_mismatch", "Prepare the exact selected source bytes.")
+        if source["body"]["origin"] != "synthetic":
+            raise _error("controlled_source_origin_mismatch", "Controlled development fixtures must retain synthetic origin.", paths=["source_id"])
+        operation = self.workflow.begin_operation(actor, workspace_id, "intake", key, request.model_dump())
+        if not operation["created_new"]:
+            if operation.get("response") is not None:
+                return operation["response"]
+            raise _error("operation_pending", "This intake operation needs reconciliation before new work.", status=409)
+        attempt = None
+        try:
+            current = self.workflow.workspace(actor, workspace_id)
+            input_context = {name: current[name] for name in ("current_dataset_id", "current_problem_id")}
+            if request.current_revision_id:
+                revision = self.workflow.get(actor, request.current_revision_id)
+                if revision["workspace_id"] != workspace_id or revision["kind"] not in {"dataset", "problem"}:
+                    raise _error("not_found", "The selected revision was not found.", status=404)
+                if revision["id"] not in {current["current_dataset_id"], current["current_problem_id"]}:
+                    raise _error("stale_revision", "Review the current input revision before preparing a new source.", status=409)
+            # This is a nonfinancial local trace. No consent identity, model
+            # request, token reservation or provider-ledger entry is invented.
+            attempt = self.workflow.create_record(actor, workspace_id, "controlled_attempt", {
+                "execution_lane": "controlled_source_preview", "operation_id": operation["id"],
+                "source_asset_id": source["id"], "source_digest": source["body"]["sha256"],
+                "current_revision_id": request.current_revision_id,
+                "input_context": input_context,
+                "lookup_method": "frozen_fixture_lookup", "external_provider_calls": 0, "actual_model_tokens": 0,
+            }, key, operation="controlled-intake-attempt", parent_id=source["id"])
+            preview = self.controlled_source_proposer.prepare(
+                source_asset_id=source["id"], metadata=source["body"], source_bytes=raw,
+                current_revision_id=request.current_revision_id, notes=request.notes,
+                existing_values=request.existing_values)
+            if (preview["source_asset_id"] != source["id"] or preview["source_digest"] != source["body"]["sha256"]
+                    or preview["observed_source_digest"] != source["body"]["sha256"]
+                    or preview["current_revision_id"] != request.current_revision_id
+                    or preview["width"] != source["body"]["width"] or preview["height"] != source["body"]["height"]):
+                raise _error("source_binding_mismatch", "The controlled preview does not match the retained source and revision.")
+            body = {"source_asset_id": source["id"], "source_digest": source["body"]["sha256"],
+                "current_revision_id": request.current_revision_id,
+                "fields": [{**field, "method": "controlled_fixture"} for field in preview["fields"]],
+                "diagnostics": preview["diagnostics"]}
+            self._validate_proposal(body, source, request, method="controlled_fixture")
+            body = ControlledIntakeProposalRecordBody.model_validate({**body,
+                "input_context": input_context,
+                "status": preview["status"], "code": preview["code"], "next_action": preview["next_action"],
+                "conflicts": preview["conflicts"], "provenance": {
+                    "local_attempt_id": attempt["id"], "preview_schema_version": preview["schema_version"],
+                    "prompt_version": preview["prompt_version"], "prompt_digest": preview["prompt_sha256"],
+                    "context_digest": preview["context_digest"], "fixture_id": preview["fixture_id"],
+                    "fixture_digest": preview["fixture_digest"], "fixture_version": preview["fixture_version"],
+                    "fixture_review_status": preview["fixture_review_status"],
+                    "lookup_method": preview["lookup_method"], "source_metadata": source["body"],
+                }}).model_dump(mode="json")
+            record = self.workflow.create_record(actor, workspace_id, "intake_proposal", body, key, operation="intake-result")
+            self.workflow.create_record(actor, workspace_id, "controlled_outcome", {
+                "local_attempt_id": attempt["id"], "execution_lane": "controlled_source_preview",
+                "status": body["status"], "code": body["code"], "proposal_id": record["id"],
+                "proposal_digest": record["digest"], "external_provider_calls": 0, "actual_model_tokens": 0,
+            }, key, operation="controlled-intake-outcome", parent_id=attempt["id"])
+            return self.workflow.finish_operation(actor, workspace_id, "intake", key, record)
+        except BaseException as exc:
+            code = getattr(exc, "code", "invalid_controlled_output")
+            if attempt is not None:
+                try:
+                    self.workflow.create_record(actor, workspace_id, "controlled_outcome", {
+                        "local_attempt_id": attempt["id"], "execution_lane": "controlled_source_preview",
+                        "status": "failed", "code": code, "external_provider_calls": 0, "actual_model_tokens": 0,
+                    }, key, operation="controlled-intake-outcome", parent_id=attempt["id"])
+                except DomainError:
+                    pass  # Preserve an already committed outcome after an uncertain response.
+            self.workflow.fail_operation(actor, workspace_id, "intake", key, code)
+            if isinstance(exc, (DomainError, KeyboardInterrupt, SystemExit)):
+                raise
+            raise _error(code, "Controlled preparation failed; accepted work is preserved. Continue manually.", status=503) from None
+
+    def _validate_proposal(self, body: dict, source: dict, request: IntakeRequest | ControlledIntakeRequest,
+                           *, method: str = "gemini_vision") -> None:
         if body["source_asset_id"] != source["id"] or body["source_digest"] != source["body"]["sha256"]:
             raise _error("source_binding_mismatch", "The provider returned a proposal for another source.")
         if body.get("current_revision_id") != request.current_revision_id:
@@ -280,7 +369,7 @@ class IntakeService:
             if not FIELD_PATH.fullmatch(path) or path in paths:
                 raise _error("invalid_field_path", "The provider returned a duplicate or unsupported field path.", paths=[path])
             paths.add(path)
-            if field["source_asset_id"] != source["id"] or field["grounding"] != "unreviewed_visual" or field["method"] != "gemini_vision":
+            if field["source_asset_id"] != source["id"] or field["grounding"] != "unreviewed_visual" or field["method"] != method:
                 raise _error("invalid_grounding", "Visual transcription cannot certify or accept itself.", paths=[path])
             locator = field["locator"]
             if locator["page"] != 1:
@@ -308,7 +397,13 @@ class IntakeService:
                 diagnostic("unsupported_unit", "Resolve the unit to a supported template unit.")
             proposed = field.get("candidate_exact") or field.get("original_value")
             existing = request.existing_values.get(path)
-            if existing is not None and proposed != existing:
+            matches = proposed == existing
+            if method == "controlled_fixture" and existing is not None and proposed is not None and _scalar_path(path):
+                try:
+                    matches = _normalize_scalar(existing) == _normalize_scalar(proposed)
+                except DomainError:
+                    matches = False
+            if existing is not None and not matches:
                 diagnostic("existing_value_conflict", "The source conflicts with an existing value; choose explicitly during review.")
 
     def review(
@@ -317,6 +412,10 @@ class IntakeService:
         proposal = self.workflow.get(actor, proposal_id, kind="intake_proposal")
         if proposal["workspace_id"] != workspace_id:
             raise _error("not_found", "The proposal was not found in this workspace.", status=404)
+        if proposal["body"].get("execution_mode") == "controlled":
+            controlled = ControlledIntakeProposalRecordBody.model_validate(proposal["body"])
+            if controlled.status == "unavailable":
+                raise _error("intake_unavailable", "This source produced no extracted values; continue through manual input.", status=409)
         if proposal["digest"] != request.expected_proposal_digest:
             raise _error("stale_proposal", "Review the exact current proposal before accepting values.", status=409)
         originals = {f["field_path"]: f for f in proposal["body"]["fields"]}
@@ -341,10 +440,35 @@ class IntakeService:
             if unit_expected and selected.value != unit_expected:
                 raise _error("unsupported_unit", f"This field requires {unit_expected}.", paths=[path])
             reviewed_values.append({**selected.model_dump(), "normalized_value": normalized, "original_proposal": original})
-        return self.workflow.create_record(
-            actor, workspace_id, "intake_review",
-            {"proposal_id": proposal_id, "proposal_digest": proposal["digest"], "source_asset_id": proposal["body"]["source_asset_id"],
+        body = {"proposal_id": proposal_id, "proposal_digest": proposal["digest"], "source_asset_id": proposal["body"]["source_asset_id"],
              "current_revision_id": proposal["body"].get("current_revision_id"), "reviewed_fields": reviewed_values,
-             "resolved_diagnostics": request.resolved_diagnostics, "review_state": "reviewed", "execution_approved": False},
-            key, operation="intake-review", parent_id=proposal_id,
-        )
+             "resolved_diagnostics": request.resolved_diagnostics, "review_state": "reviewed", "execution_approved": False}
+
+        def action(conn):
+            current = self.workflow.authorize(actor, workspace_id, conn)
+            validate_intake_context(proposal["body"], current)
+            source = self.workflow._get(conn, actor, body["source_asset_id"], "source_asset")
+            self.workflow._same_workspace(workspace_id, source)
+            if source["body"]["sha256"] != proposal["body"]["source_digest"]:
+                raise _error("source_binding_mismatch", "The reviewed proposal must match its original source.")
+            self.sources.read(actor, source["id"])
+            return self.workflow._insert(conn, actor, workspace_id, "intake_review", body, proposal_id)
+
+        # Keep create_record's existing request identity for historical retries.
+        return self.workflow._perform(actor, workspace_id, "intake-review", key,
+            {"body": body, "parent_id": proposal_id}, action)
+
+
+def validate_intake_context(proposal: dict, current: dict) -> None:
+    """Check both heads, including an initially empty workspace, under its lock."""
+    context = proposal.get("input_context")
+    if context is not None:
+        stale = any(current[name] != context[name] for name in ("current_dataset_id", "current_problem_id"))
+    elif proposal.get("execution_mode") == "controlled":
+        # Preserve readable historical records, but never infer a missing snapshot.
+        stale = True
+    else:
+        referenced = proposal.get("current_revision_id")
+        stale = referenced is not None and referenced not in {current["current_dataset_id"], current["current_problem_id"]}
+    if stale:
+        raise _error("stale_revision", "Inputs changed after source preparation; prepare and review a new proposal.", status=409)

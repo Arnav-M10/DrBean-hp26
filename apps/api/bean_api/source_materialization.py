@@ -8,6 +8,7 @@ import re
 
 from .canonical import canonical_bytes
 from .contracts import DatasetBody, MaterializeIntakeRequest, ProblemBody
+from .intake import validate_intake_context
 from .workflow import DomainError
 
 
@@ -72,6 +73,7 @@ class SourceMaterializationService:
             if proposal["digest"] != review["body"]["proposal_digest"] or proposal["body"]["source_digest"] != source["body"]["sha256"]:
                 raise DomainError("source_binding_mismatch", "Source, proposal and review identities do not agree.", 422)
             current = self.workflow.authorize(actor, workspace_id, conn)
+            validate_intake_context(proposal["body"], current)
             referenced = review["body"].get("current_revision_id")
             if referenced and referenced not in {current["current_dataset_id"], current["current_problem_id"]}:
                 raise DomainError("stale_revision", "The selected input changed after source review.", current_revision_id=current["current_problem_id"] or current["current_dataset_id"])

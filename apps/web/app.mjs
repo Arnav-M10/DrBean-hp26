@@ -336,7 +336,22 @@ byId('export-draft').addEventListener('click', () => {
 
 let renderWorkflow
 createBounds()
-renderWorkflow = setupWorkflow(currentDraft)
+renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
+  const accepted = new Map()
+  for (const field of review.body.reviewed_fields) {
+    const match = /^rows\[(\d+)\]\.(time|concentration|hard_allowance)$/.exec(field.field_path)
+    if (!match) continue
+    const index = Number(match[1]), row = accepted.get(index) || {}
+    row[match[2] === 'hard_allowance' ? 'epsilon' : match[2]] = field.normalized_value
+    accepted.set(index, row)
+  }
+  if (!accepted.size) throw new Error('This review has no supported measurement rows. Enter measurements manually.')
+  rows = []; sources = [{ id: source.id, name: 'Reviewed source image', description: 'Explicitly accepted controlled-source values; inspect the retained source review for original strings and corrections.' }]
+  for (const [, values] of [...accepted].sort((a, b) => a[0] - b[0])) addRow(values, source.id)
+  rowsReviewed = false; questionReviewed = false
+  byId('dataset-origin').value = source.body.origin === 'synthetic' ? 'synthetic' : ''
+  renderRows(); location.hash = 'inputs'; announce('Reviewed source values copied to the measurement draft. Review missing fields and the question before preparing science.')
+})
 addRow()
 renderRows()
 route(false)

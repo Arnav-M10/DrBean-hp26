@@ -451,9 +451,15 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("setup", "start", "stop", "status", "recover"):
-        sub.add_parser(name)
+        command = sub.add_parser(name)
+        if name == "start":
+            command.add_argument("--controlled-source-examples", action="store_true",
+                                 help="Enable only the packaged controlled source examples; Gemini remains disabled.")
     sub.add_parser("doctor").add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    if getattr(args, "controlled_source_examples", False):
+        os.environ["BEAN_SOURCE_INTAKE_MODE"] = "controlled"
+        os.environ["BEAN_CONTROLLED_SOURCE_MANIFEST"] = os.path.join(REPO, "scripts", "ai", "fixtures", "source-previews.v1.json")
     return {"setup": cmd_setup, "doctor": cmd_doctor, "start": cmd_start, "stop": cmd_stop,
             "status": cmd_status, "recover": cmd_recover}[args.command](args)
 

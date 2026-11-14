@@ -1,0 +1,145 @@
+{
+  "$defs": {
+    "SourceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "const": 1,
+          "default": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "label": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "excerpt": {
+          "maxLength": 1000,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "maximum": 12000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        }
+      },
+      "required": [
+        "label",
+        "excerpt"
+      ],
+      "title": "SourceLocator",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A fixture-authored candidate, never Gemini transcription.",
+  "properties": {
+    "field_path": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Field Path",
+      "type": "string"
+    },
+    "original_value": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Original Value"
+    },
+    "candidate_exact": {
+      "anyOf": [
+        {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate Exact"
+    },
+    "unit": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unit"
+    },
+    "source_asset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Source Asset Id",
+      "type": "string"
+    },
+    "locator": {
+      "$ref": "#/$defs/SourceLocator"
+    },
+    "method": {
+      "const": "controlled_fixture",
+      "title": "Method",
+      "type": "string"
+    },
+    "grounding": {
+      "const": "unreviewed_visual",
+      "default": "unreviewed_visual",
+      "title": "Grounding",
+      "type": "string"
+    },
+    "ambiguity": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ambiguity"
+    }
+  },
+  "required": [
+    "field_path",
+    "original_value",
+    "source_asset_id",
+    "locator",
+    "method"
+  ],
+  "title": "ControlledIntakeField",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ControlledIntakeField"
+}

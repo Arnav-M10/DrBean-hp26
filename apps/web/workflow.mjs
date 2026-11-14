@@ -13,13 +13,13 @@ function save(bytes, name) {
   const a = document.createElement('a'); a.href = url; a.download = name; a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
-export function setupWorkflow(getDraft) {
+export function setupWorkflow(getDraft, applyReviewedFields) {
   let api, capabilities, workspace = '', plan, approval, run, report, frozen, inputs, busy = false, pollTimer
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
   const available = () => baselineAvailable(capabilities)
-  const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save })
-  const sources = setupSourceWorkflow({ context: () => ({ api, workspace, busy }), getDraft, button, node, exactRecord, useInputs: async materialized => {
+  const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save, openRun: async id => { await refreshRun(id); location.hash = 'investigations' } })
+  const sources = setupSourceWorkflow({ context: () => ({ api, workspace, busy, capabilities }), applyReviewedFields, getDraft, button, node, exactRecord, useInputs: async materialized => {
     const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(materialized.problem))
     inputs = materialized; plan = prepared; frozen = fingerprint(); approval = undefined
   } })
@@ -91,7 +91,8 @@ export function setupWorkflow(getDraft) {
     button(investigations, 'Open or refresh run', () => refreshRun(), !api || !workspace)
     investigations.append(node('p', 'Keep the run identifier to reopen authenticated history. Pending runs update automatically. Refresh retrieves status; it never reruns a scenario.'))
     if (run) {
-      investigations.append(node('p', `${run.id} · execution: ${run.state}`), exactRecord('Run and scenario records', run))
+      const execution = node('p', `${run.id} · execution: ${run.state}`); execution.setAttribute('role', 'status')
+      investigations.append(execution, exactRecord('Run and scenario records', run))
       if (run.error_code) investigations.append(node('p', `Execution stopped: ${run.error_code}. Any completed evidence remains below.`))
       for (const evidence of run.evidence ?? []) {
         const result = evidence.body.result

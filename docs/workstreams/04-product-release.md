@@ -1,5 +1,8 @@
 # Workstream 4 log: product, integration and release
 
+Current checkpoint: PR #27 supplies source review and both follow-up modes. Clean checkout 366dfe1 passed every offline gate; final actual-follow-up candidate 2b4080d is being qualified. The sections below preserve chronological observations; earlier unavailable states are historical. Human consultation, observed task and device rehearsal remain pending.
+
+
 Standing brief: master document DB-MASTER-1, section 2. This log is a navigation aid; verify the repository before relying on it. Shared index: [issue ledger](../issue-ledger.md), [integration status](../INTEGRATION_STATUS.md).
 
 ## Current state

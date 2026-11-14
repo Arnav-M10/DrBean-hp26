@@ -14,7 +14,7 @@ from .auth import AuthenticationError, principal
 from .canonical import canonical_bytes, parse_decimal
 from .config import Settings
 from .contracts import (
-    AgentProviderConsent, ApprovalRequest, AssistantTurnRequest, CreatePlanRequest, DatasetBody,
+    AgentProviderConsent, ApprovalRequest, AssistantTurnRequest, ControlledIntakeRequest, CreatePlanRequest, DatasetBody,
     DecimalInputRequest, DesignRequestBody, IntakeRequest, IntakeReviewRequest, ObservationProposalBody,
     ObservationReviewRequest, ProblemBody, StartRunRequest, WorkspaceCreateRequest,
     MaterializeIntakeRequest,
@@ -45,19 +45,34 @@ def provider_config_from_env() -> ProviderConfig:
 
 def create_app(settings: Settings | None = None, *, provider=None, adapter=None) -> FastAPI:
     settings = settings or Settings.from_env()
+    controlled_source_proposer = None
+    if settings.source_intake_mode == "controlled":
+        from pathlib import Path
+        from .canonical import parse_json_strict
+        from .providers import ControlledSourceProposer
+        try:
+            manifest = Path(settings.controlled_source_manifest_path)
+            if not manifest.is_file():
+                raise ValueError("A regular local fixture manifest is required")
+            with manifest.open("rb") as stream:
+                raw_manifest = stream.read(128 * 1024 + 1)
+            controlled_source_proposer = ControlledSourceProposer(parse_json_strict(raw_manifest, max_bytes=128 * 1024))
+        except (OSError, TypeError, ValueError, ProviderFailure):
+            raise ValueError("Controlled source intake requires a valid bounded local fixture manifest") from None
     store = Store(settings.database_path)
     workflow = Workflow(store)
     ledger = ProviderLedger(store)
     provider = provider or GeminiProvider(provider_config_from_env(), ledger)
     adapter = adapter or create_science_adapter(settings.counterdex_python, settings.science_adapter)
     sources = SourceService(workflow, settings.blob_dir)
-    intake = IntakeService(workflow, sources, provider)
+    intake = IntakeService(workflow, sources, provider, controlled_source_proposer=controlled_source_proposer)
     conversation = ConversationService(workflow, provider, sources)
     artifacts = ArtifactService(workflow, settings.artifact_dir)
     materialization = SourceMaterializationService(workflow, sources)
     app = FastAPI(title="Dr. Bean research API", version="DB-SC-1", description="GF-2 policy. Explicit local SQLite lane. Scientific capabilities are reported at /capabilities.")
     app.state.settings, app.state.workflow, app.state.ledger = settings, workflow, ledger
     app.state.provider, app.state.adapter = provider, adapter
+    app.state.controlled_source_proposer = controlled_source_proposer
     app.add_middleware(RequestBoundary, max_json_bytes=settings.max_json_bytes, max_upload_bytes=settings.max_upload_bytes)
 
     @app.exception_handler(DomainError)
@@ -99,12 +114,16 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
                 "auth": "server_bearer", "manual_review": True,
                 "source_intake": {"media_types": ["image/png", "image/jpeg"], "max_assets": 1,
                                   "max_bytes": 5242880, "max_pixels": 12000000, "max_fields": 50,
-                                  "retention": "retain", "pdf": False},
+                                  "retention": "retain", "pdf": False,
+                                  "execution_mode": settings.source_intake_mode,
+                                  "application_review_integration": "available" if controlled_source_proposer else "disabled",
+                                  "controlled_authorship": "controlled_fixture" if controlled_source_proposer else None},
                 "model_templates": [{"id": "two_rate_concentration", "schema_implemented": True,
                                      "scientific_adapter_qualified": bool(adapter.capabilities().get("verified_in_environment")),
                                      "units": {"time": "h", "concentration": "mg/L", "rates": "1/h"},
                                      "initial_concentration": "0/1", "rate_order": "ke_lt_ka", "target_interval": "closed"}],
-                "science": adapter.capabilities(), "ai_mode": "disabled_placeholder",
+                "science": adapter.capabilities(),
+                "ai_mode": "controlled_placeholder" if controlled_source_proposer else "disabled_placeholder",
                 "gemini": {**provider.capabilities(), "dispatch_enabled": False, "live_qualification": "not_run"},
                 "deepagents": {"implemented": True, "configured": bool(provider.capabilities().get("configured")),
                                "reachable": None, "verified_in_environment": False},
@@ -232,7 +251,7 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
                         headers={"X-Artifact-SHA256": record["body"]["sha256"], "Content-Disposition": "inline"})
 
     @app.post(PREFIX + "/workspaces/{workspace_id}/intake-proposals", status_code=201)
-    async def intake_proposal(workspace_id: str, body: IntakeRequest, actor: Actor, key: OperationKey):
+    async def intake_proposal(workspace_id: str, body: IntakeRequest | ControlledIntakeRequest, actor: Actor, key: OperationKey):
         return await intake.create(actor, workspace_id, body, key)
 
     @app.post(PREFIX + "/workspaces/{workspace_id}/intake-proposals/{proposal_id}/review", status_code=201)
