@@ -1,4 +1,4 @@
-import { BeanApi, qualifiedScience } from './api.mjs'
+import { BeanApi, baselineAvailable, baselineExplanation } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 const byId = id => document.getElementById(id)
 function node(tag, text) { const n = document.createElement(tag); n.textContent = text; return n }
@@ -11,11 +11,11 @@ function save(bytes, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 export function setupWorkflow(getDraft) {
-  let api, capabilities, workspace = '', plan, approval, run, report, frozen, inputs, busy = false
+  let api, capabilities, workspace = '', plan, approval, run, report, frozen, inputs, busy = false, pollTimer
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
-  const qualified = () => qualifiedScience(capabilities)
-  function reset() { plan = approval = run = report = frozen = inputs = undefined }
+  const available = () => baselineAvailable(capabilities)
+  function reset() { clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined }
   function button(parent, label, action, disabled = false) {
     const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy
     b.addEventListener('click', () => perform(action)); parent.append(b); return b
@@ -33,8 +33,8 @@ export function setupWorkflow(getDraft) {
     for (const item of list) { const o = node('option', item.name); o.value = item.id; select.append(o) }
     select.value = workspace
   }
-  async function refreshRun() {
-    const loaded = await api.json(`/runs/${encodeURIComponent(byId('run-id').value.trim())}`)
+  async function refreshRun(id = byId('run-id').value.trim()) {
+    const loaded = await api.json(`/runs/${encodeURIComponent(id)}`)
     if (loaded.workspace_id !== workspace) throw new Error('Select the run’s workspace before opening it.')
     const evidence = await Promise.all(loaded.scenarios.filter(s => s.result_id).map(s => api.json(`/records/${encodeURIComponent(s.result_id)}`)))
     run = { ...loaded, evidence }; report = undefined
@@ -44,7 +44,7 @@ export function setupWorkflow(getDraft) {
     byId('workspace-controls').hidden = !api
     for (const id of ['connect-form', 'new-workspace']) for (const el of byId(id).elements) el.disabled = busy
     byId('workspace-select').disabled = busy
-    review.append(node('p', !api ? 'Investigation planning is unavailable. Connect to the local backend above.' : !workspace ? 'Choose a workspace above.' : qualified() ? 'Save reviewed inputs to prepare a provider-free baseline plan.' : 'Plan review is available. Scientific execution is unavailable: Owner 02 must connect and qualify Owner 01’s Counterdex adapter in the API and worker.'))
+    review.append(node('p', !api ? 'Investigation planning is unavailable. Connect to the local backend above.' : !workspace ? 'Choose a workspace above.' : available() ? 'Save reviewed inputs to prepare a baseline investigation. Counterdex will search and check these exact inputs. No model-provider calls are used.' : `Plan review is available. Baseline execution is unavailable: ${capabilities?.science?.reason || 'the configured runtime does not offer baseline discovery'}.`))
     button(review, 'Save inputs and prepare plan', async () => {
       const draft = getDraft(), snapshot = fingerprint()
       const datasetPayload = datasetBody(draft, draft.context)
@@ -52,11 +52,11 @@ export function setupWorkflow(getDraft) {
       problemBody(draft, { id: '', digest: '' })
       const dataset = await api.json(`/workspaces/${workspace}/datasets`, datasetPayload)
       const problem = await api.json(`/workspaces/${workspace}/problems`, problemBody(draft, dataset))
-      const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(problem))
+      const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(problem, draft.question.goal))
       plan = prepared; inputs = { dataset, problem }; frozen = snapshot; approval = undefined
     }, !api || !workspace)
     if (plan) {
-      review.append(node('p', `Plan ${plan.id} · server digest ${plan.digest}`), node('p', 'One baseline; no optional scenario. Provider: none; no source transmission. Limits: 0 provider turns, 2 tool calls, 1 scientific reservation, 120 seconds. Design work requires a separate approval.'), exactRecord('Exact frozen dataset and problem', inputs), exactRecord('Exact frozen plan', plan))
+      review.append(node('p', `Plan ${plan.id} · server digest ${plan.digest}`), node('h4', 'Question for this investigation'), node('p', plan.body.objective.question), node('p', plan.body.objective.success_criterion), node('p', 'One baseline; no optional scenario. Provider: none; no source transmission. Limits: 0 provider turns, 2 tool calls, 1 scientific reservation, 120 seconds. Design work requires a separate approval.'), exactRecord('Exact frozen dataset and problem', inputs), exactRecord('Exact frozen plan', plan))
       if (!currentPlan()) review.append(node('p', 'Draft changed. Prepare a new plan before approving or queueing.'))
       const label = node('label', ' I reviewed the exact frozen plan and approve only this scope.')
       const check = document.createElement('input'); check.type = 'checkbox'; check.id = 'approve-scope'; check.disabled = !currentPlan() || Boolean(approval) || busy
@@ -69,32 +69,66 @@ export function setupWorkflow(getDraft) {
       if (approval) review.append(exactRecord('Approval receipt', approval))
       button(review, 'Queue approved manual run', async () => {
         capabilities = await api.json('/capabilities')
-        if (!qualified() || !currentPlan() || !approval) throw new Error('Qualified adapter and current explicit approval required.')
+        if (!available() || !currentPlan() || !approval) throw new Error('Available baseline discovery and current explicit approval are required.')
         run = await api.json(`/plans/${plan.id}/runs`, { approval_id: approval.id, expected_plan_digest: plan.digest })
+        byId('run-id').value = run.id
         report = undefined; location.hash = 'investigations'
-      }, !qualified() || !approval || !currentPlan() || Boolean(run && run.plan_id === plan.id))
+      }, !available() || !approval || !currentPlan() || Boolean(run && run.plan_id === plan.id))
     }
     const investigations = byId('backend-investigations'), previousId = byId('run-id')?.value || run?.id || ''
     investigations.replaceChildren(node('h3', 'Persisted investigation'))
     const label = node('label', 'Run identifier'); label.className = 'stack'
     const input = document.createElement('input'); input.type = 'text'; input.id = 'run-id'; input.value = previousId
     label.append(input); investigations.append(label)
-    button(investigations, 'Open or refresh run', refreshRun, !api || !workspace)
-    investigations.append(node('p', 'Use a saved run identifier to reopen authenticated history. Refresh retrieves status; it never reruns a scenario.'))
+    button(investigations, 'Open or refresh run', () => refreshRun(), !api || !workspace)
+    investigations.append(node('p', 'Keep the run identifier to reopen authenticated history. Pending runs update automatically. Refresh retrieves status; it never reruns a scenario.'))
     if (run) {
       investigations.append(node('p', `${run.id} · execution: ${run.state}`), exactRecord('Run and scenario records', run))
+      if (run.error_code) investigations.append(node('p', `Execution stopped: ${run.error_code}. Any completed evidence remains below.`))
       for (const evidence of run.evidence ?? []) {
         const result = evidence.body.result
-        investigations.append(node('h4', `Scenario ${evidence.body.scenario_id}`), node('p', `Outcome: ${result.scientific_outcome}. Verification: ${result.verification}. Expected binding: ${result.expected_binding}. Replay: ${result.replay}. Reason: ${result.reason_code ?? 'none'}.`), node('p', 'These are persisted server states. This browser has not replayed or independently verified scientific evidence.'), exactRecord('Exact evidence record', evidence))
+        investigations.append(node('h4', `Scenario ${evidence.body.scenario_id}`), node('p', baselineExplanation(result)), node('p', `Outcome: ${result.scientific_outcome}. Verification: ${result.verification}. Expected binding: ${result.expected_binding}. Replay: ${result.replay}. Reason: ${result.reason_code ?? 'none'}.`), node('p', 'These are persisted server states. This browser has not replayed or independently verified scientific evidence.'))
+        if (result.candidates?.length) {
+          const region = node('div', ''); region.className = 'table-region'; region.tabIndex = 0; region.setAttribute('role', 'region'); region.setAttribute('aria-label', 'Computed candidate parameters')
+          const table = node('table', ''), head = node('thead', ''), headings = node('tr', ''), body = node('tbody', '')
+          for (const title of ['Candidate', 'A (mg/L)', 'ke (1/h)', 'ka (1/h)', 'Verification']) { const th = node('th', title); th.scope = 'col'; headings.append(th) }
+          head.append(headings)
+          for (const candidate of result.candidates) {
+            const row = node('tr', '')
+            for (const value of [candidate.id, candidate.parameter_vector.A, candidate.parameter_vector.ke, candidate.parameter_vector.ka, candidate.verification]) row.append(node('td', value))
+            body.append(row)
+          }
+          table.append(head, body); region.append(table); investigations.append(node('p', 'Computed candidate parameters are exact rational values. Each candidate remains bound to this reviewed problem.'), region)
+        }
+        investigations.append(exactRecord('Exact evidence record', evidence))
         button(investigations, 'Download exact evidence record', async () => {
           const artifact = await api.download(`/artifacts/${evidence.id}`); save(artifact.bytes, `dr-bean-${evidence.id}.json`)
           byId('status').textContent = `Downloaded exact bytes. SHA-256 ${artifact.digest}. Byte integrity does not establish scientific validity.`
         })
+        for (const reference of result.artifacts ?? []) {
+          const name = `dr-bean-${reference.id}`
+          investigations.append(node('h4', `Native scientific evidence ${reference.id}`), node('p', `${reference.byte_size} bytes · SHA-256 ${reference.sha256}`))
+          button(investigations, 'Download native scientific evidence', async () => {
+            const download = await api.download(`/artifacts/${encodeURIComponent(reference.id)}`, reference)
+            save(download.bytes, `${name}.native.json`)
+            byId('status').textContent = 'Native evidence downloaded. Download its separate replay anchors and use a prepared Counterdex interpreter to replay it.'
+          })
+          button(investigations, 'Download replay anchors', async () => {
+            const download = await api.download(`/artifacts/${encodeURIComponent(reference.id)}/anchor?download=true`)
+            save(download.bytes, `${name}.anchors.json`)
+          })
+          const instructions = node('details', '')
+          const replayScope = result.replay === 'passed'
+            ? 'Replay freshly checks the recorded candidate mathematically; it never reruns discovery.'
+            : 'Replay validates evidence integrity and expected identities. It does not rerun discovery or establish the absence of a counterexample.'
+          instructions.append(node('summary', 'Replay this evidence outside the browser'), node('p', `Use the matching prepared Counterdex package with CPython 3.11. Supply the separately downloaded anchors as the expected identities. ${replayScope} Browser download hashes establish byte integrity only.`), node('pre', `python3.11 -m counterdex replay-native ${name}.native.json --anchors ${name}.anchors.json`))
+          investigations.append(instructions)
+        }
       }
     }
-    investigations.append(node('p', 'Next-measurement workflow unavailable: no adopted qualified design adapter is connected. Owner 02 must adopt Owner 01’s projection and artifact mapping; suggestions require their own reviewed plan and approval.'))
+    investigations.append(node('p', 'Next-measurement design and follow-up controls are not part of this baseline screen. They require their own reviewed inputs and approval.'))
     const reports = byId('backend-report'); reports.replaceChildren(node('h3', 'Reviewer snapshot'))
-    reports.append(node('p', 'A report freezes the selected run, inputs, evidence and design records at creation. A JSON byte hash is not scientific replay. Public reviewer sharing and portable native bundles are unavailable.'))
+    reports.append(node('p', 'A report freezes the selected run, inputs and evidence inventory at creation. Download native scientific evidence and its separate replay anchors from Investigations. A report JSON byte hash is not scientific replay. Public reviewer sharing is unavailable.'))
     button(reports, 'Create report for selected run', async () => { report = await api.json(`/runs/${run.id}/reports`, {}) }, !api || !run)
     if (report) {
       reports.append(exactRecord('Report snapshot', report))
@@ -102,6 +136,11 @@ export function setupWorkflow(getDraft) {
         const download = await api.download(`/reports/${report.id}/download`); save(download.bytes, `dr-bean-${report.id}.json`)
         byId('status').textContent = `Downloaded SHA-256 ${download.digest}. Browser replay: unsupported.`
       })
+    }
+    clearTimeout(pollTimer)
+    if (api && run && ['queued', 'running', 'cancel_requested'].includes(run.state) && !busy) {
+      const id = run.id
+      pollTimer = setTimeout(() => perform(() => refreshRun(id)), 1000)
     }
   }
   byId('connect-form').addEventListener('submit', event => {
@@ -111,7 +150,7 @@ export function setupWorkflow(getDraft) {
       if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('Unsupported API contract or policy version.')
       await candidate.json('/workspaces') // Authenticate before retaining the client.
       api = candidate; capabilities = caps; workspace = ''; reset(); await workspaces()
-      byId('connection-status').textContent = `Connected · DB-SC-1 / GF-2. Science: ${qualified() ? 'qualified by server' : 'unavailable'}. Gemini intake and follow-up: unavailable in this frontend; live service qualification and separate payload consent are required.`
+      byId('connection-status').textContent = `Connected · DB-SC-1 / GF-2. Baseline discovery: ${available() ? 'available; each result is checked separately' : 'unavailable'}. Gemini remains disabled. No model-provider calls are made by this manual workflow.`
     })
   })
   byId('disconnect').addEventListener('click', () => {

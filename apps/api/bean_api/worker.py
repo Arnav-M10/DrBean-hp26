@@ -39,7 +39,8 @@ class Worker:
         self.controlled_model = controlled_model
         self.artifacts = ArtifactService(workflow, self.settings.artifact_dir)
 
-    def _publish_native(self, actor, job, result, *, problem, dataset, aggregate_limit):
+    def _publish_native(self, actor, job, result, *, problem, dataset, aggregate_limit,
+                        application_projection=None, scenario_id=None):
         packets = result.pop("_native_artifacts", [])
         if not packets:
             if result.get("scientific_problem_digest") and result.get("artifacts"):
@@ -47,13 +48,23 @@ class Worker:
             return result
         from .canonical import semantic_digest
         from .scientific_projection import PROJECTION_VERSION, project_problem
-        scientific_digest = semantic_digest("problem", project_problem(problem, dataset))
+        from .baseline_evidence import MAPPING_POLICY, expected_baseline_anchor, validate_baseline_packet
+        baseline = result.get("projection_version") == MAPPING_POLICY
+        if baseline:
+            from .counterdex_adapter import CounterdexAdapter
+            if type(self.adapter) is not CounterdexAdapter or scenario_id is None or len(packets) != 1:
+                raise DomainError("binding_mismatch", "Native baseline publication needs the reserved scientific scope.")
+            expected_anchor = expected_baseline_anchor(application_projection, problem=problem, dataset=dataset,
+                                                       job=job, scenario_id=scenario_id)
+            scientific_digest = expected_anchor["projection_digest"]
+        else:
+            scientific_digest = semantic_digest("problem", project_problem(problem, dataset))
+            expected_anchor = {"projection_version": PROJECTION_VERSION,
+                "application_problem_id": problem["id"], "application_problem_digest": problem["digest"],
+                "application_dataset_id": dataset["id"], "application_dataset_digest": dataset["digest"],
+                "scientific_problem_digest": scientific_digest}
         if result.get("scientific_problem_digest") != scientific_digest:
             raise DomainError("binding_mismatch", "Native export must bind the frozen scientific projection.")
-        expected_anchor = {"projection_version": PROJECTION_VERSION,
-            "application_problem_id": problem["id"], "application_problem_digest": problem["digest"],
-            "application_dataset_id": dataset["id"], "application_dataset_digest": dataset["digest"],
-            "scientific_problem_digest": scientific_digest}
         for field in ("scientific_design_digest", "native_suggestion_digest"):
             if result.get(field):
                 expected_anchor[field] = result[field]
@@ -77,8 +88,16 @@ class Worker:
             anchor = packet.get("anchor", {})
             if any(anchor.get(field) != value for field, value in expected_anchor.items()):
                 raise DomainError("binding_mismatch", "Native anchors must match the frozen application and scientific identities.")
-            items.append({"content": content, "media_type": packet["media_type"],
-                          "artifact_kind": packet["artifact_kind"], "anchor": packet["anchor"]})
+            item = {"content": content, "media_type": packet["media_type"],
+                    "artifact_kind": packet["artifact_kind"], "anchor": anchor}
+            if baseline:
+                if anchor != {**expected_anchor, "artifact_sha256": reference["sha256"]}:
+                    raise DomainError("binding_mismatch", "The native replay anchor must exactly identify these retained bytes.")
+                validate_baseline_packet(content, anchor, projection=application_projection, job=job,
+                                         scenario_id=scenario_id, result=result)
+                item["origin"] = {"run_id": job["id"], "scenario_id": scenario_id,
+                                  "plan_id": job["plan_id"], "approval_id": job["approval_id"]}
+            items.append(item)
         verification = result.get("verification_record")
         if verification and (verification["artifact_id"] not in by_id
                 or verification["artifact_sha256"] != by_id[verification["artifact_id"]]["sha256"]
@@ -110,6 +129,9 @@ class Worker:
         from .counterdex_adapter import CounterdexAdapter
         if type(self.adapter) is not CounterdexAdapter:
             return False
+        from .baseline_evidence import MAPPING_POLICY, baseline_result_checked
+        if result.get("projection_version") == MAPPING_POLICY:
+            return baseline_result_checked(result)
         replay = result.get("native_replay") or {}
         record = result.get("verification_record") or {}
         fresh = replay.get("fresh_checked") or {}
@@ -170,15 +192,22 @@ class Worker:
         if wall < 1:
             self.workflow.fail_scenario(actor, run_id, scenario_id, "budget_exhausted")
             raise DomainError("budget_exhausted", "No scientific wall budget remains.")
+        from .counterdex_adapter import CounterdexAdapter
+        args = (problem, dataset, {**plan["body"]["budget"], "scientific_wall_seconds": wall})
+        if type(self.adapter) is CounterdexAdapter:
+            args += ({"run_id": run_id, "scenario_id": scenario_id, "workflow": {
+                "plan_id": plan["id"], "approval_id": job["approval_id"],
+                "operation_id": run_id, "execution_id": run_id}},)
         task = asyncio.create_task(asyncio.to_thread(
-            run_bounded, self.adapter, "investigate", (problem, dataset, plan["body"]["budget"]),
+            run_bounded, self.adapter, "investigate", args,
             wall_seconds=wall, cancelled=lambda: stop.is_set() or self._cancelled(actor, run_id),
-            result_cap=3 * 1024 * 1024))
+            result_cap=12 * 1024 * 1024))
         try:
             result = await asyncio.shield(task)
             if "worker_error" in result:
                 raise DomainError(result["worker_error"], "The scientific worker stopped without a completed result.")
             native = result.pop("_native_artifacts", [])
+            application_projection = result.pop("_application_projection", None)
             result = ScientificResult.model_validate(result).model_dump(mode="json")
             if result["problem_id"] != problem["id"] or result.get("problem_digest") not in {None, problem["digest"]}:
                 raise DomainError("binding_mismatch", "Adapter output does not bind the reserved problem.")
@@ -186,7 +215,8 @@ class Worker:
                 raise DomainError("adapter_not_qualified", "This adapter is not qualified to emit checked evidence.")
             result["_native_artifacts"] = native
             result = self._publish_native(actor, job, result, problem=problem, dataset=dataset,
-                                          aggregate_limit=2 * 1024 * 1024)
+                                          aggregate_limit=4 * 1024 * 1024,
+                                          application_projection=application_projection, scenario_id=scenario_id)
             evidence = self.workflow.complete_scenario(actor, run_id, scenario_id, result)
             return self._fact(evidence)
         except asyncio.CancelledError:

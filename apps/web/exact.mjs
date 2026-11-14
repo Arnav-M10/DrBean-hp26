@@ -136,6 +136,7 @@ export function parseMeasurementsCsv(text) {
 export function validateMeasurements(rows) {
   const errors = [];
   const includedTimes = new Set();
+  if (rows.length > 128) errors.push({ index: -1, field: 'rows', message: 'Counterdex supports at most 128 rows, including excluded rows.' });
   rows.forEach((row, index) => {
     for (const field of measurementFields) {
       try {
@@ -149,6 +150,7 @@ export function validateMeasurements(rows) {
         if (field === "epsilon" && compareExact(value, "0/1") <= 0) {
           throw new Error("Enter a positive hard allowance.");
         }
+        if (field === "concentration" && compareExact(value, "0/1") < 0) throw new Error("Enter a nonnegative concentration.");
       } catch (error) {
         errors.push({ index, field, message: error.message });
       }

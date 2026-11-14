@@ -37,6 +37,153 @@
       "title": "ArtifactReference",
       "type": "object"
     },
+    "BaselineSearchSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "policy": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Policy",
+          "type": "string"
+        },
+        "ka_points": {
+          "maximum": 128,
+          "minimum": 2,
+          "title": "Ka Points",
+          "type": "integer"
+        },
+        "ke_points": {
+          "maximum": 128,
+          "minimum": 2,
+          "title": "Ke Points",
+          "type": "integer"
+        },
+        "max_candidates": {
+          "maximum": 32,
+          "minimum": 1,
+          "title": "Max Candidates",
+          "type": "integer"
+        },
+        "max_rate_pairs": {
+          "maximum": 16384,
+          "minimum": 1,
+          "title": "Max Rate Pairs",
+          "type": "integer"
+        },
+        "wall_seconds": {
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Wall Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "policy",
+        "ka_points",
+        "ke_points",
+        "max_candidates",
+        "max_rate_pairs",
+        "wall_seconds"
+      ],
+      "title": "BaselineSearchSettings",
+      "type": "object"
+    },
+    "BaselineSearchSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "policy": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Policy",
+          "type": "string"
+        },
+        "execution": {
+          "enum": [
+            "completed",
+            "partial",
+            "failed",
+            "cancelled",
+            "interrupted"
+          ],
+          "title": "Execution",
+          "type": "string"
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
+        },
+        "partial": {
+          "title": "Partial",
+          "type": "boolean"
+        },
+        "attempted_count": {
+          "maximum": 16384,
+          "minimum": 0,
+          "title": "Attempted Count",
+          "type": "integer"
+        },
+        "evaluated_count": {
+          "maximum": 16384,
+          "minimum": 0,
+          "title": "Evaluated Count",
+          "type": "integer"
+        },
+        "possible_count": {
+          "maximum": 16384,
+          "minimum": 0,
+          "title": "Possible Count",
+          "type": "integer"
+        },
+        "feasible_count": {
+          "maximum": 16384,
+          "minimum": 0,
+          "title": "Feasible Count",
+          "type": "integer"
+        },
+        "retained_count": {
+          "maximum": 32,
+          "minimum": 0,
+          "title": "Retained Count",
+          "type": "integer"
+        },
+        "exact_attempts": {
+          "maximum": 32,
+          "minimum": 0,
+          "title": "Exact Attempts",
+          "type": "integer"
+        },
+        "settings": {
+          "$ref": "#/$defs/BaselineSearchSettings"
+        }
+      },
+      "required": [
+        "policy",
+        "execution",
+        "partial",
+        "attempted_count",
+        "evaluated_count",
+        "possible_count",
+        "feasible_count",
+        "retained_count",
+        "exact_attempts",
+        "settings"
+      ],
+      "title": "BaselineSearchSummary",
+      "type": "object"
+    },
     "CandidateReference": {
       "additionalProperties": false,
       "properties": {
@@ -440,7 +587,10 @@
     "projection_version": {
       "anyOf": [
         {
-          "const": "bean-to-counterdex.v1",
+          "enum": [
+            "bean-to-counterdex.v1",
+            "DB-SC-1-to-groundwork-v1"
+          ],
           "type": "string"
         },
         {
@@ -502,6 +652,17 @@
       "maxProperties": 64,
       "title": "Native Replay",
       "type": "object"
+    },
+    "baseline_search": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BaselineSearchSummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
