@@ -22,6 +22,7 @@ const routes = new Map([
   ['/design.mjs', ['design.mjs', 'text/javascript']],
   ['/followup-workflow.mjs', ['followup-workflow.mjs', 'text/javascript']],
   ['/design-workflow.mjs', ['design-workflow.mjs', 'text/javascript']],
+  ['/result-view.mjs', ['result-view.mjs', 'text/javascript']],
   ['/styles.css', ['styles.css', 'text/css']],
 ]);
 

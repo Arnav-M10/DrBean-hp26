@@ -3,122 +3,234 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
   <link rel="icon" href="data:,">
-  <title>Dr. Bean · Research workspace</title>
+  <title>Dr. Bean · Check a scientific claim</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to main content</a>
-  <header class="masthead">
-    <a class="brand" href="#research"><span class="brand-mark" aria-hidden="true"></span>Dr. Bean</a>
-    <span class="powered">Research evidence · Counterdex for supported scientific checks</span>
-    <span class="local-tag">Your research</span>
+  <header class="topbar">
+    <a class="brand" href="#start"><span class="brand-mark" aria-hidden="true"></span>Dr. Bean</a>
+    <p id="study-context" class="study-context" aria-live="polite"></p>
+    <p id="connection-pill" class="connection-pill" data-state="off">Not connected</p>
   </header>
-  <div class="workspace">
-    <div class="workspace-heading">
-      <div>
-        <p class="eyebrow">Research workspace</p>
-        <h1>Your research workspace</h1>
-      </div>
-      <button id="export-draft" type="button" class="secondary">Download draft</button>
-    </div>
-    <nav aria-label="Workspace" class="workspace-nav">
-      <a href="#research">Add your data or paper</a>
-      <a href="#inputs">Inputs</a>
-      <a href="#question">Question</a>
-      <a href="#review">Review</a>
-      <a href="#investigations">Investigations</a>
-      <a href="#report">Report</a>
+
+  <div class="shell">
+    <nav class="steps" aria-label="Study steps">
+      <ol id="step-list">
+        <li data-step="start"><a href="#start"><span class="step-n" aria-hidden="true">1</span><span class="step-text"><span class="step-name">Start</span><span class="step-state"></span></span></a></li>
+        <li data-step="inputs"><a href="#inputs"><span class="step-n" aria-hidden="true">2</span><span class="step-text"><span class="step-name">Check inputs</span><span class="step-state"></span></span></a>
+          <ol class="substeps">
+            <li><a href="#inputs">Inputs</a></li>
+            <li><a href="#question">Question</a></li>
+            <li><a href="#review">Review</a></li>
+          </ol>
+        </li>
+        <li data-step="investigations"><a href="#investigations"><span class="step-n" aria-hidden="true">3</span><span class="step-text"><span class="step-name">Investigate</span><span class="step-state"></span></span></a></li>
+        <li data-step="result"><a href="#result"><span class="step-n" aria-hidden="true">4</span><span class="step-text"><span class="step-name">Result</span><span class="step-state"></span></span></a></li>
+        <li data-step="next"><a href="#next"><span class="step-n" aria-hidden="true">5</span><span class="step-text"><span class="step-name">Next measurement</span><span class="step-state"></span></span></a>
+          <ol class="substeps">
+            <li><a href="#next">Compare times</a></li>
+            <li><a href="#report">Report</a></li>
+          </ol>
+        </li>
+      </ol>
+      <p class="steps-note">Moving between steps never runs, approves or resubmits anything.</p>
     </nav>
+
     <main id="main" tabindex="-1">
-      <section id="research" aria-labelledby="research-title">
-        <div class="section-heading"><h2 id="research-title" tabindex="-1">Add your data or paper</h2><p>Inspect your files, ask a question, review what will be sent, and explore cited evidence. General AI analysis is separate from mathematical verification.</p></div>
-        <div id="general-workspace"></div>
-        <div id="durable-research" class="card" aria-live="polite"></div>
-      </section>
-      <details class="card" id="connection-panel"><summary>Advanced server connection</summary>
-          <p>Connect to this Dr. Bean server with your researcher access token. Gemini uses the server owner's key; you do not need a Gemini key. Your access token stays in memory until you disconnect or close this tab.</p>
-          <form id="connect-form">
+      <details id="connection-panel" class="connection"><summary>Connect to a Dr. Bean server</summary>
+        <div class="connection-body">
+          <p>Paste the researcher access token the server owner gave you. It stays in this tab's memory only and is cleared when you disconnect or close the tab. You never need a Gemini key.</p>
+          <form id="connect-form" class="inline-form">
             <label class="stack">Researcher access token<input id="bearer" type="password" autocomplete="off" required></label>
-            <button type="submit">Connect</button><button id="disconnect" type="button" class="secondary">Disconnect</button>
+            <div class="actions"><button type="submit">Connect</button><button id="disconnect" type="button" class="secondary">Disconnect</button></div>
           </form>
           <p id="connection-status" role="status">Disconnected. Investigation planning is unavailable.</p>
           <div id="workspace-controls" hidden>
             <label class="stack">Workspace<select id="workspace-select" aria-label="Workspace"></select></label>
-            <form id="new-workspace"><label class="stack">New workspace name<input id="workspace-name" type="text" maxlength="120" required></label><button>Create workspace</button></form>
+            <form id="new-workspace" class="inline-form"><label class="stack">New workspace name<input id="workspace-name" type="text" maxlength="120" required></label><button>Create workspace</button></form>
           </div>
-          <div id="backend-error" class="errors" role="alert" hidden></div>
-        </details>
-      <div class="card" id="backend-source-review"></div>
-      <section id="inputs" aria-labelledby="inputs-title">
-        <div class="section-heading">
-          <h2 id="inputs-title" tabindex="-1">Measurements</h2>
-          <p>Import a CSV or enter your readings. Use elapsed hours and concentrations in mg/L.</p>
         </div>
-        <div class="card import-card">
+      </details>
+      <div id="connect-hint" class="note wait connect-hint"><p id="connect-hint-text"></p><button type="button" class="secondary" id="connect-hint-open">Open connection</button></div>
+      <div id="backend-error" class="errors" role="alert" hidden></div>
+
+      <!-- 1 · Start -->
+      <section id="start" class="page" aria-labelledby="start-title">
+        <header class="page-head">
+          <h1 id="start-title" tabindex="-1">Bring your measurements and check a claim</h1>
+          <p class="lede">Dr. Bean tests a claimed range for a drug's elimination rate against your concentration measurements. It searches for parameter values that fit every reading within its allowance but fall outside the claim, then helps you choose the next measurement that would tell two explanations apart.</p>
+        </header>
+
+        <div class="begin">
+          <div class="begin-main">
+            <h2>Start a study</h2>
+            <p>You will review the measurements and the claim, approve one bounded check, and read what the checker found.</p>
+            <div class="actions">
+              <button type="button" id="start-example">Start with the example study</button>
+              <a class="button secondary" href="#inputs" id="start-manual">Enter measurements myself</a>
+            </div>
+            <p class="fine">The example is synthetic: five readings between 0.25 and 4 hours, each allowed ±0.50 mg/L, testing the claim that the elimination rate lies between 0.10 and 0.17 per hour.</p>
+          </div>
+          <dl class="scope">
+            <div><dt>Model</dt><dd>Two-rate concentration curve, C(t) = A·(e<sup>−ke·t</sup> − e<sup>−ka·t</sup>)</dd></div>
+            <div><dt>Units</dt><dd>Elapsed hours, mg/L, rates per hour</dd></div>
+            <div><dt>Data you can bring</dt><dd>Typed values, a CSV with <code>time,concentration,epsilon</code>, or a PNG/JPEG lab sheet read under review</dd></div>
+            <div><dt>Who decides what</dt><dd>You review inputs and approve each operation. The Counterdex checker decides mathematical results. AI never does.</dd></div>
+          </dl>
+        </div>
+
+        <section class="block" aria-labelledby="terms-title">
+          <h2 id="terms-title">Four words you will see</h2>
+          <dl class="terms">
+            <div><dt>Claim</dt><dd>The closed range you are testing, for example “ke is between 0.10 and 0.17 per hour.”</dd></div>
+            <div><dt>Allowance</dt><dd>The largest gap you accept between a curve and a reading. It is a hard bound, not a standard deviation.</dd></div>
+            <div><dt>Candidate</dt><dd>One set of parameter values (A, ke, ka) whose curve stays within every reading's allowance.</dd></div>
+            <div><dt>Counterexample</dt><dd>A candidate whose ke lies outside the claim. It shows your data does not force the claim. It does not reveal the true value.</dd></div>
+          </dl>
+        </section>
+
+        <section class="block" aria-labelledby="resume-title">
+          <h2 id="resume-title">Return to earlier work</h2>
+          <p>Saved investigations live on the server in your workspace. Drafts you are typing live only in this tab.</p>
+          <div id="resume-list" class="resume"></div>
+        </section>
+
+        <section id="research" class="block" aria-labelledby="research-title">
+          <h2 id="research-title" tabindex="-1">Ask about a paper or data file</h2>
+          <p>A separate path for general questions about your own files. Answers are AI analysis with citations, not mathematical verification, and they never fill in the measurement table on their own.</p>
+          <details class="files-path" id="files-path"><summary>Open file questions</summary>
+            <div id="general-workspace"></div>
+          </details>
+        </section>
+      </section>
+
+      <!-- 2 · Check inputs: measurements -->
+      <section id="inputs" class="page" aria-labelledby="inputs-title" hidden>
+        <header class="page-head">
+          <p class="crumb">Step 2 of 5 · Check inputs</p>
+          <h1 id="inputs-title" tabindex="-1">Measurements</h1>
+          <p class="lede">Add the readings the check will rely on: elapsed hours since dosing, concentration in mg/L, and each reading's allowance.</p>
+        </header>
+        <div class="block import-card">
           <div>
-            <h3>Bring in measurements</h3>
-            <p>CSV columns <code>time</code>, <code>concentration</code>, and <code>epsilon</code></p>
+            <h2>Add measurements</h2>
+            <p>Load the synthetic example, import a CSV with columns <code>time</code>, <code>concentration</code> and <code>epsilon</code>, or type rows into the table below.</p>
           </div>
           <div class="actions">
-            <label for="csv-file" class="button file-button">Choose CSV<input type="file" accept=".csv,text/csv" id="csv-file"></label>
             <button class="secondary" type="button" id="example">Load synthetic example</button>
+            <label for="csv-file" class="button secondary file-button">Import CSV<input type="file" accept=".csv,text/csv" id="csv-file"></label>
           </div>
           <div id="import-preview" class="import-preview" hidden></div>
         </div>
-        <form id="measurements" class="card" novalidate>
-          <h3>Measurement table</h3>
-          <p id="allowance-help">A hard allowance is the maximum discrepancy accepted by this analysis. A standard deviation requires a separate rule before it can be used as a hard allowance.</p>
+        <form id="measurements" class="block" novalidate>
+          <h2>Measurement table</h2>
+          <p id="allowance-help">An allowance is the largest discrepancy you accept between the model and that reading, in mg/L. A standard deviation is not an allowance unless you have a separate rule that turns it into a hard bound.</p>
           <div id="rows-errors" class="errors" tabindex="-1" hidden></div>
           <div class="table-region" role="region" aria-label="Editable measurements" tabindex="0">
-            <table>
-              <thead><tr><th scope="col">Row</th><th scope="col">Include</th><th scope="col">Elapsed time (h)</th><th scope="col">Concentration (mg/L)</th><th scope="col">Hard allowance (mg/L)</th><th scope="col">Row action</th></tr></thead>
+            <table class="edit-table">
+              <thead><tr><th scope="col">Row</th><th scope="col">Include</th><th scope="col">Elapsed time <span class="unit">h</span></th><th scope="col">Concentration <span class="unit">mg/L</span></th><th scope="col">Allowance <span class="unit">± mg/L</span></th><th scope="col"><span class="sr-only">Row action</span></th></tr></thead>
               <tbody id="rows"></tbody>
             </table>
           </div>
           <p id="source-summary" class="source-summary"></p>
-          <details id="source-details" hidden><summary>Measurement provenance</summary><ul id="sources"></ul></details>
+          <figure class="mini-plot" id="input-plot" hidden><figcaption>Your included readings, with each allowance drawn as a vertical bar.</figcaption></figure>
+          <details id="source-details" hidden><summary>Where these rows came from</summary><ul id="sources"></ul></details>
           <footer class="actions spread">
             <button class="secondary" type="button" id="add-row">Add row</button>
-            <button type="submit">Review question</button>
+            <button type="submit">Next: describe the claim</button>
           </footer>
         </form>
+        <details class="block source-path" id="source-path"><summary>Read values from a lab-sheet image instead</summary>
+          <div id="backend-source-review"></div>
+        </details>
       </section>
-      <section id="question" aria-labelledby="question-title" hidden>
-        <div class="section-heading">
-          <h2 id="question-title" tabindex="-1">Research question</h2>
-          <p>Under the reviewed model and allowances, do all compatible elimination rates lie within your target interval?</p>
-        </div>
-        <form id="question-form" class="card" novalidate>
+
+      <!-- 2 · Check inputs: claim -->
+      <section id="question" class="page" aria-labelledby="question-title" hidden>
+        <header class="page-head">
+          <p class="crumb">Step 2 of 5 · Check inputs</p>
+          <h1 id="question-title" tabindex="-1">Claim and assumptions</h1>
+          <p class="lede">State the range you want to test and the search limits for each parameter. The check asks: do all parameter values that fit your readings keep ke inside this range?</p>
+        </header>
+        <form id="question-form" class="block" novalidate>
           <div id="question-errors" class="errors" tabindex="-1" hidden></div>
-          <h3>Two-rate concentration model</h3>
-          <p>Concentration starts at zero. The absorption rate <var>ka</var> is greater than the elimination rate <var>ke</var>.</p>
-          <details><summary>Model equation</summary><p><code>C(t) = A × (exp(−ke × t) − exp(−ka × t))</code></p></details>
-          <label class="stack">Experiment identifier<input id="experiment-id" type="text" required></label>
-          <label class="stack">Elapsed-time origin<input id="time-origin" type="text" required placeholder="Describe the experiment’s t=0"></label>
-          <label class="stack">Dataset origin<select id="dataset-origin"><option value="">Choose origin</option><option value="actual">Actual measurements</option><option value="hypothetical">Hypothetical</option><option value="synthetic">Synthetic</option></select></label>
-          <div id="bounds"></div>
-          <label class="stack">Origin of historical hard allowances <textarea id="allowanceOrigin" rows="2" required></textarea></label>
-          <label class="stack">Methods or source notes <span class="optional">Optional</span><textarea id="methods" rows="3"></textarea></label>
-          <label class="stack">Research goal <span class="optional">Optional: the closed-interval question above is used when blank.</span><textarea id="goal" rows="2" maxlength="2000"></textarea></label>
-          <footer class="actions spread"><a href="#inputs">Back to measurements</a><button type="submit">Review draft</button></footer>
+          <p id="example-note" class="note" hidden>Prefilled from the synthetic example study. Review every value before you continue; you can change any of them.</p>
+          <fieldset class="group">
+            <legend>About this dataset</legend>
+            <label class="stack">Experiment name<span class="help">A short identifier you will recognise later, such as <code>pk_trial_3</code>.</span><input id="experiment-id" type="text" required></label>
+            <label class="stack">What t = 0 means<span class="help">For example, “time of oral dose.”</span><input id="time-origin" type="text" required placeholder="Describe the experiment’s t=0"></label>
+            <label class="stack">Where the readings came from<select id="dataset-origin"><option value="">Choose origin</option><option value="actual">Actual measurements</option><option value="hypothetical">Hypothetical</option><option value="synthetic">Synthetic</option></select></label>
+          </fieldset>
+          <div class="claim-group">
+            <h2>The claim being tested</h2>
+            <p>Concentration starts at zero and absorption is faster than elimination (ka &gt; ke). Both endpoints of the claim are included.</p>
+            <div id="bounds"></div>
+            <details><summary>Model equation</summary><p><code>C(t) = A × (exp(−ke × t) − exp(−ka × t))</code></p></details>
+          </div>
+          <fieldset class="group">
+            <legend>Why you trust the allowances</legend>
+            <label class="stack">Origin of the allowances<span class="help">Say where ±0.50 mg/L (or your values) comes from: assay specification, team choice, synthetic setting.</span><textarea id="allowanceOrigin" rows="2" required></textarea></label>
+            <label class="stack">Methods or source notes <span class="optional">Optional</span><textarea id="methods" rows="2"></textarea></label>
+            <label class="stack">Your question in your own words <span class="optional">Optional. Left blank, Dr. Bean asks the precise claim question.</span><textarea id="goal" rows="2" maxlength="2000" placeholder="Could ke plausibly be faster than 0.17 per hour given these readings?"></textarea></label>
+          </fieldset>
+          <footer class="actions spread"><a href="#inputs">Back to measurements</a><button type="submit">Next: review inputs</button></footer>
         </form>
       </section>
-      <section id="review" aria-labelledby="review-title" hidden>
-        <div class="section-heading"><h2 id="review-title" tabindex="-1">Review draft</h2><p>Check the measurements, allowances, and model bounds before preparing an investigation plan.</p></div>
-        <div class="card" id="review-summary"></div>
-        <div id="backend-review" class="card"></div>
+
+      <!-- 2 · Check inputs: review & approve -->
+      <section id="review" class="page" aria-labelledby="review-title" hidden>
+        <header class="page-head">
+          <p class="crumb">Step 2 of 5 · Check inputs</p>
+          <h1 id="review-title" tabindex="-1">Review and approve</h1>
+          <p class="lede">This is the last look before any computation. Saving freezes these exact inputs on the server. Approving lets one bounded check run on them, nothing more.</p>
+        </header>
+        <div class="block" id="review-summary"></div>
+        <div id="backend-review" class="block"></div>
       </section>
-      <section id="investigations" aria-labelledby="investigations-title" hidden>
-        <div class="section-heading"><h2 id="investigations-title" tabindex="-1">Investigations</h2></div>
-        <div id="backend-investigations" class="card"></div>
+
+      <!-- 3 · Investigate -->
+      <section id="investigations" class="page" aria-labelledby="investigations-title" hidden>
+        <header class="page-head">
+          <p class="crumb">Step 3 of 5</p>
+          <h1 id="investigations-title" tabindex="-1">Investigate</h1>
+          <p class="lede">See what is running, what finished and anything waiting for you. Every entry here comes from a server record; nothing is simulated.</p>
+        </header>
+        <div id="backend-investigations" class="block"></div>
+        <div id="durable-research" class="block" aria-live="polite"></div>
       </section>
-      <section id="report" aria-labelledby="report-title" hidden>
-        <div class="section-heading"><h2 id="report-title" tabindex="-1">Reviewer report</h2></div>
-        <div id="backend-report" class="card"></div>
+
+      <!-- 4 · Result -->
+      <section id="result" class="page" aria-labelledby="result-title" hidden>
+        <header class="page-head">
+          <p class="crumb">Step 4 of 5</p>
+          <h1 id="result-title" tabindex="-1">What the check found</h1>
+        </header>
+        <div id="backend-results"></div>
+        <div id="backend-assistant"></div>
       </section>
-      <aside class="workspace-status" aria-label="Workspace storage">This draft is held in this tab. Download a copy before reloading or closing it.</aside>
+
+      <!-- 5 · Next measurement and report -->
+      <section id="next" class="page" aria-labelledby="next-title" hidden>
+        <header class="page-head">
+          <p class="crumb">Step 5 of 5</p>
+          <h1 id="next-title" tabindex="-1">Choose the next measurement</h1>
+          <p class="lede">When the check finds two different candidates that both fit, one new reading at the right time can rule one of them out. Give the times you could actually measure and how precise that reading would be.</p>
+        </header>
+        <div id="backend-next" class="block"></div>
+        <section id="report" class="block" aria-labelledby="report-title">
+          <h2 id="report-title" tabindex="-1">Report and evidence</h2>
+          <div id="backend-report"></div>
+        </section>
+      </section>
+
+      <footer class="workspace-status" aria-label="Draft storage">
+        <p><strong>Your draft is not saved.</strong> Measurements and claim text live only in this tab until you save them on the Review step. <button id="export-draft" type="button" class="linklike">Download draft</button></p>
+        <p class="attribution">Investigation planning uses LangChain Deep Agents when the server enables it. Mathematical results come only from the Counterdex checker.</p>
+      </footer>
       <div id="status" class="sr-only" role="status"></div>
     </main>
   </div>

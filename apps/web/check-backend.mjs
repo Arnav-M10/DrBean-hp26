@@ -81,6 +81,9 @@ try {
   })
   // This lane explicitly exercises the supported scientific workflow.
   await page.goto(base + '#inputs')
+  // Pages are hash routes; changing the hash never reloads in-memory state.
+  const go = async hash => { await page.evaluate(target => { location.hash = target }, hash); await page.waitForSelector(`#${hash}:not([hidden])`) }
+  const openSourcePanel = () => page.locator('#source-path').evaluate(panel => { panel.open = true })
   await page.locator('#connection-panel summary').click()
   await page.fill('#bearer', token)
   await page.getByRole('button', { name: 'Connect', exact: true }).click()
@@ -119,14 +122,14 @@ try {
     await page.waitForFunction(() => {
       const text = document.querySelector('#backend-investigations').textContent
       return /execution: (failed|cancelled|interrupted)/.test(text)
-        || (/execution: completed/.test(text) && text.includes('Outcome:'))
+        || (/execution: completed/.test(text) && document.querySelector('#backend-results').textContent.includes('Outcome:'))
     }, null, { timeout: 125000 })
     const finished = await api(`/runs/${run.id}`)
     assert.equal(finished.state, 'completed', JSON.stringify(finished))
     const evidence = await api(`/records/${finished.scenarios[0].result_id}`)
     const result = evidence.body.result
     assert.ok(['certified_counterexample', 'no_counterexample_found', 'numerical_candidate', 'inconclusive'].includes(result.scientific_outcome))
-    assert.match(await page.locator('#backend-investigations').textContent(), new RegExp(`Outcome: ${result.scientific_outcome}\\.`))
+    assert.match(await page.locator('#backend-results').textContent(), new RegExp(`Outcome: ${result.scientific_outcome}\\.`))
     assert.equal(result.expected_binding, 'matches')
     if (expectCounterexample) {
       assert.equal(result.scientific_outcome, 'certified_counterexample')
@@ -138,6 +141,7 @@ try {
   }
   const workspace = await page.locator('#workspace-select').inputValue()
   // Source proposal is an explicitly controlled intake fixture; science runs normally.
+  await openSourcePanel()
   await page.locator('#source-image-file').setInputFiles(join(root, 'fixtures/intake/clean.png'))
   await page.selectOption('#source-origin', 'synthetic')
   await page.getByRole('button', { name: 'Upload source for inspection', exact: true }).click()
@@ -181,6 +185,7 @@ try {
 
   async function downloadAndReplay(result, name, design = false) {
     const reference = result.artifacts[0]
+    await go(design ? 'next' : 'result')
     const [nativeDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download native design evidence' : 'Download native scientific evidence', exact: true }).first().click()])
     const nativePath = join(temp, `${name}.native.json`)
     await nativeDownload.saveAs(nativePath)
@@ -209,6 +214,7 @@ try {
   // Design uses the actual returned pair, its own reviewed assumptions and approval.
   assert.equal(capabilities.science.native_design, true)
   assert.equal(evidence.body.result.candidates.length, 2)
+  await go('next')
   await page.fill('#design-times', '8, 6')
   await page.fill('#design-allowance', '0.2')
   await page.fill('#design-horizon', '8')
@@ -261,7 +267,7 @@ try {
     assert.equal(suggestion.body.verification, 'valid')
     assert.equal(suggestion.body.replay, 'passed')
     assert.equal(await page.locator('[aria-label="Measurement design grid"] tbody tr').count(), 2)
-    assert.deepEqual(await page.locator('[aria-label="Measurement design grid"] tbody tr td:first-child').allTextContents(), ['8/1', '6/1'])
+    assert.deepEqual(await page.locator('[aria-label="Measurement design grid"] tbody tr td:first-child').allTextContents(), ['8', '6'])
     assert.match(await page.locator('#backend-design').textContent(), new RegExp(`Design tier: ${expectedTier}`))
     await downloadAndReplay(suggestion.body, name, true)
     return { finished, suggestion }
@@ -326,8 +332,9 @@ try {
   assert.equal(followupEvidence.body.result.candidate_results.length, 2)
   assert.equal(followupEvidence.body.result.native_replay.operation, 'recheck')
   assert.equal(followupEvidence.body.result.native_replay.dataset_origin, followupOrigin === 'actual' ? 'synthetic' : 'hypothetical')
+  await go('result')
   await page.getByRole('region', { name: 'Follow-up candidate checks', exact: true }).waitFor()
-  assert.match(await page.locator('#backend-investigations').textContent(), new RegExp(`Dataset origin: ${followupOrigin === 'actual' ? 'synthetic' : 'hypothetical'}`))
+  assert.match(await page.locator('#backend-results').textContent(), new RegExp(`Dataset origin: ${followupOrigin === 'actual' ? 'synthetic' : 'hypothetical'}`))
 
   await downloadAndReplay(followupEvidence.body.result, 'followup')
 
@@ -348,6 +355,7 @@ try {
   assert.equal((await api(`/records/${evidence.id}`)).digest, evidence.digest)
   // Changed bytes cannot reuse a controlled extraction; accepted science stays intact.
   await page.getByRole('link', { name: 'Review', exact: true }).click()
+  await openSourcePanel()
   const beforeFallback = await api(`/workspaces/${workspace}/records?kind=dataset`)
   const changedSource = Buffer.concat([await readFile(join(root, 'fixtures/intake/clean.png')), Buffer.from('changed source bytes')])
   await page.locator('#source-image-file').setInputFiles({ name: 'clean.png', mimeType: 'image/png', buffer: changedSource })
@@ -373,7 +381,7 @@ try {
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0)
   assert.equal((await context.cookies()).length, 0)
   await page.click('#disconnect')
-  assert.match(await page.locator('#backend-review').textContent(), /Connect to the local backend/)
+  assert.match(await page.locator('#backend-review').textContent(), /Connect to a Dr\. Bean server/)
   const denied = await fetch(`${base}/api/bean/v1/workspaces`, { headers: { Origin: 'https://external.invalid' } })
   assert.equal(denied.status, 403)
   console.log('Passed: actual browser review/approval/dispatch, real baseline discovery on two reviewed inputs, separately approved positive and no-separation designs from the actual pair, exact native and anchor downloads with installed-engine replay, preserved earlier evidence, reopened design history, zero provider attempts, memory-only credentials, and proxy origin rejection.')
