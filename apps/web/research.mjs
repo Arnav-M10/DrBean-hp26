@@ -216,6 +216,10 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion })
     if (!s.plan) root.append(element('p', 'No maintained plan has been recorded yet.'))
     details(root, 'Exact historical reviewed inputs', s.reviewed_context)
     if (s.state === 'ready' || s.state === 'paused') button(root, 'Advance research plan', () => controller.advance(), !caps?.dispatch_enabled || Boolean(state.pending) || (s.mode === 'live' && (s.provider_allocation?.physical_requests || 0) <= s.usage.physical_calls))
+    if (s.state === 'completed' && s.reports.length && !s.children.some(child => child.kind === 'design_job')) {
+      root.append(element('p', 'The investigation report is retained. Planning a next step does not approve a design; its exact pair, times and allowance require a separate review.'))
+      button(root, 'Plan next step for separate review', () => controller.advance(), !caps?.dispatch_enabled || Boolean(state.pending) || (s.mode === 'live' && (s.provider_allocation?.physical_requests || 0) <= s.usage.physical_calls))
+    }
     const review = s.pending_review
     if (review && ['plan', 'design_plan'].includes(review.kind)) {
       root.append(element('h4', review.kind === 'design_plan' ? 'Review the separate pair-design operation' : review.body.followup ? 'Review the separate original-candidate recheck' : 'Review the investigation operation'))
