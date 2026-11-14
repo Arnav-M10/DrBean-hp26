@@ -1215,9 +1215,13 @@ def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, ev
             expected[c] == "indeterminate" or fresh_verdicts.get(c) == expected[c] for c in expected)
         checks.expect(f"{name}_fresh_replay_per_candidate_agrees", agree,
                       f"fresh replay {fresh_verdicts}, application {application}, independent oracle {expected}")
-        checks.expect(f"{name}_fresh_replay_keeps_hypothetical_review",
-                      fresh.get("operation") == "review" and fresh.get("dataset_origin") == "hypothetical",
-                      f"operation {fresh.get('operation')}, dataset origin {fresh.get('dataset_origin')}")
+        # The re-check operation is the one the application publishes (PR #11 'review'; v2 'recheck'); never discovery.
+        published = (((flow.capabilities().get("science") or {}).get("native_followup") or {}).get("operation")
+                     or "review")
+        checks.expect(f"{name}_fresh_replay_is_a_hypothetical_recheck",
+                      fresh.get("operation") == published and fresh.get("dataset_origin") == "hypothetical",
+                      f"operation {fresh.get('operation')} (published {published}), dataset origin "
+                      f"{fresh.get('dataset_origin')}")
     elif downloads:
         checks.add(f"{name}_fresh_replay_per_candidate_agrees", "not_observed",
                    "the fresh replay report carried no candidate results")

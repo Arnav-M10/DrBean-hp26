@@ -39,6 +39,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 | F-EXPLANATION-NUMBER-FORMS | P2 | 3 | open | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
 | F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
 | F-RESTART-EPERM | P0 | 2 | open | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
+| H-FOLLOWUP-OPERATION | P2 | 5 | fixed_pending_retest | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
 
