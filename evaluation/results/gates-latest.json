@@ -1,7 +1,7 @@
 {
   "evidence_commits": [
-    "58e968f4c8440c2117f8ddbb332e07bbebd6a992",
-    "c8d39b56be1e8692b8608cea687b2b1c6983ef45"
+    "859404461bc9d944d055936ba8212a87da71bcd5",
+    "e791e91f617d82e68f8878d72c4f7e99631941ab"
   ],
   "evidence_only_paths": [
     "evaluation/results/",
@@ -22,7 +22,7 @@
       "description": "actual HTTP -> science -> separate design -> raw download -> fresh native replay",
       "entries": {
         "RS-HERO-FULL": {
-          "attempt_id": "att_2b31cc969d37437d",
+          "attempt_id": "att_0f60903bc15b4617",
           "reason": "",
           "status": "passed"
         }
@@ -34,27 +34,27 @@
       "description": "duplicate starts, design authority, cancellation/restart, changed input, follow-up",
       "entries": {
         "RS-CANCEL-RESTART": {
-          "attempt_id": "att_913292d16ae64365",
+          "attempt_id": "att_9c18ee097daa4f73",
           "reason": "",
           "status": "passed"
         },
         "RS-CHANGED-INPUT": {
-          "attempt_id": "att_bbe8a036c74f4663",
+          "attempt_id": "att_26177e3387134005",
           "reason": "",
           "status": "passed"
         },
         "RS-DESIGN-AUTHORITY": {
-          "attempt_id": "att_5c490fcf31de435a",
+          "attempt_id": "att_f650298ab26c404a",
           "reason": "",
           "status": "passed"
         },
         "RS-FOLLOWUP": {
-          "attempt_id": "att_01259923a6ea4309",
+          "attempt_id": "att_93274643d1904a9f",
           "reason": "",
           "status": "passed"
         },
         "RS-RETRY-CONCURRENT": {
-          "attempt_id": "att_2365cf5f7dfa465b",
+          "attempt_id": "att_52e4cdd3ec2b469b",
           "reason": "",
           "status": "passed"
         }
@@ -66,7 +66,7 @@
       "description": "guard active in API and worker; zero external model attempts in the lane",
       "entries": {
         "RS-ZERO-DISPATCH": {
-          "attempt_id": "att_1518ef4a891d4de1",
+          "attempt_id": "att_84ebce77081b4e30",
           "reason": "",
           "status": "passed"
         }
@@ -75,11 +75,16 @@
       "status": "passed"
     },
     {
-      "description": "fixed-pair constraint controls, three distinct defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP)",
+      "description": "fixed-pair constraint controls, three distinct defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP); each decided by its newest clean, executed, CPython 3.11 run of the tested engine source",
+      "expected_engine_source_sha256": "ed5a8fb2216dcf4f0113799bd3e341fc464e204492fa3bc673460dec19777750",
       "failed": [],
       "gate": "native_engine_controls",
       "missing": [],
-      "status": "passed"
+      "runs_used": {
+        "2026-11-14T07:03:21+00:00": "e791e91f617d82e68f8878d72c4f7e99631941ab"
+      },
+      "status": "passed",
+      "unqualified": {}
     },
     {
       "description": "image decoder and scientific worker subprocesses work on this host through the real stack",
@@ -110,6 +115,6 @@
   "overall": "passed",
   "schema": "drbean-release-gates/v1",
   "statement": "Gates read recorded evidence only; they dispatch no provider or scientific work.",
-  "tested_commit": "58e968f4c8440c2117f8ddbb332e07bbebd6a992",
+  "tested_commit": "859404461bc9d944d055936ba8212a87da71bcd5",
   "worktree_dirty": false
 }

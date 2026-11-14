@@ -4,7 +4,7 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 
 - Manifest version 3 (ancestry: v1, v2), contract GF-2 / DB-SC-1
 - Holdouts: prepared and sealed by digest; not used for prompt tuning; ungraded
-- Attempts recorded: 126; history verification: OK
+- Attempts recorded: 140; history verification: OK
 - Live activation: disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared accounted allocation, Owner 3's operator path and independent grading of predeclared cases. The CLI has no switch for it.
 
 ## Lanes
@@ -15,13 +15,13 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 | live_intake | 1 | NOT_RUN (disabled) | live | any | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | live_agent_controlled_tools | 1 | NOT_RUN (disabled) | live | controlled | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | actual_full_stack | 1 | NOT_RUN (disabled) | live | real | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
-| offline_real_science | 1 | yes | none/controlled | real | 7 | 92 | 48 | 21 | 23 | 0 | 0 | 0 | 0 | 0 |
+| offline_real_science | 1 | yes | none/controlled | real | 7 | 106 | 62 | 21 | 23 | 0 | 0 | 0 | 0 | 0 |
 
 Records with manifest_version 1 / harness 0.1.0 are the pre-merge inventory: 34 entries recorded before the backend and science package were merged, all `unrun` with a stale reason. They are kept byte-for-byte and interpreted as written, never relabelled as current results.
 
 Evidence classes: `executed_acceptance` (the runner executed the subject against a stack it launched and re-verified the evidence), `imported_claim` (recorded observations; never qualification).
 
-Evidence class counts (harness >= 0.2.0): executed_acceptance: 92.
+Evidence class counts (harness >= 0.2.0): executed_acceptance: 106.
 
 ## Latest attempt per scheduled entry
 
@@ -61,25 +61,25 @@ Evidence class counts (harness >= 0.2.0): executed_acceptance: 92.
 | live_intake | C01-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live1 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
-| offline_real_science | RS-CANCEL-RESTART | passed | c8d39b56be | False |  |
-| offline_real_science | RS-CHANGED-INPUT | passed | c8d39b56be | False |  |
-| offline_real_science | RS-DESIGN-AUTHORITY | passed | c8d39b56be | False |  |
-| offline_real_science | RS-FOLLOWUP | passed | c8d39b56be | False |  |
-| offline_real_science | RS-HERO-FULL | passed | c8d39b56be | False |  |
-| offline_real_science | RS-RETRY-CONCURRENT | passed | c8d39b56be | False |  |
-| offline_real_science | RS-ZERO-DISPATCH | passed | c8d39b56be | False |  |
+| offline_real_science | RS-CANCEL-RESTART | passed | e791e91f61 | False |  |
+| offline_real_science | RS-CHANGED-INPUT | passed | e791e91f61 | False |  |
+| offline_real_science | RS-DESIGN-AUTHORITY | passed | e791e91f61 | False |  |
+| offline_real_science | RS-FOLLOWUP | passed | e791e91f61 | False |  |
+| offline_real_science | RS-HERO-FULL | passed | e791e91f61 | False |  |
+| offline_real_science | RS-RETRY-CONCURRENT | passed | e791e91f61 | False |  |
+| offline_real_science | RS-ZERO-DISPATCH | passed | e791e91f61 | False |  |
 
 ## Scientific jobs and external model requests (separate counts)
 
-- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 127. This accumulated count spans historical attempts; see each attempt for its scientific outcome and the latest-entry table for current results.
-- External model requests: verified zero by the egress guard in 92 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
+- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 171. This accumulated count spans historical attempts; see each attempt for its scientific outcome and the latest-entry table for current results.
+- External model requests: verified zero by the egress guard in 106 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
 - Synthetic budget-ledger reservations in unit tests use temporary stores and are not provider charges.
 - Durations are harness wall time on loopback; they are not provider latency.
 - Harness budget ledger: no cohort opened; none may be opened now.
 
 ## Engine-level native controls (latest run; engine public operations, not HTTP)
 
-Commit c8d39b56be, interpreter CPython 3.11.17.
+Commit e791e91f61, interpreter CPython 3.11.17.
 
 | Control | Result | Observed |
 |---|---|---|
@@ -106,7 +106,7 @@ Commit c8d39b56be, interpreter CPython 3.11.17.
 | followup:4.57 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "compatible", "reference": "excluded"}, "per_candidate": {"outside": "compatible", "refe |
 | followup:4.0 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "excluded"}, "per_candidate": {"outside": "excluded", "referenc |
 
-## Release gates at 58e968f4c8 (overall: passed)
+## Release gates at 859404461b (overall: passed)
 
 | Gate | Status |
 |---|---|
@@ -154,13 +154,17 @@ Commit c8d39b56be, interpreter CPython 3.11.17.
 | F-LAUNCHER-HIDDEN-PTH | P1 | 4 | retested | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
 | F-LAUNCHER-ENV-READ | P2 | 4 | retested | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 | H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
-| F-EXPLANATION-QUALIFIER | P2 | 3 | open | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
-| F-EXPLANATION-NUMBER-FORMS | P2 | 3 | open | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
-| F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
+| F-EXPLANATION-QUALIFIER | P2 | 3 | fixed_pending_retest | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
+| F-EXPLANATION-NUMBER-FORMS | P2 | 3 | fixed_pending_retest | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
+| F-EXPLANATION-PARAPHRASE | P2 | 3 | fixed_pending_retest | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
 | F-RESTART-EPERM | P0 | 2 | retested | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
 | H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
-| F-LEDGER-TOTALS | P2 | 2 | fixed_pending_retest | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
-| F-LEDGER-MALFORMED | P2 | 2 | fixed_pending_retest | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
+| F-LEDGER-TOTALS | P2 | 2 | retested | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
+| F-LEDGER-MALFORMED | P2 | 2 | retested | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
+| F-EXPLANATION-CHECKED-GATES | P2 | 3 | fixed_pending_retest | 'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates |
+| H-GATE-CONTROLS-DIRTY | P1 | 5 | retested | native_engine_controls gate admitted dirty (and otherwise unqualified) control records |
+| F-NARRATION-OVERSUPPRESSION | P2 | 3 | open | PR #28's evidence-bound guard withholds correct limiting statements grounded in the cited record; with PR #20 it fails PR #20's own coordinator test |
+| H-SOURCE-RETRY-KEY | P2 | 5 | retested | Harness source-review test treated a new idempotency key as a retry |
 
 ## Every attempt
 
@@ -292,3 +296,17 @@ Commit c8d39b56be, interpreter CPython 3.11.17.
 | 124 | RS-FOLLOWUP | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 12117.649 |  |
 | 125 | RS-CANCEL-RESTART | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 7061.833 |  |
 | 126 | RS-ZERO-DISPATCH | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 82.429 |  |
+| 127 | RS-HERO-FULL | offline_real_science | 14 | passed | executed_acceptance | 5138c5ffa7 | False | 2868.688 |  |
+| 128 | RS-CHANGED-INPUT | offline_real_science | 14 | passed | executed_acceptance | 5138c5ffa7 | False | 2161.701 |  |
+| 129 | RS-RETRY-CONCURRENT | offline_real_science | 15 | passed | executed_acceptance | 5138c5ffa7 | False | 1386.562 |  |
+| 130 | RS-DESIGN-AUTHORITY | offline_real_science | 14 | passed | executed_acceptance | 5138c5ffa7 | False | 1137.564 |  |
+| 131 | RS-FOLLOWUP | offline_real_science | 14 | passed | executed_acceptance | 5138c5ffa7 | False | 16623.723 |  |
+| 132 | RS-CANCEL-RESTART | offline_real_science | 14 | passed | executed_acceptance | 5138c5ffa7 | False | 7194.249 |  |
+| 133 | RS-ZERO-DISPATCH | offline_real_science | 14 | passed | executed_acceptance | 5138c5ffa7 | False | 93.866 |  |
+| 134 | RS-HERO-FULL | offline_real_science | 15 | passed | executed_acceptance | e791e91f61 | False | 2384.849 |  |
+| 135 | RS-CHANGED-INPUT | offline_real_science | 15 | passed | executed_acceptance | e791e91f61 | False | 2585.218 |  |
+| 136 | RS-RETRY-CONCURRENT | offline_real_science | 16 | passed | executed_acceptance | e791e91f61 | False | 1027.055 |  |
+| 137 | RS-DESIGN-AUTHORITY | offline_real_science | 15 | passed | executed_acceptance | e791e91f61 | False | 1119.029 |  |
+| 138 | RS-FOLLOWUP | offline_real_science | 15 | passed | executed_acceptance | e791e91f61 | False | 16187.061 |  |
+| 139 | RS-CANCEL-RESTART | offline_real_science | 15 | passed | executed_acceptance | e791e91f61 | False | 7483.235 |  |
+| 140 | RS-ZERO-DISPATCH | offline_real_science | 15 | passed | executed_acceptance | e791e91f61 | False | 118.69 |  |
