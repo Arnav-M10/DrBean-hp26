@@ -123,7 +123,7 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
     if (suggestion) {
       const result = suggestion.body
       const tier = { checked_pair_separation: ['ok', 'Checked separating time'], numerical_guidance: ['wait', 'Numerical guidance only'], no_separation_established: ['off', 'No separating time found'] }[result.design_tier] ?? ['bad', 'Not established']
-      const verdict = node('div', ''); verdict.className = 'verdict'; verdict.dataset.tone = result.design_tier === 'checked_pair_separation' ? 'challenged' : 'none'
+      const verdict = node('div', ''); verdict.className = 'verdict'; verdict.dataset.tone = result.design_tier === 'checked_pair_separation' ? 'pair' : 'none'
       const chip = node('span', tier[1]); chip.className = `state ${tier[0]}`
       verdict.append(chip, node('p', result.selected_time ? `Measure at ${readable(result.selected_time)} hours, with an allowance of ±${readable(result.future_hard_allowance)} mg/L.` : 'No time on your list was selected.'), node('p', designExplanation(result)))
       verdict.children[1].className = 'verdict-statement'
