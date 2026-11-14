@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dr. Bean · Research workspace</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to main content</a>
+  <header class="masthead">
+    <a class="brand" href="#inputs"><span class="brand-mark" aria-hidden="true"></span>Dr. Bean</a>
+    <span class="powered">Powered by Groundwork</span>
+    <span class="local-tag">Local draft</span>
+  </header>
+  <div class="workspace">
+    <div class="workspace-heading">
+      <div>
+        <p class="eyebrow">Research workspace</p>
+        <h1>Concentration study</h1>
+      </div>
+      <button id="export-draft" type="button" class="secondary">Download draft</button>
+    </div>
+    <nav aria-label="Workspace" class="workspace-nav">
+      <a href="#inputs">Inputs</a>
+      <a href="#question">Question</a>
+      <a href="#review">Review</a>
+      <a href="#investigations">Investigations</a>
+      <a href="#report">Report</a>
+    </nav>
+    <main id="main" tabindex="-1">
+      <section id="inputs" aria-labelledby="inputs-title">
+        <div class="section-heading">
+          <h2 id="inputs-title" tabindex="-1">Measurements</h2>
+          <p>Import a CSV or enter your readings. Use elapsed hours and concentrations in mg/L.</p>
+        </div>
+        <div class="card import-card">
+          <div>
+            <h3>Bring in measurements</h3>
+            <p>CSV columns <code>time</code>, <code>concentration</code>, and <code>epsilon</code></p>
+          </div>
+          <div class="actions">
+            <label for="csv-file" class="button file-button">Choose CSV<input type="file" accept=".csv,text/csv" id="csv-file"></label>
+            <button class="secondary" type="button" id="example">Load synthetic example</button>
+          </div>
+          <div id="import-preview" class="import-preview" hidden></div>
+        </div>
+        <form id="measurements" class="card" novalidate>
+          <h3>Measurement table</h3>
+          <p id="allowance-help">A hard allowance is the maximum discrepancy accepted by this analysis. A standard deviation requires a separate rule before it can be used as a hard allowance.</p>
+          <div id="rows-errors" class="errors" tabindex="-1" hidden></div>
+          <div class="table-region" role="region" aria-label="Editable measurements" tabindex="0">
+            <table>
+              <thead><tr><th scope="col">Row</th><th scope="col">Include</th><th scope="col">Elapsed time (h)</th><th scope="col">Concentration (mg/L)</th><th scope="col">Hard allowance (mg/L)</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <p id="source-summary" class="source-summary"></p>
+          <details id="source-details" hidden><summary>Measurement provenance</summary><ul id="sources"></ul></details>
+          <footer class="actions spread">
+            <button class="secondary" type="button" id="add-row">Add row</button>
+            <button type="submit">Review question</button>
+          </footer>
+        </form>
+      </section>
+      <section id="question" aria-labelledby="question-title" hidden>
+        <div class="section-heading">
+          <h2 id="question-title" tabindex="-1">Research question</h2>
+          <p>Under the reviewed model and allowances, do all compatible elimination rates lie within your target interval?</p>
+        </div>
+        <form id="question-form" class="card" novalidate>
+          <div id="question-errors" class="errors" tabindex="-1" hidden></div>
+          <h3>Two-rate concentration model</h3>
+          <p>Concentration starts at zero. The absorption rate <var>ka</var> is greater than the elimination rate <var>ke</var>.</p>
+          <details><summary>Model equation</summary><p><code>C(t) = A × (exp(−ke × t) − exp(−ka × t))</code></p></details>
+          <div id="bounds"></div>
+          <label class="stack">Origin of historical hard allowances <textarea id="allowanceOrigin" rows="2" required></textarea></label>
+          <label class="stack">Methods or source notes <span class="optional">Optional</span><textarea id="methods" rows="3"></textarea></label>
+          <label class="stack">Research goal <span class="optional">Optional</span><textarea id="goal" rows="2"></textarea></label>
+          <footer class="actions spread"><a href="#inputs">Back to measurements</a><button type="submit">Review draft</button></footer>
+        </form>
+      </section>
+      <section id="review" aria-labelledby="review-title" hidden>
+        <div class="section-heading"><h2 id="review-title" tabindex="-1">Review draft</h2><p>Check the measurements, allowances, and model bounds before preparing an investigation plan.</p></div>
+        <div class="card" id="review-summary"></div>
+        <div class="notice"><h3>Investigation planning is unavailable</h3><p>The shared backend and plan schema are pending. You can edit or download your local draft.</p></div>
+      </section>
+      <section id="investigations" aria-labelledby="investigations-title" hidden>
+        <div class="section-heading"><h2 id="investigations-title" tabindex="-1">Investigations</h2></div>
+        <div class="notice"><h3>No investigations yet</h3><p>Investigation history and next-measurement suggestions become available when the shared backend can run approved plans.</p><a href="#review">Review your draft</a></div>
+      </section>
+      <section id="report" aria-labelledby="report-title" hidden>
+        <div class="section-heading"><h2 id="report-title" tabindex="-1">Reviewer report</h2></div>
+        <div class="notice"><h3>No evidence to share yet</h3><p>A reviewer report requires results and artifacts from an investigation. Download the local draft to save a copy of your current inputs.</p></div>
+      </section>
+      <aside class="workspace-status" aria-label="Workspace storage">This draft is held in this tab. Download a copy before reloading or closing it.</aside>
+      <div id="status" class="sr-only" role="status"></div>
+    </main>
+  </div>
+</body>
+</html>
