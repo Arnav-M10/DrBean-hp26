@@ -2,8 +2,8 @@
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
   "updated_at": "2026-11-14",
-  "application_code_commit": "4b5f1f5",
-  "observed_at_harness_commit": "c8d39b5",
+  "application_code_commit": "2d2993d",
+  "observed_at_harness_commit": "e791e91",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -115,6 +115,18 @@
               "att_2b31cc969d37437d",
               "att_913292d16ae64365",
               "att_906bef01ac57453d"
+            ]
+          }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7 (cancel/restart with a real 128-row workload, nothing survives worker loss or cancellation), Owner 4's unmodified launcher 6/7, barrier diagnostic passed.",
+          "evidence": {
+            "attempts": [
+              "att_0f60903bc15b4617",
+              "att_9c18ee097daa4f73",
+              "att_6ca787bfe84048e7",
+              "att_690401b8bcf048c3"
             ]
           }
         }
@@ -568,6 +580,13 @@
               "att_87537746fa40470d (source_linked_values_require_review passed)"
             ]
           }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Not drivable over HTTP on main without a proposal source (controlled intake is PR #20). On the labelled combined preview (this branch + PR #20/#27/#28) review -> materialization associates the source and the corrected value reaches a separately approved real run (tests/integration/test_source_review_science.py passes there). Close when PR #20 merges and that test passes on main.",
+          "evidence": {
+            "preview": "evaluation/results/previews/combined-6a69a55-pr20-pr27-pr28"
+          }
         }
       ]
     },
@@ -790,6 +809,18 @@
               "att_906bef01ac57453d"
             ]
           }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7 (cancel/restart with a real 128-row workload, nothing survives worker loss or cancellation), Owner 4's unmodified launcher 6/7, barrier diagnostic passed.",
+          "evidence": {
+            "attempts": [
+              "att_0f60903bc15b4617",
+              "att_9c18ee097daa4f73",
+              "att_6ca787bfe84048e7",
+              "att_690401b8bcf048c3"
+            ]
+          }
         }
       ]
     },
@@ -875,7 +906,14 @@
       "observed": "an empty var/artifacts appeared in the working tree (removed)",
       "evidence": {
         "note": "Workstream 5's own fixture had the same omission and now sets artifact_dir"
-      }
+      },
+      "retests": [
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Reproduced twice at the candidate: with var/ absent, `BEAN_COUNTERDEX_PYTHON=.venv-engine/bin/python .venv/bin/python -m pytest -q tests --ignore=tests/integration` (588 passed) leaves an empty var/artifacts in the checkout.",
+          "evidence": {}
+        }
+      ]
     },
     {
       "id": "F-DESIGN-SOURCE-ARTIFACTS",
@@ -1097,6 +1135,18 @@
               "att_906bef01ac57453d"
             ]
           }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7 (cancel/restart with a real 128-row workload, nothing survives worker loss or cancellation), Owner 4's unmodified launcher 6/7, barrier diagnostic passed.",
+          "evidence": {
+            "attempts": [
+              "att_0f60903bc15b4617",
+              "att_9c18ee097daa4f73",
+              "att_6ca787bfe84048e7",
+              "att_690401b8bcf048c3"
+            ]
+          }
         }
       ]
     },
@@ -1187,6 +1237,13 @@
           "evidence": {
             "pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"
           }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there).",
+          "evidence": {
+            "pytest": "72 passed, 28 xfailed at e791e91"
+          }
         }
       ]
     },
@@ -1219,6 +1276,13 @@
           "evidence": {
             "pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"
           }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there).",
+          "evidence": {
+            "pytest": "72 passed, 28 xfailed at e791e91"
+          }
         }
       ]
     },
@@ -1250,6 +1314,13 @@
           "result": "fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges.",
           "evidence": {
             "pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"
+          }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there).",
+          "evidence": {
+            "pytest": "72 passed, 28 xfailed at e791e91"
           }
         }
       ]
@@ -1293,6 +1364,18 @@
               "att_2b31cc969d37437d",
               "att_913292d16ae64365",
               "att_906bef01ac57453d"
+            ]
+          }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Still holds: harness path 7/7 (cancel/restart with a real 128-row workload, nothing survives worker loss or cancellation), Owner 4's unmodified launcher 6/7, barrier diagnostic passed.",
+          "evidence": {
+            "attempts": [
+              "att_0f60903bc15b4617",
+              "att_9c18ee097daa4f73",
+              "att_6ca787bfe84048e7",
+              "att_690401b8bcf048c3"
             ]
           }
         }
@@ -1417,6 +1500,13 @@
           "evidence": {
             "pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"
           }
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there).",
+          "evidence": {
+            "pytest": "72 passed, 28 xfailed at e791e91"
+          }
         }
       ]
     },
@@ -1439,8 +1529,44 @@
           "at_commit": "this branch after merging main 2d2993d",
           "result": "9/9 regressions pass; the same end-to-end test fails on the pre-fix gate",
           "evidence": {}
+        },
+        {
+          "at_commit": "candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named)",
+          "result": "The candidate's control record is clean, executed acceptance, CPython 3.11.17, engine 0.3.0 imported from the repository with a matching source digest; the fixed gate admits it (22/22).",
+          "evidence": {
+            "controls": "evaluation/results/controls.jsonl (tested_commit e791e91)"
+          }
         }
       ]
+    },
+    {
+      "id": "F-NARRATION-OVERSUPPRESSION",
+      "severity": "P2",
+      "owner": "3",
+      "status": "open",
+      "title": "PR #28's evidence-bound guard withholds correct limiting statements grounded in the cited record; with PR #20 it fails PR #20's own coordinator test",
+      "minimal_input": "commentary_rejection('The returned design remains numerical guidance.', [{'id': 'design-evidence', 'problem_id': 'problem', 'design_tier': 'numerical_guidance'}]) and three similar limiting statements",
+      "command": "local merge of PR #20 f3d424f + PR #28 623ae19: .venv/bin/python -m pytest tests/test_coordinator.py::test_separately_approved_design_has_one_completed_callback_observation",
+      "expected": "a true, non-overclaiming statement that matches the cited tier/outcome is kept (legitimate supported narration)",
+      "observed": "PR #28 returns unsupported_claim for all four (main's guard keeps them). The PR #20 test passes on PR #20 alone and fails in the combination ('failed' != 'completed', explanation_unsupported_claim): 1 failed, 688 passed in the combined backend suite. Neither PR shows it alone.",
+      "impact": "useful cautionary narration is suppressed and the two PRs conflict at merge; not unsafe (nothing is overclaimed)",
+      "suggested_fix": "admit tier/outcome-matching limiting statements in the bounded language, or change PR #20's scripted narration to an admitted form; decide before the second of the two PRs merges",
+      "evidence": {
+        "tests": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept (strict xfail under the declared policy; passes on main)",
+        "combined_backend": "1 failed, 688 passed at local merge 6a69a55"
+      },
+      "retests": []
+    },
+    {
+      "id": "H-SOURCE-RETRY-KEY",
+      "severity": "P2",
+      "owner": "5",
+      "status": "retested",
+      "title": "Harness source-review test treated a new idempotency key as a retry",
+      "observed": "first combined-preview run: a POST with a new key created a new controlled proposal (correct operation semantics) and the test failed",
+      "fixed_in": "af8918c: the retry reuses the same key, as the contract defines a retry; full combined-preview suite then 96/96",
+      "evidence": {},
+      "retests": []
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here.",

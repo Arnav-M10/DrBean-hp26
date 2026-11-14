@@ -92,6 +92,29 @@ Every finding in `evaluation/findings.json` carries the exact commit, minimal in
 
 `python3.11 evaluation/cli.py gate --require release` reads recorded evidence at the tested commit and exits nonzero unless all of these pass on a clean tree: harness integrity (manifest + history), `real_science_http` (RS-HERO-FULL), essential negative controls through HTTP (concurrency, design authority, cancel/restart, changed input, follow-up), zero external model dispatch (RS-ZERO-DISPATCH and every lane attempt verified), native engine controls, supported-machine subprocesses (real image decoder and scientific worker on this host), and no open P0. `live_gemini_qualification` is always `not_run` and **not required**. `cli.py inventory` reports the same statuses and exits 0.
 
+### Admission of evidence (what may satisfy a gate)
+
+- **Lane entries:** the newest attempt per entry at the tested commit, or at an ancestor whose later changes touch only evidence and documentation paths (`evidence_commits`), must be `executed_acceptance` of this checkout on a clean tree. Previews and diagnostics never count.
+- **Native engine controls:** each required control is decided by its newest relevant run. That run must:
+  - be clean (`worktree_dirty` explicitly false);
+  - be executed acceptance of this checkout, not an `--app-repo` preview;
+  - have run on CPython 3.11.x;
+  - have imported the repository's Counterdex, with a source digest equal to the tested code's (recorded as `engine`).
+
+  An unqualified newest run blocks that control, and older passing evidence never overrides it. A clean newer retest does supersede an older failure. Only the boolean `passed: true` counts. (Finding H-GATE-CONTROLS-DIRTY: the dirty flag used to be copied but not enforced.)
+- **Engine identity in the lane:** RS-HERO-FULL requires the application's own capability source manifest to equal the repository engine source, file by file (`engine_runtime_matches_repository_source`). A stale installed `.venv-engine` copy with the same version string therefore cannot be qualified. Rerun `scripts/dev/launcher.py setup` after any engine change.
+- **Scientific acceptance is not product release.** A passing scientific gate qualifies the application code at the tested commit on this platform. It does not establish Owner 4's offline product release (G4, the complete browser workflow) or any live-model qualification.
+
+### Scientific coverage added in this round
+
+- **Separation:** positive separation is confirmed by the decimal oracle. A separately approved wide-allowance design must give the tier the oracle predicts (no separation), select nothing, and replay fresh.
+- **Unresolved follow-up:** a reading built from the engine's own exact enclosure (the band is its middle half) must stay `inconclusive`/`insufficient_enclosure`, with the row listed as unresolved. The 80-digit value must lie inside the enclosure, compared exactly (`F-ENGINE-ENCLOSURE` otherwise). Rounding to the default 28-digit decimal context would invalidate this comparison.
+- **Source review:** source → controlled proposal → human correction and review → materialization → separately approved real science → fresh replay (`tests/integration/test_source_review_science.py`). Where the application does not offer controlled source review, the test is recorded as an explicit xfail naming the prerequisite.
+- **Explanations:**
+  - A "checked design" statement needs a cited record with tier `checked_pair_separation`, verification valid, replay passed and binding matching. A fully supported statement must be kept.
+  - Correct limiting statements grounded in the cited record must also be kept.
+  - Gap markers depend on the guard's declared `COMMENTARY_POLICY_VERSION`, not on merge order.
+
 ## Future live activation checklist (documentation only — do NOT execute now)
 
 1. A new explicit user instruction authorizing live testing, with a named person and spending allowance.

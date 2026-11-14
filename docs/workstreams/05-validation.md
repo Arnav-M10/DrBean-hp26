@@ -6,13 +6,13 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 
 | Item | Value |
 |---|---|
-| Branch | `claude/adversarial-validation` (pushed). `main` `37d8f6f` (PR #19: Counterdex 0.3, v2 design/recheck, restart recovery with the Darwin EPERM fix, launcher fixes, this branch up to `0931246`) merged in as `f3fb76c` without reverting anything; the remaining validation work (explanation-guard and ledger suites, design-contract/reuse probe, follow-up provenance check, engine previews, verified history forks, findings) goes to `main` as one PR |
+| Branch | `claude/adversarial-validation` (PR #22). `main` `2d2993d` (PRs #24-#26: browser checkpoints, follow-up browser, science review incl. Owner 2's ledger rewrite) merged in as `f29066d`; nothing reverted. Final candidate `e791e91` (application code = `main` `2d2993d`) |
 | Integration branch | `main` (GitHub default since the PR #3/#4 merges) |
-| Last recorded lane run | Combined candidate `30ab5f8` and, after PR #12 merged, final candidate `c8d39b5` (same verdicts), this Mac, no diagnostics: harness launch path **7/7 pass** (hero 37/37 + 33 qualifier, follow-up 130/130 + 194 qualifier incl. an actual reading at its own time, cancel/restart with a 128-row real workload: live children at cancel and worker kill, none left), Owner 4's unmodified launcher **6/7** (cancel/restart is harness-path only), 22/22 engine controls, integration 66 passed + 19 strict xfail (known P2 gaps only), backend 559 passed, engine 291 OK. Barrier diagnostic: cancel/restart passes, nothing for the harness to terminate. Divergent pre-merge records are kept in `evaluation/results/forks/` |
+| Last recorded lane run | Candidate `e791e91`, this Mac, no diagnostics: harness path 7/7 (new: engine runtime = repository source, oracle-confirmed positive separation, executed no-separation design, unresolved follow-up from the engine enclosure), Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 controls (qualified record), integration 72 passed + 28 xfail, backend 588, engine 292, web 30. Record: `evaluation/results/integration/qualification-e791e91.md`. Labelled preview with PRs #20/#27/#28: lane 7/7, integration 96/96, backend 688 + 1 cross-PR failure |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 from Owner 4's `.venv-engine` (created by `launcher.py setup`); checkout under iCloud-synced `~/Documents` (see F-LAUNCHER-HIDDEN-PTH) |
 | AI mode | zero external model dispatch, verified by the egress guard in API, worker and pytest; live Gemini `NOT_RUN` |
-| Findings | `evaluation/findings.json` -> `evaluation/FINDINGS.md`. **No open P0.** Closed by independent retest on `30ab5f8`: F-RESTART-EPERM, F-LAUNCHER-HIDDEN-PTH, F-LAUNCHER-ENV-READ, F-LINT-CHECKLIST; confirmed PR #19's closures of F-MAC-NPROC and F-ORPHAN-WORKER-KILL. Open: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE (P2, Owner 3), F-LEDGER-TOTALS/MALFORMED (P2, fixed only in unmerged PR #13), F-REVIEW-MATERIALIZATION (P1, not exercised by these lanes), F-TEST-VAR-LEAK, F-SIBLING-FORKS (P2) |
-| Release gate | `python3.11 evaluation/cli.py gate --require release` at the evidence commit after `30ab5f8`: see `evaluation/results/gates-latest.json` |
+| Findings | `evaluation/findings.json` -> `evaluation/FINDINGS.md`. No open P0. New: H-GATE-CONTROLS-DIRTY (P1, mine, fixed), F-EXPLANATION-CHECKED-GATES and F-NARRATION-OVERSUPPRESSION (P2, Owner 3), H-SOURCE-RETRY-KEY (P2, mine, fixed). Closed: F-LEDGER-TOTALS/MALFORMED. Open: explanation gaps (fixed in PR #28), F-NARRATION-OVERSUPPRESSION (PR #28 vs PR #20), F-REVIEW-MATERIALIZATION (P1, needs PR #20 on main), F-TEST-VAR-LEAK (reproduced), F-SIBLING-FORKS |
+| Release gate | `cli.py gate --require release` on the evidence commit after `e791e91`: `evaluation/results/gates-latest.json`. Scientific acceptance only; not Owner 4's product release, not live Gemini |
 
 ## Gate evidence (current)
 
@@ -87,10 +87,10 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 ## Next exact actions
 
-1. When PR #13 merges: remove the two ledger strict-xfail markers (they XPASS there) and close F-LEDGER-TOTALS/MALFORMED by retest.
-2. Owner 3: the explanation-guard gaps (17 strict xfails) before any live model writes user-visible prose.
-3. Retest F-REVIEW-MATERIALIZATION with an independent source-materialization scenario.
-4. After any merge into `main`: refresh `.venv-engine` (`scripts/dev/launcher.py setup`; it installs a copy of the engine), rerun both launch paths, controls and the gate, and keep parallel history appends as verified forks.
+1. Owner 3: resolve F-NARRATION-OVERSUPPRESSION before the second of PR #20 / PR #28 merges (PR #20's coordinator test narration is withheld by PR #28's language).
+2. When PR #28 merges: the 27 explanation-gap cases become ordinary assertions automatically (declared policy); confirm they pass on main and close the four F-EXPLANATION findings by retest.
+3. When PR #20 merges: `tests/integration/test_source_review_science.py` runs fully on main; close F-REVIEW-MATERIALIZATION by retest.
+4. Any later relevant code change: refresh `.venv-engine` if the engine changed, then rerun both launch paths, controls, integration and the gate on a clean candidate.
 
 ## Conditional future work (not authorized now)
 
