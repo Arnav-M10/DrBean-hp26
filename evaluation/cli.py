@@ -116,6 +116,8 @@ def _main(argv, guard_log) -> int:
                           "acceptance; requires --results")
     controls = sub.add_parser("controls")
     controls.add_argument("--results", default=RESULTS)
+    controls.add_argument("--app-repo", help="preview another checkout's engine package (e.g. a teammate worktree); "
+                          "recorded as preview evidence, never acceptance; requires --results")
     gate = sub.add_parser("gate")
     gate.add_argument("--require", choices=("release",))
     gate.add_argument("--results", default=RESULTS)
@@ -178,7 +180,10 @@ def _main(argv, guard_log) -> int:
         print(f"{args.lane}: {len(records)} attempt(s) recorded: {tally}")
         return 0 if all(r["status"] == "passed" for r in records) else 2
     if args.command == "controls":
-        return run_controls(args.results, guard_log)
+        if args.app_repo and os.path.abspath(args.results) == os.path.abspath(RESULTS):
+            print("refused: previews must write to a separate --results directory; they are never release acceptance")
+            return 1
+        return run_controls(args.results, guard_log, app_repo=args.app_repo)
     if args.command in ("gate", "inventory"):
         state = runner.git_state(REPO)
         result = gates.compute(ROOT, args.results, state["commit"], state["dirty"],
@@ -244,21 +249,24 @@ def _main(argv, guard_log) -> int:
     return 1
 
 
-def run_controls(results_dir: str, guard_log: str | None = None) -> int:
+def run_controls(results_dir: str, guard_log: str | None = None, app_repo: str | None = None) -> int:
     """Engine-level native controls in fresh CPython 3.11 processes; appended to controls.jsonl."""
     from datetime import datetime, timezone
     from drbean_eval import engine_controls, launcher
     engine_controls.GUARD_LOG = guard_log
     state = runner.git_state(REPO)
+    app = os.path.abspath(app_repo or REPO)
     try:
-        python = launcher.science_python()
+        python = launcher.science_python(app)
     except launcher.StackError as error:
         print("blocked:", error)
         return 2
-    results = engine_controls.run(python, os.path.join(REPO, "packages", "groundwork_adapter"), REPO)
+    results = engine_controls.run(python, os.path.join(app, "packages", "groundwork_adapter"), REPO)
     entry = {"schema": "drbean-engine-controls/v1", "tested_commit": state["commit"],
              "worktree_dirty": state["dirty"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
              "interpreter": launcher.interpreter_identity(python), "results": results,
+             "evidence_class": "preview" if app_repo else "executed_acceptance",
+             "app_under_test": launcher.git_commit(app) if app_repo else None,
              "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker"}
     os.makedirs(results_dir, exist_ok=True)
     with open(os.path.join(results_dir, "controls.jsonl"), "a", encoding="utf-8") as handle:

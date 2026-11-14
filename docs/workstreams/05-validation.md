@@ -73,7 +73,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
-| `codex/science-integration-fixes` (PR #15, on PR #5; Counterdex 0.3) | `9a6db61` | **NO diagnostics: 6/7 pass on this Mac** (hero, changed input, retry, design authority with v2 reuse probe, follow-up via `recheck`, zero dispatch): F-MAC-NPROC fixed there. Barrier only: worker-kill orphan still reproduces (fix is PR #14). |
+| `codex/science-integration-fixes` (PR #15, on PR #5; Counterdex 0.3) | `9a6db61` | **NO diagnostics: 6/7 pass on this Mac** (hero, changed input, retry, design authority with v2 reuse probe, follow-up via `recheck`, zero dispatch): F-MAC-NPROC fixed there. Barrier only: worker-kill orphan still reproduces (fix is PR #14). Engine controls against its Counterdex 0.3.0: **22/22 pass** (`controls --app-repo`). |
 | `backend/restart-recovery` (PR #14) | `c231be4` | with barrier: **worker-kill orphan fixed**; without: hero/changed input **fail** and a cancelled child survives (F-RESTART-EPERM, Darwin-only); local one-line patch -> 6/7 + cancel/restart pass. |
 | `backend/controlled-acceptance` (PR #13) | `731afdc` | local merge with this harness: integration suite unchanged (39 passed; failures F-MAC-NPROC/orphan; no regressions). |
 | merged `main` (`55403ab`, after PR #10) in this checkout | harness `1ae19ff` | diagnostic relax_nproc: **6/7 pass** again (hero, changed input, retry, design authority, follow-up, zero dispatch); plain acceptance on both launch paths: F-MAC-NPROC; gate exit 3. |
