@@ -11,19 +11,20 @@
 <body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="masthead">
-    <a class="brand" href="#inputs"><span class="brand-mark" aria-hidden="true"></span>Dr. Bean</a>
-    <span class="powered">Powered by Counterdex</span>
-    <span class="local-tag">Local draft</span>
+    <a class="brand" href="#research"><span class="brand-mark" aria-hidden="true"></span>Dr. Bean</a>
+    <span class="powered">Research evidence · Counterdex for supported scientific checks</span>
+    <span class="local-tag">Your research</span>
   </header>
   <div class="workspace">
     <div class="workspace-heading">
       <div>
         <p class="eyebrow">Research workspace</p>
-        <h1>Concentration study</h1>
+        <h1>Your research workspace</h1>
       </div>
       <button id="export-draft" type="button" class="secondary">Download draft</button>
     </div>
     <nav aria-label="Workspace" class="workspace-nav">
+      <a href="#research">Add your data or paper</a>
       <a href="#inputs">Inputs</a>
       <a href="#question">Question</a>
       <a href="#review">Review</a>
@@ -31,7 +32,11 @@
       <a href="#report">Report</a>
     </nav>
     <main id="main" tabindex="-1">
-      <details class="card" id="connection-panel"><summary>Server connection</summary>
+      <section id="research" aria-labelledby="research-title">
+        <div class="section-heading"><h2 id="research-title" tabindex="-1">Add your data or paper</h2><p>Inspect your files, ask a question, review what will be sent, and explore cited evidence. General AI analysis is separate from mathematical verification.</p></div>
+        <div id="general-workspace"></div>
+      </section>
+      <details class="card" id="connection-panel"><summary>Advanced server connection</summary>
           <p>Connect to this Dr. Bean server with your researcher access token. Gemini uses the server owner's key; you do not need a Gemini key. Your access token stays in memory until you disconnect or close this tab.</p>
           <form id="connect-form">
             <label class="stack">Researcher access token<input id="bearer" type="password" autocomplete="off" required></label>

@@ -129,6 +129,7 @@ def test_capabilities_do_not_claim_live_qualification(client):
 def test_openapi_exposes_flat_design_request(client):
     schema = client.get("/openapi.json").json()
     assert schema["components"]["securitySchemes"]["BearerToken"] == {"type": "http", "scheme": "bearer"}
-    assert schema["paths"][PREFIX + "/workspaces"]["get"]["security"] == [{"BearerToken": []}]
+    assert schema["components"]["securitySchemes"]["BrowserSession"] == {"type": "apiKey", "in": "cookie", "name": "__Host-bean_session"}
+    assert schema["paths"][PREFIX + "/workspaces"]["get"]["security"] == [{"BearerToken": []}, {"BrowserSession": []}]
     body = schema["paths"][PREFIX + "/runs/{run_id}/design-proposals"]["post"]["requestBody"]
     assert body["content"]["application/json"]["schema"]["$ref"].endswith("DesignRequestBody")

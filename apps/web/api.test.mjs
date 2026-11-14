@@ -3,13 +3,20 @@ import assert from 'node:assert/strict'
 import { ApiError, BeanApi, MAX_JSON_BYTES, baselineAvailable, baselineExplanation, liveGeminiAvailable } from './api.mjs'
 import { datasetBody, problemBody, planRequest, investigationObjective } from './manual.mjs'
 
-test('shared server client sends no browser-side bearer credential', async () => {
+test('a session transport explicitly sends same-origin cookies without a bearer credential', async () => {
   const api = new BeanApi(null, async (url, options) => {
     assert.equal(options.headers.Authorization, undefined)
+    assert.equal(options.credentials, 'same-origin')
+    return new Response('{}')
+  }, { mode: 'browser_session' })
+  await api.json('/workspaces')
+  assert.throws(() => new BeanApi('owner', undefined, { mode: 'browser_session' }), /cannot use bearer/)
+  assert.throws(() => new BeanApi(null, undefined, { mode: 'unknown' }), /Unsupported/)
+  const local = new BeanApi(null, async (url, options) => {
     assert.equal(options.credentials, 'omit')
     return new Response('{}')
   })
-  await api.json('/workspaces')
+  await local.json('/workspaces')
 })
 
 test('uncertain mutation retry retains its operation key and token never enters body or URL', async () => {
@@ -23,6 +30,7 @@ test('uncertain mutation retry retains its operation key and token never enters 
   await api.json('/plans/p/approvals', { accepted: true })
   assert.equal(seen[0].headers['Idempotency-Key'], seen[1].headers['Idempotency-Key'])
   assert.equal(seen[0].headers.Authorization, 'Bearer private-token')
+  assert.equal(seen[0].credentials, 'omit')
   assert.ok(!seen[0].url.includes('private-token') && !seen[0].body.includes('private-token'))
 })
 test('mismatched download bytes are rejected', async () => {
@@ -145,5 +153,99 @@ test('assistant operation identity matches its request body and survives a lost 
   assert.equal(seen[0].body, seen[1].body)
   assert.equal(seen[0].url, '/api/bean/v1/workspaces/workspace/assistant-turns')
   await assert.rejects(api.assistantTurn('workspace', { ...body, client_operation_id: '' }), /operation identity/)
+  assert.equal(seen.length, 2)
+})
+
+test('general upload keeps original bytes and a bounded filename with a stable retry identity', async () => {
+  const bytes = new TextEncoder().encode('species,height_cm\nbean,4.6\n'), seen = []
+  const api = new BeanApi(null, async (url, options) => {
+    seen.push({ url, ...options })
+    if (seen.length === 1) throw new Error('lost response')
+    return new Response('{"id":"asset_one"}')
+  }, { mode: 'browser_session' })
+  const file = { type: 'text/csv', name: 'plant-study.csv', size: bytes.byteLength, arrayBuffer: async () => bytes.buffer }
+  await assert.rejects(api.uploadResearchAsset('workspace_one', file), error => error.kind === 'uncertain')
+  assert.equal(seen.length, 1)
+  assert.equal((await api.uploadResearchAsset('workspace_one', file)).id, 'asset_one')
+  assert.equal(seen[0].url, '/api/bean/v1/workspaces/workspace_one/research-assets')
+  assert.equal(seen[0].headers['X-Source-Name'], file.name)
+  assert.equal(seen[0].headers['Content-Type'], file.type)
+  assert.deepEqual(new Uint8Array(seen[0].body), bytes)
+  assert.equal(seen[0].credentials, 'same-origin')
+  assert.equal(seen[0].headers['Idempotency-Key'], seen[1].headers['Idempotency-Key'])
+  await api.uploadResearchAsset('workspace_one', { ...file, name: 'different.csv' })
+  assert.notEqual(seen[1].headers['Idempotency-Key'], seen[2].headers['Idempotency-Key'])
+  for (const name of ['caf\u00e9.csv', 'a'.repeat(256), '../private.csv', 'folder\\name.csv', 'injected\r\nX-Owner: owner']) {
+    await api.uploadResearchAsset('workspace_one', { ...file, name })
+    assert.equal(seen.at(-1).headers['X-Source-Name'], undefined)
+  }
+  await api.uploadResearchAsset('workspace_one', { ...file, type: '' })
+  assert.equal(seen.at(-1).headers['Content-Type'], 'application/octet-stream')
+  await assert.rejects(api.uploadResearchAsset('workspace_one', { ...file, size: 5242881 }), /5 MiB/)
+  await assert.rejects(api.uploadResearchAsset('workspace_one', { ...file, size: 0 }), /5 MiB/)
+  await assert.rejects(api.uploadResearchAsset('workspace_one', { ...file, size: file.size + 1 }), /changed/)
+  await assert.rejects(api.request('/x', bytes.buffer, 'text/csv', undefined, { Authorization: 'owner' }), /metadata/)
+})
+
+test('research analysis waits for the bounded synchronous operation and preserves body and explicit identity on retry', async () => {
+  const seen = [], timeouts = [], originalTimeout = AbortSignal.timeout
+  AbortSignal.timeout = milliseconds => { timeouts.push(milliseconds); return new AbortController().signal }
+  try {
+    const api = new BeanApi('owner', async (url, options) => {
+      seen.push({ url, ...options })
+      if (seen.length === 1) throw new Error('lost analysis response')
+      return new Response('{"id":"analysis_one"}')
+    })
+    const body = { client_operation_id: 'research_one', question: 'Which plants grew taller?', assets: [{ id: 'asset_one', sha256: 'a'.repeat(64) }],
+      consent: { accepted: true, provider: 'gemini', model: 'gemini-test', asset_ids: ['asset_one'], include_question: true } }
+    await assert.rejects(api.researchAnalysis('workspace_one', body), error => error.kind === 'uncertain')
+    assert.equal(seen.length, 1)
+    await api.researchAnalysis('workspace_one', body)
+    for (const call of seen) assert.equal(call.headers['Idempotency-Key'], JSON.parse(call.body).client_operation_id)
+    assert.equal(seen[0].body, seen[1].body)
+    assert.equal(seen[0].url, '/api/bean/v1/workspaces/workspace_one/research-analyses')
+    assert.deepEqual(timeouts, [75000, 75000])
+    await api.json('/research-analyses/analysis_one')
+    assert.equal(timeouts.at(-1), 15000)
+    await assert.rejects(api.researchAnalysis('workspace_one', { ...body, client_operation_id: '' }), /operation identity/)
+    assert.equal(seen.length, 3)
+  } finally { AbortSignal.timeout = originalTimeout }
+})
+
+test('JSON research files retain exact uploaded bytes instead of being reserialized as an operation body', async () => {
+  const seen = [], contents = '{\n  "species": "bean", "height_cm": 4.60, "unit": "\u03bcm"\n}\n'
+  const file = new File([contents], 'plants.json', { type: 'application/json' })
+  const api = new BeanApi('owner', async (url, options) => {
+    seen.push({ url, ...options })
+    if (seen.length === 1) throw new Error('lost upload response')
+    return new Response('{}')
+  })
+  await assert.rejects(api.uploadResearchAsset('workspace_one', file), error => error.kind === 'uncertain')
+  await api.uploadResearchAsset('workspace_one', file)
+  assert.equal(seen[0].headers['Content-Type'], 'application/json')
+  assert.equal(seen[0].headers['X-Source-Name'], 'plants.json')
+  assert.equal(new TextDecoder().decode(seen[0].body), contents)
+  assert.equal(new TextDecoder().decode(seen[1].body), contents)
+  assert.equal(seen[0].headers['Idempotency-Key'], seen[1].headers['Idempotency-Key'])
+  await api.uploadResearchAsset('workspace_one', new File([contents.replace('4.60', '4.70')], file.name, { type: file.type }))
+  assert.notEqual(seen[1].headers['Idempotency-Key'], seen[2].headers['Idempotency-Key'])
+})
+
+test('explicit upload operation identity is preserved across retries and invalid identities never dispatch', async () => {
+  const seen = [], file = new File(['species,height_cm\nbean,4.6\n'], 'plants.csv', { type: 'text/csv' })
+  const api = new BeanApi(null, async (url, options) => {
+    seen.push({ url, ...options })
+    if (seen.length === 1) throw new Error('lost upload response')
+    return new Response('{}')
+  }, { mode: 'browser_session' })
+  await assert.rejects(api.uploadResearchAsset('workspace_one', file, 'upload_one'), error => error.kind === 'uncertain')
+  assert.equal(seen.length, 1)
+  await api.uploadResearchAsset('workspace_one', file, 'upload_one')
+  assert.equal(seen[0].headers['Idempotency-Key'], 'upload_one')
+  assert.equal(seen[1].headers['Idempotency-Key'], 'upload_one')
+  assert.deepEqual(new Uint8Array(seen[0].body), new Uint8Array(seen[1].body))
+  for (const operationId of ['', null, 1, 'bad identity', 'x'.repeat(129)]) {
+    await assert.rejects(api.uploadResearchAsset('workspace_one', file, operationId), /upload operation identity/)
+  }
   assert.equal(seen.length, 2)
 })

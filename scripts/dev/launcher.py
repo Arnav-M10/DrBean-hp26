@@ -21,6 +21,9 @@ and server readiness are not evidence that a live test has passed.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import fcntl
+from functools import wraps
 import json
 import os
 import platform
@@ -31,6 +34,7 @@ import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -43,7 +47,7 @@ BACKEND_PY = os.path.join(REPO, ".venv", "bin", "python")
 ENGINE_VENV = os.path.join(REPO, ".venv-engine")
 ENGINE_PY = os.path.join(ENGINE_VENV, "bin", "python")
 ENGINE_SRC = os.path.join(REPO, "packages", "groundwork_adapter")
-HOST = "127.0.0.1"  # loopback only; a hosted boundary is a separate, unimplemented decision
+HOST = "127.0.0.1"  # loopback only; sharing uses a separate restricted gateway
 API_PORT, WEB_PORT = 8000, 4173  # apps/web/serve.mjs proxies /api/bean/v1/ to the fixed port 8000
 AI_MODE = "placeholder"
 
@@ -52,11 +56,12 @@ PROVIDER_ENV_EXACT = {
     "GEMINI_API_KEY", "GEMINI_MODEL", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS",
     "BEAN_GEMINI_ACCOUNT_GATE", "BEAN_GEMINI_ACCOUNT_DECISION_ID", "BEAN_GEMINI_IMAGE_TOKEN_BOUND",
     "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LANGCHAIN_API_KEY", "LANGCHAIN_TRACING_V2", "LANGCHAIN_ENDPOINT",
-    "DATABASE_URL",
+    "DATABASE_URL", "BEAN_AUTH_TOKENS_JSON", "BEAN_SHARED_GATEWAY_FILE",
 }
 PROVIDER_ENV_PREFIXES = ("BEAN_GEMINI_", "GOOGLE_GEMINI_", "GOOGLE_GENAI_", "GOOGLE_CLOUD_", "VERTEX",
-                         "LANGSMITH_", "ANTHROPIC_", "OPENAI_")
+                         "LANGSMITH_", "ANTHROPIC_", "OPENAI_", "BEAN_SHARE_")
 SERVICES = ("api", "worker", "web")
+SHARING_SERVICES = ("share-tunnel", "share-gateway", "share-awake")
 LIVE_CONFIG = os.path.join(VAR, "gemini.local.json")
 LIVE_MODELS = frozenset({"gemini-2.5-flash-lite", "gemini-3.5-flash-lite"})
 LIVE_KEYS = frozenset({"GEMINI_API_KEY", "GEMINI_MODEL", "BEAN_GEMINI_ACCOUNT_GATE",
@@ -205,6 +210,70 @@ def http_json(url: str, timeout=3.0):
 
 
 # ---------------------------------------------------------------- owned processes
+class LifecycleError(RuntimeError):
+    """A safe, nonsecret diagnostic for process-control failures."""
+
+
+@contextmanager
+def lifecycle_lock(timeout: float = 55.0):
+    """Serialize launcher and sharing mutations; never unlink an active lock file."""
+    os.makedirs(RUN, mode=0o700, exist_ok=True)
+    path = os.path.join(RUN, "lifecycle.lock")
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError:
+        raise LifecycleError("Cannot open the private process-control lock.") from None
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+            raise LifecycleError("Process-control lock must be an owner-only regular file (0600).")
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise LifecycleError("Another launcher or sharing command is still running; retry shortly.") from None
+                time.sleep(0.05)
+        try:
+            yield
+        finally:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
+
+
+def serialized_lifecycle(function):
+    @wraps(function)
+    def serialized(*args, **kwargs):
+        try:
+            with lifecycle_lock():
+                return function(*args, **kwargs)
+        except LifecycleError as error:
+            print(str(error))
+            return 1
+    return serialized
+
+
+def private_json(path, data):
+    """Atomically publish an owner-only JSON file, including after a failed write."""
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, mode=0o700, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".bean-", suffix=".tmp", dir=parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def started_at(pid: int) -> str | None:
     """Process start time as reported by ps; used to prove a pid is still the one we started."""
     code, text = out(["ps", "-p", str(pid), "-o", "stat=,lstart="])
@@ -218,17 +287,51 @@ def pidfile(name: str) -> str:
     return os.path.join(RUN, f"{name}.json")
 
 
+def process_record(name: str) -> dict | None:
+    """Read bounded, owner-controlled process metadata without trusting its PID."""
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        with os.fdopen(os.open(pidfile(name), flags), "r", encoding="utf-8") as handle:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_size > 16384:
+                return None
+            if stat.S_IMODE(info.st_mode) & 0o022:
+                return None
+            record = json.load(handle)
+        if not isinstance(record, dict) or record.get("name") != name:
+            return None
+        pid = record.get("pid")
+        stamp = record.get("started_at")
+        if type(pid) is not int or not 1 < pid < 2**31 or not isinstance(stamp, str) or not stamp:
+            return None
+    except (OSError, ValueError, UnicodeError):
+        return None
+    return record
+
+
 def owned(name: str) -> dict | None:
     """The live process this launcher started for `name`, or None. A reused pid is not ours."""
-    try:
-        with open(pidfile(name), encoding="utf-8") as handle:
-            record = json.load(handle)
-    except (OSError, ValueError):
+    record = process_record(name)
+    if record is None:
         return None
-    return record if record.get("started_at") and started_at(record["pid"]) == record["started_at"] else None
+    try:
+        return record if os.getpgid(record["pid"]) == record["pid"] \
+            and started_at(record["pid"]) == record["started_at"] else None
+    except OSError:
+        return None
+
+
+def unproven_process(name: str) -> bool:
+    """A live or unreadable record must not be overwritten as an assumed stale PID."""
+    if not os.path.lexists(pidfile(name)) or owned(name):
+        return False
+    record = process_record(name)
+    return record is None or started_at(record["pid"]) is not None
 
 
 def spawn(name: str, command: list[str], env: dict) -> dict:
+    if owned(name) or unproven_process(name):
+        raise LifecycleError("Refusing to replace a running process ownership record.")
     os.makedirs(RUN, exist_ok=True)
     log_path = os.path.join(RUN, f"{name}.log")
     with open(log_path, "ab") as log:
@@ -236,42 +339,62 @@ def spawn(name: str, command: list[str], env: dict) -> dict:
         log.flush()
         process = subprocess.Popen(command, cwd=REPO, env=env, stdin=subprocess.DEVNULL, stdout=log,
                                    stderr=subprocess.STDOUT, start_new_session=True)
-    stamp = None
-    for _ in range(20):
-        stamp = started_at(process.pid)
-        if stamp:
-            break
-        time.sleep(0.05)
-    record = {"name": name, "pid": process.pid, "started_at": stamp, "command": command, "log": log_path}
-    with open(pidfile(name), "w", encoding="utf-8") as handle:
-        json.dump(record, handle)
-    return record
+    try:
+        stamp = None
+        for _ in range(20):
+            stamp = started_at(process.pid)
+            if stamp:
+                break
+            if process.poll() is not None:
+                break
+            time.sleep(0.05)
+        if not stamp:
+            raise LifecycleError("A launched process exited or its ownership could not be established.")
+        record = {"name": name, "pid": process.pid, "started_at": stamp, "command": command, "log": log_path}
+        private_json(pidfile(name), record)
+        return record
+    except BaseException:
+        # The unreaped Popen child cannot have had its PID reused. Clean up a
+        # child whose record could not be written instead of leaving it orphaned.
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        process.wait()
+        raise
 
 
 def stop_one(name: str, grace: float = 10.0) -> str:
     record = owned(name)
     if record is None:
+        if unproven_process(name):
+            return "ownership unproven (record preserved; process not signaled)"
         if os.path.exists(pidfile(name)):
-            os.remove(pidfile(name))  # stale record; the pid is gone or belongs to someone else
+            os.remove(pidfile(name))  # validated record; its old process is gone
             return "not running (stale record removed)"
         return "not running"
     pid = record["pid"]
     try:
-        os.killpg(pid, signal.SIGTERM)  # its own session, so this reaches only its process group
+        if owned(name) == record:
+            os.killpg(pid, signal.SIGTERM)  # only its own session/process group
     except ProcessLookupError:
         pass
     deadline = time.monotonic() + grace
     while time.monotonic() < deadline and started_at(pid) == record["started_at"]:
         time.sleep(0.2)
     forced = False
-    if started_at(pid) == record["started_at"]:
+    if owned(name) == record:
         forced = True
         try:
             os.killpg(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         time.sleep(0.3)
-    os.remove(pidfile(name))
+    try:
+        os.remove(pidfile(name))
+    except FileNotFoundError:
+        pass
     return "killed after grace period" if forced else "stopped"
 
 
@@ -472,6 +595,7 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 1
 
 
+@serialized_lifecycle
 def cmd_start(_args) -> int:
     static = static_facts()
     live = live_config()
@@ -486,6 +610,9 @@ def cmd_start(_args) -> int:
         print(f"Already running (started by this launcher): {', '.join(already)}. "
               "Use scripts/dev/stop.sh first, or `launcher.py status`.")
         return 1
+    if any(unproven_process(name) for name in SERVICES):
+        print("A process record has unproven ownership. Nothing was changed; inspect it before restarting.")
+        return 1
     busy = [port for port in (API_PORT, WEB_PORT) if port_in_use(port)]
     if busy:
         print(f"Port(s) {busy} on {HOST} are in use by a process this launcher did not start. "
@@ -498,7 +625,7 @@ def cmd_start(_args) -> int:
                       "--port", str(API_PORT), "--no-access-log"], provider_env)
         spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], provider_env)
         spawn("web", ["node", os.path.join("apps", "web", "serve.mjs"), str(WEB_PORT)], env)
-    except (OSError, KeyboardInterrupt) as error:
+    except (OSError, LifecycleError, KeyboardInterrupt) as error:
         for name in reversed(SERVICES):
             stop_one(name)
         print(f"Start interrupted ({type(error).__name__}); started services were stopped. See logs in {RUN}.")
@@ -532,12 +659,25 @@ def cmd_start(_args) -> int:
     return 1 if alert else 0
 
 
+@serialized_lifecycle
 def cmd_stop(_args) -> int:
-    for name in ("web", "worker", "api"):
-        print(f"  {name:<7}{stop_one(name)}")
+    # A gateway must never survive core shutdown with an admitted origin: a
+    # different process could later bind either fixed upstream port.
+    try:
+        os.unlink(os.path.join(VAR, "share-origin.json"))
+    except FileNotFoundError:
+        pass
+    except OSError:
+        print("Cannot close shared-origin admission; core services were left running.")
+        return 1
+    unproven = False
+    for name in (*SHARING_SERVICES, "web", "worker", "api"):
+        result = stop_one(name)
+        unproven = unproven or result.startswith("ownership unproven")
+        print(f"  {name:<7}{result}")
     print("Data in var/ is preserved. If a run was in progress, run "
           "`python3 scripts/dev/launcher.py recover` before the next start.")
-    return 0
+    return 1 if unproven else 0
 
 
 def cmd_status(_args) -> int:
@@ -549,6 +689,7 @@ def cmd_status(_args) -> int:
     return 0
 
 
+@serialized_lifecycle
 def cmd_recover(_args) -> int:
     if any(owned(name) for name in ("api", "worker")) or port_in_use(API_PORT):
         print("Stop the API and worker first (scripts/dev/stop.sh). Recovery must not run beside them.")
