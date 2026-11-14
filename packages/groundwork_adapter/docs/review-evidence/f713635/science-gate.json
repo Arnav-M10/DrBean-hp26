@@ -1,0 +1,114 @@
+{
+  "evidence_commits": [
+    "f71363589ad5370cabbf99bfaf96c8a2d11e57db"
+  ],
+  "evidence_only_paths": [
+    "evaluation/results/",
+    "evaluation/FINDINGS.md",
+    "evaluation/findings.json",
+    "evaluation/README.md",
+    "docs/evaluation-protocol.md",
+    "docs/workstreams/05-validation.md"
+  ],
+  "gates": [
+    {
+      "description": "frozen manifest and append-only history verify",
+      "gate": "harness_integrity",
+      "problems": [],
+      "status": "passed"
+    },
+    {
+      "description": "actual HTTP -> science -> separate design -> raw download -> fresh native replay",
+      "entries": {
+        "RS-HERO-FULL": {
+          "attempt_id": "att_e5648fcb968d4327",
+          "reason": "",
+          "status": "passed"
+        }
+      },
+      "gate": "real_science_http",
+      "status": "passed"
+    },
+    {
+      "description": "duplicate starts, design authority, cancellation/restart, changed input, follow-up",
+      "entries": {
+        "RS-CANCEL-RESTART": {
+          "attempt_id": "att_e498ca4b97984d26",
+          "reason": "",
+          "status": "passed"
+        },
+        "RS-CHANGED-INPUT": {
+          "attempt_id": "att_0476ecc9aaa046ee",
+          "reason": "",
+          "status": "passed"
+        },
+        "RS-DESIGN-AUTHORITY": {
+          "attempt_id": "att_f6e3bd156adb4e77",
+          "reason": "",
+          "status": "passed"
+        },
+        "RS-FOLLOWUP": {
+          "attempt_id": "att_5711d33229c24afb",
+          "reason": "",
+          "status": "passed"
+        },
+        "RS-RETRY-CONCURRENT": {
+          "attempt_id": "att_85f9575bdc334737",
+          "reason": "",
+          "status": "passed"
+        }
+      },
+      "gate": "essential_negative_controls_http",
+      "status": "passed"
+    },
+    {
+      "description": "guard active in API and worker; zero external model attempts in the lane",
+      "entries": {
+        "RS-ZERO-DISPATCH": {
+          "attempt_id": "att_cf7aa658dfc1412e",
+          "reason": "",
+          "status": "passed"
+        }
+      },
+      "gate": "zero_external_model_dispatch",
+      "status": "passed"
+    },
+    {
+      "description": "fixed-pair constraint controls, three distinct defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP)",
+      "failed": [],
+      "gate": "native_engine_controls",
+      "missing": [],
+      "status": "passed"
+    },
+    {
+      "description": "image decoder and scientific worker subprocesses work on this host through the real stack",
+      "gate": "supported_machine_subprocesses",
+      "observed": {
+        "baseline_completed_with_evidence": "passed",
+        "runtime": {
+          "machine": "arm64",
+          "system": "Darwin"
+        },
+        "source_image_admitted": "passed"
+      },
+      "status": "passed"
+    },
+    {
+      "description": "evaluation/findings.json lists no open P0",
+      "gate": "no_unresolved_p0",
+      "open_p0": [],
+      "status": "passed"
+    },
+    {
+      "description": "NOT a current acceptance gate. Live lanes are disabled; activation needs a new explicit user instruction. Placeholder runs are not Gemini evidence.",
+      "gate": "live_gemini_qualification",
+      "required": false,
+      "status": "not_run"
+    }
+  ],
+  "overall": "passed",
+  "schema": "drbean-release-gates/v1",
+  "statement": "Gates read recorded evidence only; they dispatch no provider or scientific work.",
+  "tested_commit": "f71363589ad5370cabbf99bfaf96c8a2d11e57db",
+  "worktree_dirty": false
+}
