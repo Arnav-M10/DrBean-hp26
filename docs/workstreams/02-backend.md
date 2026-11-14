@@ -1,45 +1,64 @@
-# Browser baseline milestone
+# Backend milestone progress
 
-Current task: PR review handoff. Implementation, real-browser acceptance and
-final regression checks are complete.
+Completed: browser baseline, pushed and merged in PR #6 (`1f75bdc`).
+Completed: separately approved next-measurement design from the actual baseline
+pair, with browser review and independently replayable native design evidence.
+Current task: release CI handoff for pushed PR #9; merge is held for failing checks.
 
-Base: `main` at `adac945` (PR #4), branch `backend/browser-baseline`.
-Backend: Python 3.12.14; scientific child: prepared CPython 3.11.18.
-Model providers remain disabled; no model calls or credential checks are authorized.
+Branch: `backend/browser-design`; integrated `main` at `9cc90e0` (PRs #7–8).
+Verified on Linux, backend Python 3.12.14, scientific CPython 3.11.18.
+Interfaces: DB-SC-1 / GF-2, `counterdex.bridge.v1`,
+`DB-SC-1-to-groundwork-v1`, `counterdex.application-bundle.v1`.
+Model providers remain disabled; no calls or credential checks were performed.
 
-## Works / reused
+## Works / verified now
 
-- Immutable input/plan/approval records, one-run reservations and scoped access.
-- Supervised scientific process boundary, native storage/downloads, source review.
-- Owner 1's real bounded discovery and application-bound replay protocol are now
-  merged. The earlier missing-producer dependency is resolved.
-- Reviewed HTTP inputs now produce real bounded baseline results, retained native
-  packets and exact replay-anchor downloads. Separate installed-engine CLI replay
-  passes, including changed-input, wrong-binding and no-witness controls.
-- Actual Chromium review/approval/queue, polling, native + anchor downloads and
-  separate installed-engine replay pass for two distinct reviewed datasets.
-  Earlier evidence remains intact; no model-provider attempts occur.
-- Resolved scientific child spawn `EAGAIN` beside Chromium: the per-user process
-  guard now allows 256 processes/threads while preserving other job limits and
-  stricter inherited hard limits.
-
-## Handoff
-
-- Review the focused `backend/browser-baseline` branch against `main`.
-
-## Blocked / outside this milestone
-
-- No missing scientific producer dependency is currently identified.
-- New measurement design/follow-up UI, controlled AI activation, independent
-  evaluator expansion and hosted deployment are outside this focused milestone.
-- Actual Mac qualification is not established by Linux checks.
+- Reviewed measurements → explicit baseline approval → actual bounded discovery.
+  No fixture candidates; native downloads and separate replay anchors work.
+- Two compatible discovered candidates → reviewed grid, precision, horizon and
+  permissions → separate design approval → one durable design job.
+- Checked separation, checked no-separation and honest numerical fallback retain
+  all approved grid rows. A selected measurement is conditional on this pair.
+- Native design packets retain original baseline bytes/anchors unchanged. Fresh
+  replay checks supported facts; it never reruns numerical discovery.
+- Changed design inputs require new approval. Wrong scope/anchors, corrupt bytes,
+  cancelled or expired authority cannot publish a new checked design result.
+- Browser history reopening shows the original design scope; changing baselines
+  clears the previous design display. Earlier evidence stays available.
 
 ## Evidence
 
-Backend regression: 290 passed, including baseline HTTP/CLI acceptance and
-16 adversarial binding checks. Ruff and whitespace checks pass. Engine suite: 257
-tests, 2 skipped; installed-runtime supervisor checks separately pass (13 tests),
-and application-schema compatibility passes. Browser unit checks: 18 passed;
-actual browser milestone passes. Contract export is deterministic (39 schemas).
-Synthetic examples supply input values only; production candidate results are
-always computed.
+- 335 backend tests passed (excluding the independent `tests/integration` suite),
+  including actual HTTP design, separate installed
+  `-I` CLI replay, adversarial binding and late cancellation/expiry controls.
+- Reversed candidate order preserves ID/vector binding. Numerical-only evidence
+  publishes and replays its integrity/binding without claiming checked facts.
+- 29 browser unit tests passed after integrating the latest web/release changes.
+- Actual Chromium completed baseline, positive design and no-separation design,
+  separate approvals, native/anchor downloads, offline replay and history checks.
+- Ruff (`apps tests scripts`), schema compatibility and deterministic export pass.
+- Commands: `BEAN_COUNTERDEX_PYTHON=/path/to/prepared/python BEAN_COUNTERDEX_REPLAY_PYTHON=/path/to/prepared/python .venv/bin/python -m pytest -q tests --ignore=tests/integration`;
+  `node --test apps/web/*.test.mjs`; `PLAYWRIGHT_MODULE=/path/to/playwright/index.js CHROMIUM_PATH=/usr/bin/chromium BEAN_COUNTERDEX_PYTHON=/path/to/prepared/python node apps/web/check-backend.mjs`.
+
+## Blocked / next
+
+- Release CI is not green. On the first PR #9 run, backend, engine, browser unit
+  and evaluator self-check jobs passed; the stack job failed. Owner 4 must pass
+  the prepared CPython 3.11 via `DRBEAN_SCIENCE_PYTHON` to the evaluator step in
+  `.github/workflows/ci.yml`; otherwise admission reports `scientific_runtime_missing`.
+- With that runtime supplied locally, Owner 5's evaluator still needs support for
+  `counterdex.application-bundle.v1`, `replay-native` and the eight retained anchor
+  fields in `evaluation/drbean_eval/native.py`. Its hero expectation also requires
+  checked extension while `allow_continuation` is false; that input correctly
+  produces numerical guidance. Independent tests were not weakened here.
+- Owner 2/4 must resolve the CI-only descendant-process boundary failure (the
+  ordinary-user check passed all five locally). Owner 5's orphan/teardown probe
+  must distinguish exited zombies from live computation. Recovery and follow-up
+  failures in the broader evaluator remain separate from this design milestone.
+- Native design currently admits requests for checked pair separation; returned
+  outcomes remain evidence-based. PR #9 stays open pending the release checks.
+- Next owned feature: a separately reviewed follow-up that checks the original
+  selected pair. The engine currently admits one appended hypothetical reading.
+  Actual-observation native review needs Owner 1 to extend that admission/mapping.
+- Follow-up UI, live AI, independent evaluator expansion and hosted deployment
+  were not added here. Actual Mac qualification remains not run.
