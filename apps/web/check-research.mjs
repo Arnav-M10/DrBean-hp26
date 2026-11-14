@@ -90,7 +90,7 @@ try {
     allowanceOrigin: 'Explicit synthetic hard bound of0.50mg/L, not an SD or instrument claim', goal: 'Does this reviewed target range survive these corrected measurements, and what checked pair measurement could distinguish the computed candidates?' })) await page.fill(`#${id}`, value)
   await page.selectOption('#dataset-origin', 'synthetic')
   await page.click('#question-form button[type=submit]')
-  await page.goto(base + '#research')
+  await page.goto(base + '#investigations')
   const panel = page.locator('#durable-research')
   await panel.getByText('Feasible next-measurement constraints (optional until design)', { exact: true }).click()
   for (const [name, value] of Object.entries({ times: '8, 6', allowance: '0.2', horizon: '8', allowanceReason: 'Explicit synthetic prospective hard bound; not a claim about an instrument' })) await panel.locator(`[name="${name}"]`).fill(value)

@@ -70,9 +70,10 @@ try {
     }
     return json(route, { code: 'unimplemented_controlled_fixture', message: path }, 404)
   })
-  await page.goto(url)
+  // File questions are a separate path on the Start step, opened by its deep link.
+  await page.goto(url + '#research')
   await page.waitForFunction(() => !document.getElementById('research-files').disabled)
-  check('general research is the primary entry', await page.locator('#research').isVisible() && !await page.locator('#inputs').isVisible())
+  check('file questions open as a separate path', await page.locator('#research-files').isVisible() && !await page.locator('#inputs').isVisible())
   check('automatic connection has no token input', !await page.locator('#bearer').isVisible())
   await page.setInputFiles('#research-files', { name: 'penguins-excerpt.csv', mimeType: 'text/csv', buffer: rawCsv })
   await page.waitForSelector('#general-assets .retained-file')

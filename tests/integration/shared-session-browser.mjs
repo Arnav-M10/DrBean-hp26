@@ -242,6 +242,7 @@ try {
 
   // Real retained-file producer, actual citation validation and ordinary UI.
   // Only the model response is an explicitly labelled local controlled preview.
+  await pageA.evaluate(() => { location.hash = 'research' })
   await pageA.locator('#research-files').setInputFiles(join(root, 'tests/integration/fixtures/general/penguins-excerpt.csv'))
   await pageA.locator('#general-assets article').first().waitFor()
   const admitted = await browserRequest(pageA, `/workspaces/${sessionA.workspace_id}/research-assets`)
@@ -289,6 +290,8 @@ try {
 
   const sourceQuestion = 'Which scientific model and metadata would be needed for these penguin measurements?'
   await pageA.locator('#research-question').fill(sourceQuestion)
+  // The research plan lives on the Investigate step; changing the hash never reloads state.
+  await pageA.evaluate(() => { location.hash = 'investigations' })
   await pageA.getByRole('button', { name: 'Save selected files and research question', exact: true }).click()
   await pageA.locator('#durable-research h4').filter({ hasText: sourceQuestion }).waitFor()
   const savedResearch = await browserRequest(pageA, `/workspaces/${sessionA.workspace_id}/research-sessions`)

@@ -1,5 +1,6 @@
 import { parseExact } from './exact.mjs'
 import { planRequest } from './manual.mjs'
+import { readable } from './result-view.mjs'
 
 export function setupFollowupWorkflow({ context, button, node, exactRecord, openRun }) {
   let rowId = '', origin = 'hypothetical', observedTime = '', observedAllowance = ''
@@ -10,10 +11,10 @@ export function setupFollowupWorkflow({ context, button, node, exactRecord, open
     if (!suggestion || suggestion.body.design_tier !== 'checked_pair_separation') return
     const { api, workspace, busy } = context(), result = suggestion.body
     const section = node('section', ''); section.id = 'followup-review'; parent.append(section)
-    section.append(node('h4', 'Review a follow-up observation'), node('p', `The design suggested ${result.selected_time} h with hard allowance ${result.future_hard_allowance} mg/L. An actual reading must use its own acquisition time and justified allowance. Declaring a reading actual is your statement, not instrument verification.`))
+    section.append(node('h3', 'Add the new reading'), node('p', `The comparison suggested ${readable(result.selected_time)} h with an allowance of ±${readable(result.future_hard_allowance)} mg/L. An actual reading must use its own acquisition time and justified allowance. Declaring a reading actual is your statement, not instrument verification.`))
     const originLabel = node('label', 'Observation origin'); originLabel.className = 'stack'
     const originSelect = node('select', ''); originSelect.id = 'followup-origin'; originSelect.setAttribute('aria-label', 'Observation origin'); originSelect.disabled = busy || Boolean(proposal)
-    for (const optionOrigin of ['hypothetical', 'actual']) { const option = node('option', optionOrigin); option.value = optionOrigin; originSelect.append(option) }
+    for (const optionOrigin of ['hypothetical', 'actual']) { const option = node('option', optionOrigin === 'actual' ? 'Actual, measured' : 'Hypothetical, for exploration'); option.value = optionOrigin; originSelect.append(option) }
     originSelect.value = origin
     originSelect.addEventListener('change', () => {
       origin = originSelect.value; value = reason = observedTime = observedAllowance = ''
@@ -65,7 +66,7 @@ export function setupFollowupWorkflow({ context, button, node, exactRecord, open
     }, Boolean(plan))
     if (!plan) return
     section.append(exactRecord('Exact follow-up plan requiring new approval', plan))
-    const label = node('label', ` I reviewed this ${origin} follow-up plan and approve this scope.`); label.className = 'stack'
+    const label = node('label', ` I reviewed this ${origin} follow-up plan and approve this scope.`)
     const check = node('input', ''); check.type = 'checkbox'; check.id = 'followup-approve-scope'; check.disabled = busy || Boolean(approval)
     label.prepend(check); section.append(label)
     const approve = button(section, 'Approve reviewed follow-up', async () => {
