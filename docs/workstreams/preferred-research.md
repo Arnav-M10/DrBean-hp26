@@ -1,29 +1,33 @@
 # Preferred research workspace
 
-Branch `codex/preferred-research-workspace`, base main `a876543` (merged PR55).
-Owner: workspace-preview, browser transport/activity/review/readable reports.
-Backend recovery/report owner: PR60 `codex/deepagents-completion`.
-Claude owns independent qualification and all live Gemini calls.
+Owner: workspace-preview, trusted browser transport/activity/reviews/readable reports.
+PR55 merged at `a876543`; current frontend is PR61 `codex/preferred-research-workspace`.
+Backend recovery/reports remain PR60; Claude owns independent testing/all live calls.
 
-Current task: reuse ResearchController/exact input conversion and existing private
-cookie bootstrap in the preferred shell. Initial reviewed inputs create the
-session and request its plan as one explicit action. Every scientific scope keeps
-its canonical separate approval. Poll only real persisted state/events; never
-advance or retry unknown mutations automatically after reload/failure.
+**Complete:** reviewed CSV/manual concentration inputs → actual maintained Deep
+Agents plan → canonical human review → real Counterdex child → readable retained
+results/native downloads → optional separately approved checked pair design.
+Private cookies, exact bindings, metering and the manual loop are reused. Imported
+originals survive corrections. Actual persisted events/reasons drive activity.
+Refresh reopens evidence; uncertain mutations are never automatically retried.
+Stale approvals dispatch nothing. Expired identity blocks operations; an explicit
+new workspace clears all inputs, assumptions, history and approvals from the view.
+Numerical plasma comparison remains at `/workspace-preview/comparison.html`.
+Generic static serving is visibly draft/sample-only and cannot execute.
 
-Numerical comparison remains available at comparison.html with its existing
-working integration. Static serving stays labelled draft/sample-only. Controlled
-execution and real Counterdex/native evidence will be tested; live calls are not
-part of this frontend task. No framework, redesign, new animation or backend rewrite.
+**Tested:** frontend `c78a0094f75133e2f2a52c1c4ebbb2a4db340793`: 11 browser checks.
+Combined `fcb97cf4d55a8f205122329be07ab3f58da048f0` (same frontend + backend
+`a2f568b`): 12 browser checks, 14 preserved numerical checks, 129 unit tests,
+static browser, Ruff and whitespace passed. Real native replay passed. Post-science
+model failure is a separately labelled controlled diagnostic; no science is faked.
+Provider calls: zero. Later frontend commits contain evidence/documentation only.
 
-Implemented in the preferred shell: exact CSV/manual review, actual private
-research sessions, persisted public plan/events, canonical investigation and
-separate design approval, automatic read-only result retrieval, readable retained
-HTML and real native/anchor downloads. Numerical comparison is preserved at
-`/workspace-preview/comparison.html`. Static mode cannot execute.
+**Blocked/gates:** required CI and Claude's independent combined/live qualification.
+Claude's backend live finding `F-LIVE-COMMENTARY-NUMBER` remains open; the UI preserves
+completed science if narration stops. No limits, validators or allocation changed.
+Observation ingestion, broad restart and arbitrary-file/model registration stay deferred.
 
-Author checks against main + this frontend: 9 controlled browser checks passed,
-including actual scientific children, changed claim/evidence-dependent clarification,
-refresh, native replay, and a separately injected post-science model-failure
-worker. Preserved numerical browser checks passed. Final CI/combined-backend
-qualification is pending. No provider call or credential inspection was performed.
+**Current task:** frontend implementation/author qualification complete; deliver
+PR61 plus the published `codex/preferred-combined-qualification` candidate for review.
+Exact launch commands, researcher steps, receipts/screenshots and scope:
+[frontend handoff](../frontend/preferred-research/README.md).
