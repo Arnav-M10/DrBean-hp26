@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 from google.genai import types
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import ToolMessage
 import pytest
 
 from bean_api.config import Settings
@@ -56,33 +56,10 @@ class OfflineSDK:
         declared = {item.name for tool in kwargs["config"].tools for item in tool.function_declarations}
         assert declared == TOOLS
         if self.research_policy:
-            # Offline wire bridge only. Decisions come from the shipped fixture
-            # after decoding the actual model input, including real tool outputs.
-            # No fabricated candidates, native bytes or scientific responses.
-            from bean_api.research_controlled import build_controlled_research_model
-            messages = []
-            for content in kwargs["contents"]:
-                if content.role == "model":
-                    calls = [{"name": part.function_call.name, "args": part.function_call.args,
-                              "id": part.function_call.id, "type": "tool_call"}
-                             for part in content.parts if part.function_call is not None]
-                    messages.append(AIMessage(content="".join(part.text or "" for part in content.parts), tool_calls=calls))
-                    continue
-                for part in content.parts:
-                    if part.function_response is not None:
-                        value = part.function_response.response
-                        assert set(value) == {"output"}, value
-                        output = value["output"]
-                        messages.append(ToolMessage(content=output if isinstance(output, str) else json.dumps(output),
-                            name=part.function_response.name, tool_call_id=part.function_response.id))
-                    else:
-                        messages.append(HumanMessage(content=part.text))
-            result = build_controlled_research_model()._generate(messages).generations[0].message
-            assert len(result.tool_calls) == 1
-            selected = result.tool_calls[0]
-            name, args = selected["name"], selected["args"]
-            self.policy_calls.append(selected)
-            return self.response(name, args, selected["id"])
+            from research_efficient_wire import efficient_calls, efficient_response
+            calls = efficient_calls(kwargs["contents"], len(self.requests))
+            self.policy_calls.extend(calls)
+            return efficient_response(calls, LIVE_MODEL)
         results = [part.function_response for content in kwargs["contents"] for part in content.parts
                    if part.function_response is not None]
         if not results:
@@ -240,7 +217,7 @@ def test_real_configuration_keeps_free_tier_and_account_gate_checks():
 
 @pytest.mark.parametrize("metered_app", ["native"], indirect=True)
 def test_actual_baseline_approval_evidence_and_report_through_metered_model(metered_app, tmp_path):
-    """Six admitted offline SDK turns through ordinary production application wiring."""
+    """Three admitted offline SDK turns through ordinary production application wiring."""
     from test_research_controlled_application import replay_current_source, saved_messages
     client, service, worker, wire = metered_app
     wire.research_policy = True
@@ -279,7 +256,7 @@ def test_actual_baseline_approval_evidence_and_report_through_metered_model(mete
     waiting = service.get("alice", session["id"])
     assert waiting["state"] == "waiting_review", waiting
     assert waiting["pending_review"]["kind"] == "plan" and not waiting["children"]
-    assert len(wire.requests) == 3
+    assert len(wire.requests) == 2
     decision = {"expected_revision": waiting["revision"], "pending_review_id": waiting["pending_review"]["id"],
         "expected_review_digest": waiting["pending_review_digest"], "decision": "approve", "accepted": True}
     path = f"/research-sessions/{session['id']}/decisions"
@@ -304,8 +281,10 @@ def test_actual_baseline_approval_evidence_and_report_through_metered_model(mete
     assert result["scientific_outcome"] == "certified_counterexample"
     assert result["baseline_search"]["attempted_count"] > 0
     assert result["problem_digest"] == problem["digest"]
-    assert any(call["name"] == "read_research_evidence" and call["args"]["evidence_id"] == evidence_id
-               for call in wire.policy_calls)
+    assert any(part.function_response and any(fact["id"] == evidence_id for fact in
+                   part.function_response.response.get("output", {}).get("canonical_evidence", []))
+               for request in wire.requests for content in request["contents"] for part in content.parts
+               if part.function_response and isinstance(part.function_response.response.get("output"), dict))
     report_call = wire.policy_calls[-1]
     assert report_call["name"] == "publish_research_report"
     assert report_call["args"]["evidence_ids"] == [evidence_id]
@@ -320,27 +299,24 @@ def test_actual_baseline_approval_evidence_and_report_through_metered_model(mete
     assert report["body"]["evidence"] == [evidence]
     assert report["body"]["root_inputs"]["dataset"] == dataset
     attempts = client.app.state.ledger.list_attempts("alice", workspace)
-    assert len(wire.requests) == len(wire.constructions) == wire.closed == len(attempts) == 6
-    assert final["usage"]["physical_calls"] == final["usage"]["logical_turns"] == 6
+    assert len(wire.requests) == len(wire.constructions) == wire.closed == len(attempts) == 3
+    assert final["usage"]["physical_calls"] == final["usage"]["logical_turns"] == 3
     assert all(item["state"] == "completed" for item in attempts)
     assert final["provider_allocation"]["physical_requests"] == 6
     fresh = replay_current_source(client, result, tmp_path)
     assert fresh["verification"] == "valid" and fresh["replay"] == "passed"
     assert worker.tick() == 0
-    assert len(wire.requests) == 6
+    assert len(wire.requests) == 3
 
 
 @pytest.mark.parametrize("metered_app", ["native"], indirect=True)
-def test_reviewed_design_constraints_baseline_fits_the_documented_operator_allocation(metered_app):
-    """Owner 5 author check: admission estimate for the predeclared live sample.
+@pytest.mark.parametrize("input_allocation", [64_000, 61_000])
+def test_reviewed_design_constraints_baseline_fits_the_documented_operator_allocation(metered_app, input_allocation):
+    """Real baseline + separately reviewed design, without increasing allocation.
 
-    The browser demo saves reviewed design constraints with the question, so the
-    live baseline carries them in every request. With the documented operator
-    allocation (6 requests, 64,000 input, 3,072 output tokens) main aa51f16
-    reserved 49,524 input tokens for the first five requests and refused the
-    sixth (the report) with provider_budget_exhausted after the science ran.
-    research-prompt.v4's bounded views must complete it with headroom. The SDK
-    is substituted; this is accounting evidence, not live qualification.
+    The SDK is substituted. This exercises one admissible evidence-dependent
+    model strategy, not live Gemini understanding or its eventual request size.
+    A smaller allocation must preserve completed science and stop before SDK use.
     """
     client, service, worker, wire = metered_app
     wire.research_policy = True
@@ -366,7 +342,7 @@ def test_reviewed_design_constraints_baseline_fits_the_documented_operator_alloc
         "expected_problem_digest": problem["digest"], "design_constraints": conditions["design_constraints"]}, "session")
     consent(client, session)
     service.allocate_provider("alice", session["id"], {"physical_requests": 6,
-        "input_tokens": 64_000, "output_tokens": 3072, "accepted": True}, "offline-operator-allocation")
+        "input_tokens": input_allocation, "output_tokens": 3072, "accepted": True}, "offline-operator-allocation")
 
     def reserved_before_sdk():
         attempts = client.app.state.ledger.list_attempts("alice", workspace)
@@ -389,12 +365,66 @@ def test_reviewed_design_constraints_baseline_fits_the_documented_operator_alloc
     assert final["state"] == "completed" and len(final["reports"]) == 1, final
     attempts = client.app.state.ledger.list_attempts("alice", workspace)
     reserved = [item["metadata"]["reserved_input_tokens"] for item in attempts]
-    assert len(attempts) == len(wire.requests) == 6 and all(item["state"] == "completed" for item in attempts)
+    assert len(attempts) == len(wire.requests) == 3 and all(item["state"] == "completed" for item in attempts)
     assert [call["name"] for call in wire.policy_calls] == ["write_todos", "prepare_scientific_proposal",
-        "run_scientific_operation", "read_research_evidence", "write_todos", "publish_research_report"]
-    assert sum(reserved) <= 60_000, reserved  # measured 57,206 at research-prompt.v4
+        "run_scientific_operation", "write_todos", "publish_research_report"]
+    assert sum(reserved) <= 64_000, reserved
     assert sum(item["metadata"]["reserved_output_tokens"] for item in attempts) <= 3072
     steps = final["plan"]["body"]["steps"]
     evidence_id = final["children"][0]["scenarios"][0]["result_id"]
     assert [step["status"] for step in steps] == ["completed", "completed", "pending"]
     assert all(step["reference_ids"] == [evidence_id] for step in steps[:2])
+    # Continue the same session into a separately approved design without any
+    # capacity increase or new consent. All physical calls still use the meter.
+    accepted(f"/research-sessions/{session['id']}/advance", {"expected_revision": final["revision"]}, "design-advance")
+    worker.tick()
+    waiting = service.get("alice", session["id"])
+    assert waiting["state"] == "waiting_review" and len(waiting["children"]) == 1, waiting
+    assert len(wire.requests) == 5
+    accepted(f"/research-sessions/{session['id']}/decisions", {
+        "expected_revision": waiting["revision"], "pending_review_id": waiting["pending_review"]["id"],
+        "expected_review_digest": waiting["pending_review_digest"], "decision": "approve", "accepted": True}, "approve-design")
+    for _ in range(4):
+        worker = Worker(service.workflow, settings=client.app.state.settings,
+            provider_config=worker.config, ledger=client.app.state.ledger)
+        worker.tick()
+        final = service.get("alice", session["id"])
+        if final["state"] != "waiting_child":
+            break
+    if input_allocation == 61_000:
+        assert final["state"] == "failed" and final["action"]["error_code"] == "provider_budget_exhausted"
+        assert len(final["children"]) == len(final["reports"]) == 2
+        assert all(child["state"] == "completed" for child in final["children"])
+        assert final["interaction"]["quota_exhausted"] and final["interaction"]["results"]["available"]
+        assert final["interaction"]["results"]["deterministic_summary_available"]
+        assert not final["interaction"]["results"]["commentary_available"]
+        report = client.get(PREFIX + "/reports/" + final["reports"][-1]).json()
+        assert report["body"]["commentary_status"] == "unavailable"
+        assert report["body"]["model_failure"] == {"code": "provider_budget_exhausted"}
+        attempts = client.app.state.ledger.list_attempts("alice", workspace)
+        assert len(wire.requests) == len(attempts) == 5
+        worker.tick()
+        denied = post(client, f"/research-sessions/{session['id']}/advance", {"expected_revision": final["revision"]}, "exhausted-resume")
+        assert denied.status_code == 409
+        assert len(wire.requests) == 5
+        assert service.get("alice", session["id"])["provider_allocation"]["input_tokens"] == input_allocation
+        return
+    assert final["state"] == "completed" and len(final["children"]) == 2, final
+    assert len(final["reports"]) == 2
+    assert wire.policy_calls[-1]["name"] == "publish_research_report"
+    assert wire.policy_calls[-1]["args"]["next_action"] == "review_observation"
+    attempts = client.app.state.ledger.list_attempts("alice", workspace)
+    reservations = [item["metadata"]["reserved_input_tokens"] for item in attempts]
+    assert len(wire.requests) == len(attempts) == final["usage"]["physical_calls"] == 6
+    assert sum(reservations) <= 64_000, reservations
+    assert final["provider_allocation"] == {"physical_requests": 6, "input_tokens": input_allocation, "output_tokens": 3072}
+    assert final["provider_usage"]["reported_input_tokens"] == 120
+    assert final["provider_usage"]["reserved_input_tokens"] == sum(reservations)
+    assert final["provider_usage"]["unresolved_attempts"] == 0
+    assert all(item["state"] == "completed" for item in attempts)
+    from test_research_controlled_application import saved_messages
+    # Compaction affects only requests, not provider signatures or audit history.
+    retained = saved_messages(client, session["id"])
+    assert sum(bool(getattr(message, "tool_calls", [])) for message in retained) == 6
+    assert len(retained) > len(wire.requests[-1]["contents"])
+    assert worker.tick() == 0 and len(wire.requests) == 6

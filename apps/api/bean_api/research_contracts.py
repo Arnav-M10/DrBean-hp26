@@ -179,6 +179,57 @@ class ResearchReviewedContext(StrictModel):
     sources: list[ResearchSourceRef] = Field(max_length=5)
 
 
+class ResearchProviderRemaining(StrictModel):
+    physical_requests: int = Field(ge=0)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+
+
+class ResearchProviderUsage(StrictModel):
+    scope: Literal["research_session"]
+    physical_requests: int = Field(ge=0)
+    reserved_input_tokens: int = Field(ge=0)
+    reserved_output_tokens: int = Field(ge=0)
+    accounted_input_tokens: int = Field(ge=0)
+    accounted_output_tokens: int = Field(ge=0)
+    reported_input_tokens: int | None = Field(ge=0)
+    reported_output_tokens: int | None = Field(ge=0)
+    reported_thought_tokens: int | None = Field(ge=0)
+    reported_total_tokens: int | None = Field(ge=0)
+    reported_attempts: int = Field(ge=0)
+    unresolved_attempts: int = Field(ge=0)
+    accounting_valid: bool
+    remaining: ResearchProviderRemaining
+
+
+class ResearchRecovery(StrictModel):
+    required: bool
+    code: str | None
+    can_reconcile: bool
+    next_action: Literal["none", "reconcile", "inspect_accounting_or_cancel"]
+
+
+class ResearchResultAvailability(StrictModel):
+    available: bool
+    report_ids: list[Identifier]
+    latest_report_id: Identifier | None
+    evidence_ids: list[Identifier]
+    download_job_ids: list[Identifier]
+    commentary_available: bool
+    deterministic_summary_available: bool
+
+
+class ResearchInteraction(StrictModel):
+    waiting_for_review: bool
+    waiting_for_observation: bool
+    provider_consent_required: bool
+    quota_exhausted: bool
+    recovery: ResearchRecovery
+    results: ResearchResultAvailability
+    suggested_action: Literal["reconcile", "inspect_accounting_or_cancel", "wait", "review", "review_observation",
+                              "inspect_results", "review_provider_consent", "inspect_allocation", "advance"]
+
+
 class ResearchSnapshot(StrictModel):
     schema_version: Literal["DB-RESEARCH-1"]
     id: Identifier
@@ -207,6 +258,8 @@ class ResearchSnapshot(StrictModel):
     reports: list[Identifier]
     provider_disclosure: dict[str, Any]
     provider_allocation: dict[str, int]
+    interaction: ResearchInteraction | None = None
+    provider_usage: ResearchProviderUsage | None = None
     created_at: str
     updated_at: str
 
@@ -299,7 +352,8 @@ class ResearchPorts(Protocol):
     async def execute_child(self, review_id: str, expected_review_digest: str) -> dict[str, Any]: ...
     async def read_evidence(self, evidence_id: str) -> dict[str, Any]: ...
     async def request_clarification(self, fields: list[str], reason: str) -> dict[str, Any]: ...
-    async def publish_report(self) -> dict[str, Any]: ...
+    async def publish_report(self, *, evidence_ids: list[str] | None = None,
+                             commentary: dict[str, Any] | None = None) -> dict[str, Any]: ...
     async def admit_model(self) -> None: ...
     async def admit_tool(self, name: str) -> None: ...
 
