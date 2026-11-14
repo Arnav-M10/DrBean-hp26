@@ -1,0 +1,63 @@
+{
+  "schema_version": "coordinator-sprint-checklist.v1",
+  "profile": "deepagents-completion-sprint.v1",
+  "author": "C (Claude Code, independent validator and integration tester)",
+  "owners": {
+    "A": "Codex A: backend recovery, context efficiency, persisted agent reports",
+    "B": "Codex B: connected workspace-preview interface",
+    "C": "Claude Code: regression tests, combined qualification, the bounded live Gemini test, demonstration evidence"
+  },
+  "statement": "Acceptance checklist for the Deep Agents completion sprint. A status is assigned only from behaviour observed on a named commit in a named lane. A missing producer is never a pass. This profile does not replace predicates.v1 or the narrow demo profile and implies no general scientific proof.",
+  "status_vocabulary": ["PASS", "FAIL", "NOT_RUN", "NOT_AVAILABLE"],
+  "lanes": {
+    "controlled": "Controlled model decisions (offline fixture policy, zero provider requests) with the actual graph, routes, worker and authority.",
+    "real_science": "As controlled, plus actual Counterdex execution, native evidence and replay.",
+    "live_gemini": "Actual Gemini through the metered gateway and reserve-before-dispatch ledger; FREE TIER ONLY; sprint ceiling 12 physical requests including failed and uncertain attempts; no automatic retry or fallback; public or synthetic inputs only.",
+    "historical_replay": "Fresh native replay of retained artifacts with the matching Counterdex runtime."
+  },
+  "rules": [
+    "Controlled, real-science, live and replay results are recorded separately; a controlled run is never labelled live.",
+    "Frozen predicates and expected results are not weakened to obtain a pass; a correction is a new profile version.",
+    "Adaptivity is graded as acceptable sets of next actions per evidence condition, not exact wording or tool order.",
+    "A live PASS needs ledger attempts with execution_mode live, provider gemini and recorded usage, and model-issued tool calls that the graph executed.",
+    "If a live run exposes a defect, live traffic stops until an offline regression demonstrates the fix."
+  ],
+  "items": [
+    {"id": "ACC-01", "claim": "The preferred UI invokes the actual Deep Agents coordinator.",
+     "pass": "Driving the preferred browser interface creates a DB-RESEARCH-1 session and advances it; the ordinary worker runs the compiled create_deep_agent graph, whose recorded tool events and research-plan.v1 revision belong to that session. A mockup, fixture events or a direct API script do not pass.",
+     "owner": "B", "lanes": ["controlled", "live_gemini"]},
+    {"id": "ACC-02", "claim": "Gemini actually selects and uses tools.",
+     "pass": "In the live lane, genuine provider responses contain function calls (write_todos and at least one research tool) that the graph executes, each turn preceded by a reserved ledger attempt with provider gemini, execution_mode live and recorded usage.",
+     "owner": "C", "lanes": ["live_gemini"]},
+    {"id": "ACC-03", "claim": "Scientific evidence changes the next action.",
+     "pass": "Sessions differing only in the reviewed claim or returned evidence take different next actions from the acceptable sets: a checked counterexample leads to a separately approved pair-design review; no counterexample or unresolved leads to an assumption review or honest stop, never a design. Missing inputs lead to clarification without science.",
+     "owner": "A", "lanes": ["real_science", "live_gemini"]},
+    {"id": "ACC-04", "claim": "Required approvals are enforced.",
+     "pass": "No scientific child exists before the canonical decision; the dispatched child binds the approved review id and digest; rejection, forged, stale or edited decisions and raw graph commands create no child; design requires its own approval.",
+     "owner": "A", "lanes": ["real_science", "live_gemini"]},
+    {"id": "ACC-05", "claim": "Interrupted work recovers without duplicate computation.",
+     "pass": "Interrupting the worker after a child is reserved or dispatched and restarting it continues or reconciles the same action: child jobs and scientific reservations do not increase, duplicate resume or decision returns the existing action, and evidence is preserved.",
+     "owner": "A", "lanes": ["real_science"]},
+    {"id": "ACC-06", "claim": "Validated explanations and recommendations reach downloaded reports.",
+     "pass": "The downloaded research report contains the agent's explanation and next-step recommendation, each bound to cited evidence ids that exist in the report; unsupported or ungrounded statements are withheld or marked; the report never upgrades a tier or claims proof.",
+     "owner": "A", "lanes": ["real_science", "live_gemini"]},
+    {"id": "ACC-07", "claim": "Science remains accessible after model failure.",
+     "pass": "After a completed child, a model failure (including a provider error) leaves evidence, report snapshot, native bytes, anchor and fresh replay intact and the recorded outcome unchanged.",
+     "owner": "A", "lanes": ["real_science", "live_gemini"]},
+    {"id": "ACC-08", "claim": "Quota exhaustion is clear and triggers no fallback or retry.",
+     "pass": "A provider 429 or an exhausted session allocation produces one charged attempt (or none when refused before dispatch), a stable error code the UI shows in plain language, no second provider request, no switch to the controlled policy or another model, and no scientific child.",
+     "owner": "A", "lanes": ["controlled", "live_gemini"]},
+    {"id": "LIVE-01", "claim": "One small investigation runs through the preferred browser interface and the Gemini-backed graph.",
+     "pass": "ACC-02 observed in the browser journey; approved science executes; returned evidence reaches the model (a later live turn's input contains the evidence id); a grounded report is retained.",
+     "owner": "C", "lanes": ["live_gemini"]},
+    {"id": "LIVE-02", "claim": "A contrasting live case changes the next action.",
+     "pass": "A live session with missing inputs or an inconclusive result takes a different permitted next action than LIVE-01.",
+     "owner": "C", "lanes": ["live_gemini"]},
+    {"id": "LIVE-03", "claim": "The follow-up design path runs live within the remaining limit.",
+     "pass": "A live advance after LIVE-01's report proposes a separate pair-design review that executes only after its own approval.",
+     "owner": "C", "lanes": ["live_gemini"]},
+    {"id": "COMB-01", "claim": "One integrated commit containing both owners' changes passes combined qualification.",
+     "pass": "On that commit in isolated stores and ports: refresh/reopen, approval rejection, duplicate resume, interruption recovery, report binding, native download and replay, and evidence preservation after provider failure; the relevant release checks pass once.",
+     "owner": "C", "lanes": ["controlled", "real_science", "historical_replay"]}
+  ]
+}

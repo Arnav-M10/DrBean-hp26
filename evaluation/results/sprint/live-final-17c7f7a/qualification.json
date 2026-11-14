@@ -1,0 +1,64 @@
+{
+  "schema_version": "qualification-extension-observation.v1",
+  "operator": "root",
+  "independent_claude_execution": false,
+  "tested_commit": "17c7f7a82972be2ebc7b296b41277c1f395f1968",
+  "integrated_main": "04a9012a1d16b42aeca38fcae2bdc3f5a5a1c1d6",
+  "authorization_id": "user-final-handoff-2026-11-14",
+  "record": "record.json",
+  "live_baseline": "failed",
+  "reason": "provider_malformed_tool_call: write_todos arguments failed strict type validation before any tool was admitted",
+  "validation_detail": {
+    "reason": "wrong_argument_type",
+    "tool_name": "write_todos"
+  },
+  "diagnostic_limit": "Rejected raw arguments and the failing field were not retained. No specific malformed value, model-vs-SDK cause or repair can be inferred from this receipt.",
+  "physical_requests": 1,
+  "cumulative_physical_requests": 15,
+  "effective_grants": 28,
+  "reserved_input_tokens": 7388,
+  "reserved_output_tokens": 512,
+  "accounted_input_tokens": 7388,
+  "accounted_output_tokens": 512,
+  "reported_input_tokens": 1738,
+  "reported_output_tokens": 41,
+  "reported_thought_tokens": null,
+  "reported_total_tokens": 1779,
+  "unresolved_attempts": 0,
+  "scientific_children": 0,
+  "reports": 0,
+  "review_reached": false,
+  "independent_internal_receipt_check": {
+    "status": "failed",
+    "predicate": "research_action_completed_without_error",
+    "scope": "Read-only Codex subagent; not Claude live acceptance"
+  },
+  "controlled_browser": {
+    "status": "passed",
+    "predicates": 12,
+    "provider_calls": 0,
+    "record": "controlled-browser-receipt.json",
+    "qualifies_live_gemini": false
+  },
+  "frozen_sprint_profile_changed": false,
+  "production_limits_changed": false,
+  "next_live_run_authorized": false,
+  "unused_grant_released": false,
+  "merge_ready": false,
+  "offline_regressions": {
+    "tested_commit": "17c7f7a82972be2ebc7b296b41277c1f395f1968",
+    "backend": {
+      "passed": 1601,
+      "skipped": 0,
+      "failed": 0,
+      "duration_seconds": 170.53,
+      "command": "BEAN_AI_MODE=placeholder BEAN_COUNTERDEX_PYTHON=$PWD/.venv-engine/bin/python BEAN_COUNTERDEX_REPLAY_PYTHON=$PWD/.venv-engine/bin/python PATH=$PWD/.venv-engine/bin:$PATH PYTHONPATH=$PWD/packages/counterdex_models .venv/bin/pytest -q tests --ignore=tests/integration -rs"
+    },
+    "ui": {
+      "passed": 151,
+      "failed": 0,
+      "command": "node --test apps/web/*.test.mjs apps/web/study/*.test.mjs workspace-preview/tests/*.test.mjs"
+    },
+    "qualifies_live_gemini": false
+  }
+}

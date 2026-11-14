@@ -19,6 +19,7 @@ from langchain.agents.middleware.types import hook_config
 from langchain.tools import ToolRuntime
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.types import Command, interrupt
+from pydantic import Field
 
 from .ai_prompts import COMMENTARY_POLICY_VERSION
 from .canonical import canonical_bytes
@@ -499,7 +500,11 @@ class ResearchCoordinator:
             # boundary's terminal guard writes END without admitting/calling a
             # model. Complete that guard so a later explicit action can advance.
             return await self._invoke(None)
-        if (state.next != ("tools",) or not 1 <= len(state.tasks) <= 2
+        # LangGraph lists each pending Send task, including duplicate node
+        # names. A safe batch can retain two unfinished tools, or one pending
+        # tool plus its completed sibling in state.tasks.
+        if (not 1 <= len(state.next) <= len(state.tasks) <= 2
+                or any(node != "tools" for node in state.next)
                 or any(task.name != "tools" for task in state.tasks)):
             # Without a committed tool decision the model output is not
             # reconstructible here. A completed physical request may have lost
@@ -599,8 +604,9 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
                                        "graph_version": GRAPH_VERSION, **event}))
 
     async def prepare_scientific_proposal(kind: Literal["investigation", "design", "followup"],
-                                         reference_ids: list[str]) -> dict[str, Any]:
-        """Prepare an unaccepted scientific proposal from reviewed references."""
+                                         reference_ids: Annotated[list[str], Field(min_length=1, max_length=16)],
+                                         runtime: ToolRuntime) -> dict[str, Any]:
+        """Prepare and pause for human review; no science. Investigation: [reviewed_context.dataset.id]. Design: [evidence ID]."""
         _references(reference_ids)
         result = _bounded(await _await(ports.prepare_proposal(kind, reference_ids)), 8000)
         if isinstance(result, dict) and "available" in result:
@@ -612,11 +618,37 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
             return result
         if not isinstance(result, dict) or result.get("accepted") is not False or not result.get("proposal_id"):
             raise CoordinatorFailure("research_proposal_authority_violation")
-        return result
+        proposal_id = result["proposal_id"]
+        review = _review(await _await(ports.read_review(proposal_id)), proposal_id)
+        if any(result.get(key) != review[key] for key in ("proposal_digest", "review_id", "review_digest")):
+            raise CoordinatorFailure("research_review_changed")
+        replay_review = runtime.state.get("review_interrupt_calls", {}).get(runtime.tool_call_id)
+        if replay_review is not None and replay_review != review["review_digest"]:
+            raise CoordinatorFailure("research_review_changed")
+        if review["decision"] == "pending" or replay_review == review["review_digest"]:
+            if review["decision"] == "pending":
+                await emit({"type": "review_required", "review_id": review["review_id"],
+                            "review_digest": review["review_digest"], "proposal_id": proposal_id,
+                            "observation_key": f"review:{review['review_id']}:{review['review_digest']}"})
+            interrupt({"kind": "canonical_scientific_review", "proposal_id": proposal_id,
+                       "proposal_digest": review["proposal_digest"], "review_id": review["review_id"],
+                       "review_digest": review["review_digest"], "tool_call_id": runtime.tool_call_id})
+            await authority()
+            fresh = _review(await _await(ports.read_review(proposal_id)), proposal_id)
+            if any(fresh[key] != review[key] for key in ("proposal_digest", "review_id", "review_digest")):
+                raise CoordinatorFailure("research_review_changed")
+            review = fresh
+        if review["decision"] not in {"approved", "rejected"}:
+            raise CoordinatorFailure("research_canonical_approval_required")
+        # Preparation never executes a child. The model receives the exact
+        # reviewed binding only after the human decision; execution still uses
+        # the separate run tool's canonical approval and stable job checks.
+        return {**result, "review_decision": review["decision"],
+                "next_tool": "run_scientific_operation" if review["decision"] == "approved" else "request_clarification"}
 
     async def run_scientific_operation(proposal_id: str, proposal_digest: str,
                                        review_id: str, review_digest: str, runtime: ToolRuntime) -> dict[str, Any]:
-        """Pause for canonical approval; execute/reconcile only that child."""
+        """Copy all four prepared fields verbatim; pause for approval; execute/reconcile that child."""
         _references([proposal_id])
         review = _review(await _await(ports.read_review(proposal_id)), proposal_id)
         if (proposal_digest, review_id, review_digest) != (
@@ -705,7 +737,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     async def publish_research_report(evidence_ids: list[str], text: str,
             next_action: Literal["stop", "clarify", "review_design", "review_observation", "review_plan"],
             runtime: ToolRuntime) -> Command:
-        """Publish an evidence-bound report and proposed next action."""
+        """Report evidence/next_action; text exactly 'The evidence has a conditional scope.'."""
         _references(evidence_ids)
         # Validate commentary against the complete bounded facts, not the view.
         facts = {ref: await complete_fact(ref) for ref in evidence_ids}
@@ -829,17 +861,17 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     # tool/schema while supplying the research-specific instruction once. This
     # reduces charged context without dropping any reviewed input or evidence.
     planning = TodoListMiddleware(
-        system_prompt="Maintain evidence-based todos; preserve completed steps; no authority.",
-        tool_description="Update proposed steps; preserve completed ones. No authority.")
+        system_prompt="Plan from evidence; preserve completed steps; no authority.",
+        tool_description="Plan only; preserve completed steps.")
     graph = create_deep_agent(model=model, tools=typed, middleware=[NoFilesystem(), planning, Boundary()],
         state_schema=ResearchState, backend=StateBackend(), checkpointer=checkpointer,
         subagents=[], skills=None, memory=None, store=None, cache=None, debug=False,
-        system_prompt=("Use canonical IDs. Plan; prepare; human approve; run; use canonical_evidence; report/clarify. "
-            "Batch only independent todos+prepare/report. Snapshots keep prior facts. Clarify missing assumptions; invent nothing. "
+        system_prompt=("Use canonical IDs/evidence. "
+            "Batch only independent todos+prepare/report. Clarify missing assumptions; invent nothing. "
             "A counterexample is compatible and strictly outside the CLOSED claim. Bounded misses prove nothing. "
             "Design: distinct checked candidates, reviewed times/allowance, separate approval, positive checked margin. "
             "Keep history and readings' time/allowance/origin. Exclusions aren't global. Execution/binding/verification/replay differ. "
-            "Cite evidence: 'The evidence has a conditional scope.'"))
+            "Report text exactly 'The evidence has a conditional scope.'"))
     inventories = [set(n.data.tools_by_name) for n in graph.get_graph().nodes.values()
                    if hasattr(n.data, "tools_by_name")]
     if inventories != [set(TOOLS)]:

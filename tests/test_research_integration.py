@@ -163,6 +163,7 @@ def test_actual_graph_uses_canonical_review_child_and_report_after_reconstructio
         graph = await build(backend, saver=saver)
         paused = await graph.start()
         assert paused["awaiting_review"] and not backend.children
+        assert (await graph.snapshot())["model_turns"] == backend.model_turns == 2
         state = await graph._graph.aget_state(graph._config)
         import json
         first_question = next(message for message in state.values["messages"] if isinstance(message, HumanMessage))
@@ -183,8 +184,12 @@ def test_actual_graph_uses_canonical_review_child_and_report_after_reconstructio
         assert report["commentary_persisted"] is True
         assert report["agent_commentary"] == backend.reports[0]["agent_commentary"]
         assert all("arguments" not in event and "args" not in event for event in backend.events)
-        requested = [event for event in backend.events if event["summary"] == "tool_requested: run_scientific_operation"]
+        requested = [event for event in backend.events if event["summary"] == "tool_requested: prepare_scientific_proposal"]
         assert len(requested) == 2 and requested[0]["observation_key"] == requested[1]["observation_key"]
+        # The pending preparation replays its same tool call after approval;
+        # executing the child is the next, separately admitted model decision.
+        executed = [event for event in backend.events if event["summary"] == "tool_requested: run_scientific_operation"]
+        assert len(executed) == 1
     asyncio.run(exercise())
 
 
@@ -193,6 +198,7 @@ def test_new_review_action_and_same_action_child_wait_preserve_graph_and_one_job
         backend, saver = CanonicalBackend(), InMemorySaver()
         first = await build(backend, saver=saver)
         reviewed = await first.start()
+        assert reviewed["awaiting_review"] and (await first.snapshot())["model_turns"] == backend.model_turns == 2
         backend.review.update(decision="approve", approval_id="approval")
         execute = backend.execute_child
 
@@ -212,6 +218,7 @@ def test_new_review_action_and_same_action_child_wait_preserve_graph_and_one_job
         assert waiting["interrupts"][0]["job_id"] == "job"
         assert waiting["todos"] == reviewed["todos"] and len(backend.children) == 1
         assert backend.model_turns == 3 and len(backend.tool_attempts) == 3
+        assert (await parent.snapshot())["model_turns"] == 1
         wrong_action = await build(backend, saver=saver, ctx=runtime(action_id="another-action"))
         with pytest.raises(CoordinatorFailure, match="research_child_wait_cannot_renew_action"):
             await wrong_action.resume(new_action=True)
@@ -222,7 +229,7 @@ def test_new_review_action_and_same_action_child_wait_preserve_graph_and_one_job
         assert len(backend.children) == 1 and len(backend.child_requests) == 2
         assert backend.child_requests[0] == backend.child_requests[1] == ("review", "b" * 64)
         assert backend.model_turns == 4 and len(backend.tool_attempts) == 4
-        assert (await restored.snapshot())["model_turns"] == 1
+        assert (await restored.snapshot())["model_turns"] == 2
     asyncio.run(exercise())
 
 
@@ -316,8 +323,9 @@ def test_design_uses_only_explicit_canonical_constraints_or_refuses(constraints)
         model = ToolScript(calls=[("prepare_scientific_proposal", {"kind": "design", "reference_ids": ["reviewed-input"]}),
                                   ("request_clarification", {"fields": ["measurement"], "question": "Obtain the reviewed reading."})])
         graph = await build(backend, model=model)
-        assert (await graph.start())["terminal"]["kind"] == "clarification"
+        started = await graph.start()
         if constraints is None:
+            assert started["terminal"]["kind"] == "clarification"
             assert not backend.design_arguments
             state = await graph._graph.aget_state(graph._config)
             result = next(json.loads(m.content) for m in state.values["messages"]
@@ -325,8 +333,22 @@ def test_design_uses_only_explicit_canonical_constraints_or_refuses(constraints)
             assert result["available"] is False and result["accepted"] is False
             assert set(result) == {"available", "accepted", "kind", "reason"}
         else:
+            assert started["awaiting_review"] and started["terminal"] is None
+            assert backend.model_turns == 1 and not backend.children
             assert backend.design_arguments == [constraints]
+            # A supported proposal now hands off immediately. This explicit
+            # canonical decision authorizes only its retained scope; it does
+            # not force the model to execute or invent a new measurement.
+            backend.review.update(decision="approve", approval_id="design-approval")
+            resumed = await graph.resume()
+            assert resumed["terminal"]["kind"] == "clarification"
+            assert backend.design_arguments == [constraints, constraints]
             assert backend.snapshot["design_constraints"] == constraints
+            state = await graph._graph.aget_state(graph._config)
+            prepared = next(json.loads(message.content) for message in state.values["messages"]
+                            if getattr(message, "name", None) == "prepare_scientific_proposal")
+            assert prepared["accepted"] is False and prepared["review_decision"] == "approved"
+            assert prepared["next_tool"] == "run_scientific_operation"
         assert not backend.children
     asyncio.run(exercise())
 

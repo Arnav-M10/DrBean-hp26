@@ -1,0 +1,177 @@
+{
+  "schema_version": "coordinator-sprint-observation.v1",
+  "profile": "deepagents-completion-sprint.v1",
+  "profile_canonical_sha256": "8df5078e66da409d0149a179308008f129e517d1d75203a2bdd2c2e2fc9df4f9",
+  "candidate": {
+    "kind": "combined",
+    "application_commit": "a43d5b2",
+    "branch": "claude/sprint-combined",
+    "contents": "main a876543 + PR #60 (Codex A) head a2f568b + PR #61 (Codex B) commits through 4eddae7, cherry-picked onto A (git merge could not run here; trees verified identical to B's head for workspace-preview and apps/web)",
+    "harness": "claude/deepagents-qualification (tests and evaluation files only, layered uncommitted onto the candidate)"
+  },
+  "environment": {
+    "os": "macOS 26.7 arm64",
+    "backend": "CPython 3.13 (uv sync --locked)",
+    "engine": "CPython 3.11, Counterdex 0.3.0",
+    "browser": "Playwright Chromium; launcher on ephemeral ports with isolated temporary stores; the user's app on 8000/4173 untouched"
+  },
+  "live": {
+    "model": "gemini-3.5-flash-lite",
+    "free_tier": "Officially free of charge on the Free tier (pricing page, read 2026-11-14); billing linkage not independently verifiable; relies on the user's free-tier statement and recorded decision user-free-tier-zero-spend-public-smoke-2026-11-14",
+    "physical_requests": 8,
+    "sprint_physical_requests_total": 8,
+    "reservations": "every request was reserved by the product ledger before dispatch (retry_policy none, max_requests 1)",
+    "runs": [
+      {
+        "dir": "live-baseline-A-a2f568b",
+        "ui": "apps/web",
+        "application": "PR #60 head a2f568b",
+        "physical_requests": 5,
+        "outcome": "plan, proposal, review stop, approved Counterdex child (certified_counterexample, replay passed), evidence read, plan revised, report published; commentary withheld (explanation_unsupported_number); action failed with an honest deterministic report",
+        "provider_usage": "not captured by the harness (fixed afterwards)"
+      },
+      {
+        "dir": "live-preview-baseline-a43d5b2-harness-bug-0-requests",
+        "ui": "workspace-preview",
+        "physical_requests": 0,
+        "outcome": "harness ended before the worker acquired the action"
+      },
+      {
+        "dir": "live-preview-baseline-a43d5b2-race-0-requests",
+        "ui": "workspace-preview",
+        "physical_requests": 0,
+        "outcome": "harness race; no dispatch"
+      },
+      {
+        "dir": "live-preview-baseline-a43d5b2",
+        "ui": "workspace-preview (preferred)",
+        "application": "combined a43d5b2",
+        "physical_requests": 3,
+        "provider_reported_usage": {
+          "input_tokens": 5767,
+          "output_tokens": 252,
+          "total_tokens": 6019
+        },
+        "outcome": "write_todos, prepare_scientific_proposal, then provider_malformed_tool_call; failed closed, charged, not retried, no child"
+      }
+    ]
+  },
+  "items": [
+    {
+      "id": "ACC-01",
+      "status": "PASS",
+      "lane": "live_gemini + controlled",
+      "basis": "Driving the preferred workspace (/workspace-preview/) created the live DB-RESEARCH-1 session, saved consent and advanced it; the ordinary worker ran the compiled graph and recorded plan_updated and tool events (write_todos, prepare_scientific_proposal) for that session. Controlled real-science journey through the same workspace also passes.",
+      "evidence": [
+        "evaluation/results/sprint/live-preview-baseline-a43d5b2/record.json",
+        "workspace-preview/check-research.mjs (passed on a43d5b2)",
+        "workspace-preview/check-connected.mjs (passed on a43d5b2)"
+      ]
+    },
+    {
+      "id": "ACC-02",
+      "status": "PASS",
+      "lane": "live_gemini",
+      "basis": "Genuine Gemini responses carried function calls the graph executed: write_todos, prepare_scientific_proposal, run_scientific_operation and publish_research_report (A head) and write_todos, prepare_scientific_proposal (combined). Every turn was a reserved ledger attempt with provider gemini, execution_mode live; provider-reported usage recorded on the combined run (5,767 input / 252 output tokens over 3 attempts).",
+      "evidence": [
+        "evaluation/results/sprint/live-baseline-A-a2f568b/record.json",
+        "evaluation/results/sprint/live-preview-baseline-a43d5b2/record.json"
+      ]
+    },
+    {
+      "id": "ACC-03",
+      "status": "PASS",
+      "lane": "real_science",
+      "basis": "On a43d5b2, sessions differing only in claim or allowance take different acceptable next actions (design review vs clarification); missing inputs ask without science. The live contrast (LIVE-02) was not run.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_04_changed_evidence_changes_the_next_action",
+        "tests/test_research_agent_conditions.py"
+      ]
+    },
+    {
+      "id": "ACC-04",
+      "status": "PASS",
+      "lane": "real_science + live_gemini",
+      "basis": "No child before the canonical decision; forged/raw/duplicate decisions refused (combined suites). Live: the Gemini-proposed run_scientific_operation stopped for review with zero children, approve stayed disabled until the exact checkbox, and only after browser approval did the exact child run.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_02_approval_binds_the_dispatched_operation",
+        "tests/integration/test_research_session_probes.py",
+        "evaluation/results/sprint/live-baseline-A-a2f568b/record.json"
+      ]
+    },
+    {
+      "id": "ACC-05",
+      "status": "PASS",
+      "lane": "real_science",
+      "basis": "Worker killed after child dispatch; --recover then explicit, idempotent reconcile completes the same action with one job and one reservation; A's runtime-recovery tests pass on a43d5b2.",
+      "evidence": [
+        "tests/test_sprint_recovery.py",
+        "tests/test_research_runtime_recovery.py",
+        "tests/test_research_pending_continuation.py"
+      ]
+    },
+    {
+      "id": "ACC-06",
+      "status": "FAIL",
+      "lane": "real_science PASS, live_gemini FAIL",
+      "basis": "Real-science lane: the downloaded report carries validated, evidence-bound agent_commentary with next_action and no scientific authority. Live lane: Gemini's commentary was withheld (explanation_unsupported_number), so no validated explanation reached the live report (F-LIVE-COMMENTARY-NUMBER, PR #60).",
+      "evidence": [
+        "tests/test_sprint_quota_and_reports.py::test_acc06_downloaded_report_carries_the_validated_explanation_and_recommendation",
+        "evaluation/results/sprint/live-baseline-A-a2f568b/research-report.json"
+      ]
+    },
+    {
+      "id": "ACC-07",
+      "status": "PASS",
+      "lane": "real_science + live_gemini",
+      "basis": "Offline 429 after science and DEMO-09 (oracle R1) keep evidence, native bytes, anchor and replay. Live: after the commentary failure the evidence, native file and anchor downloaded and fresh replay passed (certified_counterexample, matches).",
+      "evidence": [
+        "tests/test_sprint_quota_and_reports.py::test_acc07_acc06_provider_failure_after_real_science_keeps_evidence_and_report_content",
+        "tests/integration/test_langchain_demo.py::test_demo_09_model_failure_preserves_completed_evidence",
+        "evaluation/results/sprint/live-baseline-A-a2f568b/record.json"
+      ]
+    },
+    {
+      "id": "ACC-08",
+      "status": "FAIL",
+      "lane": "controlled + live_gemini",
+      "basis": "Backend passes: a 429 is one charged provider_rate_limited attempt, never retried, no controlled fallback; an exhausted allocation is refused before the SDK; live, an unallocated advance is refused with zero requests and a malformed live reply failed closed without retry. Presentation fails the pass condition: the preferred workspace shows the raw code ('Agent stopped (provider_malformed_tool_call)') rather than a plain-language quota or failure message.",
+      "evidence": [
+        "tests/test_sprint_quota_and_reports.py::test_acc08_provider_429_is_one_charged_attempt_with_a_clear_code_and_no_retry_or_fallback",
+        "tests/test_sprint_quota_and_reports.py::test_acc08_exhausted_session_allocation_refuses_before_any_request",
+        "evaluation/results/sprint/live-dry-run-22a3854/record.json"
+      ]
+    },
+    {
+      "id": "LIVE-01",
+      "status": "FAIL",
+      "lane": "live_gemini",
+      "basis": "Through apps/web on A's head every step ran (tool calls, approved science, evidence back to the model, retained grounded deterministic report) but the action ended failed with commentary withheld. Through the preferred workspace on the combined build the run stopped at provider_malformed_tool_call before review. No run met the full pass condition through the preferred interface.",
+      "evidence": [
+        "evaluation/results/sprint/live-baseline-A-a2f568b/record.json",
+        "evaluation/results/sprint/live-preview-baseline-a43d5b2/record.json"
+      ]
+    },
+    {
+      "id": "LIVE-02",
+      "status": "NOT_RUN",
+      "lane": "live_gemini",
+      "basis": "Live traffic stopped after a live-exposed defect (provider_malformed_tool_call) per the stop rule; the harness case (missing inputs through apps/web, 2 requests) is ready."
+    },
+    {
+      "id": "LIVE-03",
+      "status": "NOT_RUN",
+      "lane": "live_gemini",
+      "basis": "Stopped as above; the per-session ceiling (8) also leaves too little after a full baseline for a live design path."
+    },
+    {
+      "id": "COMB-01",
+      "status": "PASS",
+      "lane": "controlled + real_science + historical_replay",
+      "basis": "On de38c92 (A + B) all 14 checks passed once; B's later UI-only commits (a43d5b2) re-passed workspace unit, research and connected browser checks. Covered: refresh/reopen and stale review (preferred check), approval rejection and duplicate decisions, duplicate resume and interruption recovery, report binding, native download and fresh replay, evidence preservation after provider failure, release checks (backend 1493 passed; integration 157 passed, 1 skipped, 49 xfailed; engine OK; fixture replay; lint).",
+      "evidence": [
+        "battery: backend-unit, backend-integration, sprint-probes, eval-selftests (189), lint, engine-unit, engine-fixture-replay, models-unit, web-unit, preview-unit, browser-preview-research, browser-preview-connected, browser-web-research, browser-web-backend"
+      ]
+    }
+  ]
+}

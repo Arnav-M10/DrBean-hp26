@@ -113,3 +113,197 @@ existing limitation saying fresh replay is **not** an independently implemented
 proof system. That overbroad predicate was reported to C on PR #60; the limitation
 was preserved. C must refine/re-run its acceptance against the combined browser
 candidate. No live check was performed here.
+
+## Live findings and repair — follow-through
+
+Claude’s first live run at `a2f568b` used five requests: canonical review, approved
+real science and replay succeeded; numeric commentary was correctly rejected.
+A later preferred-workspace run at `a43d5b2` used three requests and stopped on a
+malformed tool call before review/science. Those are failed live acceptance cases,
+not evidence of a qualified Gemini release. The reported sprint use is eight of
+12 physical requests, with ten effective grants; no limit was raised here.
+
+The report instructions now state the exact accepted neutral caption. Scientific
+facts remain in the canonical report, while planning, tools and next_action remain
+model decisions. The run tool explicitly asks for the four prepared identity fields
+verbatim. Numeric validation, operation authority and retry policy are unchanged.
+The two signed-SDK/native-science narration cases both use three calls with the
+same allocation: incorrect numeric prose stays rejected and preserves science;
+the instructed caption persists with an evidence-dependent review_design action.
+Baseline plus design still fits six requests: 63,709 conservative input reservation
+under 64,000. The reserved output remains 3,072; this is offline accounting evidence.
+
+Malformed tool responses now retain bounded diagnostic enums, a declared tool name
+and schema-known missing-field names only. Raw model arguments, unknown names,
+text and IDs are never included. Request/usage accounting and main error codes stay
+unchanged. The prior live malformed call was not retained before its rejection;
+these diagnostics do not claim to identify or repair that historical response.
+
+Claude explicitly authorized adopting the DEMO-09 R1 oracle from `9229150`; that
+exact test update is included. The coordinator action stays failed if required
+commentary fails. Completed science and commentary availability remain separate.
+
+## Integrated browser and bounded live follow-through (2026-11-14)
+
+Integrated main `9aac876`, backend PR #60, preferred workspace PR #61, and
+Claude's qualification PR #62 through `387c203` in PR #63. The original user
+worktree and shared running services were preserved. The preferred browser
+passed all 12 predicates at `1832b8b`, including fresh native replay, separate
+approvals, changed-input behavior, private-session recovery and retained
+results after a model failure. All 24 installed Counterdex source files match
+this source under qualified CPython 3.11.17; backend runtime is CPython 3.13.18.
+
+The user delegated one additional live run capped at six requests. The explicit
+qualification-only extension retained the earlier ten effective grants/eight
+attempts, permitting a single six-request grant with ceiling 16. Application
+quotas, free-tier admission, consent and no-retry behavior stayed unchanged.
+Root executed Claude's harness; this is not independent Claude execution.
+
+At `08a0bf75bda81aaecd46f38713b6ff18508bdd23`, Gemini made two real requests:
+`write_todos`, then `prepare_scientific_proposal(kind=investigation, reference_ids=[])`.
+The backend rejected the latter as `research_references_invalid`, before any
+review, scientific child or report. The browser settled to an honest stopped
+state. The harness's `completed` flag describes its execution, not acceptance:
+live baseline acceptance **failed**. Retained receipts are in
+[`live-followthrough-08a0bf7`](../../evaluation/results/sprint/live-followthrough-08a0bf7/qualification.json).
+
+Accounting: reserved/accounted input 15,472/output 1,024; provider-reported
+input 3,539/output 57/total 3,596; unresolved 0. Cumulative actual requests are 10,
+with 16 effective grants. The four unused slots are not released or replenished.
+No automatic retry or second live run occurred.
+
+The observed gap was a tool-schema mismatch: a public unconstrained list
+allowed an empty reference set while the backend required 1-16 IDs. The repair
+exposes those bounds and tells the model to copy the reviewed dataset ID or
+a retained design-evidence ID. Scope/approval checks remain intact; no IDs are
+filled in automatically. Two signed substituted-SDK regressions verify the
+empty-list refusal and a valid reference reaching canonical review after a
+standalone planning turn. A second UI fix stops promising downloads when no
+scientific result exists. The baseline-plus-design metered regression still
+completes in 6 requests, 63,937 conservative input tokens and 3,072 output tokens
+under the existing 6/64,000/3,072 allocation; this is one offline strategy, not
+a guarantee about a live model's request shape.
+
+The repaired candidate needs a fresh authorized live qualification. No live
+pass or independent Claude acceptance is inferred from offline checks, and
+PR #63 remains unmerged while this blocker is open.
+
+## Immediate human-review handoff after the second live failure
+
+The user separately authorized one repaired-candidate run capped at six requests,
+raising only the qualification grant ceiling from16 to22. At
+`344596e350b6332856aaefecf837eb0ce7151ddd` (application code identical to21d932d),
+Gemini correctly copied the reviewed dataset ID. It then alternated planning and
+preparing the same canonical proposal until the existing four-turn action limit
+stopped it. No review, scientific child or report was reached. The four physical
+requests reserved32,676input/2,048output; provider-reported usage was7,810input,
+198output,8,008total, with no unresolved attempt. Cumulative actual requests are14;
+effective grants are22. No unused slots were refunded and no third run was made.
+The failed receipt is retained in
+[`live-repaired-344596e`](../../evaluation/results/sprint/live-repaired-344596e/qualification.json).
+
+The resulting fix moves the existing canonical review interrupt into successful
+proposal preparation. This makes review a backend-enforced handoff, before another
+planning turn. Preparation never calls the scientific executor. After the actual
+human decision it returns the same four bound IDs/digests plus `review_decision`
+and a non-authoritative `next_tool` hint. A later explicit run-tool call must still
+pass every canonical approval, binding, lease and stable-job check. Unavailable
+proposals retain their existing clarification response. No public route or browser
+approval payload changed, and prompt/checkpoint versions remain compatible.
+
+The new signed substituted-SDK regression opens review after two requests and
+completes actual Counterdex execution/reporting after explicit approval in four.
+Negative cases cover rejection, changed scope, wrong proposal/digest, read-only
+refresh, duplicate decisions and replacement workers. Legacy pending-run
+checkpoints and a lost acknowledgement while resuming preparation are also tested.
+Targeted results:99 coordinator/recovery/handoff tests and7 metered tests pass.
+The unchanged six-request baseline-plus-design allocation completes at63,893
+reserved input tokens and3,072 output tokens. The61,000input case stops before
+its sixth request while retaining both completed scientific children and fallback
+report. Only redundant phase-list wording was removed to fit the existing limit;
+no scientific facts, checks or quotas were relaxed.
+
+This structural repair is not yet live-qualified. Both actual failed runs remain
+failed, and PR #63 cannot be merged as a qualified live workflow without a fresh
+explicitly authorized qualification.
+
+## Final authorized live qualification — failed, integration remains blocked
+
+The user authorized one final run of at most six requests, with the qualification
+grant ceiling raised from 22 to 28 and merge conditional on success. The exact
+tested candidate was `17c7f7a82972be2ebc7b296b41277c1f395f1968`, incorporating
+main `04a9012` and its paper-profile changes. Root ran Claude's existing harness
+through the preferred workspace; this was not independent Claude execution.
+
+Gemini's first response was rejected as `provider_malformed_tool_call`, with
+the bounded diagnostic `wrong_argument_type` for `write_todos`. No tool was
+admitted and no canonical review, scientific child, report or download was
+created. The browser correctly showed the stopped state and absent results.
+The retained diagnostic does not identify the failing field or value; rejected
+raw arguments were deliberately not retained. It does not establish a specific
+model-versus-SDK cause. Harness completion is not scientific or live acceptance.
+Read-only inspection found the pinned `write_todos` public schema unchanged by
+provider conversion. A conforming SDK-shaped response passed offline, while six
+different malformed shapes reproduced the same diagnostic. All 98 targeted
+model, gateway, diagnostic and structural-handoff checks passed; no reproducible
+adapter defect was established and no speculative type coercion was added.
+
+The single physical request reserved/accounted 7,388 input and 512 output tokens.
+Provider-reported usage was 1,738 input, 41 output and 1,779 total; thought-token
+usage was unreported, with zero unresolved attempts. Historical actual requests
+now total 15, and effective grants total 28. The five unused slots are not
+released or replenished. Live testing has stopped; no further run is authorized.
+An internal read-only receipt audit independently rejected the completed-action
+predicate, without claiming Claude's independent acceptance.
+
+The same candidate passed all 12 provider-free preferred-browser predicates,
+including actual Counterdex execution, separate approvals, evidence-dependent
+next steps, downloads, fresh native replay and model-failure retention. It also
+passed 151 UI tests, 180 focused backend checks and the complete backend suite:
+1,601 passed in 170.53 seconds with zero skips or failures under the matching
+engine runtime. These do not qualify Gemini.
+The successful-at-capacity UI correction keeps a validated next-step proposal
+visible alongside the capacity warning; it grants no additional execution.
+
+Receipts: [final live failure](../../evaluation/results/sprint/live-final-17c7f7a/qualification.json),
+[full retained run](../../evaluation/results/sprint/live-final-17c7f7a/record.json),
+and [separate controlled browser checks](../../evaluation/results/sprint/live-final-17c7f7a/controlled-browser-receipt.json).
+PR #63 remains draft and unmerged. Backend/model-adapter owners must establish
+the tool-shape failure offline before another live qualification is considered;
+Claude's actual independent acceptance remains outstanding. No application
+limits, scientific checks, consent or private-session boundaries were relaxed.
+
+## Offline CI recovery correction after the final live run
+
+The evidence-only push `8082f9e` passed 15 of 16 CI jobs. Its push backend job
+failed `test_recovery_of_safe_plan_proposal_batch_preserves_prepared_identity`
+with `research_model_outcome_unrecoverable`; the independent PR backend run and
+the local full suite passed. The failure was reproduced deterministically by
+holding the planning tool's checkpoint acknowledgement after its canonical plan
+was committed, while the preparation task lost its acknowledgement too.
+
+LangGraph reports one `tools` entry for each unfinished task. Two unfinished
+tools therefore produce `("tools", "tools")`; a completed sibling remains in
+`state.tasks` while only one entry remains in `state.next`. The continuation
+guard incorrectly required a singleton pending-node tuple. It now admits one
+or two pending tool tasks, bounded by the retained task count, with every node
+and task still required to be `tools`. Existing saved model-decision, allowed
+batch, unique call-ID, response, lease, scope and approval predicates remain.
+No pending model node can be resumed through this correction.
+
+The real SQLite worker regression now explicitly exercises both acknowledgement
+orders and verifies unchanged plan/proposal identities, one model call, no
+scientific child and unchanged tool admission. This is an offline recovery fix;
+it does not repair or reclassify the failed live `write_todos` response. No further
+live request was made, and PR #63 remains blocked on live qualification.
+
+## Explicit merge instruction after qualification disclosure
+
+After receiving the failed-live-run summary, the user explicitly instructed:
+"is it pushed and merged? if not do that". Integration is proceeding under that
+new instruction, without relabelling live qualification or independent Claude
+acceptance as passed. Main `d80c1ae` (PR #66) was incorporated cleanly; its
+application changes were already present in the verified `c4e9997` candidate,
+so the resulting application and test trees are unchanged. Historical failed
+receipts, all request accounting and the live-qualification blocker are retained.
+No further provider request or budget allocation is authorized by this merge.

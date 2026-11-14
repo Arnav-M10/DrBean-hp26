@@ -173,7 +173,7 @@ def test_real_plan_interrupt_reconstructed_graph_and_evidence_dependent_decision
         assert paused["interrupts"][0]["review_id"] == "review"
         with pytest.raises(CoordinatorFailure, match="research_canonical_approval_required"):
             await first.resume()
-        assert len(ports.turns) == 3 and not ports.children
+        assert len(ports.turns) == 2 and not ports.children
         ports.review["decision"] = "approved"
         # Rebuilding the real graph with the same saver preserves state. This is
         # not fresh-process disk persistence or B's actual application startup.
@@ -203,7 +203,7 @@ def test_changed_review_refuses_resume_without_new_model_or_child(field, value):
         ports.review.update(decision="approved", **{field: value})
         with pytest.raises(CoordinatorFailure, match="research_review_changed"):
             await graph.resume()
-        assert len(ports.turns) == 3 and not ports.children
+        assert len(ports.turns) == 2 and not ports.children
     asyncio.run(exercise())
 
 
@@ -271,7 +271,7 @@ def test_checkpoint_binding_is_not_reusable_under_changed_context(changed):
         ports.review["decision"] = "approved"
         with pytest.raises(CoordinatorFailure, match="research_checkpoint_incompatible"):
             await factory(ports, saver=saver, ctx=context(**changed)).resume()
-        assert len(ports.turns) == 3 and not ports.children
+        assert len(ports.turns) == 2 and not ports.children
     asyncio.run(exercise())
 
 
@@ -451,7 +451,7 @@ def test_backend_admitted_approval_action_resumes_same_plan_with_explicit_new_co
         approved = factory(ports, saver=saver, ctx=context(action_id="approved-action"))
         result = await approved.resume(new_action=True)
         assert result["terminal"]["kind"] == "report" and len(ports.children) == 1
-        assert ports.turns == [("action", 1), ("action", 2), ("action", 3), ("approved-action", 1)]
+        assert ports.turns == [("action", 1), ("action", 2), ("approved-action", 1), ("approved-action", 2)]
         assert len(ports.tool_admissions) == 4
     asyncio.run(exercise())
 

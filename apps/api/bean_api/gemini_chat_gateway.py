@@ -20,6 +20,7 @@ from typing import Any
 from google.genai import types
 
 from .ledger import LedgerBudgetExceeded
+from .gemini_tool_diagnostics import safe_validation_detail
 from .providers import (
     AttemptLedger, ProviderConfig, ProviderFailure, _finish_reason, _hosted_sdk_object,
     _request_id, classify_failure, live_usage, live_wire_schema, package_version,
@@ -246,18 +247,27 @@ class GeminiChatGateway:
         except BaseException as exc:
             code = "provider_cancelled_unknown_outcome" if isinstance(exc, asyncio.CancelledError) else (
                 exc.code if isinstance(exc, ProviderFailure) else classify_failure(exc)[0])
+            validation_detail = safe_validation_detail(getattr(exc, "validation_detail", None),
+                {declaration.name: declaration.parameters_json_schema for tool in typed_tools
+                 for declaration in tool.function_declarations}) if code == "provider_malformed_tool_call" else None
             if not finalization_attempted:
                 try:
                     finalization_attempted = True
-                    self.ledger.finish_attempt(attempt_id, {
+                    outcome = {
                         "status": "unknown_outcome" if dispatched and usage is None else "failed",
                         "code": code, "usage": usage if live else None, "finished_at": utc_now(),
-                        "external_provider_calls": int(live and dispatched)})
+                        "external_provider_calls": int(live and dispatched)}
+                    if validation_detail is not None:
+                        outcome["validation_detail"] = validation_detail
+                    self.ledger.finish_attempt(attempt_id, outcome)
                 except Exception:
                     pass  # Preserve an uncertain reservation; do not retry or refund.
             if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
                 raise
-            raise ProviderFailure(code, False, attempt_id) from None
+            failure = ProviderFailure(code, False, attempt_id)
+            if validation_detail is not None:
+                failure.validation_detail = validation_detail
+            raise failure from None
         finally:
             if client is not None:
                 await _close_client(client)
