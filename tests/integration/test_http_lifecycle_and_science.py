@@ -66,8 +66,18 @@ def test_cross_workspace_records_are_invisible_and_unusable(module_stack):
 
 
 @pytest.mark.real_stack
-def test_queued_cancel_restart_recovery_and_no_orphans(module_stack, flow):
-    require(sf.scenario_cancel_restart(flow, HERO, module_stack))
+def test_queued_cancel_restart_recovery_and_no_orphans(stack_factory, tmp_path):
+    """Uses the harness's deterministic diagnostic barrier inside the scientific child (after setsid and limits),
+    so cancellation and worker death hit a computation that is genuinely in flight. The product's own cancel,
+    kill and recovery code is what runs; the barrier only holds the child until the harness releases it."""
+    stack = stack_factory(diagnostic_overrides=("science_barrier",))
+    try:
+        python = launcher.science_python()
+    except launcher.StackError:
+        python = None
+    flow = sf.Flow(reviewer(stack), other_actor(stack), str(tmp_path), science_python=python,
+                   package_dir=str(REPO / "packages" / "groundwork_adapter"), guard_log=stack.guard_log)
+    require(sf.scenario_cancel_restart(flow, HERO, stack))
 
 
 @pytest.mark.real_stack
