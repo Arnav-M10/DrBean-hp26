@@ -195,3 +195,57 @@ inconclusive science, candidate-specific feedback and fresh native replay.
 No whole-product, live-provider or release-ready claim follows from this branch.
 Useful specialists and wider paper processing remain behind the working parent
 and ordinary browser gates. B alone chooses the application merge sequence.
+# Urgent offline investigation checkpoint — November 14, 2026
+
+A implemented `bean_api.research_controlled.build_controlled_research_model()`
+against B's actual PR41 caller at `0cabe92076f3575eff029d9904c5a52c0bb6510e`.
+This zero-argument factory returns an explicitly offline deterministic fixture,
+not live AI. It uses the actual Deep Agents planning/tool graph and consumes
+returned proposal IDs, canonical approval, actual child evidence and guarded
+report acceptance. It never supplies candidates or scientific results.
+
+Ordinary create_app/Worker checks now demonstrate: reviewed synthetic inputs →
+plan → human review pause → canonical approval → actual Counterdex baseline →
+explicit evidence read → updated next-step plan → accepted canonical report.
+The same objective/dataset name with changed concentrations computes a bounded
+search miss and proposes clarification instead of pair-design review. Missing
+reviewed assumptions stop before any scientific job. Downloaded native bytes
+replay against external anchors using this checkout's Counterdex source in
+qualified CPython3.11; an inconclusive/unsupported result stays so.
+
+A fixed approval-action wakeup when LangGraph has applied pending writes but
+B's raw checkpoint still names the old action. Exact reconstructed bindings and
+versions are required; counters are not reset. `continue_pending()` additionally
+reconciles only committed tool work or a retained terminal result under the same
+action, rejecting pending model/middleware retries. B should adopt that method
+for same-action recovery; its runtime/authority files were not edited here.
+
+Validation: **156 passed** across controlled policy, ordinary application/native
+replay, graph/adversarial, pending continuation, application adapter and metered
+application tests; Ruff and diff checks passed. Guarded execution used backend
+CPython3.13 and scientific CPython3.11. Four metered-path tests use explicitly
+substituted SDK/readiness fixtures: ordinary live-shaped planning/clarification,
+real consent/session/physical ledgers and refusal at missing admission or an
+exhausted allocation. They are not live-provider qualification. No provider
+requests, credential inspection or production capacity changes occurred.
+
+Run in the assembled B+A checkout, with prepared local runtimes:
+
+```sh
+env -i PATH=/opt/homebrew/bin:/usr/bin:/bin LANG=C.UTF-8 \
+  PYTHONDONTWRITEBYTECODE=1 BEAN_AI_MODE=placeholder \
+  BEAN_COUNTERDEX_PYTHON=/path/to/qualified-python3.11 \
+  PYTHONPATH=apps/api:evaluation/drbean_eval/guard \
+  DRBEAN_EGRESS_GUARD_LOG=/tmp/drbean-offline-research-guard.jsonl \
+  /path/to/backend-python3.13 -B -m pytest -q -p no:cacheprovider \
+  tests/test_research_controlled.py tests/test_research_controlled_application.py \
+  tests/test_research_pending_continuation.py tests/test_research_coordinator.py \
+  tests/test_research_coordinator_adversarial.py tests/test_research_integration.py \
+  tests/test_research_metered_application.py
+```
+
+Scope: baseline and useful next-action/report now exercised; actual checked pair
+design follows this checkpoint. Report commentary is retained in graph messages
+as a guarded annotation, not misrepresented as B's canonical report body.
+These are A author integration checks; B integrates and C qualifies the resulting
+candidate/browser. Live coordination remains `not_run`.

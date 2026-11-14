@@ -16,7 +16,7 @@ from typing import Annotated, Any, Callable, Literal, Protocol
 
 from langchain.agents.middleware import AgentMiddleware, AgentState, TodoListMiddleware
 from langchain.tools import ToolRuntime
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.types import Command, interrupt
 
 from .ai_prompts import COMMENTARY_POLICY_VERSION
@@ -224,13 +224,25 @@ class ResearchCoordinator:
         return await self._invoke(self._action_input())
 
     async def resume(self, *, new_action: bool = False) -> dict[str, Any]:
-        """A wake signal only. The interrupted tool rereads canonical approval."""
+        """A wake signal only. The interrupted tool rereads canonical approval.
+
+        ``new_action`` is a backend hint, not permission to reset counters. A
+        saver can expose an older checkpoint plus committed pending writes;
+        only LangGraph's reconstructed state identifies the effective action.
+        """
         if new_action:
             await _await(self.ports.check_authority())
             state = await self._graph.aget_state(self._config)
-            if (state.values.get("input_binding") != self.context.input_binding()
-                    or not _versions_match(state.values)
-                    or state.values.get("action_id") == self.context.action_id):
+            if state.values.get("action_id") == self.context.action_id:
+                # The approval action update is already durable in pending
+                # writes even when the backend's raw checkpoint is older.
+                # Require its entire current binding and preserve all counters.
+                if (state.values.get("research_binding") != self.context.binding()
+                        or not _versions_match(state.values)):
+                    raise CoordinatorFailure("research_checkpoint_incompatible")
+                new_action = False
+            elif (state.values.get("input_binding") != self.context.input_binding()
+                    or not _versions_match(state.values)):
                 raise CoordinatorFailure("research_checkpoint_incompatible")
         else:
             state = await self._snapshot()
@@ -262,6 +274,36 @@ class ResearchCoordinator:
             update["review_interrupt_calls"] = reviewed_calls
         return await self._invoke(Command(resume={"wake": True}, update=update or None))
 
+    async def continue_pending(self) -> dict[str, Any]:
+        """Reconcile a committed tool under the same already-admitted action.
+
+        B must first reconcile its lease, journal and provider ledger. This
+        method cannot renew an action or retry a pending model node: a model
+        request might have an unknown remote outcome. Tool effects remain
+        subject to B's canonical authority and stable operation identities.
+        """
+        state = await self._snapshot()
+        if not state.next and state.values.get("research_terminal"):
+            # The terminal result reached the checkpointer, but the worker's
+            # acknowledgement may have been lost. Reading it creates no work.
+            return self._result(state.values)
+        if (state.next != ("tools",) or len(state.tasks) != 1
+                or state.tasks[0].name != "tools"):
+            raise CoordinatorFailure("research_checkpoint_reconciliation_required")
+        messages = state.values.get("messages") or []
+        last = messages[-1] if messages else None
+        calls = last.tool_calls if isinstance(last, AIMessage) else []
+        if (len(calls) != 1 or calls[0].get("name") not in TOOLS
+                or last.invalid_tool_calls):
+            raise CoordinatorFailure("research_checkpoint_reconciliation_required")
+        task = state.tasks[0]
+        if task.interrupts and task.error is None:
+            # An unanswered canonical pause still needs the normal current
+            # review checks. A failed resumed task instead consumes its already
+            # committed resume writes when invoked with None below.
+            return await self.resume()
+        return await self._invoke(None)
+
     async def snapshot(self) -> dict[str, Any]:
         state = await self._snapshot()
         pending = [i.value for task in state.tasks for i in task.interrupts]
@@ -281,6 +323,9 @@ class ResearchCoordinator:
             async with asyncio.timeout(self.context.active_seconds):
                 result = await self._graph.ainvoke(value, config=self._config, durability="sync")
         await _await(self.ports.check_authority())
+        return self._result(result)
+
+    def _result(self, result: Any) -> dict[str, Any]:
         if not result.get("__interrupt__") and not result.get("research_terminal"):
             raise CoordinatorFailure("research_completion_unaccepted")
         pending = [copy.deepcopy(i.value) for i in result.get("__interrupt__", [])]
