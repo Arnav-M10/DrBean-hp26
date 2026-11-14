@@ -2,6 +2,16 @@
 
 Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw evidence and machine-readable findings live in `evaluation/`; this log links them and is not a second status source.
 
+## C status: narrow LangChain demo (scope change, 2026-11-14)
+
+| Item | Value |
+|---|---|
+| Profile | `evaluation/coordinator/demo-profile.langchain-narrow-demo.v1.json`. It is separate from the frozen 54, has `release_qualification: false` and lists 31 deferred predicates. |
+| Candidate | B's integrated PR #43 head `c2e0743`, not merged to main. It contains main `070b697`, A's controlled factory (PR #44 `0491939`) and C harness `db7098b`. |
+| Results | HTTP demo and related C checks 34 passed, 1 skipped; browser probe 10/10. Claims: DEMO-01..09 passed; DEMO-10 not_run (no coordinated live sample). Record: `evaluation/results/coordinator/demo-pr43-c2e0743.json` |
+| Findings | F-RESEARCH-WORKER-UNGUARDED (P2, B), F-RESEARCH-PLAN-PROGRESS-PENDING (P3, B/A). F-SESSION-CAPACITY-EXHAUSTION is closed by retest. F-CI-BROWSER-CHECK-INTERMITTENT is fixed_pending_retest. |
+| Next | Retest the final merge to main with the same commands. Verify one coordinated live sample if A and B run it. |
+
 ## C status: DB-COORDINATOR-3OWNER-1 (current; the sections below are the earlier sprint's record)
 
 | Item | Value |
