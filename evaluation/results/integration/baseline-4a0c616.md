@@ -117,3 +117,24 @@ The clean batch at `e3c36bc`:
 (SCI-01..09) now passes on main. Everything still not available depends on B's integration of research
 sessions, the checkpointer, the decision path, the action journal, the crash matrix, research metering and the
 general-file producer.
+
+## Revision 3 at c6307df: A's metered gateway probed (statuses unchanged)
+
+`tests/integration/test_research_gateway_independent.py` passes 6/6 on main. These are component probes; no
+route reaches the gateway on main.
+- Live mode fails closed without B's session-accounting marker, which main's ledger lacks, and refuses a transport
+  override.
+- An exhausted ledger refuses before any client exists.
+- There is one admission per request, and the controlled transport never receives the key.
+- A response lost after sending, or a cancellation in flight, stays `unknown_outcome`, charged once and never
+  reissued.
+
+This is CRASH-08 on A's adapter, plus the METER-01/02 component parts. Batch at `c6307df`:
+- acceptance 7/7;
+- controls 27/27;
+- `controlled_callbacks` `lane_8398389c434d4657`: 116 passed, 1 xfail, 44 NOT_AVAILABLE;
+- `controlled_science` `lane_b4cc77c6a256409a`: 22 passed;
+- `historical_replay` `lane_7b3072ff90f64428`: 212 replayed;
+- gate exit 0.
+
+Observation `baseline-4a0c616-r3.json`: **18 passed, 1 not_run, 35 not_available, 0 failed**.

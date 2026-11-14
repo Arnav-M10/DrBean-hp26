@@ -1,0 +1,39 @@
+{
+ "controlled_model_invocations": {
+  "reason": "controlled doubles are authored and asserted inside each test; their call counts are not exported",
+  "status": "not_measured",
+  "value": null
+ },
+ "external_model_requests": {
+  "basis": "egress guard installed in every launched process; no blocked attempt recorded",
+  "deliberate_guard_probes": [
+   {
+    "kind": "egress_blocked",
+    "target": "generativelanguage.googleapis.com",
+    "test": "test_pytest_process_itself_is_egress_guarded"
+   },
+   {
+    "kind": "provider_client_blocked",
+    "target": "google.genai.Client",
+    "test": "test_guard_spies_refuse_client_construction_but_allow_sdk_types"
+   }
+  ],
+  "status": "verified_zero",
+  "value": 0
+ },
+ "guard": {
+  "credential_variable_names_present": [],
+  "credential_variable_names_read": [],
+  "events": 5,
+  "guard_installed_events": 1,
+  "logs": 1,
+  "note": "names only; no credential value is read, logged or transmitted",
+  "stack_logs_kept": 0,
+  "stacks_started": 0
+ },
+ "provider_tokens": {
+  "reason": "no provider request was dispatched",
+  "status": "not_applicable",
+  "value": null
+ }
+}
