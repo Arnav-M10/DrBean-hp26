@@ -16,6 +16,16 @@ import launcher  # noqa: E402
 
 
 class ChildEnvironment(unittest.TestCase):
+    def test_isolated_ports_are_explicit_bounded_and_reach_the_web_proxy(self):
+        with mock.patch.dict(os.environ, {"BEAN_DEV_API_PORT": "28130"}):
+            self.assertEqual(launcher.local_port("BEAN_DEV_API_PORT", 8000), 28130)
+        for invalid in ("0", "80", "65536", "28130/secret", " 28130"):
+            with self.subTest(value=invalid), mock.patch.dict(os.environ, {"BEAN_DEV_API_PORT": invalid}):
+                with self.assertRaises(SystemExit):
+                    launcher.local_port("BEAN_DEV_API_PORT", 8000)
+        with mock.patch.object(launcher, "API_PORT", 28130):
+            self.assertEqual(launcher.child_env()["BEAN_WEB_API_PORT"], "28130")
+
     def test_controlled_examples_require_explicit_start_option(self):
         with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(launcher, "cmd_start", return_value=0):
             self.assertEqual(launcher.main(["start", "--controlled-source-examples"]), 0)

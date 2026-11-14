@@ -155,6 +155,10 @@ jobs:
       - name: private sessions through actual HTTPS gateway and API
         if: always()
         run: node tests/integration/shared-session-browser.mjs
+      - name: ordinary Deep Agents browser investigation and separate checked pair-design
+        run: |
+          export NODE_PATH="$PWD/tests/integration/node_modules"
+          node apps/web/check-research.mjs
       - name: real browser API and science workflow
         run: |
           export NODE_PATH="$PWD/tests/integration/node_modules"

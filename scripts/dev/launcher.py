@@ -48,7 +48,20 @@ ENGINE_VENV = os.path.join(REPO, ".venv-engine")
 ENGINE_PY = os.path.join(ENGINE_VENV, "bin", "python")
 ENGINE_SRC = os.path.join(REPO, "packages", "groundwork_adapter")
 HOST = "127.0.0.1"  # loopback only; sharing uses a separate restricted gateway
-API_PORT, WEB_PORT = 8000, 4173  # apps/web/serve.mjs proxies /api/bean/v1/ to the fixed port 8000
+
+
+def local_port(name: str, default: int) -> int:
+    value = os.environ.get(name, str(default))
+    if not re.fullmatch(r"[0-9]{1,5}", value) or not 1024 <= int(value) <= 65535:
+        raise SystemExit(f"{name} must be an integer loopback port between 1024 and 65535.")
+    return int(value)
+
+
+# Explicit isolated rehearsal ports leave an already-running app untouched.
+API_PORT = local_port("BEAN_DEV_API_PORT", 8000)
+WEB_PORT = local_port("BEAN_DEV_WEB_PORT", 4173)
+if API_PORT == WEB_PORT:
+    raise SystemExit("BEAN_DEV_API_PORT and BEAN_DEV_WEB_PORT must differ.")
 AI_MODE = "placeholder"
 
 # Removed from every child environment. Names only; values are never read.
@@ -174,6 +187,7 @@ def child_env() -> dict:
         BEAN_ARTIFACT_DIR=os.path.join(VAR, "artifacts"),
         BEAN_SCIENCE_ADAPTER="counterdex",
         BEAN_COUNTERDEX_PYTHON=ENGINE_PY,  # the qualified CPython 3.11 engine runtime, never a python3.11 found on PATH
+        BEAN_WEB_API_PORT=str(API_PORT),
         PYTHONDONTWRITEBYTECODE="1",
         # Defence in depth only, never relied on: if anything did try to dispatch, send it to a closed
         # loopback port instead of a provider. Owner 5 supplies the real process-level network guard.
