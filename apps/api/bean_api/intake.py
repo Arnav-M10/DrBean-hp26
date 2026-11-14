@@ -293,11 +293,12 @@ class IntakeService:
             raise _error("operation_pending", "This intake operation needs reconciliation before new work.", status=409)
         attempt = None
         try:
+            current = self.workflow.workspace(actor, workspace_id)
+            input_context = {name: current[name] for name in ("current_dataset_id", "current_problem_id")}
             if request.current_revision_id:
                 revision = self.workflow.get(actor, request.current_revision_id)
                 if revision["workspace_id"] != workspace_id or revision["kind"] not in {"dataset", "problem"}:
                     raise _error("not_found", "The selected revision was not found.", status=404)
-                current = self.workflow.workspace(actor, workspace_id)
                 if revision["id"] not in {current["current_dataset_id"], current["current_problem_id"]}:
                     raise _error("stale_revision", "Review the current input revision before preparing a new source.", status=409)
             # This is a nonfinancial local trace. No consent identity, model
@@ -306,6 +307,7 @@ class IntakeService:
                 "execution_lane": "controlled_source_preview", "operation_id": operation["id"],
                 "source_asset_id": source["id"], "source_digest": source["body"]["sha256"],
                 "current_revision_id": request.current_revision_id,
+                "input_context": input_context,
                 "lookup_method": "frozen_fixture_lookup", "external_provider_calls": 0, "actual_model_tokens": 0,
             }, key, operation="controlled-intake-attempt", parent_id=source["id"])
             preview = self.controlled_source_proposer.prepare(
@@ -323,6 +325,7 @@ class IntakeService:
                 "diagnostics": preview["diagnostics"]}
             self._validate_proposal(body, source, request, method="controlled_fixture")
             body = ControlledIntakeProposalRecordBody.model_validate({**body,
+                "input_context": input_context,
                 "status": preview["status"], "code": preview["code"], "next_action": preview["next_action"],
                 "conflicts": preview["conflicts"], "provenance": {
                     "local_attempt_id": attempt["id"], "preview_schema_version": preview["schema_version"],
@@ -437,10 +440,35 @@ class IntakeService:
             if unit_expected and selected.value != unit_expected:
                 raise _error("unsupported_unit", f"This field requires {unit_expected}.", paths=[path])
             reviewed_values.append({**selected.model_dump(), "normalized_value": normalized, "original_proposal": original})
-        return self.workflow.create_record(
-            actor, workspace_id, "intake_review",
-            {"proposal_id": proposal_id, "proposal_digest": proposal["digest"], "source_asset_id": proposal["body"]["source_asset_id"],
+        body = {"proposal_id": proposal_id, "proposal_digest": proposal["digest"], "source_asset_id": proposal["body"]["source_asset_id"],
              "current_revision_id": proposal["body"].get("current_revision_id"), "reviewed_fields": reviewed_values,
-             "resolved_diagnostics": request.resolved_diagnostics, "review_state": "reviewed", "execution_approved": False},
-            key, operation="intake-review", parent_id=proposal_id,
-        )
+             "resolved_diagnostics": request.resolved_diagnostics, "review_state": "reviewed", "execution_approved": False}
+
+        def action(conn):
+            current = self.workflow.authorize(actor, workspace_id, conn)
+            validate_intake_context(proposal["body"], current)
+            source = self.workflow._get(conn, actor, body["source_asset_id"], "source_asset")
+            self.workflow._same_workspace(workspace_id, source)
+            if source["body"]["sha256"] != proposal["body"]["source_digest"]:
+                raise _error("source_binding_mismatch", "The reviewed proposal must match its original source.")
+            self.sources.read(actor, source["id"])
+            return self.workflow._insert(conn, actor, workspace_id, "intake_review", body, proposal_id)
+
+        # Keep create_record's existing request identity for historical retries.
+        return self.workflow._perform(actor, workspace_id, "intake-review", key,
+            {"body": body, "parent_id": proposal_id}, action)
+
+
+def validate_intake_context(proposal: dict, current: dict) -> None:
+    """Check both heads, including an initially empty workspace, under its lock."""
+    context = proposal.get("input_context")
+    if context is not None:
+        stale = any(current[name] != context[name] for name in ("current_dataset_id", "current_problem_id"))
+    elif proposal.get("execution_mode") == "controlled":
+        # Preserve readable historical records, but never infer a missing snapshot.
+        stale = True
+    else:
+        referenced = proposal.get("current_revision_id")
+        stale = referenced is not None and referenced not in {current["current_dataset_id"], current["current_problem_id"]}
+    if stale:
+        raise _error("stale_revision", "Inputs changed after source preparation; prepare and review a new proposal.", status=409)

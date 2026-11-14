@@ -23,6 +23,11 @@ and `body`. Retain those returned identities rather than reconstructing them.
    `execution_mode=controlled`, source/revision identity, fields, diagnostics,
    conflicts, and fixture/prompt/context/local-attempt provenance. There is no
    `provider_attempt_id`. Display its controlled-example label.
+   The server also captures `input_context.current_dataset_id` and
+   `input_context.current_problem_id`, including null heads. Both must still
+   match at new review and materialization; clients need not supply this field.
+   Older controlled proposals without a snapshot remain readable but require
+   a newly prepared proposal before a new acceptance.
 4. Unknown, changed/reencoded, unreadable, or unsupported bytes produce
    `status=unavailable`, empty fields, and `next_action=manual_review`. Preserve
    existing inputs and offer ordinary manual entry; do not fill fixture values.
