@@ -1,0 +1,155 @@
+{
+  "$defs": {
+    "ObservationRow": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "time": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Time",
+          "type": "string"
+        },
+        "concentration": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Concentration",
+          "type": "string"
+        },
+        "hard_allowance": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Hard Allowance",
+          "type": "string"
+        },
+        "included": {
+          "title": "Included",
+          "type": "boolean"
+        },
+        "original_values": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 12,
+          "title": "Original Values",
+          "type": "object"
+        },
+        "source_asset_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Asset Id"
+        },
+        "notes": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Notes",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "time",
+        "concentration",
+        "hard_allowance",
+        "included"
+      ],
+      "title": "ObservationRow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "dataset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Dataset Id",
+      "type": "string"
+    },
+    "experiment_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Experiment Id",
+      "type": "string"
+    },
+    "observable": {
+      "const": "concentration",
+      "default": "concentration",
+      "title": "Observable",
+      "type": "string"
+    },
+    "origin": {
+      "enum": [
+        "actual",
+        "transcription",
+        "hypothetical"
+      ],
+      "title": "Origin",
+      "type": "string"
+    },
+    "row": {
+      "$ref": "#/$defs/ObservationRow"
+    },
+    "source_description": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Source Description",
+      "type": "string"
+    },
+    "change_reason": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Change Reason",
+      "type": "string"
+    },
+    "generating_choices": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 16,
+      "title": "Generating Choices",
+      "type": "object"
+    },
+    "time_unit": {
+      "const": "h",
+      "default": "h",
+      "title": "Time Unit",
+      "type": "string"
+    },
+    "concentration_unit": {
+      "const": "mg/L",
+      "default": "mg/L",
+      "title": "Concentration Unit",
+      "type": "string"
+    }
+  },
+  "required": [
+    "dataset_id",
+    "experiment_id",
+    "origin",
+    "row",
+    "source_description",
+    "change_reason"
+  ],
+  "title": "ObservationProposalBody",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ObservationProposalBody"
+}

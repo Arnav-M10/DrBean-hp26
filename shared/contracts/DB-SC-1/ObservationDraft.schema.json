@@ -1,0 +1,135 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "experiment_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Experiment Id"
+    },
+    "origin": {
+      "anyOf": [
+        {
+          "enum": [
+            "actual",
+            "transcription",
+            "hypothetical"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Origin"
+    },
+    "elapsed_time": {
+      "anyOf": [
+        {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Elapsed Time"
+    },
+    "concentration": {
+      "anyOf": [
+        {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Concentration"
+    },
+    "hard_allowance": {
+      "anyOf": [
+        {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hard Allowance"
+    },
+    "time_unit": {
+      "anyOf": [
+        {
+          "const": "h",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Time Unit"
+    },
+    "concentration_unit": {
+      "anyOf": [
+        {
+          "const": "mg/L",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Concentration Unit"
+    },
+    "source_description": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Description"
+    },
+    "generating_choices": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 16,
+      "title": "Generating Choices",
+      "type": "object"
+    },
+    "same_experiment_confirmed": {
+      "default": false,
+      "title": "Same Experiment Confirmed",
+      "type": "boolean"
+    }
+  },
+  "title": "ObservationDraft",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ObservationDraft"
+}

@@ -1,0 +1,241 @@
+{
+  "$defs": {
+    "FieldDiagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Code",
+          "type": "string"
+        },
+        "field_path": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2000,
+          "title": "Message",
+          "type": "string"
+        },
+        "blocking": {
+          "default": true,
+          "title": "Blocking",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "field_path",
+        "message"
+      ],
+      "title": "FieldDiagnostic",
+      "type": "object"
+    },
+    "IntakeField": {
+      "additionalProperties": false,
+      "properties": {
+        "field_path": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "original_value": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Original Value"
+        },
+        "candidate_exact": {
+          "anyOf": [
+            {
+              "maxLength": 514,
+              "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Exact"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "source_asset_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Source Asset Id",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/SourceLocator"
+        },
+        "method": {
+          "default": "gemini_vision",
+          "enum": [
+            "gemini_vision",
+            "manual"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "grounding": {
+          "default": "unreviewed_visual",
+          "enum": [
+            "unreviewed_visual",
+            "human_reviewed",
+            "human_entered"
+          ],
+          "title": "Grounding",
+          "type": "string"
+        },
+        "ambiguity": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ambiguity"
+        }
+      },
+      "required": [
+        "field_path",
+        "original_value",
+        "source_asset_id",
+        "locator"
+      ],
+      "title": "IntakeField",
+      "type": "object"
+    },
+    "SourceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "const": 1,
+          "default": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "label": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "excerpt": {
+          "maxLength": 1000,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "maximum": 12000000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        }
+      },
+      "required": [
+        "label",
+        "excerpt"
+      ],
+      "title": "SourceLocator",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "source_asset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Source Asset Id",
+      "type": "string"
+    },
+    "source_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Digest",
+      "type": "string"
+    },
+    "current_revision_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Revision Id"
+    },
+    "fields": {
+      "items": {
+        "$ref": "#/$defs/IntakeField"
+      },
+      "maxItems": 50,
+      "title": "Fields",
+      "type": "array"
+    },
+    "diagnostics": {
+      "items": {
+        "$ref": "#/$defs/FieldDiagnostic"
+      },
+      "maxItems": 50,
+      "title": "Diagnostics",
+      "type": "array"
+    }
+  },
+  "required": [
+    "source_asset_id",
+    "source_digest",
+    "fields"
+  ],
+  "title": "IntakeProposalBody",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:IntakeProposalBody"
+}

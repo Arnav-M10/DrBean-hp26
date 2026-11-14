@@ -1,0 +1,350 @@
+{
+  "$defs": {
+    "ArtifactReference": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "byte_size": {
+          "maximum": 4194304,
+          "minimum": 1,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "media_type": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sha256",
+        "byte_size",
+        "media_type"
+      ],
+      "title": "ArtifactReference",
+      "type": "object"
+    },
+    "CandidateReference": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "parameter_vector": {
+          "$ref": "#/$defs/CandidateVector"
+        },
+        "problem_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "problem_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Problem Digest",
+          "type": "string"
+        },
+        "observable": {
+          "const": "concentration",
+          "default": "concentration",
+          "title": "Observable",
+          "type": "string"
+        },
+        "checked_horizon": {
+          "anyOf": [
+            {
+              "maxLength": 514,
+              "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checked Horizon"
+        },
+        "verification": {
+          "default": "not_checked",
+          "enum": [
+            "not_checked",
+            "valid",
+            "invalid",
+            "inconclusive",
+            "unsupported",
+            "failed"
+          ],
+          "title": "Verification",
+          "type": "string"
+        },
+        "artifact_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Artifact Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "parameter_vector",
+        "problem_id",
+        "problem_digest"
+      ],
+      "title": "CandidateReference",
+      "type": "object"
+    },
+    "CandidateVector": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "A",
+          "type": "string"
+        },
+        "ke": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Ke",
+          "type": "string"
+        },
+        "ka": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Ka",
+          "type": "string"
+        }
+      },
+      "required": [
+        "A",
+        "ke",
+        "ka"
+      ],
+      "title": "CandidateVector",
+      "type": "object"
+    },
+    "VerificationRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "checker_name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Checker Name",
+          "type": "string"
+        },
+        "checker_version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Checker Version",
+          "type": "string"
+        },
+        "artifact_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Artifact Sha256",
+          "type": "string"
+        },
+        "proposition": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Proposition",
+          "type": "string"
+        },
+        "verification": {
+          "enum": [
+            "not_checked",
+            "valid",
+            "invalid",
+            "inconclusive",
+            "unsupported",
+            "failed"
+          ],
+          "title": "Verification",
+          "type": "string"
+        },
+        "expected_binding": {
+          "enum": [
+            "matches",
+            "mismatch",
+            "not_supplied"
+          ],
+          "title": "Expected Binding",
+          "type": "string"
+        },
+        "expected_problem_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Expected Problem Digest",
+          "type": "string"
+        },
+        "observed_problem_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Problem Digest"
+        }
+      },
+      "required": [
+        "checker_name",
+        "checker_version",
+        "artifact_id",
+        "artifact_sha256",
+        "proposition",
+        "verification",
+        "expected_binding",
+        "expected_problem_digest"
+      ],
+      "title": "VerificationRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "scientific_outcome": {
+      "enum": [
+        "certified_counterexample",
+        "numerical_candidate",
+        "no_counterexample_found",
+        "inconclusive",
+        "unsupported",
+        "failed"
+      ],
+      "title": "Scientific Outcome",
+      "type": "string"
+    },
+    "verification": {
+      "enum": [
+        "not_checked",
+        "valid",
+        "invalid",
+        "inconclusive",
+        "unsupported",
+        "failed"
+      ],
+      "title": "Verification",
+      "type": "string"
+    },
+    "expected_binding": {
+      "enum": [
+        "matches",
+        "mismatch",
+        "not_supplied"
+      ],
+      "title": "Expected Binding",
+      "type": "string"
+    },
+    "replay": {
+      "enum": [
+        "not_run",
+        "running",
+        "passed",
+        "failed",
+        "unsupported"
+      ],
+      "title": "Replay",
+      "type": "string"
+    },
+    "reason_code": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "problem_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Problem Id",
+      "type": "string"
+    },
+    "problem_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Problem Digest"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/CandidateReference"
+      },
+      "maxItems": 16,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/ArtifactReference"
+      },
+      "maxItems": 16,
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "verification_record": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VerificationRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "scientific_outcome",
+    "verification",
+    "expected_binding",
+    "replay",
+    "reason_code",
+    "problem_id"
+  ],
+  "title": "ScientificResult",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ScientificResult"
+}

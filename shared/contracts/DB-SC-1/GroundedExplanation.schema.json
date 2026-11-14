@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "fact_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Fact Ids",
+      "type": "array"
+    },
+    "text": {
+      "maxLength": 2000,
+      "title": "Text",
+      "type": "string"
+    },
+    "next_action": {
+      "enum": [
+        "stop",
+        "clarify",
+        "review_design",
+        "review_observation",
+        "review_plan"
+      ],
+      "title": "Next Action",
+      "type": "string"
+    },
+    "clarification_fields": {
+      "items": {
+        "maxLength": 256,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "title": "Clarification Fields",
+      "type": "array"
+    }
+  },
+  "required": [
+    "fact_ids",
+    "text",
+    "next_action"
+  ],
+  "title": "GroundedExplanation",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:GroundedExplanation"
+}

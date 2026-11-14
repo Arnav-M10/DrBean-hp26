@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "ProviderConsent": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "const": "gemini",
+          "default": "gemini",
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "source_asset_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 1,
+          "title": "Source Asset Ids",
+          "type": "array"
+        },
+        "include_notes": {
+          "title": "Include Notes",
+          "type": "boolean"
+        },
+        "include_existing_values": {
+          "title": "Include Existing Values",
+          "type": "boolean"
+        },
+        "accepted": {
+          "const": true,
+          "title": "Accepted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "model",
+        "include_notes",
+        "include_existing_values",
+        "accepted"
+      ],
+      "title": "ProviderConsent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "source_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "current_revision_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Revision Id"
+    },
+    "existing_values": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 50,
+      "title": "Existing Values",
+      "type": "object"
+    },
+    "notes": {
+      "default": "",
+      "maxLength": 4000,
+      "title": "Notes",
+      "type": "string"
+    },
+    "consent": {
+      "$ref": "#/$defs/ProviderConsent"
+    }
+  },
+  "required": [
+    "source_id",
+    "consent"
+  ],
+  "title": "IntakeRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:IntakeRequest"
+}

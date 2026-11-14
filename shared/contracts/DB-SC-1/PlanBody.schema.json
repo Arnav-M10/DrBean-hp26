@@ -1,0 +1,242 @@
+{
+  "$defs": {
+    "InvestigationBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "provider_turns": {
+          "default": 4,
+          "maximum": 4,
+          "minimum": 0,
+          "title": "Provider Turns",
+          "type": "integer"
+        },
+        "tool_calls": {
+          "default": 6,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Tool Calls",
+          "type": "integer"
+        },
+        "scientific_reservations": {
+          "default": 2,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Scientific Reservations",
+          "type": "integer"
+        },
+        "wall_seconds": {
+          "default": 300,
+          "maximum": 300,
+          "minimum": 1,
+          "title": "Wall Seconds",
+          "type": "integer"
+        },
+        "scientific_wall_seconds": {
+          "default": 120,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Scientific Wall Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "InvestigationBudget",
+      "type": "object"
+    },
+    "ProviderDisclosure": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "default": "none",
+          "enum": [
+            "gemini",
+            "none"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "source_asset_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 1,
+          "title": "Source Asset Ids",
+          "type": "array"
+        },
+        "context_fields": {
+          "items": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Context Fields",
+          "type": "array"
+        },
+        "permission_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permission Id"
+        }
+      },
+      "title": "ProviderDisclosure",
+      "type": "object"
+    },
+    "Scenario": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "problem_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "problem_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Problem Digest",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "baseline",
+            "optional"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "problem_id",
+        "problem_digest",
+        "kind",
+        "label"
+      ],
+      "title": "Scenario",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "DB-SC-1",
+      "default": "DB-SC-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "problem_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Problem Id",
+      "type": "string"
+    },
+    "problem_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Problem Digest",
+      "type": "string"
+    },
+    "dataset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Dataset Id",
+      "type": "string"
+    },
+    "scenarios": {
+      "items": {
+        "$ref": "#/$defs/Scenario"
+      },
+      "maxItems": 2,
+      "minItems": 1,
+      "title": "Scenarios",
+      "type": "array"
+    },
+    "permitted_tools": {
+      "items": {
+        "enum": [
+          "read_scoped_evidence",
+          "execute_approved_scenario",
+          "record_allowed_skip",
+          "prepare_design_proposal",
+          "execute_approved_design",
+          "return_grounded_explanation"
+        ],
+        "type": "string"
+      },
+      "maxItems": 6,
+      "title": "Permitted Tools",
+      "type": "array"
+    },
+    "budget": {
+      "$ref": "#/$defs/InvestigationBudget"
+    },
+    "provider_disclosure": {
+      "$ref": "#/$defs/ProviderDisclosure"
+    },
+    "parent_plan_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Plan Id"
+    }
+  },
+  "required": [
+    "problem_id",
+    "problem_digest",
+    "dataset_id",
+    "scenarios"
+  ],
+  "title": "PlanBody",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:PlanBody"
+}
