@@ -4,7 +4,7 @@ The evaluator's JSONL ledger and the backend's SQLite ``ProviderLedger`` are dif
 these tests attack the backend one directly. Nothing is dispatched, no real ledger is touched, and no
 spending allowance changes: every store is a fresh temporary SQLite file.
 
-Safety properties that hold are ordinary regressions. Known gaps are strict xfails naming their finding.
+Safety properties are ordinary regressions; the two former strict-xfail gaps are fixed on main and now regressions too.
 Live dispatch is disabled today, so under-counting has no spend; it would before any live activation.
 """
 from __future__ import annotations
@@ -121,9 +121,8 @@ def test_dispatch_requires_a_positive_integer_reservation(ledger_env, reservatio
         make().begin_attempt(context, reservation)
 
 
-@pytest.mark.xfail(strict=True, reason="F-LEDGER-TOTALS (P2, Owner 2): total_tokens larger than input+output+thought "
-                   "tokens (e.g. tool-use prompt tokens) is ignored, so remaining capacity is overstated")
 def test_a_total_larger_than_its_parts_is_charged(ledger_env):
+    # Regression for F-LEDGER-TOTALS (P2, Owner 2): fixed on main 2d2993d; was a strict xfail.
     make, context, _ = ledger_env
     ledger = make(input_token_cap=10_000, output_token_cap=10_000)
     attempt = ledger.begin_attempt(context, dict(RESERVED))
@@ -135,9 +134,8 @@ def test_a_total_larger_than_its_parts_is_charged(ledger_env):
     assert charged >= 5_000, f"charged {charged} tokens for a reported total of 5000"
 
 
-@pytest.mark.xfail(strict=True, reason="F-LEDGER-MALFORMED (P2, Owner 2): reconciliation stores non-integer usage, "
-                   "after which every reservation fails with a TypeError instead of an explicit accounting refusal")
 def test_malformed_usage_is_refused_at_reconciliation_or_blocks_explicitly(ledger_env):
+    # Regression for F-LEDGER-MALFORMED (P2, Owner 2): fixed on main 2d2993d; was a strict xfail.
     from bean_api.ledger import LedgerBudgetExceeded
     make, context, store = ledger_env
     ledger = make(input_token_cap=10_000, output_token_cap=10_000)

@@ -3,8 +3,10 @@
 Owner 3's ``commentary_rejection`` is what stands between model prose and a researcher, in both the
 conversation ``explain`` route and the coordinator's final explanation. It must refuse invented numbers,
 global-optimality claims, physical-truth claims, complete elimination of outside models and proof of
-the original interval. The controls below show it does so for the plain forms. The probes use forms a
-writer produces naturally. Known gaps are strict xfails naming their finding, so a fix flips them loudly.
+the original interval. The controls below show it does so for the plain forms; a fully supported "checked
+design" statement must be kept. The probes use forms a writer produces naturally, and a "checked design"
+claim whose record lacks or contradicts a verification gate. Known gaps are strict xfails naming their
+finding, so a fix flips them loudly (remove a marker only after its original assertion passes).
 
 String checks are regressions, not a semantic truth detector: paraphrase coverage still needs human
 assessment (recorded in the finding). No model, provider or network is involved.
@@ -17,6 +19,22 @@ from test_ai_boundaries import (PREFIX, Tools, counts, facts_from, make_app, pro
                                 run_graph, scripted_model, turn)
 
 pytestmark = [pytest.mark.controlled_app]
+
+
+def _declared_policy() -> str:
+    from bean_api import ai_prompts
+    return str(getattr(ai_prompts, "COMMENTARY_POLICY_VERSION", "") or "")
+
+
+# The gap markers apply only to a guard that does not declare Owner 3's evidence-bound statement policy (the
+# phrase-list guard on main before PR #28). A guard that declares it must pass every case below as an ordinary
+# assertion: a declared policy with a gap fails loudly, and no merge order turns fixed cases into XPASS failures.
+# Verified with --runxfail against PR #28 623ae19: all 33 assertions pass.
+LEGACY_GUARD = not _declared_policy().startswith("evidence-bound-statements")
+
+
+def gap(reason: str):
+    return pytest.mark.xfail(LEGACY_GUARD, strict=True, reason=reason + " [legacy phrase-list guard]")
 
 # Server-shaped facts for the hero claim and its discovered pair (ke outside: 101/1016; inside: 1631/12700).
 FACTS = [{"target": {"parameter": "ke", "lower": "1/10", "upper": "17/100"},
@@ -33,8 +51,12 @@ def rejection(text: str):
     return commentary_rejection(text, FACTS)
 
 
+def rejection_with(fact: dict, text: str):
+    from bean_api.ai_prompts import commentary_rejection
+    return commentary_rejection(text, [fact])
+
+
 @pytest.mark.parametrize("text, expected", [
-    ("The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.", None),
     ("The selected time is 8/1 h; 8.0 h is the same exact value.", None),
     ("This proves the interval.", "unsupported_claim"),
     ("The outside candidate has ke 0.05.", "unsupported_numeric_claim"),
@@ -45,7 +67,37 @@ def test_guard_controls(text, expected):
     assert rejection(text) == expected
 
 
-QUALIFIER = pytest.mark.xfail(strict=True, reason="F-EXPLANATION-QUALIFIER (P2, Owner 3): any hedge word earlier in "
+# A "checked design" statement is a scientific claim, not a quantity: it is supported only by a cited record whose
+# design tier is checked pair separation, with valid verification, a passed fresh replay and a matching binding.
+CHECKED_TEXT = "The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair."
+CHECKED_GATES = {"design_tier": "checked_pair_separation", "verification": "valid", "replay": "passed",
+                 "expected_binding": "matches"}
+
+
+def test_a_fully_supported_checked_design_statement_is_kept():
+    assert rejection_with({**FACTS[0], **CHECKED_GATES}, CHECKED_TEXT) is None
+
+
+CHECKED = gap("F-EXPLANATION-CHECKED-GATES (P2, Owner 3): 'checked design' prose is "
+                            "kept when its cited record lacks or contradicts the verification, replay, binding or tier gates")
+
+
+@CHECKED
+@pytest.mark.parametrize("gates", [
+    {},                                                        # no gate facts at all (the former positive fixture)
+    {**CHECKED_GATES, "verification": "invalid"}, {**CHECKED_GATES, "verification": "not_checked"},
+    {**CHECKED_GATES, "replay": "failed"}, {**CHECKED_GATES, "replay": "not_run"},
+    {**CHECKED_GATES, "expected_binding": "mismatch"},
+    {**CHECKED_GATES, "design_tier": "numerical_guidance"}, {**CHECKED_GATES, "design_tier": "no_separation_established"},
+    {**CHECKED_GATES, "native_replay": {"replay": "passed", "integrity": "failed"}},
+    {**CHECKED_GATES, "native_replay": {"replay": "passed", "verification": "invalid"}},
+], ids=["no_gates", "verification_invalid", "verification_not_checked", "replay_failed", "replay_not_run",
+        "binding_mismatch", "tier_numerical", "tier_no_separation", "native_integrity_failed", "native_invalid"])
+def test_checked_design_statement_needs_every_verification_gate(gates):
+    assert rejection_with({**FACTS[0], **gates}, CHECKED_TEXT) == "unsupported_claim"
+
+
+QUALIFIER = gap("F-EXPLANATION-QUALIFIER (P2, Owner 3): any hedge word earlier in "
                               "the clause exempts an overclaim, even when it intensifies rather than hedges")
 
 
@@ -57,7 +109,7 @@ def test_overclaim_cannot_hide_behind_an_unrelated_hedge_word(text):
     assert rejection(text) == "unsupported_claim"
 
 
-NUMBERS = pytest.mark.xfail(strict=True, reason="F-EXPLANATION-NUMBER-FORMS (P2, Owner 3): invented numbers glued to "
+NUMBERS = gap("F-EXPLANATION-NUMBER-FORMS (P2, Owner 3): invented numbers glued to "
                             "units, written as hyphen ranges, in words or as unicode fractions escape exact grounding")
 
 
@@ -71,7 +123,7 @@ def test_invented_numbers_in_common_spellings_are_refused(text):
     assert rejection(text) == "unsupported_numeric_claim"
 
 
-PARAPHRASE = pytest.mark.xfail(strict=True, reason="F-EXPLANATION-PARAPHRASE (P2, Owner 3): paraphrased overclaims in "
+PARAPHRASE = gap("F-EXPLANATION-PARAPHRASE (P2, Owner 3): paraphrased overclaims in "
                                "the four forbidden categories pass a phrase list; human assessment still required")
 
 
