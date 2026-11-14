@@ -59,5 +59,84 @@ Please supply authorized preview/byte routes and real public-file provenance.
   refusal, and two actual private browser contexts on the assembled backend.
 - No live calls or public tunnel activation are needed for development tests.
 
-Current: implementing the bounded controller/view against an injected adapter;
-awaiting owners' confirmed session and result contracts before assembled tests.
+## Delivered UI candidate
+
+Runtime/test head: `7f523c8f0f5e6ffac006037516939917027caf45`, PR #38.
+Compatible private-session dependency #39 is included by normal merge ancestry
+at `d943afe`; no competing auth, parser, provider or scientific engine was added.
+
+- Root opens the real-file research screen. The existing supported scientific
+  workflow remains at `#inputs`; examples are optional there.
+- Files/question/model are reviewed before explicit consent. Every disclosure
+  refreshes the server's current capabilities/budget; no automatic provider retry.
+- Uncertain uploads retain exact filename/bytes/media hint/operation ID in memory
+  and bounded metadata for matching-file reselection after reload. Unknown
+  analysis outcomes retain the original body/key across reload and workspace
+  switching. A new identity clears previous private-session client state.
+- Restoration immediately clears old views and locks edits. Late responses are
+  generation-fenced. Reopening binds the exact result ID and source IDs/digests.
+- Source/model text is inert, previews/tables are bounded, citations use human
+  page numbers, and AI output cannot acquire a mathematical verification badge.
+- Merely connecting or using science stores no browser credentials or data.
+  General-workspace session storage holds only user drafts/references/request
+  identities; never a session secret, bearer token or Gemini key.
+
+## Rehearsal and checks
+
+Use GPT1's documented setup and private-session gateway; local operator login
+remains in Advanced server connection. Open `#research`, select admitted files,
+inspect sources, enter a question, review the exact disclosure and accept it.
+After analysis, inspect tables/claims/limitations and their source buttons.
+Reopen a saved analysis to retrieve it; for an uncertain operation inspect its
+original disclosure and deliberately retry that same operation.
+
+**Availability gate:** current main has no general-research producer. File
+admission/analysis is honestly unavailable until Claude's actual routes and
+capability helper are registered by GPT1. There is no production fixture answer.
+Controlled browser tests are an explicit test lane, not a substitute for this join.
+
+Executed on the runtime candidate (Linux, Node 24.22.1; backend Python 3.12.14,
+matching installed Counterdex 0.3 / Python 3.11.18):
+
+| Command | Actual result |
+| --- | --- |
+| `node --test apps/web/*.test.mjs` | 71 passed; 17 new controller cases |
+| `CHROMIUM_PATH=/usr/bin/chromium node tests/integration/general_workspace_smoke.mjs` | 23 controlled-HTTP/UI checks passed; real public CSV bytes, authored analysis |
+| `CHROMIUM_PATH=/usr/bin/chromium node tests/integration/web_manual_smoke.mjs` | 18/18 manual scientific-editor checks passed |
+| `CHROMIUM_PATH=/usr/bin/chromium node tests/integration/shared-session-browser.mjs` | 12/12 actual HTTPS gateway/API/private-session checks passed; two browser contexts |
+| `CHROMIUM_PATH=/usr/bin/chromium node apps/web/check-backend.mjs` | Real baseline/design/follow-up/download/installed replay passed |
+| Same scientific command with `BEAN_TEST_FOLLOWUP_ORIGIN=actual` | Declared-actual follow-up lane passed, preserving synthetic test ancestry |
+| `.venv/bin/python -m pytest -q tests/test_browser_sessions.py` | 21 actual backend authority tests passed |
+
+Supply `BEAN_TEST_PYTHON=$PWD/.venv/bin/python` and
+`BEAN_COUNTERDEX_PYTHON=$PWD/.venv-engine/bin/python` for scientific commands.
+Install the pinned browser dependencies with
+`npm ci --prefix tests/integration --ignore-scripts`; use prepared Playwright
+Chromium or set `CHROMIUM_PATH` for the local installed binary. No process
+limits were relaxed, model calls made, budget history reset or public tunnel
+started. The precise expected local `/shared-session` 404 is asserted in the
+manual lane; all real JS and other console errors still fail.
+
+The public Palmer Penguins excerpt, immutable digests and CC0 provenance are in
+`tests/integration/fixtures/general/`. Retained results are in
+`docs/evidence/general-ui/`. Earlier failing runs were not rewritten as passes;
+the final scientific lane preserves and additionally asserts the exact custom
+question after source materialization.
+
+## Integration blockers and owner action
+
+Claude must publish `codex/general-gemini-files`, the exact typed asset/result/
+preview shapes and `register_general_routes(app)`/capability helper with state
+dependencies. GPT1 registers those actual services. Then bind any agreed schema
+amendments and rerun the combined real-parser/general-analysis browser lane,
+including cross-session general asset/analysis denial and saved-result reopening.
+The 23-check authored HTTP lane does not prove those missing backend predicates.
+Live Gemini qualification remains not_run; the user permits free tier only, $0.
+The UI component is reviewable; the full general product is not declared complete.
+
+GitHub Actions [run 43594171124](https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43594171124)
+passed all six jobs on the runtime/test candidate: backend/lint/schemas,
+web units, scientific/browser/native replay, ordinary stack/restart smoke,
+engine/native replay and evaluator self-checks. The separately retained
+23-check controlled general browser lane was also run locally; it is not yet
+an independent general-backend qualification job.
