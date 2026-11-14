@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "expected_revision": {
+      "minimum": 0,
+      "title": "Expected Revision",
+      "type": "integer"
+    },
+    "pending_review_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Pending Review Id",
+      "type": "string"
+    },
+    "expected_review_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Expected Review Digest",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "approve",
+        "reject"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "accepted": {
+      "const": true,
+      "title": "Accepted",
+      "type": "boolean"
+    },
+    "observation_review_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Observation Review Id"
+    }
+  },
+  "required": [
+    "expected_revision",
+    "pending_review_id",
+    "expected_review_digest",
+    "decision",
+    "accepted"
+  ],
+  "title": "ResearchDecision",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-RESEARCH-1:ResearchDecision"
+}
