@@ -165,6 +165,31 @@ const server = createServer(async (request, response) => {
   }
 
   const [path] = request.url.split('?');
+  // The study page: only files inside ./study with a known type. No "..", no hidden
+  // names, no percent-encoding, so a path can never leave that folder. Saved run
+  // outputs (fixtures/) and tests are for the test suite, not the browser.
+  if (path === '/study') {
+    response.writeHead(308, { Location: '/study/' }).end();
+    return;
+  }
+  if (path.startsWith('/study/')) {
+    const rest = path.slice('/study/'.length) || 'index.html';
+    const type = { html: 'text/html; charset=utf-8', mjs: 'text/javascript; charset=utf-8', js: 'text/javascript; charset=utf-8',
+      css: 'text/css; charset=utf-8', woff2: 'font/woff2' }[rest.split('.').pop()];
+    if (!type || !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*$/.test(rest.replace(/\.[a-z0-9]+$/, ''))
+        || rest.split('/').some(part => part.startsWith('.')) || rest.startsWith('fixtures/') || rest.endsWith('.test.mjs')) {
+      response.writeHead(404).end();
+      return;
+    }
+    try {
+      const bytes = await readFile(new URL(`study/${rest}`, import.meta.url));
+      response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Length': bytes.length, 'Content-Type': type, 'X-Content-Type-Options': 'nosniff' });
+      response.end(request.method === 'HEAD' ? undefined : bytes);
+    } catch (error) {
+      response.writeHead(error.code === 'ENOENT' || error.code === 'EISDIR' ? 404 : 500).end();
+    }
+    return;
+  }
   const file = routes.get(path);
   if (!file) {
     response.writeHead(404).end();
