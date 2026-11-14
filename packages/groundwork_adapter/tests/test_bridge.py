@@ -410,6 +410,46 @@ class BridgeTests(unittest.TestCase):
             replay_packet(changed, expected=packet_anchors(changed))
         self.assertEqual(substituted.exception.code, "candidate_mismatch")
 
+    def test_recheck_replay_rejects_scientific_scenario_after_resealing(self):
+        response = self.dispatch(recheck_request(self.problem, self.dataset, self.design))
+        packet, native = scientific_from(response)
+        native["scenario_id"] = "scenario_different_scientific_run"
+        native["baseline_digest"] = semantic_digest("report", {k: v for k, v in native.items() if k != "baseline_digest"})
+        scientific = canonical_bytes(native)
+        packet["scientific"] = {"sha256": artifact_digest(scientific),
+                                "bytes_base64": base64.b64encode(scientific).decode("ascii")}
+        changed = canonical_bytes(packet)
+        with self.assertRaises(AdapterError) as original:
+            replay_packet(changed, expected=response["anchors"])
+        self.assertEqual(original.exception.code, "artifact_mismatch")
+        # Recomputed diagnostic hashes allow the separate native-scope check
+        # to run; they do not authenticate the altered scientific run.
+        with self.assertRaises(AdapterError) as wrong_scope:
+            replay_packet(changed, expected=packet_anchors(changed))
+        self.assertEqual(wrong_scope.exception.code, "wrong_scenario_binding")
+
+    def test_recheck_replay_caps_complete_packet_after_resealing(self):
+        response = self.dispatch(recheck_request(self.problem, self.dataset, self.design))
+        packet, native = scientific_from(response)
+        cap = len(canonical_bytes(native)) + 1024
+        self.assertLess(cap, len(canonical_bytes(packet)))
+        native["limits"]["max_bundle_bytes"] = cap
+        native["baseline_digest"] = semantic_digest("report", {k: v for k, v in native.items() if k != "baseline_digest"})
+        scientific = canonical_bytes(native)
+        self.assertLess(len(scientific), cap)
+        packet["scientific"] = {"sha256": artifact_digest(scientific),
+                                "bytes_base64": base64.b64encode(scientific).decode("ascii")}
+        changed = canonical_bytes(packet)
+        self.assertGreater(len(changed), cap)
+        with self.assertRaises(AdapterError) as original:
+            replay_packet(changed, expected=response["anchors"])
+        self.assertEqual(original.exception.code, "artifact_mismatch")
+        # A diagnostic anchor reaches the recorded budget check. The complete
+        # provenance and ancestor bytes must fit, not only the inner certificate.
+        with self.assertRaises(AdapterError) as oversized:
+            replay_packet(changed, expected=packet_anchors(changed))
+        self.assertEqual(oversized.exception.code, "resource_exhaustion")
+
     def test_offline_lineage_shares_one_budget_and_respects_cancellation(self):
         import counterdex.native_packet as native_packet
         from counterdex.resource import ExecutionContext

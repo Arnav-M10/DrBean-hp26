@@ -10,6 +10,31 @@ are isolated development tools, not scientific runtime dependencies.
 The user confirmed permission for the work and requested an independent
 implementation; all supplied example measurements are newly constructed fixtures.
 
+## Subsequent cross-branch compatibility checks
+
+With the same qualified 0.3.0 source bytes, the actual proposed backend adapter
+and child at `cc779bf` passed checked baseline discovery, an honest no-candidate
+result, schema/qualification/publication binding checks, native replay and the
+existing checked design at `8/1`. This was a read-only compatibility check, not
+ordinary HTTP acceptance or a merge. `origin/main` remains `adac945` at the audit.
+The proposed design retains its legacy suggestion profile; the full native
+application lineage and recheck dispatch are separate remaining integration work.
+See [the updated Owner 2 handoff](OWNER2_BRIDGE_ADOPTION.md).
+
+Two new focused recheck regressions passed in 0.653 seconds: the original anchor
+rejects modified bytes, while intentionally resealed diagnostic anchors reveal
+a wrong scientific scenario and a bundle budget that omits outer lineage bytes.
+The 90 malformed proposal/row probes also rejected with typed errors. A fresh
+installed-runtime portable baseline replay passed. No scientific source file,
+version or fixture was changed, and the earlier full suite was not repeated.
+
+[Owner 5's native acceptance handoff](OWNER5_NATIVE_ACCEPTANCE.md) records the
+current evaluator's profile/replay/anchor and design-request mismatches. Its four
+executable negative assertions passed: wrong expected projection, modified raw
+bytes, modified certificate under the original anchor, and false enclosures
+under diagnostic resealed hashes. These package checks establish their named
+predicates; they do not qualify the HTTP harness or a physical experiment.
+
 ## Counterdex 0.3.0 reviewed scope and observation rechecks
 
 Qualified runtime: **CPython 3.11.17**, source digest

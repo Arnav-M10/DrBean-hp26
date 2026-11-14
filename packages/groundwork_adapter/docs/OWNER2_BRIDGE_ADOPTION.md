@@ -8,10 +8,55 @@ and science worktree `bc928550926588e6e3e1d1b54112bffb28dab590` on November 13,
 `git log origin/main..origin/backend/scientific-integration` returned no commits.
 No backend files were changed for this audit.
 
-The recorded observations below describe the pre-change 0.2.0 package. The
-adoption instructions describe the current 0.3.0 source, including explicit
-design scope, authoritative per-candidate results and admitted observation
-rechecks. Package changes do not establish that the backend has adopted them.
+The first audit below remains historical evidence for `adac945` and package
+0.2.0. The following branch audit updates the integration request for the 0.3.0
+source, including explicit design scope, authoritative candidate results and
+admitted observation rechecks.
+
+## November 13 branch audit: baseline adoption now works
+
+[PR #6](https://github.com/Arnav-M10/DrBean-hp26/pull/6),
+`backend/browser-baseline` at
+`cc779bf2d6993e6b58c537eed2a690adf9c27e34`, was audited one commit beyond `adac945`
+and has since merged into `main` as
+`1f75bdc04a3547aa2a1adb4e529363e8fafa74c5`.
+It adds real application-bridge baseline dispatch, server-owned run/scenario
+scope, separate baseline qualification, native byte/anchor publication,
+`baseline_search` DTOs and browser baseline controls. These changes resolve the
+earlier baseline dispatch and publication gaps. During the read-only audit,
+`main` still named `adac945`; the merge happened afterward on the same date.
+
+A read-only compatibility check loaded the branch's actual `contracts.py`,
+`counterdex_adapter.py`, `baseline_evidence.py` and `counterdex_child.py` from Git
+objects. Its prepared CPython 3.11 child ran the 0.3.0 scientific source from
+`codex/science-next` commit `b955780bd4e5d95d19a6ffeed6ad2a7723b4822d`.
+No backend checkout, replacement scientific adapter or provider was used.
+
+| Fresh cross-branch check | Observed result |
+|---|---|
+| Hero baseline discovery | Two computed candidates; `certified_counterexample`, `valid`, fresh replay `passed` |
+| No-candidate control, first positive measurement moved to time zero | `no_counterexample_found`, zero candidates, `not_checked`, replay `unsupported`; retained native bytes |
+| Branch authoritative `ScientificResult` | Both results validate |
+| Branch `baseline_result_checked` | True for the checked hero; false for the unchecked control |
+| Branch expected-anchor and native publication validators | Hero input, workflow, run/scenario, native bytes and external anchors match |
+| Existing design using the computed baseline vectors | `checked_pair_separation` at `8/1`; branch `DesignResult` validates |
+
+The existing design computation is checked mathematics. Its artifact remains
+`groundwork.suggestion-bundle.v1` under `bean-to-counterdex.v1`, without embedded
+application baseline history. The remaining G2 seam is the complete application
+lineage and admitted `recheck` dispatch, not a missing numerical or exact design
+producer. The branch's worker still permits only `investigate` and `design` and
+loads historical artifact bytes only from prospective `source_artifact_ids`.
+
+One small Owner 2 metadata fix remains: `CounterdexAdapter.capabilities()`
+hardcodes `adapter_version: "0.2.0"` while its observed runtime reports `0.3.0`.
+Report the observed version, keeping runtime availability separate from checked
+result qualification. No package-side compatibility defect was found here.
+
+This was an adapter/schema/binding smoke, not an authenticated HTTP or browser
+run. PR #6 records its own branch acceptance; the read-only audit does not
+qualify the combined source's HTTP behavior or the complete
+discovery/design/recheck loop.
 
 ## Recorded 0.2.0 baseline and first blocking seam
 
@@ -26,12 +71,11 @@ On the same normalized hero records:
 | Audited `Worker._checked_result_allowed` applied to that bridge result | `False` |
 | Audited package fixture bodies validated with authoritative Pydantic models | Seven requests and seven results pass, preserving exact normalized bodies |
 
-The first G1 blocker is dispatch: `counterdex_adapter.py` probes the engine and
-then unconditionally returns `baseline_producer_unavailable`.
-`counterdex_child.py` supports only probe/design/replay and also hardcodes
-baseline discovery false. The package now supplies actual bounded discovery;
-`shared/contracts/BACKEND_INTEGRATION.md` still describes the earlier missing
-producer and needs an Owner 2 update after integration.
+At `adac945`, the first G1 blocker was dispatch: `counterdex_adapter.py` probed
+the engine and unconditionally returned `baseline_producer_unavailable`.
+`counterdex_child.py` supported only probe/design/replay and hardcoded discovery
+false. PR #6 changes those paths and updates its backend integration document;
+these historical findings must not be reported as its current behavior.
 
 Changing dispatch alone is insufficient. At the audited commit,
 `Worker._checked_result_allowed` required a suggestion digest and
@@ -41,10 +85,11 @@ The 0.2.0 bridge returned operation-specific replay details in
 the authoritative `result.native_replay` field, but baseline/recheck replay
 still has a different proposition and structure from design replay.
 Publication also recomputed a different scientific projection and required its
-corresponding anchor shape. Adapt both gates to the application envelope and
-operation-specific verification; retaining fail-closed validation is required.
+corresponding anchor shape. PR #6 handles the application envelope and
+operation-specific verification for baselines. Extend that approach to design
+and recheck while retaining fail-closed validation.
 
-## Exact interface differences
+## Historical interface differences and current packet contract
 
 | Consumer at the audited commit | Current 0.3.0 application bridge |
 |---|---|
@@ -65,21 +110,28 @@ The backend projection digest is
 the package projection digest is
 `2b60f84030728f8c7830436806f98553e9a5aa1fe66d3ec19c0bc374ba06d915`.
 The mappings preserve different provenance text, so their digests must differ.
-Do not relabel either digest to make an anchor check pass. The current DTO's
-optional `projection_version` literal admits only `bean-to-counterdex.v1`;
-the bridge therefore omits it. Persist the real mapping policy and bridge anchors
-separately unless Owner 2 deliberately versions that DTO. Verification records
+Do not relabel either digest to make an anchor check pass. The `adac945` DTO's
+optional `projection_version` literal admits only `bean-to-counterdex.v1`.
+The package omits that field to remain compatible with this authority. PR #6
+also admits `DB-SC-1-to-groundwork-v1` for `ScientificResult` and supplies it in
+its baseline adapter; its design projection remains separate. Persist the real
+mapping policy and bridge anchors without changing their meaning. Verification records
 carry expected/observed scientific problem digests separately from application
 problem digests. Never insert a design/suggestion digest into a baseline result
 merely to satisfy the old gate.
 
 ## Smallest requested consumer changes
 
+PR #6 implements the baseline portion of steps 1–3. Preserve that work and
+extend its publication and validation path for application-native design and
+recheck. Keep existing checked suggestion bundles replayable under their own
+declared projection and identity.
+
 1. Keep the existing authenticated routes, approvals, ledger, worker and artifact
-   service. Replace the hardcoded unsupported branch with the prepared bridge
-   request. Pass the reserved run/scenario and the actual plan, approval,
-   operation and execution identifiers. Run bridge admission on complete
-   normalized dataset/problem records before approval.
+   service, including PR #6's prepared baseline dispatch and admission. Pass the
+   reserved run/scenario and actual plan, approval, operation and execution
+   identifiers for each newly wired operation. Retain complete normalized
+   dataset/problem records.
 2. Unpack the envelope and validate `result` with `ScientificResult` or
    `DesignResult`. Qualify each operation against fresh replay and its expected
    anchors. A baseline has no design/suggestion identity; a design does. A valid
@@ -195,6 +247,41 @@ drop a nonempty reuse request or reinterpret it as construction permission.
 
 ## Reproduction and acceptance
 
+To repeat the read-only cross-branch smoke, read the four modules named above
+with `git show cc779bf2d6993e6b58c537eed2a690adf9c27e34:<path>`, load them in
+memory under their actual `bean_api` module names, and invoke their actual
+adapter. Substitute only its child-file launch with the Git object's
+`counterdex_child.py` source, keeping the fixed server-owned `__file__` path and
+isolated CPython 3.11 invocation. The child then imports the current checkout's
+scientific source. Supply complete normalized records and real scope arguments;
+set operation/execution IDs to the audit run ID. Do not replace computation
+with a simulated adapter. This avoids a backend checkout or mutation while
+exercising actual admission, discovery, output mapping and replay.
+
+The acceptance predicates are matching immutable input/workflow scope, exact
+raw bytes/anchors, authoritative schema validity and matching fresh candidate
+facts. The no-candidate control must retain its unchecked state. Existing design
+must retain its own checked result and declared projection; complete application
+lineage additionally requires the application design packet and parent history.
+These smokes do not exercise outer-worker cancellation or HTTP authorization.
+
+For Owner 2's integrated test checkout containing the reviewed backend and
+scientific changes, extend the existing tests rather than creating another
+backend or evaluator. With matching prepared engine and backend environments:
+
+```sh
+BEAN_COUNTERDEX_PYTHON=/absolute/path/to/prepared/python3.11 \
+  PYTHONPATH=apps/api .venv/bin/python -m pytest -q \
+  tests/test_baseline_adapter.py tests/test_baseline_binding.py \
+  tests/test_baseline_workflow.py tests/test_counterdex_adapter.py
+```
+
+These branch test files are not all present on `adac945`. Their execution is a
+separate acceptance step, not a check claimed by the read-only audit. The
+commands below retain the historical checked-out `adac945` comparison and
+package-only checks; the final command's unsupported result describes that
+backend commit, not PR #6.
+
 Run from the repository root with an existing prepared engine and a backend
 Python 3.13 environment containing Pydantic. These checks do not load provider
 configuration or make network/provider calls:
@@ -246,6 +333,9 @@ Run the existing relevant backend tests, schema export,
 lint and package checks; do not count seeded design regressions or these package
 smokes as the public G1/G2 gate.
 
-No complete authenticated HTTP loop was run in this audit. G1/G2 remain
-unqualified until the existing backend consumes the envelope and Owner 5's
-actual API/worker acceptance passes.
+No complete authenticated HTTP loop was run in this audit. Current `main` at
+`1f75bdc04a3547aa2a1adb4e529363e8fafa74c5` includes PR #6's compatible baseline
+code and separate branch acceptance evidence. Combined-source checks and
+Owner 5's actual API/worker acceptance remain distinct from this smoke. The
+complete application-native design lineage and observation recheck gate remains
+pending Owner 2 routing and independent end-to-end acceptance.

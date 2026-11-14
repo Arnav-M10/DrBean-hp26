@@ -6,6 +6,33 @@ for `-I -m counterdex.bridge`; never take an executable, module, path, URL or
 environment from a request, model decision or evidence packet. No provider is
 used by this bridge. Native replay is offline; browser replay is unavailable.
 
+## Integration snapshot: November 13, 2026
+
+[PR #6](https://github.com/Arnav-M10/DrBean-hp26/pull/6),
+`backend/browser-baseline` commit
+`cc779bf2d6993e6b58c537eed2a690adf9c27e34`, implements real baseline discovery,
+scope binding, checked-result qualification and downloadable application-native
+bytes/anchors. A read-only check of its actual modules and scientific child
+against 0.3.0 source commit `b955780bd4e5d95d19a6ffeed6ad2a7723b4822d`
+passed checked discovery, an honest unchecked no-candidate control, authoritative
+schemas, native replay and publication binding predicates. It used actual
+CPython 3.11 computation without a simulated scientific adapter or provider.
+
+The branch's existing design path also produced checked separation at `8/1`.
+Its `groundwork.suggestion-bundle.v1` artifact uses `bean-to-counterdex.v1` and
+does not embed the application baseline history. That distinct format does not
+invalidate its checked mathematics. Complete application-native design lineage
+and `recheck` dispatch remain the next consumer seam. Its capabilities also
+hardcode version `0.2.0` while the observed runtime reports `0.3.0`; Owner 2 can
+derive that metadata from the runtime identity.
+
+During the read-only smoke, `main` still named `adac94540c5572fdbe08be3dc8323c61e91b264f`.
+PR #6 has since merged as `1f75bdc04a3547aa2a1adb4e529363e8fafa74c5` on the same date.
+The smoke does not establish combined-source HTTP behavior or the full
+discovery/design/recheck gate. See [OWNER2_BRIDGE_ADOPTION.md](OWNER2_BRIDGE_ADOPTION.md)
+for exact observations, the read-only reproduction approach, historical findings
+and remaining acceptance predicates.
+
 ## Runnable setup
 
 From the repository root, create a dedicated environment outside the checkout:
@@ -63,8 +90,10 @@ One request, EOF, one response, exit. Every request has
 `protocol: "counterdex.bridge.v1"` and `operation`. Unknown top-level fields fail.
 Scientific scalars are exact rational strings; JSON floats and duplicate keys
 fail. Raw native packets are capped at 4 MiB, including lineage. The 12 MiB
-transport cap separately covers base64 and result diagnostics. Owner 2's old
-2 MiB investigation transport cap must be changed to accommodate this seam.
+transport cap separately covers base64 and result diagnostics. At `adac945`,
+baseline worker transport was 3 MiB and native publication was 2 MiB. PR #6
+raises those baseline caps to 12 MiB and 4 MiB. Retain the operation's approved
+lower limit wherever it is smaller than these ceilings.
 
 | Operation | Remaining request fields |
 |---|---|
@@ -114,9 +143,10 @@ include `scientific_design_digest` and `native_suggestion_digest`. Verification
 records include expected/observed scientific problem digests separately from
 the application problem digests. Each candidate result retains its ID,
 verification, reason, violating/unresolved row IDs and exact outside-claim
-classification. The optional application `projection_version` is omitted:
-its current `bean-to-counterdex.v1` literal is a different mapping and must not
-label this package's projection. Full native bytes and independent anchors
+classification. The optional application `projection_version` is omitted to
+remain compatible with `adac945`, whose `bean-to-counterdex.v1` literal names
+a different mapping. PR #6 additionally admits `DB-SC-1-to-groundwork-v1` for
+scientific results and supplies it in its baseline adapter. Full native bytes and independent anchors
 remain in the envelope. See [RESULT_SEMANTICS.md](RESULT_SEMANTICS.md) for the
 separate evidence, compatibility and execution meanings.
 
@@ -184,13 +214,20 @@ on revised data can discover new vectors and has its own evidence identity.
 
 ## Required Owner 2 integration changes
 
+PR #6 implements the baseline portions of steps 1–3. Extend that work for
+application-native design and recheck while preserving existing suggestion
+bundles and their declared replay profile.
+
 1. Call `admission` on complete normalized application records before approval.
    See [APPLICATION_MAPPING.md](APPLICATION_MAPPING.md) for the exact projection
    and rejected subsets. Retain actual/hypothetical/synthetic classification.
 2. Pass server-owned run/scenario/workflow IDs into investigation. Provide
    original records, actual evidence body, approved request digest and original
-   raw native bytes for design. The current two-argument
-   `design(request,historical_evidence)` cannot supply these inputs.
+   raw native bytes for design. The current
+   `design(request,historical_evidence)` path uses a distinct projection and does
+   not retain the application baseline packet. Load mandatory baseline bytes
+   and independent anchors separately from prospective `source_artifact_ids`,
+   then dispatch application `design` with the full historical evidence body.
 3. Unpack the response envelope, validate its `result` against the existing
    authoritative DTO, and verify base64, raw SHA-256 and length before publishing.
    Persist the full native bytes and references atomically with the result;
@@ -250,5 +287,8 @@ remaining scientific process or descendant. Use the `hero` and `alternate`
 examples with actual search, and the fixed-pair controls only as explicitly
 labeled regression oracles. AI remains absent or controlled placeholder output;
 no live cohort or provider dispatch is authorized. Engine-focused tests and the
-3.12/3.13 parent process check are not the HTTP gate. Backend adapter/persistence
-wiring and independent HTTP acceptance remain Owner 2/5 work.
+3.12/3.13 parent process check are not the HTTP gate. PR #6's baseline wiring and
+its reported branch acceptance are concrete progress; application-native design
+lineage, observation recheck routing and independent acceptance of that complete
+loop remain Owner 2/5 work. The read-only smoke does not claim a successful HTTP
+run of the combined scientific and newly merged backend source.

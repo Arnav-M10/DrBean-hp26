@@ -2,6 +2,51 @@
 
 Owner: Person 1 / Counterdex.
 
+## Current continuation — cross-branch compatibility and replay controls
+
+Resumed November 13, 2026 at 22:50 Eastern from clean `b955780` on
+`codex/science-next`. The governing master brief is unchanged (same retained
+SHA-256). `origin/main` remains `adac945`; backend PR #6 at `cc779bf` and
+validation branch `96aa7df` are newly available but unmerged. The qualified
+Counterdex source remains **0.3.0**, digest
+`90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`, on CPython
+3.11.17. A fresh installed-runtime replay of the portable baseline passed with
+two candidates. Earlier full-suite/build evidence is historical qualification
+of these unchanged source bytes, not a newly repeated full suite.
+
+Read-only execution of the actual proposed backend adapter/child against this
+package passed checked baseline discovery, a no-candidate result, authoritative
+schema validation, baseline qualification/publication binding, native replay,
+and the existing checked design at `8/1`. This retires the baseline dispatch
+blocker **on that proposed branch**. It does not establish a merged application
+or independent HTTP acceptance. That design still uses its explicit legacy
+suggestion profile/projection; its checked mathematics passed, while complete
+application-native baseline lineage and `recheck` dispatch remain to be joined.
+Backend capability metadata also needs to report the observed runtime version.
+
+The validation branch still classifies application-native packets as unknown,
+uses the legacy replay command/anchor subset, and constructs a design request
+with the wrong allowance-origin shape and insufficient extension scope for its
+checked control. These are specific consumer-contract changes for Owner 5;
+no engine or evaluator rewrite is warranted. Package-side handoffs
+`docs/OWNER2_BRIDGE_ADOPTION.md` and `docs/OWNER5_NATIVE_ACCEPTANCE.md` record
+the actual branch versions, concrete predicates and next actions.
+
+Targeted recheck review rejected 90 malformed proposal/row mutations through
+typed errors. Two native mutations also rejected both the original raw anchors
+and deliberately resealed diagnostic inputs: a different scientific scenario,
+and a byte cap sufficient only for the inner scientific bundle. Both new focused tests passed in 0.653 seconds. Persistent
+regressions retain these distinct integrity/binding/resource defenses. Source
+and original evidence bytes remain unchanged; no scientific version bump or
+fixture regeneration is appropriate for test/documentation-only changes.
+
+Next owned trigger: once Owner 2's full native design/recheck seam or Owner 5's
+replay consumer lands, rerun that changed boundary using the real current
+consumer. Current delivery has no demonstrated package defect requiring a new
+proof rule, model family or solver feature. Keep this branch ready and preserve
+teammate attribution; do not silently merge their proposed branches. No provider
+calls, secret reads or hosted-service activation occurred.
+
 ## Completed owned continuation — integration handoff pending
 
 Started November 13, 2026 at 22:25 Eastern (33 hours 35 minutes before the
@@ -142,12 +187,11 @@ that it is unavailable or claiming the new application gate passes.
    update this log, commit coherently and publish the owner branch. A push or
    package-only pass does not establish integrated release acceptance.
 
-Next owned milestone: audit the now-integrated consumer and current acceptance
-evidence, then select the smallest demonstrated science gap. Specifically check
-whether application/native mappings still agree after backend contract changes;
-whether actual or differently timed follow-ups need a distinct admitted path;
-and whether the required downstream status truth table and minimal independent
-replay packet are complete. These are audit questions, not asserted defects.
+Next owned milestone: verify the changed native design/recheck or evaluator
+consumer when its owner publishes it, using current source and separate anchors.
+The package's actual/differently timed recheck, result truth table and portable
+reproduction packet are complete. Do not recreate them or expand scientific
+scope while the remaining consumer joins need stabilization.
 
 Handoff requirements: each interface request names recipient, versions, smallest
 change, owned location, concrete failure, valid/invalid examples, identity and
