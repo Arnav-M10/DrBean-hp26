@@ -340,8 +340,8 @@ dd { overflow-wrap: anywhere; }
    use the native instant disclosure rather than a JavaScript height wrapper. */
 @supports (interpolate-size: allow-keywords) {
   details { interpolate-size: allow-keywords; }
-  details::details-content { block-size: 0; overflow: clip; transition: block-size var(--motion-panel) var(--motion-ease), content-visibility var(--motion-panel) allow-discrete; }
-  details[open]::details-content { block-size: auto; }
+  details::details-content { block-size: 0; overflow: clip; transition: none; }
+  details[open]::details-content { block-size: auto; transition: block-size var(--motion-panel) var(--motion-ease), content-visibility var(--motion-panel) allow-discrete; }
 }
 
 @media (forced-colors: active) {
