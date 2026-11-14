@@ -1,0 +1,87 @@
+// Actual launcher -> browser -> canonical review -> Deep Agents -> real Counterdex.
+// Synthetic measurements only; no fixture candidates or provider calls.
+// The post-science model-failure diagnostic is a separate, explicitly injected fault deployment.
+import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { createRequire } from 'node:module'
+import { createServer } from 'node:net'
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const root = fileURLToPath(new URL('../', import.meta.url))
+const scratch = await mkdtemp(join(tmpdir(), 'drbean-agent-browser-'))
+const output = resolve(process.env.BEAN_RESEARCH_BROWSER_EVIDENCE_DIR || join(root, 'var/test-evidence/preferred-research'))
+const python = resolve(root, '.venv/bin/python'), engine = resolve(root, '.venv-engine/bin/python')
+async function freePort() {
+  const server = createServer()
+  await new Promise((yes, no) => { server.once('error', no); server.listen(0, '127.0.0.1', yes) })
+  const port = server.address().port
+  await new Promise(yes => server.close(yes))
+  return port
+}
+const apiPort = await freePort(), webPort = await freePort(), base = `http://127.0.0.1:${webPort}`
+const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', DRBEAN_VAR_DIR: scratch,
+  BEAN_AUTH_FILE: join(scratch, 'auth.json'),
+  BEAN_DEV_API_PORT: String(apiPort), BEAN_DEV_WEB_PORT: String(webPort), BEAN_RESEARCH_MODE: 'controlled',
+  BEAN_AI_MODE: 'placeholder', PYTHONPATH: join(root, 'apps/api') + ':' + join(root, 'evaluation/drbean_eval/guard'),
+  DRBEAN_EGRESS_GUARD_LOG: join(scratch, 'egress.jsonl'), LANGSMITH_TRACING: 'false' }
+let browser, browserContext, launched = false, page
+const checks = [], external = [], errors = []
+const redact = value => String(value)
+async function command(executable, args, timeout = 45000) {
+  const child = spawn(executable, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
+  let text = '', timer
+  for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { text = (text + bytes).slice(-1048576) })
+  const result = await new Promise((yes, no) => {
+    child.once('error', no); child.once('exit', code => yes(code))
+    timer = setTimeout(() => { child.kill('SIGTERM'); no(new Error('Owned launcher command timed out')) }, timeout)
+  }).finally(() => clearTimeout(timer))
+  assert.equal(result, 0, redact(text))
+  return text
+}
+async function api(path) {
+  assert.ok(browserContext || path === '/capabilities', 'Private API evidence requires the actual browser context')
+  const response = browserContext ? await browserContext.request.get(`${base}/api/bean/v1${path}`)
+    : await fetch(`${base}/api/bean/v1${path}`, { signal: AbortSignal.timeout(15000) })
+  const status = browserContext ? response.status() : response.status
+  assert.equal(status, 200, status === 200 ? '' : await response.text())
+  return response.json()
+}
+const check = name => checks.push(name)
+const waitState=async state=>{await page.waitForFunction(state=>document.querySelector('#research-status').textContent.includes(state),state,{timeout:150000})}
+const navigate=async id=>{await page.evaluate(id=>{location.hash=id},id);await page.locator('#'+id).waitFor({state:'visible'})}
+const session=async()=>{const listing=await api(`/workspaces/${workspace}/research-sessions`);return api(`/research-sessions/${listing.items[0].id}`)}
+let workspace, faultChildren=[]
+try {
+ await mkdir(output,{recursive:true});await command(python,['-m','bean_api.bootstrap']);await command(python,['scripts/dev/launcher.py','start']);launched=true
+ const caps=await api('/capabilities');assert.equal(caps.deepagents.execution_mode,'controlled');assert.equal(caps.gemini.dispatch_enabled,false)
+ browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||chromium.executablePath(),args:['--no-sandbox','--disable-background-networking']});browserContext=await browser.newContext({acceptDownloads:true,viewport:{width:1440,height:1000}});page=await browserContext.newPage();page.on('pageerror',error=>errors.push(error.message));await page.route('**/*',route=>{if(!route.request().url().startsWith(base+'/')&&!/^(blob|data):/.test(route.request().url())){external.push(route.request().url());return route.abort()}return route.continue()})
+ await page.goto(base+'/workspace-preview/');await page.getByText('Private research workspace connected',{exact:true}).waitFor();workspace=(await api('/shared-session/current')).workspace_id
+ await page.locator('#research-example').click();await page.locator('[aria-label="Concentration, reading 1"]').fill('4.81');await navigate('question');await page.locator('#accept-inputs').check();await page.locator('#start-research').click();await waitState('Waiting for your scientific approval');let s=await session();assert.equal(s.children.length,0);assert.equal(s.pending_review.kind,'plan');assert.ok(s.plan.body.steps.length);assert.ok((await api(`/research-sessions/${s.id}/events?after=-1`)).items.length)
+ check('actual-preferred-interface-creates-session-and-plan-with-one-reviewed-start-no-scientific-child-before-approval')
+ await page.locator('#approve-scope').check();await page.locator('#approve-science').click();await waitState('Investigation complete');await page.locator('#results').waitFor({state:'visible'});s=await session();assert.equal(s.children.length,1);assert.equal(s.children[0].state,'completed');assert.equal(s.reviewed_context.dataset.body.rows[0].concentration,'481/100');assert.match(await page.locator('#research-findings').innerText(),/readings do not force the claim/)
+ const first=s;await page.screenshot({path:join(output,'investigation-results.png'),fullPage:true});check('approved-real-worker-baseline-auto-opens-readable-results-bound-to-corrected-measurements')
+ const beforeChildren=s.children.length;await page.reload();await page.getByText('Private research workspace connected',{exact:true}).waitFor();await navigate('results');await page.locator('.scientific-evidence').first().waitFor();assert.equal((await api(`/research-sessions/${s.id}`)).children.length,beforeChildren);assert.equal((await api('/shared-session/current')).workspace_id,workspace);check('refresh-reopens-same-private-research-session-and-evidence-without-mutating-or-redispatch')
+ const [html]=await Promise.all([page.waitForEvent('download'),page.locator('#research-html').click()]);await html.saveAs(join(output,'investigation.html'));assert.match(await readFile(join(output,'investigation.html'),'utf8'),/What question was tested/)
+ for(const record of await api(`/research-sessions/${s.id}`).then(async x=>Promise.all(x.children.flatMap(c=>c.scenarios.map(r=>r.result_id).filter(Boolean)).map(id=>api(`/records/${id}`))))){const ref=record.body.result.artifacts[0],card=page.locator(`[data-evidence-id="${record.id}"]`);const[native]=await Promise.all([page.waitForEvent('download'),card.locator('[data-native]').first().click()]);const[anchors]=await Promise.all([page.waitForEvent('download'),card.locator('[data-anchor]').first().click()]);const n=join(output,`drbean-${ref.id}.native.json`),a=join(output,`drbean-${ref.id}.anchors.json`);await native.saveAs(n);await anchors.saveAs(a);assert.equal(createHash('sha256').update(await readFile(n)).digest('hex'),ref.sha256);const replay=JSON.parse(await command(engine,['-I','-m','counterdex','replay-native',n,'--anchors',a]));assert.equal(replay.integrity,'passed');assert.equal(replay.expected_binding,'matches');assert.equal(replay.replay,record.body.result.replay)}check('actual-preferred-ui-readable-html-native-packet-and-external-anchors-download-and-fresh-installed-replay')
+ await page.locator('#plan-measurement').click();await waitState('Waiting for your scientific approval');s=await session();assert.equal(s.pending_review.kind,'design_plan');assert.equal(s.children.length,1);await page.locator('#approve-scope').check();await page.locator('#approve-science').click();await waitState('Investigation complete');s=await session();assert.equal(s.children.length,2);assert.equal(s.children[1].kind,'design_job');assert.ok(s.children.every(c=>c.state==='completed'));check('optional-next-measurement-uses-evidence-dependent-proposal-and-distinct-canonical-design-approval')
+ await page.locator('#new-investigation').click();await page.locator('#research-example').click();await navigate('question');await page.locator('[name="targetMin"]').fill('0.015');await page.locator('[name="targetMax"]').fill('0.35');await page.locator('#accept-inputs').check();await page.locator('#start-research').click();await waitState('Waiting for your scientific approval');await page.locator('#approve-scope').check();await page.locator('#approve-science').click();await waitState('Investigation complete');await page.locator('#plan-measurement').click();await page.getByRole('heading',{name:'Clarify the next step',exact:true}).waitFor({timeout:150000});const different=await session();assert.equal(different.pending_review.kind,'research_clarification');assert.equal(different.children.length,1);assert.match(await page.locator('#research-review').innerText(),/unresolved|scientific|scope|assumptions/i);check('different-real-scientific-outcome-leads-to-clarification-rather-than-fabricated-pair-design')
+ for(const width of [390,1440]){await page.setViewportSize({width,height:1000});for(const route of ['inputs','question','investigation','results']){await navigate(route);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),route)}if(width===390)await page.screenshot({path:join(output,'research-phone.png'),fullPage:true})}check('preferred-research-views-fit-narrow-screen-and-preserve-inputs-and-results')
+ await command(python,['scripts/dev/launcher.py','stop']);launched=false;
+ const gateway=join(scratch,'fault-gateway.json');await writeFile(gateway,JSON.stringify({version:1,secret:'DRBEAN-DUMMY-'+crypto.randomUUID().replaceAll('-','').slice(0,30)}),{mode:0o600});
+ const faultEnv={...env,BEAN_DATABASE_PATH:join(scratch,'fault.sqlite3'),BEAN_BLOB_DIR:join(scratch,'fault-sources'),BEAN_ARTIFACT_DIR:join(scratch,'fault-artifacts'),BEAN_AUTH_FILE:join(scratch,'absent-auth.json'),BEAN_COUNTERDEX_PYTHON:engine,BEAN_COUNTERDEX_REPLAY_PYTHON:engine,BEAN_SCIENCE_ADAPTER:'counterdex',BEAN_LOCAL_GATEWAY_FILE:gateway,BEAN_LOCAL_BROWSER_ORIGIN:base,BEAN_ALLOWED_ORIGINS:base};
+ const startFault=(exe,args,environment)=>{const child=spawn(exe,args,{cwd:root,env:environment,stdio:['ignore','pipe','pipe']});child.tail='';for(const stream of [child.stdout,child.stderr])stream.on('data',b=>child.tail=(child.tail+b).slice(-5000));faultChildren.push(child);return child};
+ const faultApi=startFault(python,['-m','uvicorn','bean_api.main:create_app','--factory','--host','127.0.0.1','--port',String(apiPort),'--no-proxy-headers'],faultEnv);
+ for(let i=0;i<150;i++){if(faultApi.exitCode!==null)throw new Error(faultApi.tail);try{if((await fetch(`http://127.0.0.1:${apiPort}/healthz`)).ok)break}catch{}await new Promise(r=>setTimeout(r,100))}
+ startFault(process.execPath,['apps/web/serve.mjs',String(webPort)],{...faultEnv,BEAN_WEB_API_PORT:String(apiPort)});startFault(python,['workspace-preview/tests/failure_worker.py'],faultEnv);
+ for(let i=0;i<100;i++){try{if((await fetch(base+'/workspace-preview/research-service.json')).ok)break}catch{}await new Promise(r=>setTimeout(r,100))}
+ browserContext=await browser.newContext({acceptDownloads:true});page=await browserContext.newPage();page.on('pageerror',error=>errors.push(error.message));await page.route('**/*',route=>{if(!route.request().url().startsWith(base+'/')&&!/^(blob|data):/.test(route.request().url())){external.push(route.request().url());return route.abort()}return route.continue()});await page.goto(base+'/workspace-preview/');await page.getByText('Private research workspace connected',{exact:true}).waitFor();workspace=(await api('/shared-session/current')).workspace_id;await page.locator('#research-example').click();await navigate('question');await page.locator('#accept-inputs').check();await page.locator('#start-research').click();await waitState('Waiting for your scientific approval');await page.locator('#approve-scope').check();await page.locator('#approve-science').click();await waitState('Agent stopped');await page.locator('#results').waitFor({state:'visible'});const failed=await session();assert.equal(failed.state,'failed');assert.equal(failed.children.length,1);assert.equal(failed.children[0].state,'completed');assert.match(await page.locator('#research-findings').innerText(),/agent stopped/i);await page.screenshot({path:join(output,'model-failure-retained-evidence.png'),fullPage:true});
+ const card=page.locator('.scientific-evidence').first(),id=(await api(`/records/${failed.children[0].scenarios[0].result_id}`)).body.result.artifacts[0].id;const[native]=await Promise.all([page.waitForEvent('download'),card.locator('[data-native]').first().click()]);const[anchor]=await Promise.all([page.waitForEvent('download'),card.locator('[data-anchor]').first().click()]);const np=join(output,'failure.native.json'),ap=join(output,'failure.anchors.json');await native.saveAs(np);await anchor.saveAs(ap);const replay=JSON.parse(await command(engine,['-I','-m','counterdex','replay-native',np,'--anchors',ap]));assert.equal(replay.integrity,'passed');assert.equal(replay.expected_binding,'matches');assert.equal(replay.replay,'passed');const[failedHtml]=await Promise.all([page.waitForEvent('download'),page.locator('#research-html').click()]);await failedHtml.saveAs(join(output,'model-failure-retained.html'));assert.match(await readFile(join(output,'model-failure-retained.html'),'utf8'),/No canonical report|Canonical report/);await page.reload();await page.getByText('Private research workspace connected',{exact:true}).waitFor();await navigate('results');await page.locator('.scientific-evidence').first().waitFor();assert.equal((await session()).children.length,1);check('separate-controlled-post-science-model-failure-preserves-real-child-readable-report-native-replay-and-reopen');
+ assert.deepEqual(external,[]);assert.deepEqual(errors,[]);const guard=(await readFile(join(scratch,'egress.jsonl'),'utf8')).split('\n').filter(Boolean).map(JSON.parse);assert.deepEqual(guard.filter(e=>['egress_blocked','provider_client_blocked'].includes(e.kind)),[]);check('controlled-mode-zero-provider-or-external-browser-attempts')
+ await writeFile(join(output,'receipt.json'),JSON.stringify({status:'passed',checks,source:'real API/worker and controlled planning policy; no injected scientific result',provider_calls:0,first_session:first.id,different_session:different.id},null,2));console.log(JSON.stringify({status:'passed',checks},null,2))
+}catch(error){await page?.screenshot({path:join(output,'failure.png'),fullPage:true}).catch(()=>{});await writeFile(join(output,'failure.json'),JSON.stringify({error:String(error),errors,checks},null,2));throw error;}finally{await browser?.close();for(const child of faultChildren.reverse()){if(child.exitCode===null){child.kill('SIGTERM');await new Promise(resolve=>child.once('exit',resolve));}}if(launched)await command(python,['scripts/dev/launcher.py','stop']);await rm(scratch,{recursive:true,force:true})}
