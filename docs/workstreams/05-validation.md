@@ -8,11 +8,11 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 |---|---|
 | Branch | `claude/adversarial-validation` (PR #22). `main` `b8c5952` (PR #32: PRs #20 + #28 + fixes) merged in as `c51bbae`, after `cbfa5ef` as `6997efb`; nothing reverted |
 | Sprint brief | `05_Claude_Independent_Validation.md` (papers → Gemini → Deep Agents → Counterdex → design → follow-up → replay). Owner 5 deliverables are listed below with their state |
-| Final candidate | `c2803a4` (application code = `main` `b8c5952`). Record: `evaluation/results/integration/qualification-c2803a4.md`; `c51bbae` and `62704be` also passed the gate on the way |
+| Final candidate | `980a25a` (application code = `main` `b8c5952`). Record: `evaluation/results/integration/qualification-980a25a.md`; `c51bbae` and `62704be` also passed the gate on the way |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); engine CPython 3.11.17 (`.venv-engine`, identical to the source, which the application's child imports first anyway); checkout under iCloud-synced `~/Documents` |
 | AI mode | zero external model dispatch, verified by the egress guard in every lane report; live Gemini `not_run` (no user-enabled budget, no key inspected) |
 | Findings | `evaluation/findings.json` → `FINDINGS.md`. No open P0. Two open P1s, both on **unmerged** PRs: F-PAPER-CITATION-SUBSTRING (Owner 3, PR #35) and F-PAPER-RENDER-MEMORY (Owner 4, PR #36). Closed by retest on `main` `b8c5952`: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES. Open P2: F-NARRATION-OVERSUPPRESSION (narrowed), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT, F-PAPER-EXPONENT-FLATTENING (PR #35), F-TEST-VAR-LEAK, F-SIBLING-FORKS; harness H-LANE-ENGINE-PRECONDITION fixed |
-| Release gate | `gate --require release` exit 0 at `c2803a4` (`evaluation/results/gates-latest.json`), now including the required `evidence_lanes` gate. This is scientific acceptance of `main` `b8c5952` on this Mac only. It is not the paper/Gemini/Deep Agents product (not built yet), not Owner 4's G0–G4, and not live Gemini |
+| Release gate | `gate --require release` exit 0 at `980a25a` (`evaluation/results/gates-latest.json`), now including the required `evidence_lanes` gate. This is scientific acceptance of `main` `b8c5952` on this Mac only. It is not the paper/Gemini/Deep Agents product (not built yet), not Owner 4's G0–G4, and not live Gemini |
 
 ## Sprint deliverables (Owner 5) and their state
 
@@ -24,7 +24,7 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 | 4. Integration metrics (precision, coverage, citations, adaptivity) | scorer ready (`paper_scoring.py`); **no measurement yet**: no paper path, and live is `not_run` | `evaluation/drbean_eval/paper_scoring.py` |
 | 5. Ordinary-user acceptance on the final combined commit with Owner 4's launcher | **not possible yet**: no combined paper product exists (PR #34 is interface-only; PRs #33 and #35 are unwired) | — |
 | 6. Sponsor evidence matrix | **done for the current state**; truthful about what is not built or not run | `evaluation/results/sponsor-evidence.md` |
-| 7. Release judgment, gate table, rehearsal script | scientific gate for `main` passes; paper product judgment pending; rehearsal script for the current loop in the qualification record | `evaluation/results/integration/qualification-c2803a4.md` |
+| 7. Release judgment, gate table, rehearsal script | scientific gate for `main` passes; paper product judgment pending; rehearsal script for the current loop in the qualification record | `evaluation/results/integration/qualification-980a25a.md` |
 
 ## Gate evidence (current)
 
@@ -109,7 +109,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 2. **Owner 3 (before PR #35 merges):** F-PAPER-CITATION-SUBSTRING (P1). Require whole-token boundaries in the page text, not only in the quote. Then F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2). Each has a strict-xfail regression in `tests/integration/test_paper_proposal_validation.py`, which turns into a failure when fixed so the marker is retired by retest.
 3. **Owner 4:** two more development PDFs are needed to reach the brief's six: a mixed-units document (Owner 1's minutes/ng-per-mL variant from PR #33) and a missing-raw-data or graph-only document. Gold for the four delivered papers is in `evaluation/corpus/development/`.
 4. **Owner 2:** apply or review PR #36's route patch and publish the `research-agent.v1` implementation (PR #34). The paper-route, identity and resume attacks switch from NOT_AVAILABLE to HARNESS_PENDING when advertised, and Owner 5 then writes them against the published routes.
-5. **Harness (Owner 5):** after PR #33 merges, historical replay must use the engine at each packet's recorded commit, because the new engine source refuses older packets as `source_version_mismatch`.
+5. **Done (harness):** historical replay now replays a packet that the tested checker refuses as another source version with the engine extracted at the commit that produced it (`replayed_original_checker`). On the PR #33 preview, its three review-evidence packets replay this way, and only the 0.2.0 archive stays `incompatible_version`. Still open: Owner 4's full launcher start with a dummy live opt-in is `NOT_RUN`, because ports 8000/4173 are held by another running instance on this Mac (not touched); its doctor check passes.
 6. **Freeze:** when Owners 2–4 record the frozen implementation and prompt versions, reveal H1–H4 (verify the commitment `ad8a6913…`) and run them in the controlled lanes; live only within a user-enabled budget.
 7. Any later relevant code change: refresh `.venv-engine` if the engine changed, then rerun the acceptance lane, controls, the three evidence lanes and the gate on a clean candidate. Never edit the checkout during a run.
 
