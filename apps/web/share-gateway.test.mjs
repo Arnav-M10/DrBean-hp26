@@ -28,16 +28,17 @@ test('sharing accepts one explicit HTTPS tunnel origin, never a URL with credent
   }
 })
 
-test('shared gateway fails closed and preserves bearer authentication while rewriting only the approved origin', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'bean-share-')), file = join(directory, 'origin.json'), calls = []
+test('shared gateway admits only the isolated server-owned demo identity and never exposes its credential', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'bean-share-')), file = join(directory, 'origin.json'), access = join(directory, 'access.json'), calls = []
+  const demoToken = 'd'.repeat(40)
   const upstream = createServer((req, res) => {
     let body = ''; req.on('data', chunk => { body += chunk }); req.on('end', () => {
       calls.push({ headers: req.headers, method: req.method, path: req.url, body })
-      res.writeHead(req.headers.authorization ? 200 : 401, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ authenticated: Boolean(req.headers.authorization) }))
+      res.writeHead(req.headers.authorization === `Bearer ${demoToken}` ? 200 : 401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ identity: 'shared-demo' }))
     })
   })
-  const upstreamPort = await listen(upstream), gateway = createShareGateway({ originFile: file, webPort: upstreamPort })
+  const upstreamPort = await listen(upstream), gateway = createShareGateway({ originFile: file, accessFile: access, webPort: upstreamPort })
   const port = await listen(gateway)
   try {
     assert.equal((await send(port)).status, 503)
@@ -47,7 +48,13 @@ test('shared gateway fails closed and preserves bearer authentication while rewr
       assert.equal((await send(port, { headers })).status, 403)
     }
     assert.equal(calls.length, 0)
-    assert.equal((await send(port)).status, 401)
+    assert.equal((await send(port)).status, 503)
+    await writeFile(access, JSON.stringify({ token: demoToken }), { mode: 0o600 })
+    assert.equal((await send(port)).status, 200)
+    const session = await send(port, { path: '/api/bean/v1/shared-session' })
+    assert.equal(session.status, 200)
+    assert.deepEqual(JSON.parse(session.text), { mode: 'shared_demo', shared_data: true, credentials: 'server_managed' })
+    assert.equal(session.text.includes(demoToken), false)
     const result = await send(port, { method: 'POST', headers: { origin, authorization: 'Bearer test-token',
       cookie: 'unrelated=secret', 'x-forwarded-host': 'evil.test', 'content-type': 'application/json', 'idempotency-key': 'operation_one' }, body: '{"name":"Shared test"}' })
     assert.equal(result.status, 200)
@@ -56,7 +63,7 @@ test('shared gateway fails closed and preserves bearer authentication while rewr
     const call = calls.at(-1)
     assert.equal(call.headers.host, `127.0.0.1:${upstreamPort}`)
     assert.equal(call.headers.origin, `http://127.0.0.1:${upstreamPort}`)
-    assert.equal(call.headers.authorization, 'Bearer test-token')
+    assert.equal(call.headers.authorization, `Bearer ${demoToken}`)
     assert.equal(call.headers['idempotency-key'], 'operation_one')
     assert.equal(call.headers.cookie, undefined)
     assert.equal(call.headers['x-forwarded-host'], undefined)

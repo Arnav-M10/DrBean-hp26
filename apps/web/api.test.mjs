@@ -3,6 +3,15 @@ import assert from 'node:assert/strict'
 import { ApiError, BeanApi, MAX_JSON_BYTES, baselineAvailable, baselineExplanation, liveGeminiAvailable } from './api.mjs'
 import { datasetBody, problemBody, planRequest, investigationObjective } from './manual.mjs'
 
+test('shared server client sends no browser-side bearer credential', async () => {
+  const api = new BeanApi(null, async (url, options) => {
+    assert.equal(options.headers.Authorization, undefined)
+    assert.equal(options.credentials, 'omit')
+    return new Response('{}')
+  })
+  await api.json('/workspaces')
+})
+
 test('uncertain mutation retry retains its operation key and token never enters body or URL', async () => {
   const seen = []
   const api = new BeanApi('private-token', async (url, options) => {

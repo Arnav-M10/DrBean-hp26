@@ -37,8 +37,9 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
       byId('backend-error').textContent = error.message; byId('backend-error').hidden = false; byId('connection-panel').open = true
     } finally { busy = false; render() }
   }
-  async function workspaces() {
+  async function workspaces(selectFirst = false) {
     const list = await api.json('/workspaces')
+    if (selectFirst && !workspace && list.length) workspace = list[0].id
     const select = byId('workspace-select'); select.replaceChildren(node('option', 'Choose workspace')); select.firstChild.value = ''
     for (const item of list) { const o = node('option', item.name); o.value = item.id; select.append(o) }
     select.value = workspace
@@ -199,5 +200,29 @@ export function setupWorkflow(getDraft, applyReviewedFields) {
       const created = await api.json('/workspaces', { name: byId('workspace-name').value }); workspace = created.id; reset(); await workspaces()
     })
   })
-  render(); return render
+  render()
+  // The public preview supplies a restricted demo identity at its server-side
+  // gateway. Its app credential never reaches JavaScript or browser storage.
+  ;(async () => {
+    let session
+    try {
+      const result = await fetch('/api/bean/v1/shared-session', { credentials: 'omit', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(5000) })
+      if (result.status !== 200) return
+      session = await result.json()
+    } catch { return }
+    if (session?.mode !== 'shared_demo' || session.credentials !== 'server_managed') return
+    byId('connect-form').hidden = true
+    byId('connection-panel').querySelector('summary').textContent = 'Shared demo workspace'
+    byId('connection-panel').querySelector('p').textContent = 'Open and work together. Everyone with this link can see and change the demo data. Your private workspaces are separate; Gemini uses the server owner’s key and shared trial allowance.'
+    byId('connection-panel').open = true
+    await perform(async () => {
+      const candidate = new BeanApi(null)
+      const caps = await candidate.json('/capabilities')
+      if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('Unsupported shared server.')
+      await candidate.json('/workspaces')
+      api = candidate; capabilities = caps; workspace = ''; reset(); await workspaces(true)
+      byId('connection-status').textContent = 'Connected automatically to the shared demo. No API key or access token is needed.'
+    })
+  })()
+  return render
 }

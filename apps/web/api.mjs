@@ -53,7 +53,8 @@ export class BeanApi {
   constructor(token, fetcher = globalThis.fetch.bind(globalThis)) { this.#token = token; this.fetcher = fetcher }
   async request(path, body, mediaType = 'application/json', operationKey) {
     const serialized = body === undefined ? undefined : mediaType === 'application/json' ? JSON.stringify(body) : body
-    const headers = { Authorization: `Bearer ${this.#token}` }
+    const headers = {}
+    if (this.#token) headers.Authorization = `Bearer ${this.#token}`
     if (serialized !== undefined) {
       headers['Content-Type'] = mediaType
       // One operation key per distinct request. A retry of the same request reuses it, so an
