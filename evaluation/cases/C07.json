@@ -1,0 +1,287 @@
+{
+  "case_id": "C07",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "Recoverable specific state; unchanged draft/evidence; bounded permitted repair; no fixture substituted into a live lane.",
+  "synthetic_ids_only": true,
+  "title": "Provider or output failure",
+  "variants": {
+    "A": {
+      "boundary": "the provider refuses or safety-blocks the request",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "safety_block"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C07A-1",
+          "path": "state",
+          "type": "in",
+          "values": [
+            "provider_refused",
+            "provider_safety_blocked"
+          ],
+          "why": "the failure has a specific state"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07A-2",
+          "path": "recoverable",
+          "type": "eq",
+          "value": true,
+          "why": "the state is recoverable"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07A-3",
+          "path": "proposals",
+          "type": "count_eq",
+          "value": 0,
+          "why": "no proposal is admitted from a failed response"
+        },
+        {
+          "axis": "authority",
+          "id": "C07A-4",
+          "path": "fallback.fixture_substituted",
+          "type": "eq",
+          "value": false,
+          "why": "no fixture or cached success is substituted"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07A-5",
+          "path": "fallback.manual_path_available",
+          "type": "eq",
+          "value": true,
+          "why": "the manual path remains available"
+        },
+        {
+          "axis": "authority",
+          "id": "C07A-6",
+          "path": "repair_requests",
+          "type": "le",
+          "value": 1,
+          "why": "at most one permitted repair request"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07A-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07A-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C07A-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C07A-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C07A-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C07A-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C07A-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {
+          "A_max": "12/1",
+          "A_min": "1/1"
+        },
+        "source": "c01a"
+      },
+      "operation": "intake"
+    },
+    "B": {
+      "boundary": "malformed truncated output, then a timeout on the single repair",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "malformed_truncated_json"
+          },
+          {
+            "kind": "timeout"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C07B-1",
+          "path": "state",
+          "type": "in",
+          "values": [
+            "provider_timeout",
+            "provider_malformed"
+          ],
+          "why": "the failure has a specific state"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07B-2",
+          "path": "recoverable",
+          "type": "eq",
+          "value": true,
+          "why": "the state is recoverable"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07B-3",
+          "path": "proposals",
+          "type": "count_eq",
+          "value": 0,
+          "why": "no proposal is admitted from a failed response"
+        },
+        {
+          "axis": "authority",
+          "id": "C07B-4",
+          "path": "fallback.fixture_substituted",
+          "type": "eq",
+          "value": false,
+          "why": "no fixture or cached success is substituted"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07B-5",
+          "path": "fallback.manual_path_available",
+          "type": "eq",
+          "value": true,
+          "why": "the manual path remains available"
+        },
+        {
+          "axis": "authority",
+          "id": "C07B-6",
+          "path": "repair_requests",
+          "type": "le",
+          "value": 1,
+          "why": "at most one permitted repair request"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07B-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C07B-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C07B-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C07B-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C07B-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C07B-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C07B-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        },
+        {
+          "axis": "authority",
+          "id": "C07B-7",
+          "path": "usage_reconciliation",
+          "type": "eq",
+          "value": "unknown_stays_reserved",
+          "why": "a timed-out request is not assumed free"
+        }
+      ],
+      "input": {
+        "existing_draft": {
+          "A_max": "12/1",
+          "A_min": "1/1"
+        },
+        "source": "c01a"
+      },
+      "operation": "intake"
+    }
+  }
+}

@@ -1,0 +1,284 @@
+{
+  "case_id": "C05",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "Exact source binding and workspace authorization reject the substitution; no silent overwrite or private-source disclosure; current valid references remain available for repair.",
+  "synthetic_ids_only": true,
+  "title": "Attribution, scope and existing values",
+  "variants": {
+    "A": {
+      "boundary": "Unicode content; request cites a source reference left from an earlier revision",
+      "controlled": {
+        "provider_script": [
+          {
+            "cites": [
+              "stale:synthetic-src-rev1"
+            ],
+            "kind": "structured_proposals",
+            "transcribes": "c05a"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C05A-1",
+          "path": "proposals[field=methods_note].value",
+          "type": "eq",
+          "value": "Prepared with the Müller–Åström protocol, revision β; temperature 37 °C ± 0.5 °C.",
+          "why": "Unicode text is preserved without normalization"
+        },
+        {
+          "axis": "authority",
+          "id": "C05A-2",
+          "path": "source_binding.stale_reference",
+          "type": "eq",
+          "value": "rejected_stale",
+          "why": "a reference from an earlier revision is not accepted as current"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05A-3",
+          "path": "source_binding.current_reference_available",
+          "type": "eq",
+          "value": true,
+          "why": "the current valid reference stays available for repair"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05A-4",
+          "path": "state",
+          "type": "in",
+          "values": [
+            "needs_repair",
+            "review_ready"
+          ],
+          "why": "the state is recoverable"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05A-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05A-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C05A-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C05A-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C05A-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C05A-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C05A-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "request_source_refs": [
+          "current:c05a",
+          "stale:synthetic-src-rev1"
+        ],
+        "source": "c05a"
+      },
+      "operation": "intake"
+    },
+    "B": {
+      "boundary": "request substitutes a source asset owned by another workspace and proposes to overwrite a complete field",
+      "controlled": {
+        "provider_script": [
+          {
+            "cites": [
+              "foreign-workspace:synthetic-src-w2"
+            ],
+            "kind": "structured_proposals",
+            "proposes": {
+              "target_max": "1/4"
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "authority",
+          "id": "C05B-1",
+          "path": "source_binding.authorization",
+          "type": "eq",
+          "value": "denied",
+          "why": "a source from another workspace is refused"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05B-2",
+          "path": "draft_after.target_max",
+          "type": "eq",
+          "value": "17/100",
+          "why": "the complete field keeps its reviewed value"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05B-3",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "field": "target_max",
+            "status": "proposed"
+          },
+          "why": "no overwrite proposal built on the foreign source"
+        },
+        {
+          "axis": "privacy",
+          "id": "C05B-4",
+          "sentinels": [
+            "DRBEAN-OTHER-WORKSPACE-SOURCE-55d0c8"
+          ],
+          "type": "no_sentinel",
+          "why": "nothing from the other workspace's source is disclosed"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05B-5",
+          "path": "source_binding.current_reference_available",
+          "type": "eq",
+          "value": true,
+          "why": "the caller's own valid references remain usable"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05B-6",
+          "path": "state",
+          "type": "eq",
+          "value": "rejected",
+          "why": "the request is rejected, not partially applied"
+        },
+        {
+          "axis": "authority",
+          "id": "C05B-7",
+          "path": "source_binding.existence_disclosed",
+          "type": "eq",
+          "value": false,
+          "why": "the rejection does not reveal whether the foreign asset exists"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05B-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C05B-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C05B-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C05B-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C05B-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C05B-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C05B-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {
+          "target_max": "17/100",
+          "target_min": "1/10"
+        },
+        "foreign_source_contains": "DRBEAN-OTHER-WORKSPACE-SOURCE-55d0c8",
+        "request_source_refs": [
+          "foreign-workspace:synthetic-src-w2"
+        ],
+        "source": "c05a"
+      },
+      "operation": "intake"
+    }
+  }
+}

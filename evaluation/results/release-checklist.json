@@ -1,0 +1,231 @@
+{
+  "boundaries": [
+    {
+      "boundary": "Clean no-key start",
+      "evidence_checks": [
+        "clean_tree",
+        "web_unit_tests",
+        "web_manual_smoke"
+      ],
+      "gap": "Only the local web draft workspace exists. There is no backend, health probe or capability endpoint to start or probe.",
+      "id": "B01",
+      "owners": [
+        "02"
+      ],
+      "status": "partial"
+    },
+    {
+      "boundary": "Source-to-review",
+      "evidence_checks": [],
+      "gap": "No source admission, Gemini intake or source review view exists. Frozen sheets, expected transcriptions and cases C01-C05 are ready.",
+      "id": "B02",
+      "owners": [
+        "02",
+        "03"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "Web-to-backend",
+      "evidence_checks": [
+        "web_manual_smoke",
+        "harness_unit_tests"
+      ],
+      "gap": "Web side only: exported scalars are strings and parseExact agrees with the DB-SC-1 oracle. No backend or generated client exists to compare enums, errors and versions.",
+      "id": "B03",
+      "owners": [
+        "02",
+        "03"
+      ],
+      "status": "partial"
+    },
+    {
+      "boundary": "Approval-to-job",
+      "evidence_checks": [],
+      "gap": "No approval or run routes exist.",
+      "id": "B04",
+      "owners": [
+        "02"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "Accepted work/draft edit",
+      "evidence_checks": [],
+      "gap": "No runs exist.",
+      "id": "B05",
+      "owners": [
+        "02",
+        "03"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "Agent-to-science",
+      "evidence_checks": [],
+      "gap": "No deepagents runtime or Groundwork adapter exists. Cases C06, C08, C09 are ready.",
+      "id": "B06",
+      "owners": [
+        "01",
+        "02"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "Baseline-to-design",
+      "evidence_checks": [],
+      "gap": "No design routes exist.",
+      "id": "B07",
+      "owners": [
+        "01",
+        "02",
+        "03"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "Pair-to-suggestion",
+      "evidence_checks": [],
+      "gap": "No suggestion verifier exists. Oracle controls C10/C11 are ready. Checked separation is NOT advertised: the positive-margin full-stack case is marked unshipped.",
+      "id": "B08",
+      "owners": [
+        "01"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "New value-to-history",
+      "evidence_checks": [],
+      "gap": "No revisions or observation proposals exist. Case C12 is ready.",
+      "id": "B09",
+      "owners": [
+        "02",
+        "03"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "Export-to-reviewer",
+      "evidence_checks": [],
+      "gap": "The web draft download is an input record only; the editor has no reopen action and there are no reports or identities.",
+      "id": "B10",
+      "owners": [
+        "02",
+        "03"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "Fresh replay",
+      "evidence_checks": [],
+      "gap": "No checker, artifact or replay exists. Browser replay: unsupported.",
+      "id": "B11",
+      "owners": [
+        "01"
+      ],
+      "status": "unrun"
+    },
+    {
+      "boundary": "Failure-to-recovery",
+      "evidence_checks": [],
+      "gap": "No store, jobs or provider layer exists. Case C07 is ready.",
+      "id": "B12",
+      "owners": [
+        "02"
+      ],
+      "status": "unrun"
+    }
+  ],
+  "checks": {
+    "capabilities_probe": {
+      "detail": "DRBEAN_API_BASE is not set; no backend exists in this checkout",
+      "status": "unrun"
+    },
+    "clean_tree": {
+      "detail": "no untracked or modified files",
+      "status": "passed"
+    },
+    "grader_selftest": {
+      "command": "/usr/local/bin/python3 evaluation/cli.py selftest",
+      "duration_s": 0.06,
+      "exit_code": 0,
+      "status": "passed",
+      "tail": [
+        "grader self-test (harness only, not product evidence): {\"variants\": 24, \"passing_exemplars\": 24, \"failing_exemplars\": 62, \"assertions\": 289, \"exercised\": 106}"
+      ]
+    },
+    "harness_unit_tests": {
+      "command": "/usr/local/bin/python3 -W error -m unittest discover -s evaluation/tests",
+      "duration_s": 0.59,
+      "exit_code": 0,
+      "status": "passed",
+      "tail": [
+        "........................................",
+        "----------------------------------------------------------------------",
+        "Ran 40 tests in 0.512s",
+        "",
+        "OK"
+      ]
+    },
+    "manifest_verify": {
+      "command": "/usr/local/bin/python3 evaluation/cli.py verify",
+      "duration_s": 0.05,
+      "exit_code": 0,
+      "status": "passed",
+      "tail": [
+        "manifest v1: 12 cases, 24 fixture entries, 12 sources, 2 holdouts; OK"
+      ]
+    },
+    "secret_scan": {
+      "command": "/usr/local/bin/python3 scripts/release/secret_scan.py",
+      "duration_s": 0.14,
+      "exit_code": 0,
+      "status": "passed",
+      "tail": [
+        "secret scan: 0 finding(s)"
+      ]
+    },
+    "web_manual_smoke": {
+      "command": "node tests/integration/web_manual_smoke.mjs",
+      "duration_s": 0.88,
+      "exit_code": 0,
+      "status": "passed",
+      "tail": [
+        "   \"id\": \"no-credentials-in-browser-storage\",",
+        "   \"passed\": true,",
+        "   \"detail\": \"no cookies or storage\"",
+        "  }",
+        " ]",
+        "}"
+      ]
+    },
+    "web_unit_tests": {
+      "command": "node --test",
+      "duration_s": 0.08,
+      "exit_code": 0,
+      "status": "passed",
+      "tail": [
+        "# pass 11",
+        "# fail 0",
+        "# cancelled 0",
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 57.39755"
+      ]
+    }
+  },
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "recorded_at": "2026-11-14T02:22:54+00:00",
+  "release_ready": false,
+  "tally": {
+    "failed": 0,
+    "partial": 2,
+    "passed": 0,
+    "unrun": 10
+  },
+  "tested_commit": "e21c1670e0166579399a71f1be7d8ba4ea62f074",
+  "worktree_dirty": false
+}

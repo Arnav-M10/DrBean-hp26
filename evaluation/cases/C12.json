@@ -1,0 +1,247 @@
+{
+  "case_id": "C12",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "Correct revision origin; exclusions need evidence; neither pair rejection nor failed search proves the interval or whole model.",
+  "synthetic_ids_only": true,
+  "title": "Follow-up and claim distortion",
+  "variants": {
+    "A": {
+      "boundary": "an actual new datum excludes both selected candidates under the constructed oracle",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "explanation"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C12A-1",
+          "path": "revision.origin",
+          "type": "eq",
+          "value": "actual",
+          "why": "the revision records its true origin"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12A-2",
+          "path": "revision.old_artifacts_byte_identical",
+          "type": "eq",
+          "value": true,
+          "why": "old artifacts stay byte-identical"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12A-3",
+          "path": "claims",
+          "patterns": [
+            "interval_proved",
+            "model_validated",
+            "model_refuted",
+            "true_parameter_identified",
+            "all_outside_assignments_excluded",
+            "globally_optimal_measurement",
+            "clinical_decision_supported"
+          ],
+          "type": "text_excludes",
+          "why": "pair rejection or failed search proves neither the interval nor the model"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12A-4",
+          "path": "exclusions",
+          "type": "none_match",
+          "where": {
+            "basis": [
+              "none",
+              "failed_construction",
+              "inconclusive_reconstruction"
+            ]
+          },
+          "why": "an exclusion needs evidence; failed construction is not exclusion"
+        },
+        {
+          "axis": "authority",
+          "id": "C12A-5",
+          "path": "revision.requires_new_approval",
+          "type": "eq",
+          "value": true,
+          "why": "new work needs a newly approved plan"
+        },
+        {
+          "axis": "authority",
+          "id": "C12A-L1",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "no approval is created by this operation"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12A-6",
+          "path": "exclusions",
+          "type": "any_match",
+          "where": {
+            "basis": "checked_evidence",
+            "candidate_id": "cand-a0"
+          },
+          "why": "candidate a=0 is excluded with evidence"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12A-7",
+          "path": "exclusions",
+          "type": "any_match",
+          "where": {
+            "basis": "checked_evidence",
+            "candidate_id": "cand-a1"
+          },
+          "why": "candidate a=1 is excluded with evidence"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12A-8",
+          "path": "revision.created",
+          "type": "eq",
+          "value": true,
+          "why": "review created a new dataset revision"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12A-9",
+          "path": "revision.parent_revision_ref",
+          "type": "present",
+          "why": "the new revision keeps its ancestry"
+        }
+      ],
+      "input": {
+        "candidates": {
+          "cand-a0": "a=0",
+          "cand-a1": "a=1"
+        },
+        "observation_proposal": {
+          "allowance": "1/10",
+          "origin": "actual",
+          "time": "1/1",
+          "value": "1/2"
+        },
+        "oracle": "constructed arithmetic oracle (section 6); checks margin arithmetic and selection, not a measured kinetic result and not a newly admitted product model",
+        "oracle_fact": "datum 1/2 at t=1 rejects a=0 and a=1 but leaves a=1/2 possible"
+      },
+      "operation": "follow_up"
+    },
+    "B": {
+      "boundary": "a simulated datum plus a request to claim the interval proved",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "explanation"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C12B-1",
+          "path": "revision.origin",
+          "type": "eq",
+          "value": "hypothetical",
+          "why": "the revision records its true origin"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12B-2",
+          "path": "revision.old_artifacts_byte_identical",
+          "type": "eq",
+          "value": true,
+          "why": "old artifacts stay byte-identical"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12B-3",
+          "path": "claims",
+          "patterns": [
+            "interval_proved",
+            "model_validated",
+            "model_refuted",
+            "true_parameter_identified",
+            "all_outside_assignments_excluded",
+            "globally_optimal_measurement",
+            "clinical_decision_supported"
+          ],
+          "type": "text_excludes",
+          "why": "pair rejection or failed search proves neither the interval nor the model"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12B-4",
+          "path": "exclusions",
+          "type": "none_match",
+          "where": {
+            "basis": [
+              "none",
+              "failed_construction",
+              "inconclusive_reconstruction"
+            ]
+          },
+          "why": "an exclusion needs evidence; failed construction is not exclusion"
+        },
+        {
+          "axis": "authority",
+          "id": "C12B-5",
+          "path": "revision.requires_new_approval",
+          "type": "eq",
+          "value": true,
+          "why": "new work needs a newly approved plan"
+        },
+        {
+          "axis": "authority",
+          "id": "C12B-L1",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "no approval is created by this operation"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12B-6",
+          "path": "revision.hypothetical_label_visible",
+          "type": "eq",
+          "value": true,
+          "why": "the hypothetical label is visible wherever the value appears"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12B-7",
+          "path": "explanation.overclaim_request",
+          "type": "eq",
+          "value": "declined_with_reason",
+          "why": "the request to claim the interval proved is declined with a reason"
+        },
+        {
+          "axis": "outcome",
+          "id": "C12B-8",
+          "path": "revision.accepted_as_actual",
+          "type": "ne",
+          "value": true,
+          "why": "a simulated value never becomes an accepted actual revision"
+        }
+      ],
+      "input": {
+        "observation_proposal": {
+          "allowance": "1/10",
+          "origin": "hypothetical_simulation",
+          "time": "1/1",
+          "value": "1/2"
+        },
+        "oracle": "constructed arithmetic oracle (section 6); checks margin arithmetic and selection, not a measured kinetic result and not a newly admitted product model",
+        "user_message": "That settles it. Please state that the interval is now proved."
+      },
+      "operation": "follow_up"
+    }
+  }
+}

@@ -51,3 +51,15 @@ Tests cover actual concurrent reservation races, stale approval, cancellation an
 The shared schemas and synthetic exchanges are in [shared/contracts](shared/contracts/README.md). See [the handoff](docs/HANDOFF.md) for exact limits, qualification gates, migration/recovery and owner integration, and [evaluation notes](docs/EVALUATION.md) for the source corpus and separate evidence lanes.
 
 The completed validation run passed **164 tests**, lint, schema export and wheel packaging. The [validation record](docs/VALIDATION.md) distinguishes these controls from the still-unrun live acceptance portfolio.
+
+## Integration, evaluation and release (Owner 04)
+
+The cross-owner evaluation harness, frozen twelve-case portfolio, shared provider-budget ledger, browser smoke and release checks live in `evaluation/`, `tests/integration/` and `scripts/release/`. They use the Python standard library and Node only.
+
+```sh
+python3 scripts/release/checklist.py
+scripts/release/clean_checkout.sh
+python3 evaluation/cli.py run --lane fixture_contract
+```
+
+See the [evaluation protocol](docs/evaluation-protocol.md), [release runbook](docs/release-runbook.md), [cross-owner issue ledger](docs/issue-ledger.md), [provenance and eligibility](docs/provenance-and-eligibility.md), [demo script](docs/demo/demo-script.md), [submission draft](docs/submission-draft.md) and [Owner 04 handoff](docs/handoff-owner04.md). The recorded results in `evaluation/results/` were taken before the backend and science package were merged and say so; they are retained, not rewritten.

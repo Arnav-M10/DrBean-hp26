@@ -1,0 +1,261 @@
+{
+  "case_id": "C02",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "No invented bounds; a focused question or explicit choice; unresolved input cannot authorize computation.",
+  "synthetic_ids_only": true,
+  "title": "Missing or conflicting interval",
+  "variants": {
+    "A": {
+      "boundary": "the claim cites a literature range without numbers",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "structured_proposals",
+            "transcribes": "c02a"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C02A-1",
+          "path": "state",
+          "type": "eq",
+          "value": "needs_clarification",
+          "why": "unresolved interval needs clarification"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02A-2",
+          "path": "proposals[field=target_min].value",
+          "type": "absent",
+          "why": "no lower bound is invented or silently chosen"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02A-3",
+          "path": "proposals[field=target_max].value",
+          "type": "absent",
+          "why": "no upper bound is invented or silently chosen"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02A-4",
+          "path": "questions",
+          "type": "any_match",
+          "where": {
+            "topic": "target_interval"
+          },
+          "why": "a focused question asks for the interval"
+        },
+        {
+          "axis": "authority",
+          "id": "C02A-5",
+          "path": "plan_attempt.accepted",
+          "type": "eq",
+          "value": false,
+          "why": "unresolved input cannot be frozen into a plan"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02A-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02A-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C02A-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C02A-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C02A-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C02A-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C02A-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "source": "c02a",
+        "then": "attempt_plan_freeze"
+      },
+      "operation": "intake"
+    },
+    "B": {
+      "boundary": "two cited sources give conflicting intervals",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "structured_proposals",
+            "transcribes": "c02b"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C02B-1",
+          "path": "state",
+          "type": "eq",
+          "value": "needs_clarification",
+          "why": "unresolved interval needs clarification"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02B-2",
+          "path": "proposals[field=target_min].value",
+          "type": "absent",
+          "why": "no lower bound is invented or silently chosen"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02B-3",
+          "path": "proposals[field=target_max].value",
+          "type": "absent",
+          "why": "no upper bound is invented or silently chosen"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02B-4",
+          "path": "questions",
+          "type": "any_match",
+          "where": {
+            "kind": "explicit_choice",
+            "topic": "target_interval"
+          },
+          "why": "the conflict is offered as an explicit choice"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02B-6",
+          "path": "questions[topic=target_interval].options",
+          "type": "count_eq",
+          "value": 2,
+          "why": "both attributed intervals are offered"
+        },
+        {
+          "axis": "authority",
+          "id": "C02B-5",
+          "path": "plan_attempt.accepted",
+          "type": "eq",
+          "value": false,
+          "why": "unresolved input cannot be frozen into a plan"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02B-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C02B-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C02B-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C02B-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C02B-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C02B-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C02B-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "source": "c02b",
+        "then": "attempt_plan_freeze"
+      },
+      "operation": "intake"
+    }
+  }
+}

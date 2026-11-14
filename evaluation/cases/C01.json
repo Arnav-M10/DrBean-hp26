@@ -1,0 +1,357 @@
+{
+  "case_id": "C01",
+  "contract": {
+    "revision": "GF-2",
+    "wire_profile": "DB-SC-1"
+  },
+  "required_observation": "Accurate inspectable proposals; populated exact fields stay unchanged; accepted review produces the expected normalized draft.",
+  "synthetic_ids_only": true,
+  "title": "Complete source",
+  "variants": {
+    "A": {
+      "boundary": "baseline layout; empty draft",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "structured_proposals",
+            "transcribes": "c01a"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C01A-1",
+          "path": "state",
+          "type": "eq",
+          "value": "review_ready",
+          "why": "a readable complete source yields a reviewable proposal set"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01A-2",
+          "path": "proposals[field=target_min].value",
+          "type": "eq",
+          "value": "1/10",
+          "why": "target lower bound transcribed exactly"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01A-3",
+          "path": "proposals[field=target_max].value",
+          "type": "eq",
+          "value": "17/100",
+          "why": "target upper bound transcribed exactly"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01A-4",
+          "path": "proposals[field=row4_concentration].value",
+          "type": "eq",
+          "value": "534984763/100000000",
+          "why": "eight-decimal concentration is exact, not a binary float"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01A-5",
+          "path": "proposals[field=ke_max].value",
+          "type": "eq",
+          "value": "3/10",
+          "why": "decimal 0.3 becomes the reduced rational 3/10"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01A-6",
+          "path": "proposals",
+          "type": "any_match",
+          "where": {
+            "field": "row1_allowance",
+            "semantics": "hard_bound",
+            "status": "proposed",
+            "unit": "mg/L",
+            "value": "1/10"
+          },
+          "why": "hard allowance keeps its value, unit and hard-bound meaning"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01A-7",
+          "path": "reviewed_draft",
+          "type": "eq",
+          "value": {
+            "A_max": "12/1",
+            "A_min": "1/1",
+            "ka_max": "2/1",
+            "ka_min": "1/2",
+            "ke_max": "3/10",
+            "ke_min": "1/10",
+            "model_template": "two_rate_absorption_elimination",
+            "row1_allowance": "1/10",
+            "row1_concentration": "172428641/100000000",
+            "row1_time": "1/4",
+            "row2_allowance": "1/10",
+            "row2_concentration": "149153379/50000000",
+            "row2_time": "1/2",
+            "row3_allowance": "1/10",
+            "row3_concentration": "28178207/6250000",
+            "row3_time": "1/1",
+            "row4_allowance": "1/10",
+            "row4_concentration": "534984763/100000000",
+            "row4_time": "2/1",
+            "row5_allowance": "1/10",
+            "row5_concentration": "17240533/4000000",
+            "row5_time": "4/1",
+            "target_max": "17/100",
+            "target_min": "1/10"
+          },
+          "why": "accepting the review yields exactly the expected normalized draft"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01A-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01A-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C01A-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C01A-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C01A-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C01A-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C01A-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        }
+      ],
+      "input": {
+        "existing_draft": {},
+        "review": "accept_all",
+        "source": "c01a"
+      },
+      "operation": "intake"
+    },
+    "B": {
+      "boundary": "two-column layout and harmless wording; two exact fields already populated",
+      "controlled": {
+        "provider_script": [
+          {
+            "kind": "structured_proposals",
+            "transcribes": "c01b"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "axis": "outcome",
+          "id": "C01B-1",
+          "path": "state",
+          "type": "eq",
+          "value": "review_ready",
+          "why": "a readable complete source yields a reviewable proposal set"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-2",
+          "path": "proposals[field=target_min].value",
+          "type": "eq",
+          "value": "1/10",
+          "why": "target lower bound transcribed exactly"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-3",
+          "path": "proposals[field=target_max].value",
+          "type": "eq",
+          "value": "17/100",
+          "why": "target upper bound transcribed exactly"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-4",
+          "path": "proposals[field=row4_concentration].value",
+          "type": "eq",
+          "value": "534984763/100000000",
+          "why": "eight-decimal concentration is exact, not a binary float"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-5",
+          "path": "proposals[field=ke_max].value",
+          "type": "eq",
+          "value": "3/10",
+          "why": "decimal 0.3 becomes the reduced rational 3/10"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-6",
+          "path": "proposals",
+          "type": "any_match",
+          "where": {
+            "field": "row1_allowance",
+            "semantics": "hard_bound",
+            "status": "proposed",
+            "unit": "mg/L",
+            "value": "1/10"
+          },
+          "why": "hard allowance keeps its value, unit and hard-bound meaning"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-7",
+          "path": "reviewed_draft",
+          "type": "eq",
+          "value": {
+            "A_max": "12/1",
+            "A_min": "1/1",
+            "ka_max": "2/1",
+            "ka_min": "1/2",
+            "ke_max": "3/10",
+            "ke_min": "1/10",
+            "model_template": "two_rate_absorption_elimination",
+            "row1_allowance": "1/10",
+            "row1_concentration": "172428641/100000000",
+            "row1_time": "1/4",
+            "row2_allowance": "1/10",
+            "row2_concentration": "149153379/50000000",
+            "row2_time": "1/2",
+            "row3_allowance": "1/10",
+            "row3_concentration": "28178207/6250000",
+            "row3_time": "1/1",
+            "row4_allowance": "1/10",
+            "row4_concentration": "534984763/100000000",
+            "row4_time": "2/1",
+            "row5_allowance": "1/10",
+            "row5_concentration": "17240533/4000000",
+            "row5_time": "4/1",
+            "target_max": "17/100",
+            "target_min": "1/10"
+          },
+          "why": "accepting the review yields exactly the expected normalized draft"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-S1",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_ref": null,
+            "status": "proposed"
+          },
+          "why": "every proposed value carries an inspectable source locator"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-S2",
+          "path": "proposals",
+          "type": "none_match",
+          "where": {
+            "source_label": "source_verified"
+          },
+          "why": "a visual locator is not proof of a correct reading"
+        },
+        {
+          "after": "draft_after",
+          "axis": "outcome",
+          "before": "draft_before",
+          "id": "C01B-S3",
+          "type": "unchanged",
+          "why": "intake does not mutate the draft; only review does"
+        },
+        {
+          "axis": "authority",
+          "id": "C01B-L1",
+          "path": "provider_requests",
+          "type": "le",
+          "value": 2,
+          "why": "GF-2: at most two provider requests per intake"
+        },
+        {
+          "axis": "authority",
+          "id": "C01B-L2",
+          "path": "proposals",
+          "type": "count_le",
+          "value": 50,
+          "why": "GF-2: at most 50 proposed fields"
+        },
+        {
+          "axis": "authority",
+          "id": "C01B-L3",
+          "path": "approvals_created",
+          "type": "eq",
+          "value": 0,
+          "why": "intake never creates an approval"
+        },
+        {
+          "axis": "authority",
+          "id": "C01B-L4",
+          "path": "computation_authorized",
+          "type": "eq",
+          "value": false,
+          "why": "intake alone never authorizes computation"
+        },
+        {
+          "axis": "outcome",
+          "id": "C01B-8",
+          "path": "draft_after.A_max",
+          "type": "eq",
+          "value": "12/1",
+          "why": "a populated exact field stays unchanged"
+        }
+      ],
+      "input": {
+        "existing_draft": {
+          "A_max": "12/1",
+          "A_min": "1/1"
+        },
+        "review": "accept_all",
+        "source": "c01b"
+      },
+      "operation": "intake"
+    }
+  }
+}
