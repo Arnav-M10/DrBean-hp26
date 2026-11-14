@@ -6,6 +6,15 @@ Standard-library Python, run with CPython 3.11. Owner: Workstream 5 (independent
 
 ## Integrated acceptance checkpoint
 
+The final source commit `159fd65303c5ff87a14dfa616f88dbd5a76777b5` was
+qualified again after the explanatory-text corrections: all seven ordinary HTTP
+entries and all 22 native controls passed on a clean tree. The
+[independent scientific gate](results/integration/159fd65-science-gate.json)
+passes every required check, including append-only integrity, adverse controls,
+supported-host execution, verified zero model dispatch and no unresolved P0.
+The latest [report](results/REPORT.md) includes all 112 historical attempts.
+Subsequent changes in this checkpoint only record this evidence and its summary.
+
 Source `d821202b339ed60720e3c919d6be47e450e3b894` passed all seven
 `offline_real_science` HTTP entries and all 22 native controls on a clean macOS
 worktree, using the locked backend Python 3.13.18 and installed Counterdex 0.3.0
