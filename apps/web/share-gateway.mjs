@@ -84,7 +84,7 @@ export function createShareGateway({ originFile, gatewayFile, webPort = 4173, ap
     // top-level entry document gets this exception; its API and subresource
     // requests must still originate from the approved page.
     const entryNavigation = ['GET', 'HEAD'].includes(request.method)
-      && ['/', '/index.html'].includes(request.url?.split('?')[0])
+      && ['/', '/index.html', '/workspace-preview/', '/workspace-preview/index.html'].includes(request.url?.split('?')[0])
       && request.headers['sec-fetch-mode'] === 'navigate' && request.headers['sec-fetch-dest'] === 'document'
     if (request.headers.host !== origin.host || request.headers['x-forwarded-proto'] !== 'https'
       || (request.headers['x-forwarded-host'] && request.headers['x-forwarded-host'] !== origin.host)

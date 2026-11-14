@@ -53,6 +53,7 @@ jobs:
         run: |
           export BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python"
           export PATH="$PWD/.venv-engine/bin:$PATH"   # some tests look up python3.11 on PATH
+          export PYTHONPATH="$PWD/packages/counterdex_models"  # exercise the current-source numerical adapter
           uv run pytest -q tests --ignore=tests/integration -rs
       - run: uv run ruff check apps tests scripts
       - name: exported schemas match the committed ones
@@ -163,6 +164,8 @@ jobs:
       - name: private sessions through actual HTTPS gateway and API
         if: always()
         run: node tests/integration/shared-session-browser.mjs
+      - name: private model comparison transport with actual numerical computation
+        run: node tests/integration/model_comparison_browser.mjs --results /tmp/drbean-comparison-browser-evidence
       - name: ordinary Deep Agents browser investigation and separate checked pair-design
         run: |
           export NODE_PATH="$PWD/tests/integration/node_modules"

@@ -60,6 +60,16 @@ function repeatedHeader(request) {
   return [...counts.values()].some(count => count > 1);
 }
 const routes = new Map([
+  ['/workspace-preview/', ['../../workspace-preview/index.html', 'text/html']],
+  ['/workspace-preview/index.html', ['../../workspace-preview/index.html', 'text/html']],
+  ['/workspace-preview/app.mjs', ['../../workspace-preview/app.mjs', 'text/javascript']],
+  ['/workspace-preview/styles.css', ['../../workspace-preview/styles.css', 'text/css']],
+  ['/workspace-preview/reference.json', ['../../workspace-preview/reference.json', 'application/json']],
+  ['/workspace-preview/examples/synthetic.request.json', ['../../fixtures/model-comparison/synthetic.request.json', 'application/json']],
+  ['/workspace-preview/examples/synthetic.response.json', ['../../fixtures/model-comparison/synthetic.response.json', 'application/json']],
+  ['/workspace-preview/examples/request.schema.json', ['../../fixtures/model-comparison/request.schema.json', 'application/json']],
+  ['/workspace-preview/examples/result.schema.json', ['../../fixtures/model-comparison/result.schema.json', 'application/json']],
+  ['/comparison-api.mjs', ['comparison-api.mjs', 'text/javascript']],
   ['/examples/controlled-source.png', ['../../fixtures/intake/clean.png', 'image/png']],
   ['/', ['index.html', 'text/html']],
   ['/index.html', ['index.html', 'text/html']],
@@ -165,6 +175,19 @@ const server = createServer(async (request, response) => {
   }
 
   const [path] = request.url.split('?');
+  if (path === '/workspace-preview/comparison-service.json') {
+    // Only this application server declares the trusted transport. A standalone
+    // static preview cannot acquire API authority by changing this manifest;
+    // the connector still confirms the private session and backend capability.
+    const bytes = Buffer.from(JSON.stringify({
+      schema_version: 'DB-MODEL-COMPARISON-CONNECTION-1', available: true,
+      mode: 'private_session', module: '/comparison-api.mjs',
+      request_schema: 'DB-MODEL-COMPARISON-1', result_schema: 'DB-MODEL-COMPARISON-RESULT-1',
+    }));
+    response.writeHead(200, { ...SAFE_HEADERS, 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': bytes.length });
+    response.end(request.method === 'HEAD' ? undefined : bytes);
+    return;
+  }
   const file = routes.get(path);
   if (!file) {
     response.writeHead(404).end();
