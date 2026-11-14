@@ -2,8 +2,8 @@
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
   "updated_at": "2026-11-14",
-  "application_code_commit": "9cc90e0 (origin/main incl. PR #6 browser-baseline, #7 Owner 4, #8 this branch to 4ea7cb3)",
-  "observed_at_harness_commit": "3b55843",
+  "application_code_commit": "80f95a454ec95248690c6aeee1652886741340fc",
+  "observed_at_harness_commit": "f992b48",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -30,6 +30,17 @@
             "results": "evaluation/results/previews/backend-followup-8525cab/relax_nproc+science_barrier",
             "attempts": [
               "att_3cf444719093428e"
+            ]
+          }
+        },
+        {
+          "at_commit": "merged main 80f95a4 via harness b827c61 and f992b48 (diagnostics relax_nproc + science_barrier)",
+          "result": "Still reproduces on main, twice: the scientific child survives the worker SIGKILL and `worker --recover` (the run is correctly marked interrupted and not redispatched). Running cancellation still kills its child. Since f992b48 the harness terminates the orphan before releasing the barrier (H-ORPHAN-TEARDOWN).",
+          "evidence": {
+            "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier",
+            "attempts": [
+              "att_d0b306605a744db4",
+              "att_593e67a5ca214685"
             ]
           }
         }
@@ -122,7 +133,7 @@
       "id": "F-BASELINE-DISCOVERY",
       "severity": "P0",
       "owner": "1 (producer) and 2 (adapter wiring)",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "Counterdex has no bounded baseline candidate-discovery operation (investigate)",
       "minimal_input": "evaluation/cases/science/hero-v1.json",
       "command": "PYTHONPATH=packages/groundwork_adapter python3.11 -c 'import counterdex; print(counterdex.__all__)'",
@@ -152,6 +163,16 @@
           "evidence": {
             "results": "evaluation/results/previews/main-8bb1fbe/relax_nproc"
           }
+        },
+        {
+          "at_commit": "merged main 80f95a4 (PR #9 + PR #11) via harness b827c61; diagnostic relax_nproc only (F-MAC-NPROC blocks every non-diagnostic run on this Mac)",
+          "result": "Closed by retest: real bounded discovery on main returns a certified counterexample with an individually compatible strict outside candidate and a designable pair. neighbouring entries in the same run: RS-HERO-FULL, RS-CHANGED-INPUT, RS-RETRY-CONCURRENT, RS-DESIGN-AUTHORITY, RS-FOLLOWUP, RS-ZERO-DISPATCH all pass.",
+          "evidence": {
+            "results": "evaluation/results/previews/main-b827c61/relax_nproc",
+            "attempts": [
+              "att_1ace0e6c87124367"
+            ]
+          }
         }
       ]
     },
@@ -159,7 +180,7 @@
       "id": "F-NATIVE-BYTES",
       "severity": "P0",
       "owner": "2 (bytes, anchor record) and 1 (complete packet)",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "No authenticated route returns native packet bytes; /artifacts/{id} serves the entity envelope; records expose no scientific anchors",
       "minimal_input": "any completed run with ArtifactReference entries",
       "command": "RS-HERO-FULL checks baseline_native_bytes_downloadable and *_anchor_from_authenticated_record",
@@ -190,6 +211,16 @@
           "evidence": {
             "results": "evaluation/results/previews/main-8bb1fbe/relax_nproc"
           }
+        },
+        {
+          "at_commit": "merged main 80f95a4 (PR #9 + PR #11) via harness b827c61; diagnostic relax_nproc only (F-MAC-NPROC blocks every non-diagnostic run on this Mac)",
+          "result": "Closed by retest: baseline and design native packets download byte-exact with their reference digests, carry complete application anchors from GET /artifacts/{id}/anchor and replay fresh; altered-byte and wrong-anchor controls are rejected. neighbouring entries in the same run: RS-HERO-FULL, RS-CHANGED-INPUT, RS-RETRY-CONCURRENT, RS-DESIGN-AUTHORITY, RS-FOLLOWUP, RS-ZERO-DISPATCH all pass.",
+          "evidence": {
+            "results": "evaluation/results/previews/main-b827c61/relax_nproc",
+            "attempts": [
+              "att_1ace0e6c87124367"
+            ]
+          }
         }
       ]
     },
@@ -197,7 +228,7 @@
       "id": "F-FOLLOWUP-FEEDBACK",
       "severity": "P0",
       "owner": "2 (design-bound follow-up, PR #11) and 1 (wider native admission)",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "No application route reports candidate-specific outcomes for the prior pair after a hypothetical reading",
       "minimal_input": "hero design pair + hypothetical 3.4 / 4.57 / 4.0 mg/L at the selected time, allowance 0.2",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --only RS-HERO-FULL RS-FOLLOWUP",
@@ -241,6 +272,16 @@
             "attempts": [
               "att_158c6358ca2b4d49",
               "att_9a4ac710315648c6"
+            ]
+          }
+        },
+        {
+          "at_commit": "merged main 80f95a4 (PR #9 + PR #11) via harness b827c61; diagnostic relax_nproc only (F-MAC-NPROC blocks every non-diagnostic run on this Mac)",
+          "result": "Closed by retest of the original repro: the design-bound follow-up on main re-checks the original pair on all three readings; application, fresh native replay and the independent oracle agree per candidate; tampered, substituted and foreign scopes are refused. neighbouring entries in the same run: RS-HERO-FULL, RS-CHANGED-INPUT, RS-RETRY-CONCURRENT, RS-DESIGN-AUTHORITY, RS-FOLLOWUP, RS-ZERO-DISPATCH all pass. Release acceptance on this Mac still waits on F-MAC-NPROC, tracked there.",
+          "evidence": {
+            "results": "evaluation/results/previews/main-b827c61/relax_nproc",
+            "attempts": [
+              "att_3adc20dee66049ee"
             ]
           }
         }
@@ -501,6 +542,17 @@
             ],
             "results": "evaluation/results, evaluation/results/owner4-launcher, evaluation/results/owner4-launcher/relax_nproc"
           }
+        },
+        {
+          "at_commit": "merged main 80f95a4 via harness b827c61",
+          "result": "Unchanged on both launch paths (harness and Owner 4's launcher): hero and changed-input baselines fail with scientific_runtime_unavailable. It is now the only blocker between this Mac and release acceptance of the hero, design and follow-up path, which pass in full when only this guard is relaxed.",
+          "evidence": {
+            "attempts": [
+              "att_568062c9c3434610",
+              "att_98ac5a9ee88048d1",
+              "att_1ace0e6c87124367"
+            ]
+          }
         }
       ]
     },
@@ -578,7 +630,7 @@
       "id": "F-DESIGN-SOURCE-ARTIFACTS",
       "severity": "P1",
       "owner": "2 (projection) and 1 (engine reuse format)",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation",
       "minimal_input": "hero-v2 on backend/browser-baseline cc779bf: discovered pair, grid [6,8] h, allowance 1/5, horizon 8, construction+continuation, source_artifact_ids=[baseline native artifact]",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <worktree of backend/browser-baseline> --diagnostic relax_nproc --results evaluation/results/previews/x --only RS-HERO-FULL",
@@ -601,6 +653,16 @@
           "result": "Fixed on that branch: the documented design with source artifact ids reaches checked_pair_separation (selected 8 h, strictly positive exact margin) and both native packets pass fresh replay; RS-HERO-FULL passes with 33/33 qualifier re-checks. Close after merge and a non-diagnostic run.",
           "evidence": {
             "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"
+          }
+        },
+        {
+          "at_commit": "merged main 80f95a4 (PR #9 + PR #11) via harness b827c61; diagnostic relax_nproc only (F-MAC-NPROC blocks every non-diagnostic run on this Mac)",
+          "result": "Closed by retest: the documented design request WITH source_artifact_ids now returns checked_pair_separation at 8/1 with a strictly positive exact margin, valid verification and fresh replay of both packets; no isolation probe was needed. neighbouring entries in the same run: RS-HERO-FULL, RS-CHANGED-INPUT, RS-RETRY-CONCURRENT, RS-DESIGN-AUTHORITY, RS-FOLLOWUP, RS-ZERO-DISPATCH all pass.",
+          "evidence": {
+            "results": "evaluation/results/previews/main-b827c61/relax_nproc",
+            "attempts": [
+              "att_1ace0e6c87124367"
+            ]
           }
         }
       ]
@@ -767,7 +829,7 @@
       "id": "H-ORPHAN-TEARDOWN",
       "severity": "P1",
       "owner": "5",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "Harness teardown let an orphaned scientific computation resume and outlive the run",
       "minimal_input": "RS-CANCEL-RESTART with --diagnostic relax_nproc --diagnostic science_barrier on merged main b827c61",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --diagnostic relax_nproc --diagnostic science_barrier --results <dir> --only RS-CANCEL-RESTART",
@@ -777,7 +839,18 @@
       "evidence": {
         "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier (first attempt)"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "f992b48 on merged main 80f95a4",
+          "result": "the orphan (spawn child) was terminated before the barrier release; teardown found nothing left and no stack process outlived the CLI",
+          "evidence": {
+            "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier",
+            "attempts": [
+              "att_593e67a5ca214685"
+            ]
+          }
+        }
+      ]
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14.",
