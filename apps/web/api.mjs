@@ -96,7 +96,7 @@ export function baselineAvailable(capabilities) {
 }
 
 export function baselineExplanation(result) {
-  if (result.native_replay?.operation === 'review') {
+  if (['review', 'recheck'].includes(result.native_replay?.operation)) {
     if (result.verification !== 'valid' || result.expected_binding !== 'matches' || result.replay !== 'passed') {
       return 'Follow-up checking is incomplete or its evidence does not match. Inspect the recorded candidate states and reason before drawing a conclusion.'
     }

@@ -103,7 +103,7 @@ export function setupWorkflow(getDraft) {
           }
           table.append(head, body); region.append(table); investigations.append(node('p', 'Computed candidate parameters are exact rational values. Each candidate remains bound to this reviewed problem.'), region)
         }
-        if (result.native_replay?.operation === 'review') {
+        if (['review', 'recheck'].includes(result.native_replay?.operation)) {
           investigations.append(node('h4', 'Follow-up candidate checks'), node('p', `Observation origin: ${result.native_replay.dataset_origin ?? 'not supplied'}. This review retains the original candidate identities.`))
           const region = node('div', ''); region.className = 'table-region'; region.tabIndex = 0
           region.setAttribute('role', 'region'); region.setAttribute('aria-label', 'Follow-up candidate checks')
