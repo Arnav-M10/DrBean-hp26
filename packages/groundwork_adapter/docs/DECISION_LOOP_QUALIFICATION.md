@@ -1,5 +1,10 @@
 # Scientific decision-loop qualification
 
+This is the retained **`f713635`** review. The later normal-source-API and
+follow-up-download integration is qualified in
+[Integrated source-to-science review](INTEGRATED_SOURCE_LOOP_REVIEW.md).
+Its resolved findings do not retroactively change the evidence below.
+
 Owner 1, November 14, 2026. Reviewed candidate:
 **`f71363589ad5370cabbf99bfaf96c8a2d11e57db`**, [product PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27),
 including main **`2d2993d1a264d0128a0ea4af8f02010b263016ad`**.

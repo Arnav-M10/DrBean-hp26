@@ -1,7 +1,8 @@
 # Current scientific integration review
 
-The newer review of main `2d2993d` and product candidate `f713635`, including
-declared actual follow-ups, is [Decision-loop qualification](DECISION_LOOP_QUALIFICATION.md).
+The current review of main `2d2993d`, backend `42f92b1` and product `31a8ed3`,
+tested after integration at `5507519`, is
+[Integrated source-to-science qualification](INTEGRATED_SOURCE_LOOP_REVIEW.md).
 The evidence below is retained as the historical backend-integration review;
 its checks and browser handoffs are not silently relabelled as current results.
 

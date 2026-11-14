@@ -2,7 +2,43 @@
 
 Owner: Person 1 / Counterdex.
 
-## Current review — final scientific loop and browser integration
+## Current review — normal-source API and final follow-up replay
+
+Owner 4 supplied combined product `31a8ed3c9b66ed721cf2f37179ab3fe62ebe0d09`,
+including Owner 2's `42f92b1b07f52f4336cc4449928bc781e30ae0fe` normal controlled
+source API and stale-context safeguards. Merged their actual authored history
+into the isolated owner evidence branch as
+**`5507519cb0bd12cd3b18acd3ff87ed643470d84e`** and tested that clean resulting
+commit. No production scientific code or test was changed.
+
+New exact-merge results: **7/7 ordinary HTTP**, **22/22 native controls**, all
+required offline scientific gate predicates, and genuinely unresolved own-time
+actual-declaration HTTP/download/fresh replay **passed in 2.92 s**. Installed
+supervisor, four-outcome bridge and authoritative DTO checks separately passed.
+Runtime remains matching Counterdex 0.3.0 / CPython 3.11.17, source `90b42ae…b7bf8`;
+backend is Python 3.13.18. The preceding separate backend component passed 102
+source-boundary/provider/materialization cases on macOS. Its result is distinct
+from this combined acceptance and uses only a parent pytest socket guard.
+
+Full strict fresh-clone qualification on exact `5507519` passed all 23 checks,
+five configured gates and 12 configured boundaries: **619 backend**, **47 HTTP**,
+**31 web unit**, full engine/harness suites, **32/32 stack launch-path checks**,
+and both browser observation-origin modes. Matching native bytes and external
+anchors replay freshly. The two conditional engine skips are covered by the
+separate installed-supervisor and backend DTO passes on this same merge.
+
+The normal authenticated source-proposal route replaces the storage-writing
+fixture helper; final browser follow-up native download/replay is now connected.
+Those prior missing joins are resolved. Remaining Owner 4 work: preserve the
+custom source-plan question, cover no-separation-parent entry and assert exact
+survivor/vector/history semantics with separate reconnect/reopen acceptance.
+No additional Owner 2 scientific defect found. Owner 3 narration #28 and Claude's
+independent acceptance of the combined candidate remain separate. The engine is
+frozen and the scientific side is ready for browser completion; this is not a
+blanket product-release claim. Gemini stays disabled and model-provider calls
+remain zero. [Exact current evidence and handoff](../../packages/groundwork_adapter/docs/INTEGRATED_SOURCE_LOOP_REVIEW.md).
+
+## Historical review — browser candidate before normal-source integration
 
 Reviewed current main **`2d2993d1a264d0128a0ea4af8f02010b263016ad`** and
 product [PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27), advancing the
