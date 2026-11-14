@@ -45,14 +45,15 @@ export class BeanApi {
   #token
   #keys = new Map()
   constructor(token, fetcher = globalThis.fetch.bind(globalThis)) { this.#token = token; this.fetcher = fetcher }
-  async request(path, body) {
-    const serialized = body === undefined ? undefined : JSON.stringify(body)
+  async request(path, body, mediaType = 'application/json') {
+    const serialized = body === undefined ? undefined : mediaType === 'application/json' ? JSON.stringify(body) : body
     const headers = { Authorization: `Bearer ${this.#token}` }
     if (serialized !== undefined) {
-      headers['Content-Type'] = 'application/json'
+      headers['Content-Type'] = mediaType
       // One operation key per distinct request. A retry of the same request reuses it, so an
       // uncertain outcome can be resolved without creating a second operation.
-      const operation = path + '\n' + serialized
+      const identity = mediaType === 'application/json' ? serialized : Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', serialized)), b => b.toString(16).padStart(2, '0')).join('')
+      const operation = path + '\n' + mediaType + '\n' + identity
       if (!this.#keys.has(operation)) this.#keys.set(operation, crypto.randomUUID())
       headers['Idempotency-Key'] = this.#keys.get(operation)
     }
@@ -78,6 +79,11 @@ export class BeanApi {
     return response
   }
   async json(path, body) { return parseJson(await readBounded(await this.request(path, body), MAX_JSON_BYTES)) }
+  async uploadSource(workspace, file, origin) {
+    if (!['image/png', 'image/jpeg'].includes(file.type) || file.size < 1 || file.size > 5242880) throw new Error('Choose a PNG or JPEG up to 5 MiB.')
+    if (!['synthetic', 'public'].includes(origin)) throw new Error('Declare synthetic or public source origin.')
+    return parseJson(await readBounded(await this.request(`/workspaces/${encodeURIComponent(workspace)}/source-assets?origin=${origin}&retention=retain`, await file.arrayBuffer(), file.type), MAX_JSON_BYTES))
+  }
   // A matching digest shows the bytes arrived intact and are the selected object; it is not a scientific check.
   async download(path, expected = {}) {
     const response = await this.request(path)

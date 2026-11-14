@@ -386,7 +386,7 @@ class ControlledSourceProposer:
     def capabilities(self) -> dict[str, Any]:
         return {"provider": "controlled_source_fixtures", "execution_mode": "controlled",
                 "dispatch_enabled": False, "live_qualification": "not_run",
-                "application_review_integration": "unavailable_pending_contract"}
+                "application_review_integration": "requires_intake_service"}
 
     def prepare(self, *, source_asset_id: str, metadata: dict[str, Any], source_bytes: bytes,
                 current_revision_id: str | None = None, notes: str = "",
@@ -428,7 +428,7 @@ class ControlledSourceProposer:
             "live_qualification": "not_run", "lookup_method": "frozen_fixture_lookup",
             "fixture_version": "controlled-source-fixtures.v1",
             "fixture_review_status": "pending_independent_owner_review",
-            "application_review_integration": "unavailable_pending_contract",
+            "application_review_integration": "requires_intake_service",
             "source_asset_id": source_asset_id, "source_digest": admitted.sha256,
             "observed_source_digest": observed_digest, "width": admitted.width, "height": admitted.height,
             "current_revision_id": current_revision_id, "context_digest": context_digest,

@@ -30,6 +30,7 @@ const enginePython = process.env.BEAN_COUNTERDEX_PYTHON || 'python3.11'
 const env = { PATH: process.env.PATH, PYTHONPATH: join(root, 'apps/api'),
   BEAN_DATABASE_PATH: join(temp, 'test.sqlite'), BEAN_BLOB_DIR: join(temp, 'sources'),
   BEAN_ARTIFACT_DIR: join(temp, 'artifacts'), BEAN_AUTH_TOKENS_JSON: JSON.stringify({ 'web-test': token }),
+  BEAN_SOURCE_INTAKE_MODE: 'controlled', BEAN_CONTROLLED_SOURCE_MANIFEST: join(root, 'scripts/ai/fixtures/source-previews.v1.json'),
   BEAN_SCIENCE_ADAPTER: 'counterdex', BEAN_COUNTERDEX_PYTHON: enginePython, BEAN_WEB_API_PORT: String(apiPort) }
 const children = []
 const start = (command, args, childEnv = env) => {
@@ -91,8 +92,8 @@ try {
   await page.selectOption('#dataset-origin', 'synthetic')
   await page.click('#question-form button[type=submit]')
 
-  async function prepareApproveAndRun(expectCounterexample = true) {
-    await page.getByRole('button', { name: 'Save inputs and prepare plan' }).click()
+  async function prepareApproveAndRun(expectCounterexample = true, prepared = false) {
+    if (!prepared) await page.getByRole('button', { name: 'Save inputs and prepare plan' }).click()
     await page.waitForSelector('#approve-scope')
     assert.equal(await page.getByRole('button', { name: 'Approve reviewed plan' }).isDisabled(), true)
     assert.equal(await page.getByRole('button', { name: 'Queue approved manual run' }).isDisabled(), true)
@@ -129,13 +130,41 @@ try {
     }
     return finished
   }
-  const run = await prepareApproveAndRun()
-  assert.equal(run.state, 'completed')
   const workspace = await page.locator('#workspace-select').inputValue()
+  // Source proposal is an explicitly controlled intake fixture; science runs normally.
+  await page.locator('#source-image-file').setInputFiles(join(root, 'fixtures/intake/clean.png'))
+  await page.selectOption('#source-origin', 'synthetic')
+  await page.getByRole('button', { name: 'Upload source for inspection', exact: true }).click()
+  await page.waitForFunction(() => /Retained source /.test(document.querySelector('#source-review').textContent) || !document.querySelector('#backend-error').hidden)
+  assert.equal(await page.locator('#backend-error').isVisible(), false, await page.locator('#backend-error').textContent())
+  const sourceId = (await page.locator('#source-review').textContent()).match(/Retained source (source_[a-zA-Z0-9_]+)/)[1]
+  await page.getByRole('button', { name: 'Prepare controlled source proposal', exact: true }).click()
+  await page.getByText('Controlled example; not Gemini transcription.', { exact: true }).waitFor()
+  await page.getByLabel('rows[0].hard_allowance Reviewed value', { exact: true }).fill('0.500')
+  await page.getByLabel('rows[0].hard_allowance value origin', { exact: true }).selectOption('corrected_transcription')
+  await page.getByLabel('rows[0].hard_allowance Correction or assumption reason', { exact: true }).fill('Reviewed source uses a synthetic hard allowance of 0.50 mg/L')
+  await page.getByRole('button', { name: 'Accept reviewed source values', exact: true }).click()
+  await page.getByRole('button', { name: 'Use reviewed values in measurement draft', exact: true }).click()
+  await page.click('#measurements button[type=submit]')
+  await page.click('#question-form button[type=submit]')
+  await page.getByLabel('Explanation for the remaining manually reviewed inputs and assumptions', { exact: true }).fill('Reviewed synthetic example measurements, units, domain and claim entered explicitly for this browser test')
+  await page.getByRole('button', { name: 'Preview source-bound inputs', exact: true }).click()
+  await page.getByRole('link', { name: 'Question', exact: true }).click()
+  await page.fill('#goal', 'Changed after source preview')
+  await page.getByRole('link', { name: 'Review', exact: true }).click()
+  await page.getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }).click()
+  await page.waitForFunction(() => !document.querySelector('#backend-error').hidden)
+  assert.match(await page.locator('#backend-error').textContent(), /Revise the source-bound input preview/)
+  await page.getByRole('button', { name: 'Revise source-bound input preview', exact: true }).click()
+  await page.getByRole('button', { name: 'Preview source-bound inputs', exact: true }).click()
+  await page.getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }).click()
+  const run = await prepareApproveAndRun(true, true)
+  assert.equal(run.state, 'completed')
   const evidence = await api(`/records/${run.scenarios[0].result_id}`)
   const reference = evidence.body.result.artifacts[0]
   const dataset = (await api(`/workspaces/${workspace}/records?kind=dataset`))[0]
-  assert.equal(dataset.body.rows[0].original_values.concentration, '4.80')
+  assert.equal(dataset.body.rows[0].original_values.hard_allowance, '0.50')
+  assert.equal(dataset.body.rows[0].source_asset_id, sourceId)
   assert.equal(dataset.body.rows[0].concentration, '24/5')
   const plan = await api(`/records/${run.plan_id}`)
   assert.equal(plan.body.scientific_profile, 'counterdex.v1')
@@ -248,16 +277,28 @@ try {
   await page.waitForFunction(() => document.querySelector('#backend-design').textContent.includes('Design tier: checked_pair_separation'))
   assert.equal((await api(`/design-jobs/${noSeparation.finished.id}`)).state, 'completed')
 
+  const followupOrigin = process.env.BEAN_TEST_FOLLOWUP_ORIGIN || 'hypothetical'
+  assert.ok(['actual', 'hypothetical'].includes(followupOrigin))
+  await page.locator('#followup-origin').selectOption(followupOrigin)
+  if (followupOrigin === 'actual') {
+    await page.fill('#followup-time', '7')
+    await page.fill('#followup-allowance', '0.3')
+  }
   await page.fill('#followup-value', '3.4')
-  await page.fill('#followup-reason', 'Hypothetical browser regression reading chosen to inspect the original pair')
-  await page.getByRole('button', { name: 'Prepare hypothetical observation', exact: true }).click()
-  await page.getByRole('button', { name: 'Accept reviewed hypothetical observation', exact: true }).click()
+  await page.fill('#followup-reason', `Synthetic test of ${followupOrigin} declaration; reviewed acquisition log at 7 h and hard bound 0.3 mg/L. No real measurement claimed.`)
+  await page.getByRole('button', { name: `Prepare ${followupOrigin} observation`, exact: true }).click()
+  await page.getByRole('button', { name: `Accept reviewed ${followupOrigin} observation`, exact: true }).click()
   await page.getByRole('button', { name: 'Prepare follow-up investigation plan', exact: true }).click()
   await page.locator('#followup-approve-scope').check()
   await page.getByRole('button', { name: 'Approve reviewed follow-up', exact: true }).click()
   await page.getByRole('button', { name: 'Queue approved follow-up', exact: true }).click()
-  await page.waitForFunction(() => /Follow-up run run_/.test(document.querySelector('#followup-review').textContent))
-  const followupId = (await page.locator('#followup-review').textContent()).match(/Follow-up run (run_[a-zA-Z0-9]+)/)[1]
+  await page.waitForFunction(baselineId => {
+    const status = document.querySelector('#backend-investigations [role="status"]')?.textContent
+    const match = status?.match(/^(run_[a-zA-Z0-9]+) · execution:/)
+    return match && match[1] !== baselineId
+  }, run.id)
+  const followupId = (await page.locator('#backend-investigations [role="status"]').textContent()).match(/^(run_[a-zA-Z0-9]+)/)[1]
+  assert.equal(new URL(page.url()).hash, '#investigations')
   let followupRun
   for (let attempt = 0; attempt < 150; attempt++) {
     followupRun = await api(`/runs/${followupId}`)
@@ -265,16 +306,21 @@ try {
     await page.waitForTimeout(1000)
   }
   assert.equal(followupRun.state, 'completed', JSON.stringify(followupRun))
+  const observations = await api(`/workspaces/${workspace}/records?kind=observation_proposal`)
+  assert.equal(observations[0].body.origin, followupOrigin)
+  assert.equal(observations[0].body.row.time, followupOrigin === 'actual' ? '7/1' : positive.suggestion.body.selected_time)
+  if (followupOrigin === 'actual') {
+    assert.equal(observations[0].body.row.hard_allowance, '3/10')
+    assert.deepEqual(observations[0].body.generating_choices, {})
+  }
   const followupEvidence = await api(`/records/${followupRun.scenarios[0].result_id}`)
   assert.equal(followupEvidence.body.result.candidate_results.length, 2)
   assert.equal(followupEvidence.body.result.native_replay.operation, 'recheck')
-  assert.equal(followupEvidence.body.result.native_replay.dataset_origin, 'hypothetical')
-  await page.fill('#run-id', followupId)
-  await page.getByRole('button', { name: 'Open or refresh run', exact: true }).click()
+  assert.equal(followupEvidence.body.result.native_replay.dataset_origin, followupOrigin === 'actual' ? 'synthetic' : 'hypothetical')
   await page.getByRole('region', { name: 'Follow-up candidate checks', exact: true }).waitFor()
-  assert.match(await page.locator('#backend-investigations').textContent(), /Observation origin: hypothetical/)
+  assert.match(await page.locator('#backend-investigations').textContent(), new RegExp(`Dataset origin: ${followupOrigin === 'actual' ? 'synthetic' : 'hypothetical'}`))
 
-  assert.equal((await api(`/records/${positive.suggestion.id}`)).digest, positive.suggestion.digest)
+  await downloadAndReplay(followupEvidence.body.result, 'followup')
 
   // A changed observation must create new reviewed identities and actual computation.
   await page.getByRole('link', { name: 'Inputs', exact: true }).click()
@@ -291,6 +337,20 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Download native design evidence', exact: true }).count(), 0)
   await downloadAndReplay(changedEvidence.body.result, 'changed')
   assert.equal((await api(`/records/${evidence.id}`)).digest, evidence.digest)
+  // Changed bytes cannot reuse a controlled extraction; accepted science stays intact.
+  await page.getByRole('link', { name: 'Review', exact: true }).click()
+  const beforeFallback = await api(`/workspaces/${workspace}/records?kind=dataset`)
+  const changedSource = Buffer.concat([await readFile(join(root, 'fixtures/intake/clean.png')), Buffer.from('changed source bytes')])
+  await page.locator('#source-image-file').setInputFiles({ name: 'clean.png', mimeType: 'image/png', buffer: changedSource })
+  await page.selectOption('#source-origin', 'synthetic')
+  await page.getByRole('button', { name: 'Upload source for inspection', exact: true }).click()
+  await page.getByRole('button', { name: 'Prepare controlled source proposal', exact: true }).click()
+  await page.getByText('Extraction unavailable for these image bytes. No values were accepted or added. Use manual measurements.', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Accept reviewed source values', exact: true }).count(), 0)
+  assert.deepEqual((await api(`/workspaces/${workspace}/records?kind=dataset`)).map(record => record.id), beforeFallback.map(record => record.id))
+  await page.getByRole('button', { name: 'Use controlled example image', exact: true }).click()
+  await page.getByRole('button', { name: 'Prepare controlled source proposal', exact: true }).click()
+  await page.getByRole('button', { name: 'Accept reviewed source values', exact: true }).waitFor()
   assert.deepEqual(await api(`/workspaces/${workspace}/provider-attempts`), [])
 
   await page.getByRole('link', { name: 'Report', exact: true }).click()

@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "description": "Local fixture preparation, with no consent to hosted inference.",
+  "properties": {
+    "execution_mode": {
+      "const": "controlled",
+      "title": "Execution Mode",
+      "type": "string"
+    },
+    "source_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "expected_source_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Expected Source Digest",
+      "type": "string"
+    },
+    "current_revision_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Revision Id"
+    },
+    "existing_values": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 50,
+      "title": "Existing Values",
+      "type": "object"
+    },
+    "notes": {
+      "default": "",
+      "maxLength": 4000,
+      "title": "Notes",
+      "type": "string"
+    }
+  },
+  "required": [
+    "execution_mode",
+    "source_id",
+    "expected_source_digest"
+  ],
+  "title": "ControlledIntakeRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ControlledIntakeRequest"
+}

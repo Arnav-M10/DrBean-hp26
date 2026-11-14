@@ -20,6 +20,14 @@ class Settings:
     artifact_dir: str = "var/artifacts"
     science_adapter: str = "counterdex"
     counterdex_python: str = "python3.11"
+    source_intake_mode: str = "disabled"
+    controlled_source_manifest_path: str | None = None
+
+    def __post_init__(self):
+        if self.source_intake_mode not in {"disabled", "controlled"}:
+            raise ValueError("Source intake mode must be disabled or controlled")
+        if self.source_intake_mode == "controlled" and not self.controlled_source_manifest_path:
+            raise ValueError("Controlled intake requires an explicit trusted local fixture manifest")
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -43,6 +51,8 @@ class Settings:
             artifact_dir=os.getenv("BEAN_ARTIFACT_DIR", "var/artifacts"),
             science_adapter=os.getenv("BEAN_SCIENCE_ADAPTER", "counterdex"),
             counterdex_python=os.getenv("BEAN_COUNTERDEX_PYTHON", "python3.11"),
+            source_intake_mode=os.getenv("BEAN_SOURCE_INTAKE_MODE", "disabled"),
+            controlled_source_manifest_path=os.getenv("BEAN_CONTROLLED_SOURCE_MANIFEST"),
             allowed_origins=tuple(
                 origin.strip() for origin in os.getenv(
                     "BEAN_ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"

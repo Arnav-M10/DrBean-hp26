@@ -34,7 +34,7 @@ python3.11 -m counterdex replay-native dr-bean-ARTIFACT.native.json --anchors dr
 
 The anchors provide separately retained expected application/run identities. A matching hash establishes byte integrity, not mathematical validity. Native replay recomputes the supported predicates using the matching engine source. This is fresh checking by the same mathematical implementation, not an independently implemented checker. Browser replay remains unavailable.
 
-Keep a run identifier to reopen authenticated history after reconnecting. A report freezes the selected run and its evidence inventory. Measurement/question drafts remain tab-local; **Download draft** preserves them before closing the tab. Design drafts remain in memory until prepared as an immutable server plan. Follow-up observations and public sharing remain outside this screen.
+Keep a run identifier to reopen authenticated history after reconnecting. A report freezes the selected run and its evidence inventory. Measurement/question drafts remain tab-local; **Download draft** preserves them before closing the tab. Design drafts remain in memory until prepared as an immutable server plan. Hypothetical follow-up observations are supported below. Public sharing remains unavailable.
 
 ## Next-measurement design
 
@@ -60,6 +60,18 @@ node apps/web/check-backend.mjs
 
 Playwright is found through Node's normal resolution or `NODE_PATH`; `PLAYWRIGHT_MODULE` can name its `index.js` entry file. After `npm install` in `tests/integration`, set `NODE_PATH` to that directory's absolute `node_modules` path when running this browser check. Set `BEAN_TEST_PYTHON` or `CHROMIUM_PATH` to override `.venv/bin/python` and Playwright's own Chromium. Playwright is a test-only dependency and is not shipped with the browser application. A missing runtime or failed scientific run fails this milestone check instead of being counted as a successful demonstration.
 
-## Hypothetical follow-up
+## Follow-up observations
 
-Open a completed checked-separation design, enter a hypothetical concentration and explain its choice. Prepare and inspect the observation, explicitly accept it as a new dataset revision, then prepare and separately approve the follow-up plan before queueing. The flow retains the selected design time and allowance and rechecks the original pair. Open the returned run identifier to retrieve candidate-specific feedback and native evidence. Actual acquisition and changed time/allowance remain outside this admitted flow. The original evidence remains immutable.
+Open a completed checked-separation design, enter a hypothetical concentration and explain its choice. Prepare and inspect the observation, explicitly accept it as a new dataset revision, then prepare and separately approve the follow-up plan before queueing. The flow retains the selected design time and allowance and rechecks the original pair. Queueing opens the follow-up run directly; execution status updates until the candidate-specific results and native downloads are available. To enter a declared actual observation, choose actual origin and supply its elapsed acquisition time, hard allowance, and acquisition/source justification. Changing origin clears the entered values; it cannot relabel a generated reading. Actual origin is a user declaration, not instrument authentication. A reviewed observation advances the workspace revision. Follow-ups based on older dataset revisions are refused; prepare a new investigation from the current inputs to continue. Before acceptance, Revise observation draft clears the pending proposal for a new review. The original evidence remains immutable.
+
+## Retained source review
+
+Start with `scripts/dev/start.sh --controlled-source-examples` to enable the packaged controlled source manifest. Ordinary startup without this option leaves controlled intake disabled. Gemini stays disabled in both modes.
+
+Upload a public or synthetic PNG/JPEG and choose its origin explicitly, or choose **Use controlled example image** for the supported synthetic lab sheet. The retained image is displayed for inspection; upload neither extracts values nor approves science.
+
+Choose **Prepare controlled source proposal**. This uses the ordinary authenticated intake API and displays **Controlled example; not Gemini transcription.** Only frozen synthetic image bytes in the packaged manifest are supported. Unknown, altered/reencoded, unreadable or unsupported images return no accepted values and a visible **Continue with manual measurements** link. Existing accepted work is preserved.
+
+Compare every original/proposed value and locator against the image, record corrections and reasons, and resolve blocking diagnostics. Accept the source review, then choose **Use reviewed values in measurement draft** to replace the draft rows with those explicit accepted values. Complete missing measurements and the question separately. Explain the remaining assumptions and inspect the exact source-bound preview before accepting it. Changing the draft requires a new preview. The resulting plan still requires separate scientific approval.
+
+The browser regression uses these same visible controls, including changed-byte refusal and manual fallback. Source review, input materialization, discovery, design, follow-up and native replay use the real application and engine; controlled source values do not supply scientific results. No database helper or copied proposal identifier is needed.
