@@ -287,7 +287,7 @@ def test_controlled_source_preview_is_labeled_bound_and_has_no_execution_authori
     assert result["external_provider_calls"] == 0 and result["live_qualification"] == "not_run"
     assert result["authorship"] == "controlled_fixture" and "not Gemini transcription" in result["label"]
     assert all(f["method"] == "manual" and f["grounding"] == "unreviewed_visual" for f in result["fields"])
-    assert result["application_review_integration"] == "unavailable_pending_contract"
+    assert result["application_review_integration"] == "requires_intake_service"
     assert not hasattr(proposer, "generate") and "provider_attempt_id" not in result
     assert result["diagnostics"] == []
 
