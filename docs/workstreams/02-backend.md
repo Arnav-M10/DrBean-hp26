@@ -1,8 +1,8 @@
 # Backend milestone progress
 
 Current task: master §2.13 milestone 7 — worker-loss cleanup and restart
-reconciliation. Reproduced live scientific computation surviving worker SIGKILL
-and queued cancellation being misclassified on recovery. Fixes and tests running.
+reconciliation implemented and verified. Integration handoff is ready; remaining
+full-section acceptance depends on the workstreams listed below.
 
 Branch: `backend/restart-recovery`; stacked on PR #13 at `731afdc`.
 PR #13 remains open; `main` is `80f95a4`.
@@ -21,15 +21,15 @@ Zero model-provider calls or credential checks; live dispatch remains disabled.
 | 4. Source review and immutable objective/optional scope | Implemented; regression covered |
 | 5. Design and follow-up | Design PR #9 and hypothetical follow-up PR #11 merged; actual readings blocked on engine |
 | 6. Controlled callbacks and accounting | Backend implemented; real-science controlled acceptance passed; full independent sign-off pending |
-| 7. Release stabilization and handoff | In progress: parent-loss cleanup, queued cancellation, evidence-preserving restart |
+| 7. Release stabilization and handoff | Backend restart work verified; full release qualification remains dependency-bound |
 
 ## Verified in this change
 
-- Recovery audit: parent `finally` cleanup cannot run after SIGKILL; a live
-  scientific child can survive. Adding an owned parent-lifeline guard that stops
+- Fixed: parent `finally` cleanup could not run after SIGKILL; a live scientific
+  child survived. An independent parent-lifeline guard now stops
   the complete scientific process group without scanning unrelated processes.
 - Recovery now acknowledges never-started cancelled jobs as cancelled. Started
-  jobs remain interrupted; queued work is preserved. Acceptance tests will kill
+  jobs remain interrupted; queued work is preserved. Acceptance tests kill
   an ordinary worker after actual evidence commits and independently replay the
   unchanged bytes after restart, proving no silent redispatch.
 - PR #13 CI exposed Linux ESRCH during process-state reading in addition to the
@@ -54,6 +54,19 @@ Prior milestone 6 (PR #13), already verified:
   blocks new reservations and reports `needs_review` without changing old bytes.
 
 ## Evidence
+
+- Current full backend regression: 411 passed in 167.22s, excluding independent
+  `tests/integration`. Final 16-test parent-loss/boundary suite also passes,
+  including a subsequent guard-start-failure control (412 tests now collected).
+- Actual restart/evidence HTTP and ordinary CLI tests: 2 passed. Queued state
+  plus existing workflow tests: 31 passed. Independent code review found no
+  remaining correctness blocker. Ordinary-user process-boundary check: 7 passed
+  while the user owned 244 processes. Ruff and whitespace pass.
+- No schema/database migration or new public route. No engine, browser,
+  independent evaluator or Owner 3 source changes. The child guard adds one
+  short-lived supervised process within the existing resource policy.
+
+Prior milestone 6 evidence (PR #13):
 
 - Full backend regression: 397 passed in 140.46s (`tests --ignore=tests/integration`).
 - New actual-science controlled HTTP suite: 4 passed. Fact projection: 3 passed.
@@ -83,7 +96,7 @@ Prior milestone 6 (PR #13), already verified:
 - Next backend action: integrate admitted actual-reading changes when supplied,
   resolve any backend defects from independent acceptance, and finish release
   qualification/handoff. Merged code alone does not establish release readiness.
-- Current available backend slice: approximately 30–60 minutes including tests
-  and handoff if no further defect emerges. This replaces the earlier broader
-  1–3 hour allowance; waiting on Owners 1/3/4/5 is excluded. Full-section sign-off
-  remains dependency-bound, even when the available backend queue is finished.
+- Available restart slice is finished. No additional unblocked backend feature
+  was identified in this audit; resume when producer changes or independent
+  acceptance findings arrive. The 30–60 minute estimate covered this slice, not
+  waiting on Owners 1/3/4/5. Full-section calendar sign-off remains dependency-bound.
