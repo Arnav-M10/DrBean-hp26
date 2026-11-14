@@ -14,6 +14,7 @@ const routes = new Map([
   ['/api.mjs', ['api.mjs', 'text/javascript']],
   ['/session.mjs', ['session.mjs', 'text/javascript']],
   ['/general-workspace.mjs', ['general-workspace.mjs', 'text/javascript']],
+  ['/research.mjs', ['research.mjs', 'text/javascript']],
   ['/manual.mjs', ['manual.mjs', 'text/javascript']],
   ['/source-workflow.mjs', ['source-workflow.mjs', 'text/javascript']],
   ['/assistant-workflow.mjs', ['assistant-workflow.mjs', 'text/javascript']],

@@ -104,27 +104,36 @@ class ProviderLedger:
             raise ValueError("Provider metadata exceeds its bound")
         attempt_id = str(uuid.uuid4())
         with self.store.transaction() as conn:
-            membership = conn.execute(
-                "SELECT 1 FROM memberships WHERE workspace_id=? AND actor_id=?",
-                (context["workspace_id"], context["actor_id"]),
-            ).fetchone()
-            operation = conn.execute(
-                "SELECT * FROM operations WHERE id=? AND workspace_id=? AND actor_id=? AND state='reserved'",
-                (context["operation_id"], context["workspace_id"], context["actor_id"]),
-            ).fetchone()
-            if not membership or not operation:
-                raise ValueError("Provider attempt requires an owned durable operation")
-            rows = conn.execute("SELECT metadata, response_metadata FROM provider_attempts").fetchall()
-            used_in, used_out, malformed = _accounting(rows)
-            if malformed:
-                raise LedgerBudgetExceeded("Historical provider accounting requires review before further dispatch")
-            if len(rows) >= self.request_cap or used_in + reserved_in > self.input_token_cap or used_out + reserved_out > self.output_token_cap:
-                raise LedgerBudgetExceeded("The shared GF-2 provider ledger cannot admit another request")
-            conn.execute(
-                "INSERT INTO provider_attempts(id,workspace_id,operation_id,metadata,state,created_at) VALUES (?,?,?,?,?,?)",
-                (attempt_id, context["workspace_id"], context["operation_id"], encoded, "reserved", utc_now()),
-            )
+            self._begin_in_transaction(conn, context, encoded, reserved_in, reserved_out, attempt_id)
         return attempt_id
+
+    def _begin_in_transaction(self, conn, context, encoded, reserved_in, reserved_out, attempt_id):
+        """One physical reservation; research authority extends this transaction."""
+        membership = conn.execute(
+            "SELECT 1 FROM memberships WHERE workspace_id=? AND actor_id=?",
+            (context["workspace_id"], context["actor_id"]),
+        ).fetchone()
+        operation = conn.execute(
+            "SELECT * FROM operations WHERE id=? AND workspace_id=? AND actor_id=? AND state='reserved'",
+            (context["operation_id"], context["workspace_id"], context["actor_id"]),
+        ).fetchone()
+        if not membership or not operation:
+            raise ValueError("Provider attempt requires an owned durable operation")
+        if operation["operation"] == "research-runtime":
+            self._validate_research_attempt(conn, context, operation, encoded, reserved_in, reserved_out)
+        rows = conn.execute("SELECT metadata, response_metadata FROM provider_attempts").fetchall()
+        used_in, used_out, malformed = _accounting(rows)
+        if malformed:
+            raise LedgerBudgetExceeded("Historical provider accounting requires review before further dispatch")
+        if len(rows) >= self.request_cap or used_in + reserved_in > self.input_token_cap or used_out + reserved_out > self.output_token_cap:
+            raise LedgerBudgetExceeded("The shared GF-2 provider ledger cannot admit another request")
+        conn.execute(
+            "INSERT INTO provider_attempts(id,workspace_id,operation_id,metadata,state,created_at) VALUES (?,?,?,?,?,?)",
+            (attempt_id, context["workspace_id"], context["operation_id"], encoded, "reserved", utc_now()),
+        )
+
+    def _validate_research_attempt(self, conn, context, operation, encoded, reserved_in, reserved_out):
+        raise LedgerBudgetExceeded("Research requests require atomic session/action authority; omitted context cannot bypass it")
 
     def finish_attempt(self, attempt_id: str, metadata: dict[str, Any]) -> None:
         _usage(metadata)

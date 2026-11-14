@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "AnalysisAssetRef": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "page_indices": {
+          "anyOf": [
+            {
+              "items": {
+                "maximum": 9,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional zero-based pages to analyze (PDF). Omitted means every page.",
+          "title": "Page Indices"
+        }
+      },
+      "required": [
+        "id",
+        "sha256"
+      ],
+      "title": "AnalysisAssetRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "question": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "assets": {
+      "items": {
+        "$ref": "#/$defs/AnalysisAssetRef"
+      },
+      "maxItems": 5,
+      "minItems": 1,
+      "title": "Assets",
+      "type": "array"
+    }
+  },
+  "required": [
+    "question",
+    "assets"
+  ],
+  "title": "AnalysisEstimateRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:general-research.v1:AnalysisEstimateRequest"
+}

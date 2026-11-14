@@ -1,0 +1,369 @@
+{
+  "$defs": {
+    "ModelCitation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "C1, C2, ... unique in this response",
+          "maxLength": 8,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "page_index": {
+          "description": "Zero-based page index",
+          "maximum": 9,
+          "minimum": 0,
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "quote": {
+          "description": "Exact words copied from that page",
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "page_index",
+        "quote"
+      ],
+      "title": "ModelCitation",
+      "type": "object"
+    },
+    "ModelClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "observation",
+            "interpretation",
+            "hypothesis",
+            "method",
+            "comparison"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "uncertainty": {
+          "enum": [
+            "not_stated",
+            "sd",
+            "se",
+            "ci",
+            "range",
+            "hard_bound",
+            "other"
+          ],
+          "title": "Uncertainty",
+          "type": "string"
+        },
+        "citation_ids": {
+          "items": {
+            "maxLength": 8,
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Citation Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "kind",
+        "uncertainty",
+        "citation_ids"
+      ],
+      "title": "ModelClaim",
+      "type": "object"
+    },
+    "ModelClarification": {
+      "additionalProperties": false,
+      "properties": {
+        "question": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 300,
+          "title": "Reason",
+          "type": "string"
+        },
+        "citation_ids": {
+          "items": {
+            "maxLength": 8,
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Citation Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "question",
+        "reason",
+        "citation_ids"
+      ],
+      "title": "ModelClarification",
+      "type": "object"
+    },
+    "ModelColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Column name exactly as printed",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Unit exactly as printed in the source; null when the source does not print it",
+          "title": "Unit"
+        }
+      },
+      "required": [
+        "name",
+        "unit"
+      ],
+      "title": "ModelColumn",
+      "type": "object"
+    },
+    "ModelNextStep": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "rationale": {
+          "maxLength": 300,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "collect_data",
+            "review_extracted_values",
+            "check_units",
+            "consult_source",
+            "mathematical_check_candidate",
+            "other"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "citation_ids": {
+          "items": {
+            "maxLength": 8,
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Citation Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "rationale",
+        "kind",
+        "citation_ids"
+      ],
+      "title": "ModelNextStep",
+      "type": "object"
+    },
+    "ModelTable": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 200,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "page_index": {
+          "maximum": 9,
+          "minimum": 0,
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ModelColumn"
+          },
+          "maxItems": 24,
+          "minItems": 1,
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "description": "Cells exactly as printed; null for an empty cell",
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxItems": 24,
+            "type": "array"
+          },
+          "maxItems": 40,
+          "title": "Rows",
+          "type": "array"
+        },
+        "citation_ids": {
+          "items": {
+            "maxLength": 8,
+            "type": "string"
+          },
+          "maxItems": 6,
+          "title": "Citation Ids",
+          "type": "array"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "page_index",
+        "columns",
+        "rows",
+        "citation_ids",
+        "notes"
+      ],
+      "title": "ModelTable",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "summary": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    },
+    "extracted_tables": {
+      "items": {
+        "$ref": "#/$defs/ModelTable"
+      },
+      "maxItems": 4,
+      "title": "Extracted Tables",
+      "type": "array"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/ModelClaim"
+      },
+      "maxItems": 12,
+      "title": "Claims",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "maxLength": 400,
+        "type": "string"
+      },
+      "maxItems": 8,
+      "title": "Limitations",
+      "type": "array"
+    },
+    "clarifications": {
+      "items": {
+        "$ref": "#/$defs/ModelClarification"
+      },
+      "maxItems": 6,
+      "title": "Clarifications",
+      "type": "array"
+    },
+    "suggested_next_steps": {
+      "items": {
+        "$ref": "#/$defs/ModelNextStep"
+      },
+      "maxItems": 6,
+      "title": "Suggested Next Steps",
+      "type": "array"
+    },
+    "citations": {
+      "items": {
+        "$ref": "#/$defs/ModelCitation"
+      },
+      "maxItems": 30,
+      "title": "Citations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "summary",
+    "extracted_tables",
+    "claims",
+    "limitations",
+    "clarifications",
+    "suggested_next_steps",
+    "citations"
+  ],
+  "title": "ModelAnalysisOutput",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:general-research.v1:ModelAnalysisOutput"
+}

@@ -1,3 +1,20 @@
+# Current backend/UI integration — DB-COORDINATOR-3OWNER-1
+
+PR41 integrates real general-file services, typed durable research authority,
+private research-review UI, shared ledger admission and supervised worker storage
+on main97e0e8c. See [B progress](workstreams/B-application.md) and the
+[assembly ledger](integration/APPLICATION_ASSEMBLY.md) for implementation, tests
+and concrete remaining dependencies.
+
+The ordinary manual scientific workflow works with real Counterdex and native
+replay. General-file interpretation remains separate from mathematical verification.
+The full persistent parent journey remains unavailable until A supplies its
+production controlled policy and pending-tool continuation; live qualification is
+not_run. Larger-paper/delegate extensions remain deferred. This is a stable
+integration stopping point, not a blanket release qualification.
+
+The status and SHAs below are retained historical evidence.
+
 # Integration status
 
 Product candidate: [PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27), code `31a8ed3c9b66ed721cf2f37179ab3fe62ebe0d09`, incorporating Owner 2's `42f92b1` controlled-intake handoff. Local clean-checkout equivalent: `c4d1ad63713c9fb00b2baab5aa758f3a4c505952`; both have tree `9ed03fb5bc828117f33ca015ad44a0ec6f9d3703`.

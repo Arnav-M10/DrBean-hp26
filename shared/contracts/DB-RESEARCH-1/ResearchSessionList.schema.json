@@ -1,0 +1,554 @@
+{
+  "$defs": {
+    "ResearchActionSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "logical_turns": {
+          "minimum": 0,
+          "title": "Logical Turns",
+          "type": "integer"
+        },
+        "tool_calls": {
+          "minimum": 0,
+          "title": "Tool Calls",
+          "type": "integer"
+        },
+        "child_count": {
+          "minimum": 0,
+          "title": "Child Count",
+          "type": "integer"
+        },
+        "physical_calls": {
+          "minimum": 0,
+          "title": "Physical Calls",
+          "type": "integer"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "state": {
+          "title": "State",
+          "type": "string"
+        },
+        "budget": {
+          "$ref": "#/$defs/ResearchBudget"
+        },
+        "active_seconds": {
+          "pattern": "^[0-9]+\\.[0-9]{3}$",
+          "title": "Active Seconds",
+          "type": "string"
+        },
+        "waiting_job_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Waiting Job Id"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error Code"
+        }
+      },
+      "required": [
+        "logical_turns",
+        "tool_calls",
+        "child_count",
+        "physical_calls",
+        "id",
+        "state",
+        "budget",
+        "active_seconds",
+        "waiting_job_id",
+        "error_code"
+      ],
+      "title": "ResearchActionSnapshot",
+      "type": "object"
+    },
+    "ResearchBudget": {
+      "additionalProperties": false,
+      "description": "Lower limits win. No allocation or scientific approval is granted here.",
+      "properties": {
+        "policy_version": {
+          "const": "research-action.v1",
+          "default": "research-action.v1",
+          "title": "Policy Version",
+          "type": "string"
+        },
+        "model_turns": {
+          "default": 4,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Model Turns",
+          "type": "integer"
+        },
+        "tool_calls": {
+          "default": 6,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Tool Calls",
+          "type": "integer"
+        },
+        "scientific_reservations": {
+          "default": 2,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Scientific Reservations",
+          "type": "integer"
+        },
+        "active_seconds": {
+          "default": 300,
+          "maximum": 300,
+          "minimum": 1,
+          "title": "Active Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "ResearchBudget",
+      "type": "object"
+    },
+    "ResearchRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "workspace_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Workspace Id",
+          "type": "string"
+        },
+        "kind": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "body": {
+          "additionalProperties": true,
+          "title": "Body",
+          "type": "object"
+        },
+        "digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Id"
+        },
+        "created_by": {
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "workspace_id",
+        "kind",
+        "body",
+        "digest",
+        "parent_id",
+        "created_by",
+        "created_at"
+      ],
+      "title": "ResearchRecord",
+      "type": "object"
+    },
+    "ResearchReviewedContext": {
+      "additionalProperties": false,
+      "properties": {
+        "problem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResearchRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResearchRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/ResearchSourceRef"
+          },
+          "maxItems": 5,
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "problem",
+        "dataset",
+        "sources"
+      ],
+      "title": "ResearchReviewedContext",
+      "type": "object"
+    },
+    "ResearchSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "DB-RESEARCH-1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "workspace_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Workspace Id",
+          "type": "string"
+        },
+        "objective": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Objective",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "controlled",
+            "live"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "ready",
+            "queued",
+            "running",
+            "waiting_review",
+            "waiting_observation",
+            "waiting_child",
+            "paused",
+            "needs_reconciliation",
+            "completed",
+            "failed",
+            "cancelled"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "problem_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Problem Id"
+        },
+        "problem_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Problem Digest"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/ResearchSourceRef"
+          },
+          "maxItems": 5,
+          "title": "Sources",
+          "type": "array"
+        },
+        "plan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResearchRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pending_review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResearchRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pending_review_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pending Review Digest"
+        },
+        "action": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResearchActionSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reviewed_context": {
+          "$ref": "#/$defs/ResearchReviewedContext"
+        },
+        "children": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "maxItems": 4,
+          "title": "Children",
+          "type": "array"
+        },
+        "usage": {
+          "$ref": "#/$defs/ResearchUsage"
+        },
+        "session_limits": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Session Limits",
+          "type": "object"
+        },
+        "session_limits_policy": {
+          "enum": [
+            "research-session-limits.v1",
+            "research-session-limits.v2"
+          ],
+          "title": "Session Limits Policy",
+          "type": "string"
+        },
+        "graph_version": {
+          "const": "research-graph.v1",
+          "title": "Graph Version",
+          "type": "string"
+        },
+        "checkpoint_version": {
+          "const": "research-checkpoint.v1",
+          "title": "Checkpoint Version",
+          "type": "string"
+        },
+        "policy_version": {
+          "const": "research-action.v1",
+          "title": "Policy Version",
+          "type": "string"
+        },
+        "reports": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "title": "Reports",
+          "type": "array"
+        },
+        "provider_disclosure": {
+          "additionalProperties": true,
+          "title": "Provider Disclosure",
+          "type": "object"
+        },
+        "provider_allocation": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Provider Allocation",
+          "type": "object"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "workspace_id",
+        "objective",
+        "mode",
+        "state",
+        "revision",
+        "problem_id",
+        "problem_digest",
+        "sources",
+        "plan",
+        "pending_review",
+        "pending_review_digest",
+        "action",
+        "reviewed_context",
+        "children",
+        "usage",
+        "session_limits",
+        "session_limits_policy",
+        "graph_version",
+        "checkpoint_version",
+        "policy_version",
+        "reports",
+        "provider_disclosure",
+        "provider_allocation",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "ResearchSnapshot",
+      "type": "object"
+    },
+    "ResearchSourceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sha256"
+      ],
+      "title": "ResearchSourceRef",
+      "type": "object"
+    },
+    "ResearchUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "logical_turns": {
+          "minimum": 0,
+          "title": "Logical Turns",
+          "type": "integer"
+        },
+        "tool_calls": {
+          "minimum": 0,
+          "title": "Tool Calls",
+          "type": "integer"
+        },
+        "child_count": {
+          "minimum": 0,
+          "title": "Child Count",
+          "type": "integer"
+        },
+        "physical_calls": {
+          "minimum": 0,
+          "title": "Physical Calls",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "logical_turns",
+        "tool_calls",
+        "child_count",
+        "physical_calls"
+      ],
+      "title": "ResearchUsage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/ResearchSnapshot"
+      },
+      "maxItems": 100,
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "ResearchSessionList",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-RESEARCH-1:ResearchSessionList"
+}

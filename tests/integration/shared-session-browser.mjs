@@ -126,7 +126,7 @@ try {
   const apiPort = await freePort(), webPort = await freePort()
   const apiBase = `http://127.0.0.1:${apiPort}`
   const apiEnv = { PATH: process.env.PATH || '/usr/bin:/bin', PYTHONPATH: `${temp}:${join(root, 'apps/api')}`,
-    PYTHONDONTWRITEBYTECODE: '1', BEAN_AI_MODE: 'placeholder', BEAN_SCIENCE_ADAPTER: 'unavailable',
+    PYTHONDONTWRITEBYTECODE: '1', BEAN_AI_MODE: 'placeholder', BEAN_SCIENCE_ADAPTER: 'unavailable', BEAN_GENERAL_ANALYSIS_MODE: 'controlled_demo',
     BEAN_DATABASE_PATH: join(temp, 'browser.sqlite3'), BEAN_BLOB_DIR: join(temp, 'sources'),
     BEAN_AUTH_FILE: join(temp, 'auth.json'), BEAN_ARTIFACT_DIR: join(temp, 'artifacts'),
     BEAN_SHARE_GATEWAY_FILE: join(temp, 'share-gateway.json'), BEAN_TEST_NETWORK_GUARD: networkGuardFile }
@@ -240,9 +240,72 @@ try {
   assert.equal((await browserRequest(pageA, `/workspaces/${owner.body.id}/datasets`, { body: dataset('upgrade_attack'), headers: forgedHeaders })).status, 404)
   checks.push({ id: 'browser-owner-bearer-and-forged-boundary-cannot-upgrade-session', passed: true })
 
+  // Real retained-file producer, actual citation validation and ordinary UI.
+  // Only the model response is an explicitly labelled local controlled preview.
+  await pageA.locator('#research-files').setInputFiles(join(root, 'tests/integration/fixtures/general/penguins-excerpt.csv'))
+  await pageA.locator('#general-assets article').first().waitFor()
+  const admitted = await browserRequest(pageA, `/workspaces/${sessionA.workspace_id}/research-assets`)
+  assert.equal(admitted.status, 200); assert.equal(admitted.body.length, 1)
+  const source = admitted.body[0]
+  assert.equal(source.sha256, execFileSync(python, ['-c', 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())',
+    join(root, 'tests/integration/fixtures/general/penguins-excerpt.csv')], { env: { PATH: process.env.PATH }, encoding: 'utf8' }).trim())
+  assert.equal((await browserRequest(pageB, `/research-assets/${source.id}`)).status, 404)
+  assert.equal((await browserRequest(pageB, `/research-assets/${source.id}/content`)).status, 404)
+  checks.push({ id: 'real-file-ui-retains-exact-bytes-and-private-source-binding', passed: true })
+  const originalQuestion = 'Which penguin measurements and missing values should I review before comparing groups?'
+  await pageA.locator('#research-question').fill(originalQuestion)
+  await pageA.locator('#general-review-button').click()
+  await pageA.locator('#general-consent').waitFor()
+  assert.match(await pageA.locator('[data-general-review]').innerText(), /Controlled local preview/)
+  await pageA.locator('#general-consent').check()
+  let dropAnalysisAcknowledgement = true
+  await pageA.route('**/research-analyses', async route => {
+    if (route.request().method() === 'POST' && dropAnalysisAcknowledgement) {
+      dropAnalysisAcknowledgement = false
+      const response = await route.fetch()
+      assert.equal(response.status(), 201)
+      return route.abort('failed')
+    }
+    return route.continue()
+  })
+  await pageA.locator('#general-analyze').click()
+  await pageA.locator('#general-pending').waitFor()
+  const completedAnalysis = await browserRequest(pageA, `/workspaces/${sessionA.workspace_id}/research-analyses`)
+  assert.equal(completedAnalysis.body.length, 1, 'The actual backend completed before its acknowledgement was dropped')
+  await pageA.locator('#research-question').fill('A changed question must not relabel the saved result.')
+  await pageA.reload({ waitUntil: 'networkidle' })
+  await pageA.locator('#general-pending details').first().locator('summary').first().click()
+  await pageA.getByRole('button', { name: 'Retry this same reviewed request', exact: true }).click()
+  await pageA.locator('#general-result').waitFor()
+  assert.match(await pageA.locator('#general-result').innerText(), /Controlled test response/)
+  assert.ok((await pageA.locator('#general-result').innerText()).includes(originalQuestion))
+  assert.equal((await browserRequest(pageA, `/workspaces/${sessionA.workspace_id}/research-analyses`)).body.length, 1)
+  assert.equal((await browserRequest(pageB, `/research-analyses/${completedAnalysis.body[0].id}`)).status, 404)
+  checks.push({ id: 'actual-analysis-lost-ack-reload-retry-reuses-result-and-original-question', passed: true })
+  await pageA.locator('#general-result .citation-link').first().click()
+  await pageA.locator('#general-citation-panel').waitFor()
+  assert.ok((await pageA.locator('#general-citation-panel').innerText()).includes(source.filename))
+  checks.push({ id: 'actual-producer-citation-opens-retained-source-evidence', passed: true })
+
+  const sourceQuestion = 'Which scientific model and metadata would be needed for these penguin measurements?'
+  await pageA.locator('#research-question').fill(sourceQuestion)
+  await pageA.getByRole('button', { name: 'Save selected files and research question', exact: true }).click()
+  await pageA.locator('#durable-research h4').filter({ hasText: sourceQuestion }).waitFor()
+  const savedResearch = await browserRequest(pageA, `/workspaces/${sessionA.workspace_id}/research-sessions`)
+  assert.equal(savedResearch.body.items.length, 1)
+  const researchId = savedResearch.body.items[0].id
+  assert.equal(savedResearch.body.items[0].objective, sourceQuestion)
+  assert.equal(savedResearch.body.items[0].problem_id, null, 'Arbitrary biological data must not become concentration inputs')
+  assert.deepEqual(savedResearch.body.items[0].sources, [{ id: source.id, sha256: source.sha256 }])
+  assert.equal(savedResearch.body.items[0].action, null, 'Saving files/question does not advance or compute')
+  assert.equal((await browserRequest(pageB, `/research-sessions/${researchId}`)).status, 404)
+  assert.equal((await browserRequest(pageB, `/research-sessions/${researchId}/events`)).status, 404)
+  checks.push({ id: 'ordinary-research-ui-retains-untrusted-files-question-without-forced-scientific-model', passed: true })
+
   await pageA.reload({ waitUntil: 'networkidle' })
   assert.equal((await bootstrap(pageA)).workspace_id, sessionA.workspace_id)
   assert.equal((await browserRequest(pageA, `/records/${recordA.id}`)).body.id, recordA.id)
+  assert.equal((await browserRequest(pageA, `/research-sessions/${researchId}`)).body.objective, sourceQuestion)
   await pageB.close()
   const reopenedB = await newPage(bob)
   assert.equal((await bootstrap(reopenedB)).workspace_id, sessionB.workspace_id)

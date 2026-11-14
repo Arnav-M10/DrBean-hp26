@@ -1,0 +1,62 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/bean/v1/workspaces/<ws_id>/research-analysis-estimates",
+    "body": {
+      "question": "How did the annual mean change, and what do the NACA pages describe?",
+      "assets": [
+        {
+          "id": "<research_asset_id>",
+          "sha256": "72c3ee740c00c8060f689c82adc5f8eda66eef01583e6f4c7c6f8388db311478"
+        },
+        {
+          "id": "<research_asset_id>",
+          "sha256": "106922c6ec183719920784abab234f75b266057dc59e67e09892e47bae15d00b",
+          "page_indices": [
+            1,
+            2
+          ]
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "available": true,
+      "unavailable_reason": null,
+      "execution_mode": "controlled",
+      "model": "controlled-general-analysis",
+      "estimated_input_tokens": 14525,
+      "reserved_output_tokens": 4096,
+      "max_input_tokens": 24000,
+      "fits_context": true,
+      "fits_budget": null,
+      "budget": {
+        "accounting": "controlled_zero_spend",
+        "remaining_requests": null,
+        "remaining_input_tokens": null,
+        "remaining_output_tokens": null,
+        "billing_verified": false
+      },
+      "pages_sent": {
+        "<research_asset_id>": [
+          {
+            "page_index": 1,
+            "sent_as": "text",
+            "text_sha256": "4e48f75a3c478f1b4e3cd3055e093e8c3370d586c320964433b2259e04b3ea1d",
+            "image_sha256": null
+          },
+          {
+            "page_index": 2,
+            "sent_as": "text",
+            "text_sha256": "0c393f23ee6e45480a630fd05b9edbb4831ff1f54edd37d940f1423b39cdd41b",
+            "image_sha256": null
+          }
+        ]
+      },
+      "blocking_reasons": [],
+      "estimate_method": "utf8_bytes_plus_fixed_image_bound.v1"
+    }
+  }
+}

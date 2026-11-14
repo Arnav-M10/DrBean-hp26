@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "policy_version": {
+      "const": "research-allocation.v1",
+      "default": "research-allocation.v1",
+      "title": "Policy Version",
+      "type": "string"
+    },
+    "physical_requests": {
+      "maximum": 8,
+      "minimum": 1,
+      "title": "Physical Requests",
+      "type": "integer"
+    },
+    "input_tokens": {
+      "maximum": 64000,
+      "minimum": 1,
+      "title": "Input Tokens",
+      "type": "integer"
+    },
+    "output_tokens": {
+      "maximum": 16000,
+      "minimum": 1,
+      "title": "Output Tokens",
+      "type": "integer"
+    },
+    "accepted": {
+      "const": true,
+      "title": "Accepted",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "physical_requests",
+    "input_tokens",
+    "output_tokens",
+    "accepted"
+  ],
+  "title": "ResearchProviderAllocation",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-RESEARCH-1:ResearchProviderAllocation"
+}

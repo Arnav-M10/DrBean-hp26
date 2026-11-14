@@ -34,10 +34,12 @@ class Worker:
         from .counterdex_adapter import create_science_adapter
         self.adapter = adapter or create_science_adapter(self.settings.counterdex_python, self.settings.science_adapter)
         self.config = provider_config
-        self.ledger = ledger or ProviderLedger(workflow.store)
+        self.ledger = ledger or ProviderLedger(workflow.store, request_cap=8 if getattr(provider_config, "mode", None) == "live" else 32)
         self.id = "worker_" + uuid.uuid4().hex
         self.controlled_model = controlled_model
         self.artifacts = ArtifactService(workflow, self.settings.artifact_dir)
+        from .research_runtime import ResearchRunner
+        self.research = ResearchRunner(workflow, self.settings, self.id, provider_config=provider_config, ledger=self.ledger)
 
     def _publish_native(self, actor, job, result, *, problem, dataset, aggregate_limit,
                         application_projection=None, scenario_id=None, design_context=None, followup_context=None):
@@ -477,6 +479,7 @@ class Worker:
     def tick(self) -> int:
         from .runtime_status import write_status
         write_status(self.workflow.store.path, self.id, self.adapter)
+        research_actions = self.research.tick()
         # A queued cancellation has no child to terminate; acknowledge it durably.
         with self.workflow.store.read() as conn:
             cancelled = [dict(r) for r in conn.execute("SELECT * FROM jobs WHERE state='cancel_requested' AND started_at IS NULL")]
@@ -485,7 +488,7 @@ class Worker:
         jobs = self.workflow.queued_jobs(limit=1)
         for job in jobs:
             asyncio.run(self.execute(job))
-        return len(jobs) + len(cancelled)
+        return len(jobs) + len(cancelled) + research_actions
 
 
 def main():
@@ -503,7 +506,8 @@ def main():
             raise SystemExit("A worker already owns this SQLite lane.") from None
         workflow = Workflow(store)
         if args.recover:
-            print(json.dumps(workflow.recover_interrupted(), sort_keys=True))
+            from .research import ResearchService
+            print(json.dumps({**workflow.recover_interrupted(), **ResearchService(workflow).recover(force=True)}, sort_keys=True))
             return
         from .main import provider_config_from_env
         worker = Worker(workflow, provider_config=provider_config_from_env(), settings=settings)

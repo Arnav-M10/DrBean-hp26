@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "in_progress",
+        "waiting_review",
+        "waiting_observation",
+        "completed",
+        "failed",
+        "unresolved",
+        "skipped"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "dependencies": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 16,
+      "title": "Dependencies",
+      "type": "array"
+    },
+    "reason": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Reason",
+      "type": "string"
+    },
+    "reference_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 16,
+      "title": "Reference Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "status"
+  ],
+  "title": "ResearchPlanStep",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-RESEARCH-1:ResearchPlanStep"
+}

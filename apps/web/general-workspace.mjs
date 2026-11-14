@@ -20,6 +20,7 @@ export function generalCapabilities(capabilities) {
     maxTotalBytes: lower(general?.max_total_bytes, GENERAL_LIMITS.totalBytes),
     maxPdfPages: lower(general?.max_pdf_pages, GENERAL_LIMITS.pdfPages),
     analysisAvailable: general?.analysis?.available === true,
+    analysisMode: general?.analysis?.execution_mode ?? 'unknown',
     model: typeof general?.analysis?.model === 'string' ? general.analysis.model : '',
     reason: typeof general?.analysis?.reason === 'string' ? general.analysis.reason : '',
     remaining: general?.budget?.remaining ?? null,
@@ -319,14 +320,14 @@ export class GeneralResearchWorkspace {
   }
 }
 
-export function setupGeneralWorkspace({ root, serviceFactory = generalService, storage } = {}) {
+export function setupGeneralWorkspace({ root, serviceFactory = generalService, storage, onChange = () => {} } = {}) {
   const document = root.ownerDocument
   const element = (tag, text = '', attrs = {}) => {
     const value = document.createElement(tag); value.textContent = text
     for (const [name, setting] of Object.entries(attrs)) value.setAttribute(name, setting)
     return value
   }
-  const controller = new GeneralResearchWorkspace({ serviceFactory, storage, changed: render })
+  const controller = new GeneralResearchWorkspace({ serviceFactory, storage, changed: state => { render(); onChange(state) } })
   let displayedResultId
   const click = (parent, text, action, disabled = false, id) => {
     const button = element('button', text, { type: 'button', ...(id ? { id } : {}) }); button.disabled = disabled
@@ -414,10 +415,11 @@ export function setupGeneralWorkspace({ root, serviceFactory = generalService, s
     click(question, 'Review files and question to send', () => controller.prepareReview(), disabled || !state.assets.length, 'general-review-button')
     if (state.review) {
       const review = element('section', '', { class: 'general-disclosure', 'data-general-review': '' })
-      review.append(element('h3', '3. Review this exact disclosure'), element('p', state.review.question), element('p', `Provider: Gemini · model: ${state.review.consent.model}`))
+      const controlled = limits.analysisMode === 'controlled'
+      review.append(element('h3', '3. Review this exact disclosure'), element('p', state.review.question), element('p', `${controlled ? 'Controlled local preview' : 'Provider: Gemini'} · model: ${state.review.consent.model}`))
       textList(review, 'Selected files', state.review.assets.map(ref => state.assets.find(asset => asset.id === ref.id)?.filename ?? ref.id))
-      review.append(element('p', 'The selected files and this question will be sent to the configured Gemini service. Uploading and analysis do not approve or run a mathematical investigation.'))
-      const consentLabel = element('label', ' I accept disclosure of these selected files and this exact question to the named Gemini model.', { class: 'stack' })
+      review.append(element('p', controlled ? 'This controlled preview uses a local responder. No files are sent to Gemini, and it does not demonstrate live model understanding or approve computation.' : 'The selected files and this question will be sent to the configured Gemini service. Uploading and analysis do not approve or run a mathematical investigation.'))
+      const consentLabel = element('label', controlled ? ' I reviewed these selected files and this exact question for the controlled local preview.' : ' I accept disclosure of these selected files and this exact question to the named Gemini model.', { class: 'stack' })
       const consent = element('input', '', { type: 'checkbox', id: 'general-consent' }); consent.checked = state.accepted; consent.disabled = state.busy
       const analyze = click(review, 'Analyze reviewed files', () => controller.analyze(), state.busy || !state.accepted, 'general-analyze')
       consent.addEventListener('change', () => { controller.accept(consent.checked); analyze.disabled = !consent.checked || state.busy })

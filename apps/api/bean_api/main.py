@@ -63,7 +63,8 @@ def provider_config_from_env() -> ProviderConfig:
     )
 
 
-def create_app(settings: Settings | None = None, *, provider=None, adapter=None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, provider=None, adapter=None,
+               general_transport_factory=None, controlled_general_responder=None) -> FastAPI:
     settings = settings or Settings.from_env()
     controlled_source_proposer = None
     if settings.source_intake_mode == "controlled":
@@ -148,6 +149,13 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
         return JSONResponse(error_body(request.state.request_id, "provider_budget_exhausted",
                                        "The shared provider budget cannot admit this request. Continue manually."), status_code=409)
 
+    from .research_routes import register_research_routes
+    from .research_runtime import research_capabilities
+    from .general_research import general_research_capabilities, register_general_routes
+    register_research_routes(app)
+    register_general_routes(app, transport=general_transport_factory(app) if general_transport_factory else None,
+                            controlled_responder=controlled_general_responder)
+
     @app.get("/healthz")
     def health():
         return {"service": "dr-bean", "status": "api_reachable", "contract_version": "DB-SC-1",
@@ -174,9 +182,8 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
                 "science": adapter.capabilities(),
                 "ai_mode": "live_opt_in" if live_dispatch else "controlled_placeholder" if controlled_source_proposer else "disabled_placeholder",
                 "gemini": provider_capabilities,
-                "deepagents": {"implemented": True, "configured": False, "dispatch_enabled": False,
-                               "execution_mode": "controlled_only", "unavailable_reason": "live_coordinator_not_integrated",
-                               "reachable": None, "verified_in_environment": False},
+                "deepagents": research_capabilities(settings, provider_config),
+                "general_research": general_research_capabilities(app),
                 "transport": {"web": True, "photon": False}}
 
     @app.post(PREFIX + "/exact/decimal")

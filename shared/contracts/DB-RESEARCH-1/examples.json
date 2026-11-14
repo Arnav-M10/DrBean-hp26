@@ -1,0 +1,76 @@
+{
+  "ResearchCreate": {
+    "valid": {
+      "objective": "Test the reviewed concentration range",
+      "problem_id": "problem_reviewed",
+      "expected_problem_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mode": "controlled"
+    },
+    "refused": {
+      "objective": "Test the range",
+      "actor_id": "owner",
+      "thread_id": "chosen-thread"
+    }
+  },
+  "ResearchAdvance": {
+    "valid": {
+      "expected_revision": 0
+    },
+    "refused": {
+      "expected_revision": 0,
+      "budget": {
+        "model_turns": 12
+      }
+    }
+  },
+  "ResearchDecision": {
+    "valid": {
+      "expected_revision": 3,
+      "pending_review_id": "plan_reviewed",
+      "expected_review_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "approve",
+      "accepted": true
+    },
+    "refused": {
+      "expected_revision": 3,
+      "pending_review_id": "plan_reviewed",
+      "expected_review_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "approve",
+      "accepted": false,
+      "resume": {
+        "approved": true
+      }
+    }
+  },
+  "ResearchReconcile": {
+    "valid": {
+      "expected_revision": 4,
+      "acknowledged_unknown_outcome": true
+    },
+    "refused": {
+      "expected_revision": 4,
+      "acknowledged_unknown_outcome": false,
+      "reset_budget": true
+    }
+  },
+  "ResearchPlanRevision": {
+    "valid": {
+      "steps": [
+        {
+          "id": "prepare",
+          "title": "Review source meanings",
+          "status": "waiting_review"
+        }
+      ]
+    },
+    "refused": {
+      "steps": [
+        {
+          "id": "prepare",
+          "title": "Review source meanings",
+          "status": "proved"
+        }
+      ]
+    }
+  }
+}

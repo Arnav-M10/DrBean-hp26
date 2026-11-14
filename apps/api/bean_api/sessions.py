@@ -163,9 +163,10 @@ class BrowserSessions:
                 "workspace_id": row["workspace_id"], "credentials": "server_managed"}
 
     def _capacity(self, conn) -> None:
-        # Bound retained issuance records, including revoked credentials. Never
-        # delete private work or silently reset accounting to make more room.
-        if conn.execute("SELECT count(*) FROM browser_sessions").fetchone()[0] >= self.max_sessions:
+        # Limit concurrent credentials, retaining historical rows and private
+        # work. Logged-out/expired credentials cannot permanently exhaust access.
+        active = conn.execute("SELECT count(*) FROM browser_sessions WHERE revoked_at IS NULL AND expires_at>?", (int(self.clock()),)).fetchone()[0]
+        if active >= self.max_sessions:
             raise SessionError("shared_session_capacity", "This shared server cannot issue another session. Contact its owner.", 429)
 
     def bootstrap(self, request: Request, response: Response) -> dict:
@@ -192,7 +193,8 @@ class BrowserSessions:
         token, now = session_cookie(request), int(self.clock())
         with self.store.transaction() as conn:
             row = self._record(conn, token)
-            self._capacity(conn)
+            # Rotation atomically replaces this one active credential. It neither
+            # creates another identity/workspace nor consumes another active slot.
             replacement = secrets.token_urlsafe(32)
             conn.execute("UPDATE browser_sessions SET revoked_at=? WHERE token_hash=?", (now, row["token_hash"]))
             conn.execute("INSERT INTO browser_sessions VALUES (?,?,?,?,?,NULL)",

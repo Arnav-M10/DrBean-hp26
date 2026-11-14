@@ -1,0 +1,183 @@
+{
+  "$defs": {
+    "AllowanceOrigin": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "hypothetical",
+            "reviewed_hard_bound"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "description"
+      ],
+      "title": "AllowanceOrigin",
+      "type": "object"
+    },
+    "ResearchDesignConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "feasible_times": {
+          "items": {
+            "maxLength": 514,
+            "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Feasible Times",
+          "type": "array"
+        },
+        "future_hard_allowance": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Future Hard Allowance",
+          "type": "string"
+        },
+        "maximum_horizon": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Maximum Horizon",
+          "type": "string"
+        },
+        "allowance_origin": {
+          "$ref": "#/$defs/AllowanceOrigin"
+        },
+        "requested_tier": {
+          "enum": [
+            "numerical_guidance",
+            "checked_pair_separation"
+          ],
+          "title": "Requested Tier",
+          "type": "string"
+        },
+        "allow_construction": {
+          "default": false,
+          "title": "Allow Construction",
+          "type": "boolean"
+        },
+        "allow_continuation": {
+          "default": false,
+          "title": "Allow Continuation",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "feasible_times",
+        "future_hard_allowance",
+        "maximum_horizon",
+        "allowance_origin",
+        "requested_tier"
+      ],
+      "title": "ResearchDesignConstraints",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "DB-RESEARCH-1",
+      "default": "DB-RESEARCH-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "objective": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Objective",
+      "type": "string"
+    },
+    "problem_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Problem Id"
+    },
+    "expected_problem_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Problem Digest"
+    },
+    "source_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 5,
+      "title": "Source Ids",
+      "type": "array"
+    },
+    "mode": {
+      "default": "controlled",
+      "enum": [
+        "controlled",
+        "live"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "provider_consent_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Consent Id"
+    },
+    "design_constraints": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResearchDesignConstraints"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "objective"
+  ],
+  "title": "ResearchCreate",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-RESEARCH-1:ResearchCreate"
+}

@@ -1,0 +1,109 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "workspace_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Workspace Id",
+      "type": "string"
+    },
+    "research_session_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Research Session Id",
+      "type": "string"
+    },
+    "action_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Action Id"
+    },
+    "event_type": {
+      "enum": [
+        "plan_updated",
+        "action_started",
+        "model_attempt_started",
+        "model_attempt_finished",
+        "tool_requested",
+        "tool_finished",
+        "review_required",
+        "decision_recorded",
+        "resumed",
+        "child_linked",
+        "evidence_observed",
+        "waiting_observation",
+        "cancel_requested",
+        "reconciled",
+        "terminal"
+      ],
+      "title": "Event Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "controlled",
+        "live"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "summary": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Summary",
+      "type": "string"
+    },
+    "reference_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 16,
+      "title": "Reference Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "event_id",
+    "sequence",
+    "workspace_id",
+    "research_session_id",
+    "action_id",
+    "event_type",
+    "timestamp",
+    "mode"
+  ],
+  "title": "ResearchEvent",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-RESEARCH-1:ResearchEvent"
+}
