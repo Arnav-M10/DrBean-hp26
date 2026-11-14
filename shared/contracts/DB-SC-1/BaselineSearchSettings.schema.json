@@ -1,0 +1,54 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "policy": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Policy",
+      "type": "string"
+    },
+    "ka_points": {
+      "maximum": 128,
+      "minimum": 2,
+      "title": "Ka Points",
+      "type": "integer"
+    },
+    "ke_points": {
+      "maximum": 128,
+      "minimum": 2,
+      "title": "Ke Points",
+      "type": "integer"
+    },
+    "max_candidates": {
+      "maximum": 32,
+      "minimum": 1,
+      "title": "Max Candidates",
+      "type": "integer"
+    },
+    "max_rate_pairs": {
+      "maximum": 16384,
+      "minimum": 1,
+      "title": "Max Rate Pairs",
+      "type": "integer"
+    },
+    "wall_seconds": {
+      "maximum": 120,
+      "minimum": 1,
+      "title": "Wall Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "policy",
+    "ka_points",
+    "ke_points",
+    "max_candidates",
+    "max_rate_pairs",
+    "wall_seconds"
+  ],
+  "title": "BaselineSearchSettings",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:BaselineSearchSettings"
+}

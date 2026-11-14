@@ -1,23 +1,25 @@
 # Backend integration handoff
 
-This owner branch starts from integrated commit `586fb9bd260406b07d00241a69e38909ec32ed7c`.
-It connects the existing application to Counterdex's fixed-pair design and native
-replay APIs. **G1 is blocked:** the prepared engine has no baseline candidate
-discovery producer. An ordinary investigation returns
-`scientific_outcome: unsupported`, `reason_code: baseline_producer_unavailable`,
-and no candidates or artifacts. A completed job is not a successful discovery.
-The supplied regression pair is never used by the production investigation path.
+The browser-baseline milestone starts from `main` at `adac945`, including
+Owner 1's Counterdex 0.2.0 discovery producer. Ordinary investigations now run
+bounded numerical search followed by exact checking of frozen candidates and
+fresh native replay. The browser submits the strict reviewed plan, records
+explicit approval, displays actual baseline results and downloads native bytes
+plus separate replay anchors. No stored regression candidates are substituted.
+The current progress and observed validation are in `docs/workstreams/02-backend.md`.
 
-G2 has real fixed-pair design/replay regression coverage using explicitly seeded
-internal historical records. This does not qualify the requested discovery →
-design → follow-up loop. Owner 1 must supply bounded discovery/checking before
-that loop can pass. Candidate-level exclusion is computed in adapter regressions;
-the ordinary baseline route remains unavailable for new follow-up investigations.
+The older fixed-pair design/replay path remains covered by explicitly seeded
+internal controls. Connecting the new application-bound baseline packet to
+separate design and fixed-candidate follow-up is a later milestone. New baseline
+searches on revised data do not by themselves recheck a selected historical pair.
 
 ## Runtime and default mode
 
 Run from the repository checkout, with backend Python 3.12/3.13 and a separately
-prepared CPython 3.11 engine interpreter. Both processes require identical
+prepared CPython 3.11 engine interpreter. Install the matching engine version for
+standalone replay, for example `uv venv --python python3.11 /tmp/counterdex-engine`
+then `uv pip install --python /tmp/counterdex-engine/bin/python --no-deps ./packages/groundwork_adapter`.
+Both application processes require identical
 configuration and access to the same SQLite, source, and artifact directories:
 
 ```sh
@@ -43,7 +45,7 @@ Evidence cannot configure an executable, import, path or URL.
 `GET /healthz` distinguishes `api_reachable`, observed worker liveness, science
 runtime availability and resource policy. A dead/stale worker is not reported as
 healthy merely because the API responds. `GET /api/bean/v1/capabilities` reports
-baseline discovery false, native replay availability, and global scientific
+baseline discovery availability, native replay availability, and global scientific
 qualification false; individual results require actual matching fresh checks.
 Missing CPython returns `scientific_runtime_missing`. The explicitly selected
 `unavailable` adapter is a diagnostic lane, not a scientific fallback.
@@ -62,7 +64,10 @@ The platform policy retains wall, input/output, image/pixel and applicable CPU,
 file/process limits. Linux applies `RLIMIT_AS`; Darwin reports it unavailable.
 Decoder setup failures return infrastructure errors instead of malformed-image
 errors. Scientific termination kills the owned process group, including its
-3.11 interpreter. Linux was exercised here; the actual Mac must still be checked
+3.11 interpreter. The scientific child uses a 256-process per-user guard because
+Linux counts browser threads against that same user-wide ceiling; it is not a
+per-job quota. Stricter inherited hard limits are preserved. Linux was exercised
+here; the actual Mac must still be checked
 by the release owner. Darwin behavior has simulated platform regression coverage.
 
 ## Authenticated HTTP walkthrough
@@ -106,18 +111,21 @@ step below uses the IDs/digests returned by the running API.
    `expected_plan_digest`. Retrying this start returns the same job even with a
    new idempotency key; it cannot spend the approval twice.
 7. Poll `GET /runs/{run_id}`. Fetch its scenario's `result_id` using
-   `GET /records/{result_id}`. With the current engine, assert the explicit
-   `baseline_producer_unavailable` outcome and stop here. Do not manufacture a
-   candidate record through a public route.
+   `GET /records/{result_id}`. Inspect scientific outcome, verification, binding,
+   replay and bounded search counts independently. Download each returned native
+   artifact and its separate anchors. A computed no-counterexample outcome is
+   useful but does not prove the claim; no-candidate exports may have integrity
+   passed with mathematical replay unsupported.
 
 All relative routes after step 1 have prefix `/api/bean/v1`.
-`tests/test_scientific_http.py` is the executable backend contract example: it
-covers this ordinary blocked baseline plus a separately labeled internal seed
-for actual design, artifact reuse, download, anchor rejection and fresh replay.
+`tests/test_baseline_workflow.py` exercises actual baseline HTTP, changed-input
+computation, raw download and a separate installed-engine CLI replay, with
+wrong-anchor/corruption controls. `tests/test_scientific_http.py` additionally
+retains separately labeled legacy design controls with internal candidate seeds.
 Owner 5 should extend the existing evaluation HTTP subject using returned
 identities; these backend tests do not replace that independent harness.
 
-Once real historical candidates exist, `POST /runs/{run_id}/design-proposals`
+For the existing fixed-pair design lane, `POST /runs/{run_id}/design-proposals`
 requires the exact scenario, immutable problem digest, candidate IDs/vectors,
 `scientific_profile: counterdex.v1`, requested tier, feasible times, positive
 future hard allowance, allowance origin/description, maximum horizon, source
@@ -127,14 +135,20 @@ replay). Review and approve the resulting design plan separately, then start
 `POST /design-plans/{plan_id}/jobs`. Every approved time is returned in its
 original order. An incomplete grid cannot become a whole-grid optimum.
 
-`GET /artifacts/{artifact_id}` downloads the exact native bytes, with media type,
-length and `X-Artifact-SHA256`. `GET /artifacts/{artifact_id}/anchor` returns the
-separate application anchor. Supply its `scientific_problem_digest` and
-`native_suggestion_digest` independently to `CounterdexAdapter.replay` (the
-corresponding arguments are `expected_problem_digest` and
-`expected_suggestion_digest`). The artifact SHA, application problem/dataset
-digests, scientific problem/design digests and native suggestion digest remain
-distinct. Wrong anchors, corruption or missing source dependencies must fail.
+`GET /artifacts/{artifact_id}` downloads exact native bytes with media type,
+length and `X-Artifact-SHA256`. The `/anchor` endpoint returns its application
+envelope; `/anchor?download=true` downloads only the replay anchor object.
+For new baseline packets, replay outside the server with the matching engine:
+
+```sh
+/tmp/counterdex-engine/bin/python -I -m counterdex replay-native evidence.native.json --anchors evidence.anchors.json
+```
+
+Baseline anchors name raw SHA, dataset/application problem/scientific projection
+digests, run and scenario (request/design digests are null). Legacy fixed-pair
+bundles retain their older scientific problem/suggestion anchor format and use
+`CounterdexAdapter.replay`. The profiles are explicit and cannot be interchanged.
+Wrong anchors, corruption or missing source dependencies fail.
 
 ## Source review, follow-up and budget contracts
 
@@ -192,6 +206,7 @@ The real adapter/HTTP/qualification tests require the prepared 3.11 executable;
 without it they explicitly skip, which does not qualify the scientific path.
 This implementation was exercised on Linux, backend Python 3.12 and Counterdex
 CPython 3.11.18, including a separate TCP Uvicorn process and worker CLI against
-an isolated store, valid PNG upload, real runtime probe, honest blocked baseline,
-same-job retry and zero provider attempts. No engine source, frontend, release
-harness, evaluation history or Owner 3 model modules were changed.
+an isolated store, valid PNG upload, real runtime probe, real baseline discovery,
+same-job retry and zero provider attempts. The focused browser controls now use
+these same routes. Engine source, evaluation history and Owner 3 model modules
+remain unchanged by this milestone.

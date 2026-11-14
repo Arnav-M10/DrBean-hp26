@@ -30,14 +30,19 @@ test('normalizes exact decimal spellings while preserving the draft', () => {
   assert.equal(question.targetMin, '0.10');
 });
 
-test('admits a singleton closed target and overlapping rate ranges', () => {
-  const edited = { ...question, kaMin: '0.2', targetMax: '1/10' };
+test('admits a singleton closed target with separated rate ranges', () => {
+  const edited = { ...question, targetMax: '1/10' };
   assert.deepEqual(validateQuestion(edited).errors, []);
 });
 
-test('rejects exact bounds that only allow ka at or below ke', () => {
+test('rejects overlapping or touching rate boxes before plan preparation', () => {
   const edited = { ...question, kaMin: '0.01', kaMax: '3/200' };
-  assert.deepEqual(validateQuestion(edited).errors.map(({ field }) => field), ['kaMax']);
+  assert.deepEqual(validateQuestion(edited).errors.map(({ field }) => field), ['kaMin']);
+  assert.deepEqual(validateQuestion({ ...question, kaMin: question.keMax }).errors.map(({ field }) => field), ['kaMin']);
+});
+
+test('parameter domains require strict width while closed target equality remains valid', () => {
+  assert.deepEqual(validateQuestion({ ...question, aMax: question.aMin }).errors.map(({ field }) => field), ['aMax']);
 });
 
 test('identifies malformed, nonpositive, reversed, and missing values by field', () => {

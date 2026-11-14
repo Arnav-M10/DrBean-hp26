@@ -652,8 +652,40 @@ class CandidateResult(StrictModel):
         return self
 
 
+class BaselineSearchSettings(StrictModel):
+    policy: Identifier
+    ka_points: int = Field(ge=2, le=128)
+    ke_points: int = Field(ge=2, le=128)
+    max_candidates: int = Field(ge=1, le=32)
+    max_rate_pairs: int = Field(ge=1, le=16384)
+    wall_seconds: int = Field(ge=1, le=120)
+
+
+class BaselineSearchSummary(StrictModel):
+    policy: Identifier
+    execution: Literal["completed", "partial", "failed", "cancelled", "interrupted"]
+    reason_code: Identifier | None = None
+    partial: bool
+    attempted_count: int = Field(ge=0, le=16384)
+    evaluated_count: int = Field(ge=0, le=16384)
+    possible_count: int = Field(ge=0, le=16384)
+    feasible_count: int = Field(ge=0, le=16384)
+    retained_count: int = Field(ge=0, le=32)
+    exact_attempts: int = Field(ge=0, le=32)
+    settings: BaselineSearchSettings
+
+    @model_validator(mode="after")
+    def bounded_counts(self) -> "BaselineSearchSummary":
+        if not (self.feasible_count <= self.evaluated_count <= self.attempted_count <= self.possible_count
+                and self.attempted_count <= self.settings.max_rate_pairs
+                and self.exact_attempts <= self.retained_count <= self.settings.max_candidates
+                and self.policy == self.settings.policy):
+            raise ValueError("Search observations must fit the retained bounded search policy")
+        return self
+
+
 class ScientificResult(StrictModel):
-    legacy_optional_fields = ("projection_version", "scientific_problem_digest", "scientific_design_digest", "native_suggestion_digest", "candidate_results", "native_replay")
+    legacy_optional_fields = ("projection_version", "scientific_problem_digest", "scientific_design_digest", "native_suggestion_digest", "candidate_results", "native_replay", "baseline_search")
     scientific_outcome: ScientificOutcome
     verification: VerificationState
     expected_binding: BindingState
@@ -664,12 +696,13 @@ class ScientificResult(StrictModel):
     candidates: list[CandidateReference] = Field(default_factory=list, max_length=16)
     artifacts: list[ArtifactReference] = Field(default_factory=list, max_length=16)
     verification_record: VerificationRecord | None = None
-    projection_version: Literal["bean-to-counterdex.v1"] | None = None
+    projection_version: Literal["bean-to-counterdex.v1", "DB-SC-1-to-groundwork-v1"] | None = None
     scientific_problem_digest: Digest | None = None
     scientific_design_digest: Digest | None = None
     native_suggestion_digest: Digest | None = None
     candidate_results: list[CandidateResult] = Field(default_factory=list, max_length=16)
     native_replay: dict = Field(default_factory=dict, max_length=64)
+    baseline_search: BaselineSearchSummary | None = None
 
     @model_validator(mode="after")
     def evidence_axes(self) -> "ScientificResult":
@@ -752,6 +785,6 @@ PUBLIC_SCHEMAS = {
         StartRunRequest, DesignRequestBody, DesignPlanBody, ObservationProposalBody,
         ObservationReviewRequest, SourceAssetMetadata, IntakeProposalBody, IntakeProposalRecordBody, IntakeRequest,
         IntakeReviewRequest, AssistantTurnRequest, GroundedExplanation, ScientificResult,
-        VerificationRecord, DesignResult,
+        VerificationRecord, DesignResult, BaselineSearchSettings, BaselineSearchSummary,
     )
 }

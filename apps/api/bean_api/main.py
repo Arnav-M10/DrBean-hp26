@@ -305,8 +305,13 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
             "X-Artifact-SHA256": hashlib.sha256(content).hexdigest()})
 
     @app.get(PREFIX + "/artifacts/{artifact_id}/anchor")
-    def artifact_anchor(artifact_id: str, actor: Actor):
+    def artifact_anchor(artifact_id: str, actor: Actor, download: bool = False):
         record, _ = artifacts.read(actor, artifact_id)
+        if download:
+            content = canonical_bytes(record["body"]["anchor"])
+            return Response(content, media_type="application/json", headers={
+                "Content-Disposition": f'attachment; filename="dr-bean-{artifact_id}.anchors.json"',
+                "X-Artifact-SHA256": hashlib.sha256(content).hexdigest()})
         return {"artifact_id": artifact_id, "sha256": record["body"]["sha256"], "anchor": record["body"]["anchor"]}
 
     return app

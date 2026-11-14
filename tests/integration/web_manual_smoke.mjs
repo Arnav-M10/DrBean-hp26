@@ -45,17 +45,26 @@ try {
     'a non-numeric time shows errors and stays on Inputs')
   check('invalid-input-marked', (await page.getAttribute('#row-1-time', 'aria-invalid')) === 'true', 'aria-invalid set')
 
+  // An accidental empty row is reported with its repair and can be removed deliberately.
+  await page.fill('#row-1-time', '')
+  await page.click('#add-row')
+  await page.click('#measurements button[type=submit]')
+  check('empty-row-names-its-repair', (await page.locator('#rows-errors').innerText()).includes('Fill it in or remove it'), 'empty rows are reported, not guessed or dropped')
+  await page.getByRole('button', { name: 'Remove row 2' }).click()
+  check('empty-row-removable', (await page.locator('#rows tr').count()) === 1, 'the accidental row was removed on request')
+
   // Manual path with the synthetic example.
   await page.click('#example')
   await page.getByRole('button', { name: 'Replace rows' }).or(page.getByRole('button', { name: 'Use these rows' })).first().click()
   check('example-loaded', (await page.locator('#rows tr').count()) === 5, 'five synthetic rows')
+  check('imported-rows-kept-not-deleted', (await page.getByRole('button', { name: /^Remove row/ }).count()) === 0, 'imported rows can be excluded but not removed')
   await page.click('#measurements button[type=submit]')
   await page.waitForSelector('#question:not([hidden])')
   const bounds = { aMin: '1', aMax: '12', keMin: '1/10', keMax: '0.3', kaMin: '1/2', kaMax: '2', targetMin: '0.10', targetMax: '17/100' }
   for (const [id, value] of Object.entries(bounds)) await page.fill(`#${id}`, value)
 
   // A complete structured draft must not be blocked by a blank free-text goal.
-  await page.fill('#allowanceOrigin', 'Team-chosen hard allowance of 0.1 mg/L for the synthetic example.')
+  await page.fill('#allowanceOrigin', 'Team-chosen hard allowance of 0.50 mg/L for the synthetic example.')
   await page.fill('#goal', '')
   await page.click('#question-form button[type=submit]')
   await page.waitForSelector('#review:not([hidden])')
@@ -72,7 +81,7 @@ try {
   const scalars = [...draft.rows.flatMap(row => [row.time, row.concentration, row.epsilon]), ...Object.values(bounds).map((_, i) => draft.question[Object.keys(bounds)[i]])]
   check('export-format', draft.format === 'dr-bean-local-draft' && draft.version === 1, `${draft.format} v${draft.version}`)
   check('export-no-floats', scalars.length === 23 && scalars.every(value => typeof value === 'string'), 'every scientific scalar is a string')
-  check('export-keeps-source-spelling', draft.question.keMax === '0.3' && draft.rows[3].concentration === '5.34984763', 'original spellings retained')
+  check('export-keeps-source-spelling', draft.question.keMax === '0.3' && draft.rows[3].concentration === '6.80', 'original spellings retained')
   check('export-keeps-provenance', draft.sources.length === 1 && draft.rows.every(row => row.sourceId === 1 && row.original), 'rows keep their source and original values')
 
   // The web's exact parser produces DB-SC-1 canonical rationals.

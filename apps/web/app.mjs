@@ -14,11 +14,11 @@ const bounds = [
   ['ke', 'Target interval for elimination rate', 'h⁻¹', 'targetMin', 'targetMax'],
 ]
 const exampleCsv = `time,concentration,epsilon
-0.25,1.72428641,0.1
-0.5,2.98306758,0.1
-1,4.50851312,0.1
-2,5.34984763,0.1
-4,4.31013325,0.1`
+0.25,4.80,0.50
+0.5,7.20,0.50
+1,8.00,0.50
+2,6.80,0.50
+4,5.70,0.50`
 
 let rows = []
 let nextRowId = 1
@@ -76,6 +76,24 @@ function renderRows() {
       cell.append(input)
       tr.append(cell)
     }
+    // Deliberate removal for rows typed here. Imported rows stay visible and are excluded instead,
+    // so the record of what the source contained is kept.
+    const actionCell = element('td')
+    if (row.sourceId === null) {
+      const remove = element('button', 'Remove', { type: 'button', class: 'secondary', 'aria-label': `Remove row ${number}` })
+      remove.addEventListener('click', () => {
+        rows = rows.filter(candidate => candidate !== row)
+        if (!rows.length) addRow()
+        renderRows()
+        measurementsChanged()
+        announce(`Removed row ${number}.`)
+        byId('add-row').focus()
+      })
+      actionCell.append(remove)
+    } else {
+      actionCell.append(element('span', 'Imported', { class: 'hint', title: 'Imported rows are kept. Untick Include to leave one out.' }))
+    }
+    tr.append(actionCell)
     body.append(tr)
   }
   renderSources()
@@ -279,7 +297,7 @@ byId('example').addEventListener('click', () => {
   previewToken++
   showImportPreview(parseMeasurementsCsv(exampleCsv), {
     name: 'Synthetic two-rate example',
-    description: 'Generated with A = 10, ke = 0.2 and ka = 1.0. The observations are rounded. The example uses a team-chosen hard allowance of 0.1 mg/L.',
+    description: 'Synthetic five-row research example. Historical hard allowances are team-selected at 0.50 mg/L. Review the model domain and closed claim separately; investigation results are computed from the submitted inputs.',
   })
 })
 

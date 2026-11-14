@@ -15,6 +15,12 @@ Build window per the handbook (H1): Friday 13 November 2026 20:00 Eastern to Sun
 | Local instructions (CLAUDE.md, AGENTS.md, CONTRIBUTING) | none present |
 | Dependency locks | none; `apps/web` has no dependencies |
 
+## Update after integration
+
+The default branch `codex/researcher-reviewer-web` now also holds Owner 2's backend (`apps/api`, authored in the event workspace per `docs/HANDOFF.md`, which states no historical implementation was imported), Owner 1's Counterdex package (`packages/groundwork_adapter`; its provenance is recorded in that package's own documents) and further web work. Workstream 4 has not verified those statements independently; they are each owner's record. The table above describes the first inspection and is kept as history.
+
+Workstream 4's later event-time contributions: `scripts/dev/**`, `scripts/release/stack_smoke.py`, the rewritten `scripts/release/checklist.py` and `clean_checkout.sh`, `.github/workflows/ci.yml`, and the documents listed in `docs/ownership-and-layout.md`.
+
 ## Reuse decision
 
 **Status: pending.** No organizer ruling on reuse of pre-event implementation has been recorded by the human team. Until one is, this branch follows the restrictive reading:
