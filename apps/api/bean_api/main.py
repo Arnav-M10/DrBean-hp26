@@ -18,6 +18,7 @@ from .contracts import (
     DecimalInputRequest, DesignRequestBody, IntakeRequest, IntakeReviewRequest, ObservationProposalBody,
     ObservationReviewRequest, ProblemBody, StartRunRequest, WorkspaceCreateRequest,
     MaterializeIntakeRequest,
+    ExperimentTemplateRequest,
 )
 from .conversation import ConversationService
 from .http import RequestBoundary, error_body
@@ -54,6 +55,8 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
     intake = IntakeService(workflow, sources, provider)
     conversation = ConversationService(workflow, provider, sources)
     artifacts = ArtifactService(workflow, settings.artifact_dir)
+    from .researcher_tools import ResearcherTools
+    researcher_tools = ResearcherTools(workflow)
     materialization = SourceMaterializationService(workflow, sources)
     app = FastAPI(title="Dr. Bean research API", version="DB-SC-1", description="GF-2 policy. Explicit local SQLite lane. Scientific capabilities are reported at /capabilities.")
     app.state.settings, app.state.workflow, app.state.ledger = settings, workflow, ledger
@@ -276,6 +279,32 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
     @app.post(PREFIX + "/runs/{run_id}/reports", status_code=201)
     def report_create(run_id: str, actor: Actor, key: OperationKey):
         return workflow.create_report(actor, run_id, key)
+
+    @app.get(PREFIX + "/workspaces/{workspace_id}/investigations/compare")
+    def compare_investigations(workspace_id: str, actor: Actor,
+                              left_run_id: str = Query(..., min_length=1, max_length=128),
+                              right_run_id: str = Query(..., min_length=1, max_length=128)):
+        return researcher_tools.compare(actor, workspace_id, left_run_id, right_run_id)
+
+    @app.post(PREFIX + "/workspaces/{workspace_id}/experiment-templates", status_code=201)
+    def save_template(workspace_id: str, body: ExperimentTemplateRequest, actor: Actor, key: OperationKey):
+        return researcher_tools.create_template(actor, workspace_id, body.model_dump(mode="json"), key)
+
+    @app.get(PREFIX + "/workspaces/{workspace_id}/experiment-templates")
+    def list_templates(workspace_id: str, actor: Actor):
+        return workflow.recent_records(actor, workspace_id, "experiment_template", limit=100)
+
+    @app.get(PREFIX + "/experiment-templates/{template_id}/draft")
+    def template_draft(template_id: str, actor: Actor):
+        return researcher_tools.template_draft(actor, template_id)
+
+    @app.get(PREFIX + "/reports/{report_id}/package")
+    def reviewer_package(report_id: str, actor: Actor):
+        from .reviewer_package import build_reviewer_package
+        content = build_reviewer_package(workflow, artifacts, actor, report_id)
+        return Response(content, media_type="application/zip", headers={
+            "Content-Disposition": f'attachment; filename="dr-bean-{report_id}-reviewer.zip"',
+            "X-Artifact-SHA256": hashlib.sha256(content).hexdigest()})
 
     @app.get(PREFIX + "/reports/{report_id}")
     def get_report(report_id: str, actor: Actor):

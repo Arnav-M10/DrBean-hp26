@@ -185,6 +185,22 @@ class MaterializedProblemInputs(StrictModel):
     target: TargetInterval
 
 
+class ExperimentTemplateRequest(StrictModel):
+    name: Annotated[str, StringConstraints(min_length=1, max_length=120)]
+    description: ShortText = ""
+    problem_id: Identifier
+    problem_digest: Digest
+    default_hard_allowance: Rational
+    allowance_origin: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+    methods: ShortText = ""
+
+    @model_validator(mode="after")
+    def positive_default(self) -> "ExperimentTemplateRequest":
+        if Fraction(self.default_hard_allowance) <= 0 or not self.name.strip() or not self.allowance_origin.strip():
+            raise ValueError("A named template needs a positive default allowance and its reviewed origin")
+        return self
+
+
 class MaterializeIntakeRequest(StrictModel):
     expected_review_digest: Digest
     dataset: DatasetBody
@@ -793,7 +809,7 @@ PUBLIC_SCHEMAS = {
     cls.__name__: cls
     for cls in (
         ApiError, WorkspaceCreateRequest, CancelRequest, DecimalInputRequest, ReportRequest,
-        DatasetBody, ProblemBody, MaterializedProblemInputs, MaterializeIntakeRequest, ResearchObjective,
+        DatasetBody, ProblemBody, MaterializedProblemInputs, MaterializeIntakeRequest, ResearchObjective, ExperimentTemplateRequest,
         CandidateResult, AllowanceOrigin, PlanBody, CreatePlanRequest, ApprovalRequest, AgentProviderConsent,
         StartRunRequest, DesignRequestBody, DesignPlanBody, ObservationProposalBody,
         ObservationReviewRequest, SourceAssetMetadata, IntakeProposalBody, IntakeProposalRecordBody, IntakeRequest,

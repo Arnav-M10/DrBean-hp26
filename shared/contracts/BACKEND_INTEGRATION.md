@@ -15,6 +15,50 @@ remains covered by explicitly seeded internal controls. Reviewed hypothetical
 follow-up plans now select native fixed-candidate review of the original design
 pair. An ordinary investigation still performs bounded discovery.
 
+## Researcher tools: reviewer packages, comparison and templates
+
+These additive tools use authenticated workspace records and existing scientific
+results. They neither dispatch science/model calls nor grant approvals.
+
+- Create a frozen report with `POST /runs/{run_id}/reports` as before, then
+  `GET /reports/{report_id}/package` for `application/zip`. The response includes
+  `X-Artifact-SHA256`. The deterministic ZIP contains `report.json`, exact
+  measurement JSON/CSV, immutable approval receipts, native evidence and separate
+  retained anchors, a checksum/size manifest and offline replay instructions.
+  Completed design and follow-up dependencies are included when in the report.
+  Raw source images are excluded; retained source metadata remains in the report.
+  Native byte/hash failures, missing dependencies or conflicting references fail
+  the whole download. Export is capped at 12 MiB and 64 members. A manifest is
+  an integrity inventory, not independent authentication or a scientific proof.
+- `GET /workspaces/{workspace_id}/investigations/compare?left_run_id=...&right_run_id=...`
+  takes a consistent read snapshot of two owned runs in that workspace. It returns
+  exact JSON-pointer changes with before/after values and presence flags, record
+  identities, scenario inputs, and independent outcome/checking states. Rows are
+  matched by ID; order changes remain explicit. Incomplete jobs are shown as such.
+  Different experiment/model identities produce a warning, not an inference that
+  one run is scientifically better. Comparison starts no computation.
+- `POST /workspaces/{workspace_id}/experiment-templates` accepts
+  `ExperimentTemplateRequest`: name/description, exact source problem ID/digest,
+  positive default hard allowance, its origin, and optional methods. It saves an
+  immutable `experiment_template` record containing the supported model, units,
+  domain, target and defaults. Measurements, experiment identity, approvals,
+  provider consent and budgets are not copied. Old templates remain unchanged.
+  `GET /workspaces/{workspace_id}/experiment-templates` lists the latest 100.
+  `GET /experiment-templates/{template_id}/draft` returns `requires_review: true`
+  defaults without creating a dataset, problem, approval or job.
+
+The browser exposes ZIP export in Report, comparison in Investigations, and
+template save/preview/apply in Review. Applying a template preserves existing
+measurement rows, clears experiment identity/origin, and invalidates stale plan
+approval controls. The allowance default applies only to subsequently added
+manual rows; existing reviewed measurement allowances are preserved. Enter the
+new experiment details and follow the ordinary review/new-plan/approval path.
+
+Validation: `tests/test_researcher_tools.py` exercises actual computed results,
+fresh ZIP-native replay, exact comparison, isolation, defaults and fail-closed
+exports. `apps/web/check-backend.mjs` exercises all three through Chromium,
+including a ZIP with baseline plus two design packets replayed separately.
+
 ## Runtime and default mode
 
 Run from the repository checkout, with backend Python 3.12/3.13 and a separately

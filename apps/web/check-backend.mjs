@@ -248,6 +248,40 @@ try {
   await page.waitForFunction(() => document.querySelector('#backend-design').textContent.includes('Design tier: checked_pair_separation'))
   assert.equal((await api(`/design-jobs/${noSeparation.finished.id}`)).state, 'completed')
 
+  // Save a reusable setup; neither measurements nor authority are in a template.
+  await page.getByRole('link', { name: 'Review', exact: true }).click()
+  await page.getByLabel('Template name', { exact: true }).fill('Reviewed reusable setup')
+  await page.getByLabel('Default hard allowance (mg/L; exact decimal or fraction)', { exact: true }).fill('0.4')
+  await page.getByRole('button', { name: 'Save current setup as template', exact: true }).click()
+  await page.waitForFunction(() => document.querySelector('[aria-label="Saved experiment template"]').options.length === 2)
+  const template = (await api(`/workspaces/${workspace}/experiment-templates`))[0]
+  assert.equal(template.body.default_hard_allowance, '2/5')
+  assert.equal(template.body.requires_review, true)
+
+  // Frozen reviewer package includes original baseline plus both completed designs.
+  await page.getByRole('link', { name: 'Report', exact: true }).click()
+  await page.getByRole('button', { name: 'Create report for selected run' }).click()
+  const [zipDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download reviewer ZIP package' }).click()])
+  const zipPath = join(temp, 'reviewer.zip'), extracted = join(temp, 'reviewer')
+  await zipDownload.saveAs(zipPath)
+  const unzip = start(python, ['-c', `import hashlib,json,pathlib,sys,zipfile
+p=pathlib.Path(sys.argv[2]);p.mkdir()
+with zipfile.ZipFile(sys.argv[1]) as z:
+ m=json.loads(z.read('manifest.json'))
+ assert len(m['native_artifacts']) == 3
+ for f in m['files']:
+  data=z.read(f['path']);assert len(data)==f['byte_size'] and hashlib.sha256(data).hexdigest()==f['sha256']
+ for name in z.namelist():
+  assert not name.startswith('/') and '..' not in pathlib.PurePosixPath(name).parts
+ z.extractall(p)
+print(json.dumps(m['native_artifacts']))`, zipPath, extracted], { PATH: process.env.PATH })
+  assert.equal(await waitForExit(unzip), 0, unzip.output)
+  for (const item of JSON.parse(unzip.output)) {
+    const replay = start(enginePython, ['-I', '-m', 'counterdex', 'replay-native', join(extracted, item.native_file), '--anchors', join(extracted, item.anchor_file)], { PATH: process.env.PATH })
+    assert.equal(await waitForExit(replay), 0, replay.output)
+    assert.equal(JSON.parse(replay.output).replay, 'passed')
+  }
+
   // A changed observation must create new reviewed identities and actual computation.
   await page.getByRole('link', { name: 'Inputs', exact: true }).click()
   await page.getByRole('textbox', { name: 'Row 1, concentration', exact: true }).fill('4.85')
@@ -262,6 +296,11 @@ try {
   assert.equal(await page.locator('#design-job-id').inputValue(), '')
   assert.equal(await page.getByRole('button', { name: 'Download native design evidence', exact: true }).count(), 0)
   await downloadAndReplay(changedEvidence.body.result, 'changed')
+  await page.getByLabel('First run identifier', { exact: true }).fill(run.id)
+  await page.getByLabel('Second run identifier', { exact: true }).fill(changed.id)
+  await page.getByRole('button', { name: 'Compare investigations', exact: true }).click()
+  await page.getByText('Exact comparison and record identities', { exact: true }).waitFor()
+  assert.match(await page.locator('#backend-investigations').textContent(), /\/concentration/)
   assert.equal((await api(`/records/${evidence.id}`)).digest, evidence.digest)
   assert.deepEqual(await api(`/workspaces/${workspace}/provider-attempts`), [])
 
@@ -275,11 +314,26 @@ try {
   assert.deepEqual(external, [])
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0)
   assert.equal((await context.cookies()).length, 0)
+  // Applying saved defaults keeps readings, clears identity and invalidates approval.
+  await page.getByRole('link', { name: 'Review', exact: true }).click()
+  await page.getByLabel('Saved experiment template', { exact: true }).selectOption(template.id)
+  await page.getByRole('button', { name: 'Preview setup template', exact: true }).click()
+  await page.getByRole('button', { name: 'Apply template defaults to draft', exact: true }).click()
+  await page.waitForFunction(() => location.hash === '#question')
+  assert.equal(await page.locator('#experiment-id').inputValue(), '')
+  assert.equal(await page.locator('#dataset-origin').inputValue(), '')
+  assert.equal(await page.locator('#keMin').inputValue(), '3/200')
+  await page.getByRole('link', { name: 'Review', exact: true }).click()
+  assert.equal(await page.getByRole('button', { name: 'Queue approved manual run' }).isDisabled(), true)
+  await page.getByRole('link', { name: 'Inputs', exact: true }).click()
+  assert.equal(await page.getByRole('textbox', { name: 'Row 1, concentration', exact: true }).inputValue(), '4.85')
+  await page.click('#add-row')
+  assert.equal(await page.getByRole('textbox', { name: 'Row 6, hard allowance', exact: true }).inputValue(), '2/5')
   await page.click('#disconnect')
   assert.match(await page.locator('#backend-review').textContent(), /Connect to the local backend/)
   const denied = await fetch(`${base}/api/bean/v1/workspaces`, { headers: { Origin: 'https://external.invalid' } })
   assert.equal(denied.status, 403)
-  console.log('Passed: actual browser review/approval/dispatch, real baseline discovery on two reviewed inputs, separately approved positive and no-separation designs from the actual pair, exact native and anchor downloads with installed-engine replay, preserved earlier evidence, reopened design history, zero provider attempts, memory-only credentials, and proxy origin rejection.')
+  console.log('Passed: real baseline/design flows, reviewer ZIP with three independently replayed artifacts, exact investigation comparison, saved/previewed/applied templates with fresh authority required, preserved readings, zero provider attempts, memory-only credentials and proxy origin rejection.')
 } finally {
   await browser?.close()
   for (const child of children.reverse()) if (child.exitCode === null && !child.launchError) child.kill('SIGTERM')

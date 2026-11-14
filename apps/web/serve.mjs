@@ -13,6 +13,7 @@ const routes = new Map([
   ['/api.mjs', ['api.mjs', 'text/javascript']],
   ['/manual.mjs', ['manual.mjs', 'text/javascript']],
   ['/workflow.mjs', ['workflow.mjs', 'text/javascript']],
+  ['/researcher-tools.mjs', ['researcher-tools.mjs', 'text/javascript']],
   ['/design.mjs', ['design.mjs', 'text/javascript']],
   ['/design-workflow.mjs', ['design-workflow.mjs', 'text/javascript']],
   ['/styles.css', ['styles.css', 'text/css']],

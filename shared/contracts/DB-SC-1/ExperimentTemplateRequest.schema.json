@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Description",
+      "type": "string"
+    },
+    "problem_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Problem Id",
+      "type": "string"
+    },
+    "problem_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Problem Digest",
+      "type": "string"
+    },
+    "default_hard_allowance": {
+      "maxLength": 514,
+      "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+      "title": "Default Hard Allowance",
+      "type": "string"
+    },
+    "allowance_origin": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Allowance Origin",
+      "type": "string"
+    },
+    "methods": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Methods",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "problem_id",
+    "problem_digest",
+    "default_hard_allowance",
+    "allowance_origin"
+  ],
+  "title": "ExperimentTemplateRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ExperimentTemplateRequest"
+}

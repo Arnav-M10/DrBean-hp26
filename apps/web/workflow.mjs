@@ -2,23 +2,25 @@ import { BeanApi, baselineAvailable, baselineExplanation } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 import { setupDesignWorkflow } from './design-workflow.mjs'
 import { designAvailable } from './design.mjs'
+import { setupResearcherTools } from './researcher-tools.mjs'
 const byId = id => document.getElementById(id)
 function node(tag, text) { const n = document.createElement(tag); n.textContent = text; return n }
 function exactRecord(title, record) {
   const d = node('details', ''); d.append(node('summary', title), node('pre', JSON.stringify(record, null, 2))); return d
 }
-function save(bytes, name) {
-  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/json' }))
+function save(bytes, name, type = 'application/json') {
+  const url = URL.createObjectURL(new Blob([bytes], { type }))
   const a = document.createElement('a'); a.href = url; a.download = name; a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
-export function setupWorkflow(getDraft) {
+export function setupWorkflow(getDraft, applyTemplate) {
   let api, capabilities, workspace = '', plan, approval, run, report, frozen, inputs, busy = false, pollTimer
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
   const available = () => baselineAvailable(capabilities)
   const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save })
-  function reset() { clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
+  const tools = setupResearcherTools({ context: () => ({ api, workspace, run, report, inputs: currentPlan() ? inputs : null }), getDraft, applyTemplate, button, node, exactRecord, save })
+  function reset() { clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset(); tools.reset() }
   function button(parent, label, action, disabled = false) {
     const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy
     b.addEventListener('click', () => perform(action)); parent.append(b); return b
@@ -141,6 +143,7 @@ export function setupWorkflow(getDraft) {
         byId('status').textContent = `Downloaded SHA-256 ${download.digest}. Browser replay: unsupported.`
       })
     }
+    tools.render({ review, investigations, reports })
     clearTimeout(pollTimer)
     const pendingRun = run && ['queued', 'running', 'cancel_requested'].includes(run.state)
     if (api && (pendingRun || designs.pending()) && !busy) {

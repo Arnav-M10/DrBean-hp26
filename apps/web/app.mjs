@@ -26,6 +26,7 @@ let sources = []
 let previewToken = 0
 let rowsReviewed = false
 let questionReviewed = false
+let defaultAllowance = ''
 
 function element(tag, text, attributes = {}) {
   const node = document.createElement(tag)
@@ -39,7 +40,7 @@ function announce(message) {
 }
 
 function addRow(values = {}, sourceId = null) {
-  const row = { id: nextRowId++, time: '', concentration: '', epsilon: '', included: true, ...values, sourceId }
+  const row = { id: nextRowId++, time: '', concentration: '', epsilon: defaultAllowance, included: true, ...values, sourceId }
   if (sourceId !== null) {
     row.original = Object.fromEntries(measurementFields.map(([field]) => [field, row[field]]))
   }
@@ -336,7 +337,17 @@ byId('export-draft').addEventListener('click', () => {
 
 let renderWorkflow
 createBounds()
-renderWorkflow = setupWorkflow(currentDraft)
+renderWorkflow = setupWorkflow(currentDraft, fields => {
+  defaultAllowance = fields.defaultAllowance
+  for (const [id, value] of Object.entries(fields)) if (id !== 'defaultAllowance') byId(id).value = value
+  for (const id of ['experiment-id', 'time-origin', 'dataset-origin', 'goal']) byId(id).value = ''
+  rowsReviewed = questionReviewed = false
+  byId('question-errors').hidden = true
+  byId('rows-errors').hidden = true
+  renderReview()
+  location.hash = 'question'
+  announce('Template defaults applied. Enter the new experiment identity and origin, review measurements and assumptions, and prepare a fresh plan.')
+})
 addRow()
 renderRows()
 route(false)
