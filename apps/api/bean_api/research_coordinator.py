@@ -600,8 +600,9 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
                                        "graph_version": GRAPH_VERSION, **event}))
 
     async def prepare_scientific_proposal(kind: Literal["investigation", "design", "followup"],
-                                         reference_ids: Annotated[list[str], Field(min_length=1, max_length=16)]) -> dict[str, Any]:
-        """Prepare only. Investigation: [reviewed_context.dataset.id]. Design: [evidence ID]. Never empty."""
+                                         reference_ids: Annotated[list[str], Field(min_length=1, max_length=16)],
+                                         runtime: ToolRuntime) -> dict[str, Any]:
+        """Prepare and pause for human review; no science. Investigation: [reviewed_context.dataset.id]. Design: [evidence ID]."""
         _references(reference_ids)
         result = _bounded(await _await(ports.prepare_proposal(kind, reference_ids)), 8000)
         if isinstance(result, dict) and "available" in result:
@@ -613,7 +614,33 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
             return result
         if not isinstance(result, dict) or result.get("accepted") is not False or not result.get("proposal_id"):
             raise CoordinatorFailure("research_proposal_authority_violation")
-        return result
+        proposal_id = result["proposal_id"]
+        review = _review(await _await(ports.read_review(proposal_id)), proposal_id)
+        if any(result.get(key) != review[key] for key in ("proposal_digest", "review_id", "review_digest")):
+            raise CoordinatorFailure("research_review_changed")
+        replay_review = runtime.state.get("review_interrupt_calls", {}).get(runtime.tool_call_id)
+        if replay_review is not None and replay_review != review["review_digest"]:
+            raise CoordinatorFailure("research_review_changed")
+        if review["decision"] == "pending" or replay_review == review["review_digest"]:
+            if review["decision"] == "pending":
+                await emit({"type": "review_required", "review_id": review["review_id"],
+                            "review_digest": review["review_digest"], "proposal_id": proposal_id,
+                            "observation_key": f"review:{review['review_id']}:{review['review_digest']}"})
+            interrupt({"kind": "canonical_scientific_review", "proposal_id": proposal_id,
+                       "proposal_digest": review["proposal_digest"], "review_id": review["review_id"],
+                       "review_digest": review["review_digest"], "tool_call_id": runtime.tool_call_id})
+            await authority()
+            fresh = _review(await _await(ports.read_review(proposal_id)), proposal_id)
+            if any(fresh[key] != review[key] for key in ("proposal_digest", "review_id", "review_digest")):
+                raise CoordinatorFailure("research_review_changed")
+            review = fresh
+        if review["decision"] not in {"approved", "rejected"}:
+            raise CoordinatorFailure("research_canonical_approval_required")
+        # Preparation never executes a child. The model receives the exact
+        # reviewed binding only after the human decision; execution still uses
+        # the separate run tool's canonical approval and stable job checks.
+        return {**result, "review_decision": review["decision"],
+                "next_tool": "run_scientific_operation" if review["decision"] == "approved" else "request_clarification"}
 
     async def run_scientific_operation(proposal_id: str, proposal_digest: str,
                                        review_id: str, review_digest: str, runtime: ToolRuntime) -> dict[str, Any]:
@@ -835,7 +862,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
     graph = create_deep_agent(model=model, tools=typed, middleware=[NoFilesystem(), planning, Boundary()],
         state_schema=ResearchState, backend=StateBackend(), checkpointer=checkpointer,
         subagents=[], skills=None, memory=None, store=None, cache=None, debug=False,
-        system_prompt=("Use canonical IDs/evidence. Plan; prepare; human approve; run; report/clarify. "
+        system_prompt=("Use canonical IDs/evidence. "
             "Batch only independent todos+prepare/report. Clarify missing assumptions; invent nothing. "
             "A counterexample is compatible and strictly outside the CLOSED claim. Bounded misses prove nothing. "
             "Design: distinct checked candidates, reviewed times/allowance, separate approval, positive checked margin. "

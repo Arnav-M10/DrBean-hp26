@@ -90,7 +90,7 @@ def test_worker_reconciles_lost_child_ack_once_without_new_model_or_science_rese
     queue(service, session)
     assert runner.tick() == 1
     waiting = service.get("alice", session["id"])
-    assert waiting["state"] == "waiting_review" and model.calls == 3
+    assert waiting["state"] == "waiting_review" and model.calls == 2
     approved = service.decide("alice", session["id"], {"expected_revision": waiting["revision"],
         "pending_review_id": waiting["pending_review"]["id"], "expected_review_digest": waiting["pending_review_digest"],
         "decision": "approve", "accepted": True}, "approve")
@@ -300,7 +300,7 @@ def test_recovery_of_safe_plan_proposal_batch_preserves_prepared_identity(author
     current = service.get("alice", session["id"])
     assert current["state"] == "waiting_review", current["action"]
     assert current["pending_review"]["id"] == prepared_id and current["plan"]["id"] == original_plan
-    assert model.calls == 2 and current["usage"]["tool_calls"] == 3
+    assert model.calls == 1 and current["usage"]["tool_calls"] == 2
     assert current["usage"]["child_count"] == 0
     with service.store.read() as conn:
         assert conn.execute("SELECT count(*) FROM research_effects WHERE kind='investigation'").fetchone()[0] == 1

@@ -67,7 +67,7 @@ def test_canonical_pause_is_not_bypassed_by_pending_continuation():
         await graph.start()
         with pytest.raises(CoordinatorFailure, match="research_canonical_approval_required"):
             await graph.continue_pending()
-        assert not ports.children and len(ports.turns) == 3
+        assert not ports.children and len(ports.turns) == 2
         ports.review["decision"] = "approved"
         assert (await graph.continue_pending())["terminal"]["kind"] == "report"
     asyncio.run(exercise())
@@ -263,6 +263,86 @@ def test_completed_plan_report_batch_finishes_terminal_guard_without_provider_re
         assert result["terminal"] == {"kind": "report", "record_id": "report"}
         assert not (await restored._snapshot()).next
         assert before == (len(ports.turns), len(ports.tool_admissions), len(ports.children), len(ports.reports))
+        assert await restored.continue_pending() == result
+
+    asyncio.run(exercise())
+
+
+def test_approved_prepare_lost_ack_reuses_review_slot_without_repeating_model_or_approval():
+    """Lost preparation acknowledgement preserves the existing human decision."""
+    from langchain_core.messages import ToolMessage
+
+    async def exercise():
+        ports, saver = Ports(), InMemorySaver()
+        graph = factory(ports, saver=saver)
+        paused = await graph.start()
+        assert paused["interrupts"][0]["tool_call_id"] == "research-call-1"
+        assert len(ports.turns) == 2 and not ports.children
+        ports.review["decision"] = "approved"
+        read_review, approved_reads = ports.read_review, 0
+
+        def lose_ack(proposal_id):
+            nonlocal approved_reads
+            result = read_review(proposal_id)
+            approved_reads += 1
+            # Resume facade, replayed preparation, then post-interrupt reread.
+            if approved_reads == 3:
+                raise RuntimeError("review reread acknowledgement lost")
+            return result
+
+        ports.read_review = lose_ack
+        with pytest.raises(RuntimeError, match="review reread acknowledgement lost"):
+            await graph.resume()
+        assert len(ports.turns) == len(ports.tool_admissions) == 2 and not ports.children
+        ports.read_review = read_review
+        restored = factory(ports, saver=saver)
+        result = await restored.continue_pending()
+        assert result["terminal"]["kind"] == "report"
+        assert len(ports.children) == 1 and len(ports.turns) == len(ports.tool_admissions) == 4
+        state = await restored._snapshot()
+        prepared = next(json.loads(message.content) for message in state.values["messages"]
+                        if isinstance(message, ToolMessage) and message.name == "prepare_scientific_proposal")
+        assert prepared["accepted"] is False and prepared["review_decision"] == "approved"
+        assert prepared["next_tool"] == "run_scientific_operation"
+        assert state.values["review_interrupt_calls"] == {"research-call-1": "review-digest"}
+        before = (len(ports.turns), len(ports.tool_admissions), len(ports.execute_calls), len(ports.reports))
+        assert await restored.continue_pending() == result
+        assert before == (len(ports.turns), len(ports.tool_admissions), len(ports.execute_calls), len(ports.reports))
+
+    asyncio.run(exercise())
+
+
+def test_legacy_completed_prepare_and_pending_run_checkpoint_remains_resumable():
+    """The old preparation shape/run-review checkpoint needs no migration."""
+    from langchain_core.messages import ToolMessage
+    from langchain_core.tools import StructuredTool
+
+    async def exercise():
+        ports, saver = Ports(), InMemorySaver()
+        old = factory(ports, saver=saver)
+
+        async def legacy_prepare(kind: str, reference_ids: list[str]) -> dict:
+            return ports.prepare_proposal(kind, reference_ids)
+
+        # Only this fixture restores the former preparation behavior. Its
+        # checkpoint is reopened by the unchanged current production graph.
+        node = next(node.data for node in old._graph.get_graph().nodes.values()
+                    if hasattr(node.data, "tools_by_name"))
+        node.tools_by_name["prepare_scientific_proposal"] = StructuredTool.from_function(
+            coroutine=legacy_prepare, name="prepare_scientific_proposal", description="Legacy prepare-only tool.")
+        paused = await old.start()
+        assert paused["awaiting_review"] and len(ports.turns) == 3 and not ports.children
+        assert paused["interrupts"][0]["tool_call_id"] == "research-call-2"
+        state = await old._snapshot()
+        prepared = next(json.loads(message.content) for message in state.values["messages"]
+                        if isinstance(message, ToolMessage) and message.name == "prepare_scientific_proposal")
+        assert "review_decision" not in prepared and "next_tool" not in prepared
+        ports.review["decision"] = "approved"
+        restored = factory(ports, saver=saver)
+        result = await restored.resume()
+        assert result["terminal"]["kind"] == "report" and len(ports.children) == 1
+        assert len(ports.turns) == len(ports.tool_admissions) == 4
+        assert (await restored._snapshot()).values["review_interrupt_calls"] == {"research-call-2": "review-digest"}
         assert await restored.continue_pending() == result
 
     asyncio.run(exercise())

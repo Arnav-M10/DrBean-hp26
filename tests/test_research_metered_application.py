@@ -256,7 +256,7 @@ def test_actual_baseline_approval_evidence_and_report_through_metered_model(mete
     waiting = service.get("alice", session["id"])
     assert waiting["state"] == "waiting_review", waiting
     assert waiting["pending_review"]["kind"] == "plan" and not waiting["children"]
-    assert len(wire.requests) == 2
+    assert len(wire.requests) == 1
     decision = {"expected_revision": waiting["revision"], "pending_review_id": waiting["pending_review"]["id"],
         "expected_review_digest": waiting["pending_review_digest"], "decision": "approve", "accepted": True}
     path = f"/research-sessions/{session['id']}/decisions"
@@ -380,7 +380,7 @@ def test_reviewed_design_constraints_baseline_fits_the_documented_operator_alloc
     worker.tick()
     waiting = service.get("alice", session["id"])
     assert waiting["state"] == "waiting_review" and len(waiting["children"]) == 1, waiting
-    assert len(wire.requests) == 5
+    assert len(wire.requests) == 4
     accepted(f"/research-sessions/{session['id']}/decisions", {
         "expected_revision": waiting["revision"], "pending_review_id": waiting["pending_review"]["id"],
         "expected_review_digest": waiting["pending_review_digest"], "decision": "approve", "accepted": True}, "approve-design")

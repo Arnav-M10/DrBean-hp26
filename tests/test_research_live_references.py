@@ -30,7 +30,7 @@ def test_proposal_references_survive_intervening_plan_and_empty_list_never_gets_
     consent(client, session)
     allocation = {"physical_requests": 6, "input_tokens": 64_000, "output_tokens": 3072}
     service.allocate_provider("alice", session["id"], {**allocation, "accepted": True}, "offline-reference-admission")
-    observed_contexts, calls, prepared_bindings = [], [], []
+    observed_contexts, calls = [], []
 
     async def proposal_from_context(**kwargs):
         wire.requests.append(kwargs)
@@ -58,12 +58,7 @@ def test_proposal_references_survive_intervening_plan_and_empty_list_never_gets_
             name, args = "prepare_scientific_proposal", {
                 "kind": "investigation", "reference_ids": [] if empty_references else [reviewed["dataset"]["id"]]}
         else:
-            assert not empty_references and len(wire.requests) == 3
-            proposal = results["prepare_scientific_proposal"]
-            assert proposal["accepted"] is False
-            args = {key: proposal[key] for key in ("proposal_id", "proposal_digest", "review_id", "review_digest")}
-            prepared_bindings.append(deepcopy(args))
-            name = "run_scientific_operation"
+            raise AssertionError("Preparation must hand off to canonical review before another model turn")
         call = {"name": name, "args": args, "id": f"DRBEAN-DUMMY-reference-{len(wire.requests)}", "type": "tool_call"}
         calls.append(deepcopy(call))
         return efficient_response([call], LIVE_MODEL)
@@ -73,7 +68,7 @@ def test_proposal_references_survive_intervening_plan_and_empty_list_never_gets_
     assert worker.tick() == 1
     final = service.get("alice", session["id"])
     attempts = deepcopy(client.app.state.ledger.list_attempts("alice", workspace))
-    expected_requests = 2 if empty_references else 3
+    expected_requests = 2
     assert len(attempts) == len(wire.requests) == final["usage"]["physical_calls"] == expected_requests
     assert final["provider_allocation"] == allocation
     assert final["children"] == [] and final["reports"] == []
@@ -87,7 +82,7 @@ def test_proposal_references_survive_intervening_plan_and_empty_list_never_gets_
         # it still consumes the physical attempt and cannot gain a reference.
         assert final["state"] == "failed" and final["pending_review"] is None
         assert final["action"]["error_code"] == "provider_malformed_tool_call"
-        assert calls[-1]["args"]["reference_ids"] == [] and prepared_bindings == []
+        assert calls[-1]["args"]["reference_ids"] == []
         assert attempts[-1]["state"] == "failed"
         assert attempts[-1]["response_metadata"]["validation_detail"] == {
             "reason": "schema_constraint", "tool_name": "prepare_scientific_proposal"}
@@ -97,14 +92,14 @@ def test_proposal_references_survive_intervening_plan_and_empty_list_never_gets_
         assert final["state"] == "waiting_review" and final["pending_review"]["kind"] == "plan"
         assert final["action"]["error_code"] is None
         assert calls[1]["args"]["reference_ids"] == [observed_contexts[1]["reviewed_context"]["dataset"]["id"]]
-        assert len(prepared_bindings) == 1
-        assert final["pending_review"]["id"] == prepared_bindings[0]["review_id"]
-        assert final["pending_review_digest"] == prepared_bindings[0]["review_digest"]
+        assert final["pending_review"]["body"]["dataset_id"] == dataset["id"]
+        assert final["pending_review"]["digest"] == final["pending_review_digest"]
+        assert [call["name"] for call in calls] == ["write_todos", "prepare_scientific_proposal"]
         assert all(attempt["state"] == "completed" for attempt in attempts)
     for request in wire.requests:
         declaration = next(declaration for tool in request["config"].tools for declaration in tool.function_declarations
                            if declaration.name == "prepare_scientific_proposal")
-        assert "reviewed_context.dataset.id" in declaration.description and "Never empty" in declaration.description
+        assert "reviewed_context.dataset.id" in declaration.description and "pause for human review" in declaration.description
         schema = declaration.parameters_json_schema["properties"]["reference_ids"]
         # The existing live-wire grammar moves numeric bounds into guidance;
         # local original-schema enforcement is proved by the refused [] above.

@@ -151,3 +151,12 @@ The focused backend PR is #60. Its checked commit and commands are retained in
 unavailable when connecting to an older server. Browser and live qualification
 remain separate. A concurrent plan/report batch captures the plan revision present
 at first publication; later plan updates do not mutate that historical report.
+
+
+Successful scientific proposal preparation now opens the existing canonical
+`waiting_review` pause immediately. The UI uses the same pending-review body,
+revision/digest checks and decision route; no new route or implicit approval is
+introduced. Preparation creates no scientific child. After the human decision,
+the model receives `review_decision` and `next_tool` guidance; execution remains a
+separate checked tool call. Existing pending run-tool checkpoints remain supported.
+This closes the observed pre-review planning loop without raising request limits.

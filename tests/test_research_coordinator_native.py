@@ -220,13 +220,15 @@ def test_new_parent_factory_uses_approved_real_science_then_selects_evidence_bou
         assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
         with pytest.raises(CoordinatorFailure, match="research_canonical_approval_required"):
             await coordinator.resume()
-        assert ports.run is None and len(ports.turns) == 3
+        assert ports.run is None and len(ports.turns) == 2
+        assert pending["interrupts"][0]["tool_call_id"] == "controlled-1"
+        assert ports.admitted_tools == ["write_todos", "prepare_scientific_proposal"]
         # Rebuilding a facade with the same in-memory state is not process restart.
         reopened = create_research_coordinator(context=context, ports=ports,
             model_factory=lambda: model, checkpointer=checkpointer)
         saved = await reopened.snapshot()
         assert saved["awaiting_review"] and saved["todos"] == ports.plans[0]
-        assert saved["model_turns"] == 3 and len(model.questions) == 3
+        assert saved["model_turns"] == 2 and len(model.questions) == 2
         ports.approve_as_human()
         finished = await reopened.resume()
         assert not finished["awaiting_review"]

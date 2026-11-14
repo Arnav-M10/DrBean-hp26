@@ -69,7 +69,7 @@ def test_review_replaced_between_resume_preflight_and_tool_replay_cannot_execute
             self.reads += 1
             if self.reads == 3:
                 # First read pauses; second is resume preflight. The third is
-                # the replayed tool's fresh read, after preflight already passed.
+                # the replayed preparation's fresh read, after preflight passed.
                 self.review[changed_field] = "replacement-identity"
             return super().read_review(proposal_id)
 
@@ -82,7 +82,7 @@ def test_review_replaced_between_resume_preflight_and_tool_replay_cannot_execute
             await graph.resume()
         assert ports.reads == 3
         assert ports.execute_calls == [] and ports.children == {} and ports.reports == []
-        assert len(ports.turns) == 3
+        assert len(ports.turns) == 2
     asyncio.run(exercise())
 
 
@@ -126,26 +126,34 @@ def test_replayed_tool_events_have_identical_keys_distinct_from_other_calls():
     async def exercise():
         ports, saver = Ports(), InMemorySaver()
         graph = factory(ports, saver=saver)
-        await graph.start()
+        paused = await graph.start()
+        assert paused["awaiting_review"] and not ports.children
+        assert not any(event.get("tool") == "run_scientific_operation" for event in ports.events)
         ports.review["decision"] = "approved"
         await factory(ports, saver=saver).resume()
         requests = [event for event in ports.events if event["type"] == "tool_requested"]
+        prepares = [event for event in requests if event["tool"] == "prepare_scientific_proposal"]
         runs = [event for event in requests if event["tool"] == "run_scientific_operation"]
-        assert len(runs) == 2  # A pending tool really re-enters after resume.
+        assert len(prepares) == 2  # The preparation tool re-enters after human review.
+        assert len(runs) == 1  # Science is requested only after that review resumes.
+        assert paused["interrupts"][0]["tool_call_id"] == prepares[0]["tool_call_id"]
 
         def observation_key(event):
             return (event["action_id"], event["type"], event["tool_call_id"], event["arguments_digest"])
 
-        assert observation_key(runs[0]) == observation_key(runs[1])
+        assert observation_key(prepares[0]) == observation_key(prepares[1])
+        assert prepares[0]["tool_call_id"] != runs[0]["tool_call_id"]
         assert len({observation_key(event) for event in requests}) == 4
-        for event in requests:
+        finished = [event for event in ports.events if event["type"] == "tool_finished"]
+        assert len(finished) == len({observation_key(event) for event in finished}) == 4
+        for event in requests + finished:
             assert len(event["arguments_digest"]) == 64
             assert "args" not in event and "arguments" not in event
-        finished = [event for event in ports.events if event["type"] == "tool_finished"
-                    and event["tool"] == "run_scientific_operation"]
-        assert len(finished) == 1
-        assert finished[0]["tool_call_id"] == runs[0]["tool_call_id"]
-        assert finished[0]["arguments_digest"] == runs[0]["arguments_digest"]
+        for name, requested in (("prepare_scientific_proposal", prepares), ("run_scientific_operation", runs)):
+            completed = [event for event in finished if event["tool"] == name]
+            assert len(completed) == 1
+            assert completed[0]["tool_call_id"] == requested[0]["tool_call_id"]
+            assert completed[0]["arguments_digest"] == requested[0]["arguments_digest"]
         assert len(ports.children) == 1
     asyncio.run(exercise())
 

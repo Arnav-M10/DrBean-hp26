@@ -46,6 +46,16 @@
       "input_tokens": 64000,
       "output_tokens": 3072,
       "qualification_extension": "user-followthrough-2026-11-14"
+    },
+    {
+      "at": "2026-11-14T22:15:16Z",
+      "purpose": "baseline-preview-344596e350b6332856aaefecf837eb0ce7151ddd",
+      "research_session_id": "research_session_bc8916cb6e8d4937b51c3e29193e3b4a",
+      "allocation_record": "research_provider_allocation_cbf7cb8770a348a79ad446d06b7f0f5e",
+      "physical_requests": 6,
+      "input_tokens": 64000,
+      "output_tokens": 3072,
+      "qualification_extension": "user-repaired-followthrough-2026-11-14"
     }
   ],
   "released": [
@@ -67,9 +77,10 @@
     "research_session_e226923e4221467f8984eb1269ad8905": 0,
     "research_session_06ba9e94df9747debe0d02eb07f9514e": 0,
     "research_session_7233afd76ccb49a98c99017392f0b6d6": 3,
-    "research_session_615696b8c14f4bcc8ebdbab2f0c221b2": 2
+    "research_session_615696b8c14f4bcc8ebdbab2f0c221b2": 2,
+    "research_session_bc8916cb6e8d4937b51c3e29193e3b4a": 4
   },
-  "sprint_physical_requests_total": 10,
+  "sprint_physical_requests_total": 14,
   "note": "Grants bound dispatch; failed and uncertain attempts count. Live traffic stopped after the 8th request (provider_malformed_tool_call) per the stop-on-defect rule.",
   "qualification_extensions": [
     {
@@ -105,5 +116,17 @@
     "remaining_extension_requests_released": false,
     "next_live_run_authorized": false,
     "note": "Stopped after the observed defect. No retry or second extension grant. The isolated store is deleted; four unused request slots are not released or replenished."
+  },
+  "qualification_repaired_followthrough": {
+    "operator": "root",
+    "tested_commit": "344596e350b6332856aaefecf837eb0ce7151ddd",
+    "receipt": "live-repaired-344596e/record.json",
+    "status": "failed",
+    "code": "agent_model_budget_exhausted",
+    "physical_requests": 4,
+    "total_physical_requests_after_run": 14,
+    "remaining_extension_requests_released": false,
+    "next_live_run_authorized": false,
+    "note": "Valid reviewed dataset references were used, but planning and preparation repeated before run requested canonical review. Four-turn action limit stopped the action before any approval or scientific child. No retry, third grant, refund or replenishment."
   }
 }

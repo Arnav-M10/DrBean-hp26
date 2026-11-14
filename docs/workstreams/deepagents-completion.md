@@ -187,3 +187,42 @@ a guarantee about a live model's request shape.
 The repaired candidate needs a fresh authorized live qualification. No live
 pass or independent Claude acceptance is inferred from offline checks, and
 PR #63 remains unmerged while this blocker is open.
+
+## Immediate human-review handoff after the second live failure
+
+The user separately authorized one repaired-candidate run capped at six requests,
+raising only the qualification grant ceiling from16 to22. At
+`344596e350b6332856aaefecf837eb0ce7151ddd` (application code identical to21d932d),
+Gemini correctly copied the reviewed dataset ID. It then alternated planning and
+preparing the same canonical proposal until the existing four-turn action limit
+stopped it. No review, scientific child or report was reached. The four physical
+requests reserved32,676input/2,048output; provider-reported usage was7,810input,
+198output,8,008total, with no unresolved attempt. Cumulative actual requests are14;
+effective grants are22. No unused slots were refunded and no third run was made.
+The failed receipt is retained in
+[`live-repaired-344596e`](../../evaluation/results/sprint/live-repaired-344596e/qualification.json).
+
+The resulting fix moves the existing canonical review interrupt into successful
+proposal preparation. This makes review a backend-enforced handoff, before another
+planning turn. Preparation never calls the scientific executor. After the actual
+human decision it returns the same four bound IDs/digests plus `review_decision`
+and a non-authoritative `next_tool` hint. A later explicit run-tool call must still
+pass every canonical approval, binding, lease and stable-job check. Unavailable
+proposals retain their existing clarification response. No public route or browser
+approval payload changed, and prompt/checkpoint versions remain compatible.
+
+The new signed substituted-SDK regression opens review after two requests and
+completes actual Counterdex execution/reporting after explicit approval in four.
+Negative cases cover rejection, changed scope, wrong proposal/digest, read-only
+refresh, duplicate decisions and replacement workers. Legacy pending-run
+checkpoints and a lost acknowledgement while resuming preparation are also tested.
+Targeted results:99 coordinator/recovery/handoff tests and7 metered tests pass.
+The unchanged six-request baseline-plus-design allocation completes at63,893
+reserved input tokens and3,072 output tokens. The61,000input case stops before
+its sixth request while retaining both completed scientific children and fallback
+report. Only redundant phase-list wording was removed to fit the existing limit;
+no scientific facts, checks or quotas were relaxed.
+
+This structural repair is not yet live-qualified. Both actual failed runs remain
+failed, and PR #63 cannot be merged as a qualified live workflow without a fresh
+explicitly authorized qualification.
