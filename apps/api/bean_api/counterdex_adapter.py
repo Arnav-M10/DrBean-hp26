@@ -65,6 +65,9 @@ class CounterdexAdapter:
                 "reason": probe.get("worker_error"),
                 "baseline_discovery": available and probe.get("baseline_discovery") is True,
                 "native_design": available and probe.get("baseline_discovery") is True,
+                "native_followup": {"available": available and probe.get("baseline_discovery") is True,
+                    "hypothetical_only": True, "selected_time_and_allowance_only": True,
+                    "requires_checked_separation": True},
                 "native_design_requested_tiers": ["checked_pair_separation"] if available and probe.get("baseline_discovery") is True else [],
                 "claim_families": ["closed_ke_interval_counterexample"] if available else [],
                 "design_tiers": ["numerical_guidance", "checked_pair_separation", "no_separation_established"] if available else [],
@@ -180,6 +183,63 @@ class CounterdexAdapter:
             "artifact_kind": "bundle", "anchor": expected}]
         result["_application_projection"] = projection
         return result
+
+    def review(self, problem: dict, dataset: dict, limits: dict, context: dict) -> dict:
+        """Review the immutable selected pair against one approved hypothetical row."""
+        from .followup_evidence import validate_followup_packet
+        required = ("run_id", "scenario_id", "workflow", "historical_artifact", "design_request")
+        if any(key not in context for key in required):
+            return {"worker_error": "incomplete_historical_projection"}
+        wall = limits["scientific_wall_seconds"]
+        admitted = self._run({"protocol": NATIVE_PROTOCOL, "operation": "admission",
+                             "problem": problem, "dataset": dataset}, min(5, wall))
+        if "worker_error" in admitted:
+            return admitted
+        projection = self._projection(admitted, problem, dataset)
+        response = self._run({"protocol": NATIVE_PROTOCOL, "operation": "review", "problem": problem,
+            "dataset": dataset, "run_id": context["run_id"], "scenario_id": context["scenario_id"],
+            "workflow": context["workflow"], "limits": {"wall_seconds": wall, "max_bundle_bytes": 4 * 1024 * 1024},
+            "historical_artifact": context["historical_artifact"]}, wall)
+        if "worker_error" in response:
+            return response
+        try:
+            if response.get("protocol") != NATIVE_PROTOCOL or response.get("ok") is not True or len(response["native_artifacts"]) != 1:
+                return {"worker_error": "incomplete_export"}
+            artifact = response["native_artifacts"][0]
+            content = base64.b64decode(artifact["bytes_base64"], validate=True)
+            packet = json.loads(content)
+            science = json.loads(base64.b64decode(packet["scientific"]["bytes_base64"], validate=True))
+            reference = {key: artifact[key] for key in ("id", "sha256", "byte_size", "media_type")}
+            if (not content or len(content) != artifact["byte_size"] or len(content) > 4 * 1024 * 1024
+                    or hashlib.sha256(content).hexdigest() != artifact["sha256"]
+                    or artifact["media_type"] != NATIVE_MEDIA_TYPE
+                    or science["limits"] != {"wall_seconds": wall, "max_bundle_bytes": 4 * 1024 * 1024}):
+                return {"worker_error": "artifact_mismatch"}
+            details = response["details"]
+            fresh = details["fresh_replay"]
+            if (details["scientific_report"] != science["report"] or details["search"] is not None
+                    or details["exact_trials"] != [] or response["result"]["artifacts"] != [reference]):
+                return {"worker_error": "binding_mismatch"}
+            result = {**response["result"], "projection_version": APPLICATION_MAPPING,
+                "scientific_problem_digest": projection["projection_digest"], "native_replay": fresh,
+                "candidate_results": [{key: value for key, value in item.items() if key not in {"parameters", "rows"}}
+                                      for item in fresh["candidate_results"]]}
+            result["verification_record"] = {**result["verification_record"],
+                "expected_scientific_problem_digest": projection["projection_digest"],
+                "observed_scientific_problem_digest": projection["projection_digest"]}
+            job = {"id": context["run_id"], "plan_id": context["workflow"]["plan_id"],
+                   "approval_id": context["workflow"]["approval_id"]}
+            validate_followup_packet(content, response["anchors"], projection=projection, job=job,
+                scenario_id=context["scenario_id"], result=result, historical_artifact=context["historical_artifact"],
+                design_request=context["design_request"])
+            result["_native_artifacts"] = [{**reference, "content_base64": artifact["bytes_base64"],
+                "artifact_kind": "bundle", "anchor": response["anchors"]}]
+            result["_application_projection"] = projection
+            return result
+        except DomainError as error:
+            return {"worker_error": error.code}
+        except (KeyError, ValueError, TypeError):
+            return {"worker_error": "invalid_native_artifact"}
 
     def replay_native(self, content: bytes, *, expected: dict, wall_seconds: int = 120) -> dict:
         response = self._run({"protocol": NATIVE_PROTOCOL, "operation": "replay",

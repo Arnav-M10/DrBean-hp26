@@ -1,5 +1,53 @@
 {
   "$defs": {
+    "FollowupScope": {
+      "additionalProperties": false,
+      "description": "Immutable selected design and separately accepted observation lineage.",
+      "properties": {
+        "design_job_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Design Job Id",
+          "type": "string"
+        },
+        "design_result_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Design Result Id",
+          "type": "string"
+        },
+        "design_result_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Design Result Digest",
+          "type": "string"
+        },
+        "observation_proposal_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Observation Proposal Id",
+          "type": "string"
+        },
+        "source_artifact_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Source Artifact Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "design_job_id",
+        "design_result_id",
+        "design_result_digest",
+        "observation_proposal_id",
+        "source_artifact_id"
+      ],
+      "title": "FollowupScope",
+      "type": "object"
+    },
     "InvestigationBudget": {
       "additionalProperties": false,
       "properties": {
@@ -313,6 +361,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/ResearchObjective"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "followup": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FollowupScope"
         },
         {
           "type": "null"

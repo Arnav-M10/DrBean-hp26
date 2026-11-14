@@ -11,9 +11,9 @@ The current progress and observed validation are in `docs/workstreams/02-backend
 Separately approved design now consumes the actual discovered pair and original
 baseline bytes through the application-bound native bridge. Design packets embed
 that original history for offline replay. The older fixed-pair design/replay path
-remains covered by explicitly seeded internal controls. Fixed-candidate follow-up
-on a new observation remains a later milestone; a new baseline search does not
-by itself recheck the selected historical pair.
+remains covered by explicitly seeded internal controls. Reviewed hypothetical
+follow-up plans now select native fixed-candidate review of the original design
+pair. An ordinary investigation still performs bounded discovery.
 
 ## Runtime and default mode
 
@@ -195,6 +195,60 @@ approval. Source-derived follow-ups must go through source materialization.
 Hypothetical provenance is retained in native projection and reports. A
 candidate becoming excluded is a scientific result distinct from corrupt bytes;
 it does not prove the original interval or eliminate all other candidates.
+
+### Reviewed fixed-pair follow-up (manual HTTP)
+
+Consumer DB-SC-1 / GF-2 uses producer `counterdex.bridge.v1` operation `review`
+and mapping `DB-SC-1-to-groundwork-v1`. Reuse IDs returned by the ordinary routes:
+
+1. Complete baseline and separately approved design. Retain the design job,
+   immutable design-result record, and its single artifact reference.
+2. `POST /workspaces/{workspace_id}/observation-proposals` with the original
+   dataset/experiment, `origin: "hypothetical"`, a new included row, exact time,
+   concentration and hard allowance, source description, change reason and
+   nonempty `generating_choices`. Use the checked selected time and allowance.
+3. `POST /observation-proposals/{proposal_id}/review` with `accepted: true`,
+   proposal digest and parent dataset ID. This returns a new dataset; it does
+   not authorize scientific work. The original dataset must still be current.
+4. Create a new problem using that returned dataset ID/digest and otherwise
+   identical model/domain/target. Preview one manual `counterdex.v1` scenario,
+   explicit objective and bounded budget. Include this new `PlanBody` field:
+
+   ```json
+   {"followup": {
+     "design_job_id": "<returned design job>",
+     "design_result_id": "<returned design result record>",
+     "design_result_digest": "<that record's digest>",
+     "observation_proposal_id": "<reviewed proposal>",
+     "source_artifact_id": "<original design artifact>"
+   }}
+   ```
+
+5. Approve the new plan and start it through the existing plan approval/run
+   routes. Retrying the accepted start returns the same job. Prior baseline or
+   design approvals do not authorize this plan.
+6. Retrieve scenario evidence and download its native artifact and separate
+   anchor through the ordinary artifact routes. The packet has operation
+   `review` and embeds the exact design (and its baseline). Replay with the
+   independently installed engine:
+   `/tmp/counterdex-engine/bin/python -I -m counterdex replay-native evidence.native.json --anchors evidence.anchors.json`.
+
+`candidate_results` records compatible, excluded or unresolved status for the
+original IDs/vectors and names violating observation IDs. `baseline_search` is
+absent: no new candidates were searched. A successful review can have valid
+verification and replay while both individual candidates are excluded. That
+does not establish global model inconsistency or prove the reviewed interval.
+Reports retain the observation proposal/review and original design lineage.
+
+Current engine admission is deliberately narrow: one hypothetical row, no source
+asset, checked-separation parent, unchanged historical rows and model, selected
+time and reviewed allowance. Unsupported actual or off-design observations are
+rejected before approval; the backend never relabels them. Owner 1 must extend
+`native_packet.validate_followup`, bridge admission and replay to support actual
+acquisition provenance, changed sampling time/allowance, or sequential readings.
+Owner 4 can connect browser controls to this same HTTP flow; no new frontend
+client or evaluator-specific route is supplied. See
+`tests/test_native_followup_workflow.py` for the executable returned-ID flow.
 
 Optional scenarios include reviewed `purpose` and
 `eligible_baseline_outcomes`. Reservation checks the actual baseline evidence;
