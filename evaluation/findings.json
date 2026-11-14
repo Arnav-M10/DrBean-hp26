@@ -69,6 +69,16 @@
               "att_2712c19d978049cb"
             ]
           }
+        },
+        {
+          "at_commit": "preview of PR #15 9a6db61 (science_barrier only, no relaxed guard)",
+          "result": "Still reproduces on PR #15 (it does not include PR #14's lifeline guard). Merge order matters: PR #14 fixes it but needs F-RESTART-EPERM fixed first, or PR #14 would break the science PR #15 just enabled on macOS.",
+          "evidence": {
+            "results": "evaluation/results/previews/science-integration-fixes-9a6db61/science_barrier",
+            "attempts": [
+              "att_5946ffbc58194fcd"
+            ]
+          }
         }
       ]
     },
@@ -514,7 +524,7 @@
       "id": "F-MAC-NPROC",
       "severity": "P0",
       "owner": "2",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "title": "On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11",
       "minimal_input": "macOS 26.7 arm64 user with 649 processes; resource policy process cap 32 (process_count: rlimit_nproc_per_user)",
       "command": ".venv/bin/python -c \"import os,resource,subprocess; pid=os.fork()\\nif pid==0:\\n resource.setrlimit(resource.RLIMIT_NPROC,(32,32)); subprocess.run(['/usr/bin/true'])\"  -> BlockingIOError Errno 35; also BEAN_COUNTERDEX_PYTHON=/opt/homebrew/bin/python3.11 .venv/bin/python -m pytest tests/test_science_boundary.py tests/test_scientific_http.py",
@@ -594,6 +604,17 @@
             "ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025",
             "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite",
             "commit": "main 61edad7 (PR #16)"
+          }
+        },
+        {
+          "at_commit": "preview of codex/science-integration-fixes 9a6db61 (PR #15, stacked on PR #5; harness 2600456; NO diagnostics)",
+          "result": "Fixed in PR #15: the process policy keeps the inherited per-user ceiling. On this Mac, with no diagnostic, 6/7 lane entries pass: hero (real discovery, checked design at 8 h, both packets replay fresh), changed input, retry/concurrency, design authority (v2 reuse probe included), design-bound follow-up (recheck; application, fresh replay and decimal oracle agree), zero dispatch. Close on main after PR #5/#15 merge.",
+          "evidence": {
+            "results": "evaluation/results/previews/science-integration-fixes-9a6db61/plain",
+            "attempts": [
+              "att_c74f45e13b1c4522",
+              "att_d6ae837f8bcc4541"
+            ]
           }
         }
       ]
@@ -992,13 +1013,23 @@
       "id": "H-FOLLOWUP-OPERATION",
       "severity": "P2",
       "owner": "5",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck'",
       "fixed_in": "the check now expects capabilities.science.native_followup.operation (default 'review')",
       "evidence": {
         "results": "evaluation/results/previews/science-integration-fixes-9a6db61/plain (first attempt)"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "2600456 against PR #15 9a6db61",
+          "result": "follow-up passes with the published 'recheck' operation",
+          "evidence": {
+            "attempts": [
+              "att_d6ae837f8bcc4541"
+            ]
+          }
+        }
+      ]
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14.",

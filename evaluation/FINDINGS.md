@@ -18,7 +18,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 | F-REVIEW-MATERIALIZATION | P1 | 2 | fixed_pending_retest | An accepted intake review creates no dataset association (source values never reach execution) |
 | F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
 | F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
-| F-MAC-NPROC | P0 | 2 | open | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
+| F-MAC-NPROC | P0 | 2 | fixed_pending_retest | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | retested | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | retested | Coordinator attempt metadata names provider gemini for controlled-model turns |
 | F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
@@ -39,7 +39,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 | F-EXPLANATION-NUMBER-FORMS | P2 | 3 | open | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
 | F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
 | F-RESTART-EPERM | P0 | 2 | open | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
-| H-FOLLOWUP-OPERATION | P2 | 5 | fixed_pending_retest | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
+| H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
 
@@ -53,6 +53,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Retest at merged main 80f95a4, harness a1b28ae, tests/integration (science_barrier only; no product guard relaxed):** Reproduces without relax_nproc: the deterministic pytest test fails no_orphan_after_worker_kill (1 live scientific child after the worker SIGKILL). The barrier holds the child after setsid and the product's limits, so this is the product's own kill/recovery path. (evidence: {"pytest": "evaluation/results/integration/pytest-merged-main-a1b28ae.md"})
 - **Retest at main 61edad7, Linux CI (ubuntu runner, no diagnostics except the harness barrier):** Reproduces on Linux too: no_orphan_after_worker_kill, 1 live scientific child after the worker SIGKILL. Not a Mac-only effect. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
 - **Retest at preview of backend/restart-recovery c231be4 (PR #14; diagnostics relax_nproc + science_barrier):** Fixed by the PR's lifeline guard: the held child is stopped when the worker is SIGKILLed; nothing for the harness to terminate. Close after PR #14 merges with F-RESTART-EPERM resolved (otherwise normal completion fails on macOS). (evidence: {"attempts": ["att_2712c19d978049cb"], "results": "evaluation/results/previews/backend-restart-recovery-c231be4/relax_nproc+science_barrier"})
+- **Retest at preview of PR #15 9a6db61 (science_barrier only, no relaxed guard):** Still reproduces on PR #15 (it does not include PR #14's lifeline guard). Merge order matters: PR #14 fixes it but needs F-RESTART-EPERM fixed first, or PR #14 would break the science PR #15 just enabled on macOS. (evidence: {"attempts": ["att_5946ffbc58194fcd"], "results": "evaluation/results/previews/science-integration-fixes-9a6db61/science_barrier"})
 
 ## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, retested)
 
@@ -183,7 +184,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Evidence:** {}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** Still failing on main: ruff check apps tests scripts reports 1 error. (evidence: {"command": ".venv/bin/ruff check apps tests scripts"})
 
-## F-MAC-NPROC (P0, owner 2, open)
+## F-MAC-NPROC (P0, owner 2, fixed_pending_retest)
 
 - **Input:** macOS 26.7 arm64 user with 649 processes; resource policy process cap 32 (process_count: rlimit_nproc_per_user)
 - **Command:** `.venv/bin/python -c "import os,resource,subprocess; pid=os.fork()\nif pid==0:\n resource.setrlimit(resource.RLIMIT_NPROC,(32,32)); subprocess.run(['/usr/bin/true'])"  -> BlockingIOError Errno 35; also BEAN_COUNTERDEX_PYTHON=/opt/homebrew/bin/python3.11 .venv/bin/python -m pytest tests/test_science_boundary.py tests/test_scientific_http.py`
@@ -197,6 +198,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Retest at 3b55843 (app code = main 9cc90e0; engine runtime now Owner 4's .venv-engine, CPython 3.11.17):** Still fails on both launch paths: harness path and Owner 4's launcher both report scientific_runtime_unavailable for the hero and changed-input baselines. With only the process-limit guard relaxed (diagnostic), the same launcher runs discovery, changed input, design authority and zero dispatch to a pass. (evidence: {"attempts": ["att_92546adc9fac471e", "att_fe675c60b66a4801", "att_8e959bd4324c48f8"], "results": "evaluation/results, evaluation/results/owner4-launcher, evaluation/results/owner4-launcher/relax_nproc"})
 - **Retest at merged main 80f95a4 via harness b827c61:** Unchanged on both launch paths (harness and Owner 4's launcher): hero and changed-input baselines fail with scientific_runtime_unavailable. It is now the only blocker between this Mac and release acceptance of the hero, design and follow-up path, which pass in full when only this guard is relaxed. (evidence: {"attempts": ["att_568062c9c3434610", "att_98ac5a9ee88048d1", "att_1ace0e6c87124367"]})
 - **Retest at main 61edad7, Linux CI:** Contrast: the same real-science HTTP tests (hero with checked design and fresh replay, changed input, design authority, design-bound follow-up) pass on the Linux runner, which owns about 64 processes. The failure on this Mac is the per-user process cap alone. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
+- **Retest at preview of codex/science-integration-fixes 9a6db61 (PR #15, stacked on PR #5; harness 2600456; NO diagnostics):** Fixed in PR #15: the process policy keeps the inherited per-user ceiling. On this Mac, with no diagnostic, 6/7 lane entries pass: hero (real discovery, checked design at 8 h, both packets replay fresh), changed input, retry/concurrency, design authority (v2 reuse probe included), design-bound follow-up (recheck; application, fresh replay and decimal oracle agree), zero dispatch. Close on main after PR #5/#15 merge. (evidence: {"attempts": ["att_c74f45e13b1c4522", "att_d6ae837f8bcc4541"], "results": "evaluation/results/previews/science-integration-fixes-9a6db61/plain"})
 
 ## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, retested)
 

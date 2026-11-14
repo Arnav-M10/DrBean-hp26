@@ -73,6 +73,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
+| `codex/science-integration-fixes` (PR #15, on PR #5; Counterdex 0.3) | `9a6db61` | **NO diagnostics: 6/7 pass on this Mac** (hero, changed input, retry, design authority with v2 reuse probe, follow-up via `recheck`, zero dispatch): F-MAC-NPROC fixed there. Barrier only: worker-kill orphan still reproduces (fix is PR #14). |
 | `backend/restart-recovery` (PR #14) | `c231be4` | with barrier: **worker-kill orphan fixed**; without: hero/changed input **fail** and a cancelled child survives (F-RESTART-EPERM, Darwin-only); local one-line patch -> 6/7 + cancel/restart pass. |
 | `backend/controlled-acceptance` (PR #13) | `731afdc` | local merge with this harness: integration suite unchanged (39 passed; failures F-MAC-NPROC/orphan; no regressions). |
 | merged `main` (`55403ab`, after PR #10) in this checkout | harness `1ae19ff` | diagnostic relax_nproc: **6/7 pass** again (hero, changed input, retry, design authority, follow-up, zero dispatch); plain acceptance on both launch paths: F-MAC-NPROC; gate exit 3. |
@@ -85,7 +86,8 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 ## Next exact actions
 
-1. F-MAC-NPROC (P0, Owner 2) is the single blocker for release acceptance on this Mac: when Owner 2's platform-aware process guard lands, rerun the plain lane on both launch paths, then `gate --require release`.
+1. Merge order (for the user / owners): PR #5 + PR #15 make real science run on this Mac with no diagnostics. PR #14 fixes the worker-kill orphan but, as is, fails every normally finishing job on macOS (F-RESTART-EPERM): fix that first. Then rerun the plain lane on both launch paths and `gate --require release`.
+1b. (history) F-MAC-NPROC (P0, Owner 2) was the single blocker for release acceptance on this Mac: when Owner 2's platform-aware process guard lands, rerun the plain lane on both launch paths, then `gate --require release`.
 2. F-ORPHAN-WORKER-KILL (P0, Owner 2): reproduced on merged `main`. Ask for a product-side test barrier so the retest can be acceptance evidence, not only a diagnostic.
 3. Done: PR #10 merged, markers removed, AI findings closed. PR #12 (Owner 4 launcher cleanup; adds `DRBEAN_SCIENCE_PYTHON` to CI, which also resolves H-CI-ENGINE there) and PR #13 (Owner 2 controlled agents with real science) are open; PR #13 previewed locally: integration suite unchanged (no regressions).
 4. A new PR from this branch to `main` would ship the native consumer, `.venv-engine` discovery (fixes H-CI-ENGINE in CI), the Owner 4 launch subject and group-aware orphan cleanup. Opening it is the user's call.
