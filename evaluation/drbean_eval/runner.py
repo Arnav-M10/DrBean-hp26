@@ -30,7 +30,10 @@ def _utc() -> str:
 def git_state(repo: str) -> dict:
     def run(*args):
         return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout.strip()
-    return {"commit": run("rev-parse", "HEAD") or None, "dirty": bool(run("status", "--porcelain"))}
+    # Recorded results and the budget ledger are evidence outputs, not inputs to the tested code.
+    changed = [line for line in run("status", "--porcelain").splitlines()
+               if not line[3:].startswith(("evaluation/results/", "evaluation/ledger/"))]
+    return {"commit": run("rev-parse", "HEAD") or None, "dirty": bool(changed)}
 
 
 def read_attempts(results_dir: str) -> list[dict]:

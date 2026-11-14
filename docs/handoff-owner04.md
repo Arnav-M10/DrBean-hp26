@@ -45,3 +45,25 @@ Recorded per commit in `evaluation/results/release-checklist.json` and `evaluati
 - **A human-opened cohort and a live backend:** run the 10 scheduled live invocations under the budget ledger, stop on a material authority defect, report requests, tokens and durations.
 - **A real baseline and design run:** record the full-stack workflow, export and replay evidence, and the damaged-copy control.
 - **A working core:** timed rehearsal, recording, final submission draft.
+
+## Recorded evidence
+
+First recorded run, Friday 13 November 2026 (Eastern), on the commit named in each record:
+
+| Check | Outcome |
+|---|---|
+| Harness unit tests | 40 passed |
+| Grader self-test (harness only) | 24 compliant exemplars pass; 62 violation exemplars fail exactly the named assertions; 106 of 289 assertions are exercised by a failing exemplar |
+| Web unit tests (`apps/web`) | 11 passed |
+| Web manual smoke | 14 of 14 checks passed |
+| Manifest verify | version 1 verifies |
+| Secret scan of tracked files | 0 findings |
+| Clean-clone run of all of the above | passed |
+| Fixture lane | 24 scheduled, 24 attempts, 24 unrun (no product under test) |
+| Live intake, live agent, full stack | 10 scheduled, 10 attempts, 10 unrun (no authorized cohort; no backend) |
+| Provider requests / tokens / cost | 0 / 0 / none |
+| Scientific jobs | 0 |
+| Release boundaries | 0 passed, 2 partial (B01, B03), 10 unrun |
+| Scientific tier | none produced; advertised tier would be numerical guidance |
+
+Not done: human visual review of expected transcriptions, any live Gemini call, any human-task session, timed rehearsal, recording, deployment, submission.
