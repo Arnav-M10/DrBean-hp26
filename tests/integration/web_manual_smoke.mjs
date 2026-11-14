@@ -45,10 +45,19 @@ try {
     'a non-numeric time shows errors and stays on Inputs')
   check('invalid-input-marked', (await page.getAttribute('#row-1-time', 'aria-invalid')) === 'true', 'aria-invalid set')
 
+  // An accidental empty row is reported with its repair and can be removed deliberately.
+  await page.fill('#row-1-time', '')
+  await page.click('#add-row')
+  await page.click('#measurements button[type=submit]')
+  check('empty-row-names-its-repair', (await page.locator('#rows-errors').innerText()).includes('Fill it in or remove it'), 'empty rows are reported, not guessed or dropped')
+  await page.getByRole('button', { name: 'Remove row 2' }).click()
+  check('empty-row-removable', (await page.locator('#rows tr').count()) === 1, 'the accidental row was removed on request')
+
   // Manual path with the synthetic example.
   await page.click('#example')
   await page.getByRole('button', { name: 'Replace rows' }).or(page.getByRole('button', { name: 'Use these rows' })).first().click()
   check('example-loaded', (await page.locator('#rows tr').count()) === 5, 'five synthetic rows')
+  check('imported-rows-kept-not-deleted', (await page.getByRole('button', { name: /^Remove row/ }).count()) === 0, 'imported rows can be excluded but not removed')
   await page.click('#measurements button[type=submit]')
   await page.waitForSelector('#question:not([hidden])')
   const bounds = { aMin: '1', aMax: '12', keMin: '1/10', keMax: '0.3', kaMin: '1/2', kaMax: '2', targetMin: '0.10', targetMax: '17/100' }

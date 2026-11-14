@@ -4,7 +4,7 @@ The dependency-free browser supports reviewed CSV/manual measurements, exact rat
 
 ## Local startup
 
-Prepare the backend and CPython 3.11 Counterdex runtime using the backend handoff. Start the API and durable worker with the same database, artifact storage and `BEAN_COUNTERDEX_PYTHON`. Then run:
+From the repository root, `scripts/dev/setup.sh` once and then `scripts/dev/start.sh` prepare both runtimes and start the API, durable worker and this workspace together on one store, with `BEAN_COUNTERDEX_PYTHON` pointing at the prepared CPython 3.11 engine and AI in placeholder mode. To run only this web server against an API you started yourself:
 
 ```sh
 node apps/web/serve.mjs
@@ -58,4 +58,4 @@ node apps/web/check-backend.mjs
 
 `check-backend.mjs` starts an isolated API, worker and proxy on unused loopback ports, drives Chromium through review/approval/queue, submits two distinct datasets to actual discovery, and separately approves positive/no-separation designs from the first actual pair. Native baseline and design bytes plus anchors are downloaded through the browser and replayed in a separate installed `-I` interpreter. The check also covers preserved earlier evidence, zero provider attempts, stale draft/design approval, design history reopening and context clearing, reports, narrow-screen layout, memory-only credentials and proxy origin rejection. It creates no candidate records or synthetic scientific responses. Temporary test data and processes are cleaned up.
 
-Set `BEAN_TEST_PYTHON` or `CHROMIUM_PATH` to override `.venv/bin/python` and `/usr/bin/chromium`. Playwright is a test-only dependency and is not shipped with the browser application. A missing runtime or failed scientific run fails this milestone check instead of being counted as a successful demonstration.
+Playwright is found through Node's normal resolution (`npm install` in `tests/integration`, or `NODE_PATH`); `PLAYWRIGHT_MODULE` can name an entry file. Set `BEAN_TEST_PYTHON` or `CHROMIUM_PATH` to override `.venv/bin/python` and Playwright's own Chromium. Playwright is a test-only dependency and is not shipped with the browser application. A missing runtime or failed scientific run fails this milestone check instead of being counted as a successful demonstration.
