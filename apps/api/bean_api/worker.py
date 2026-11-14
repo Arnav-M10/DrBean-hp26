@@ -40,7 +40,7 @@ class Worker:
         self.artifacts = ArtifactService(workflow, self.settings.artifact_dir)
 
     def _publish_native(self, actor, job, result, *, problem, dataset, aggregate_limit,
-                        application_projection=None, scenario_id=None, design_context=None):
+                        application_projection=None, scenario_id=None, design_context=None, followup_context=None):
         packets = result.pop("_native_artifacts", [])
         if not packets:
             if result.get("scientific_problem_digest") and result.get("artifacts"):
@@ -107,6 +107,10 @@ class Worker:
                     from .design_evidence import validate_design_packet
                     validate_design_packet(content, anchor, projection=application_projection, job=job,
                                            result=result, **design_context)
+                elif followup_context is not None:
+                    from .followup_evidence import validate_followup_packet
+                    validate_followup_packet(content, anchor, projection=application_projection, job=job,
+                        scenario_id=scenario_id, result=result, **followup_context)
                 else:
                     validate_baseline_packet(content, anchor, projection=application_projection, job=job,
                                              scenario_id=scenario_id, result=result)
@@ -149,6 +153,9 @@ class Worker:
             if "design_tier" in result:
                 from .design_evidence import design_result_checked
                 return design_result_checked(result)
+            if (result.get("native_replay") or {}).get("operation") == "review":
+                from .followup_evidence import followup_result_checked
+                return followup_result_checked(result)
             return baseline_result_checked(result)
         replay = result.get("native_replay") or {}
         record = result.get("verification_record") or {}
@@ -189,6 +196,31 @@ class Worker:
     def _fact(self, evidence):
         return {"id": evidence["id"], **evidence["body"]["result"]}
 
+    def _followup_history(self, actor, job, plan):
+        """Load the exact selected design; never reconstruct it from display facts."""
+        context = self.workflow.followup_context(actor, plan["body"])
+        artifact_id = plan["body"]["followup"]["source_artifact_id"]
+        record, content = self.artifacts.read(actor, artifact_id)
+        if record["workspace_id"] != job["workspace_id"]:
+            raise DomainError("not_found", "Artifact was not found.", 404)
+        result = context["design_result"]["body"]
+        reference = next((r for r in result["artifacts"] if r["id"] == artifact_id), None)
+        if reference is None or any(record["body"][key] != reference[key]
+                                    for key in ("sha256", "byte_size", "media_type")):
+            raise DomainError("artifact_binding_mismatch", "Follow-up must retain the original design artifact.")
+        request = context["design_plan"]["body"]["request"]
+        expected = {"artifact_sha256": reference["sha256"],
+            "dataset_digest": context["dataset"]["digest"], "problem_digest": context["problem"]["digest"],
+            "projection_digest": result["scientific_problem_digest"],
+            "app_request_digest": context["design_plan"]["body"]["request_digest"],
+            "design_digest": result["scientific_design_digest"],
+            "run_id": context["design_job"]["id"], "scenario_id": request["scenario_id"]}
+        if record["body"].get("anchor") != expected:
+            raise DomainError("binding_mismatch", "Retained design anchors must match the reviewed follow-up history.")
+        return {"historical_artifact": {"id": artifact_id, "sha256": reference["sha256"],
+            "bytes_base64": base64.b64encode(content).decode("ascii"), "anchors": expected},
+            "design_request": request}
+
     async def _scenario(self, actor, run_id, scenario_id):
         scope = self.workflow.check_run_scope(actor, run_id)
         plan, job = scope["plan"], scope["job"]
@@ -212,12 +244,21 @@ class Worker:
             raise DomainError("budget_exhausted", "No scientific wall budget remains.")
         from .counterdex_adapter import CounterdexAdapter
         args = (problem, dataset, {**plan["body"]["budget"], "scientific_wall_seconds": wall})
+        operation = "investigate"
+        followup_context = None
         if type(self.adapter) is CounterdexAdapter:
-            args += ({"run_id": run_id, "scenario_id": scenario_id, "workflow": {
+            execution = {"run_id": run_id, "scenario_id": scenario_id, "workflow": {
                 "plan_id": plan["id"], "approval_id": job["approval_id"],
-                "operation_id": run_id, "execution_id": run_id}},)
+                "operation_id": run_id, "execution_id": run_id}}
+            if plan["body"].get("followup"):
+                followup_context = self._followup_history(actor, job, plan)
+                execution.update(followup_context)
+                operation = "review"
+            args += (execution,)
+        elif plan["body"].get("followup"):
+            raise DomainError("followup_unavailable", "Fixed-pair review requires the qualified native adapter.")
         task = asyncio.create_task(asyncio.to_thread(
-            run_bounded, self.adapter, "investigate", args,
+            run_bounded, self.adapter, operation, args,
             wall_seconds=wall, cancelled=lambda: stop.is_set() or self._cancelled(actor, run_id),
             result_cap=12 * 1024 * 1024))
         try:
@@ -231,10 +272,15 @@ class Worker:
                 raise DomainError("binding_mismatch", "Adapter output does not bind the reserved problem.")
             if result["verification"] == "valid" and not self._checked_result_allowed(result):
                 raise DomainError("adapter_not_qualified", "This adapter is not qualified to emit checked evidence.")
+            if followup_context is not None:
+                self.workflow.check_run_scope(actor, run_id)
+                if result.get("projection_version") != "DB-SC-1-to-groundwork-v1":
+                    raise DomainError("binding_mismatch", "Follow-up cannot fall back to another scientific mapping.")
             result["_native_artifacts"] = native
             result = self._publish_native(actor, job, result, problem=problem, dataset=dataset,
                                           aggregate_limit=4 * 1024 * 1024,
-                                          application_projection=application_projection, scenario_id=scenario_id)
+                                          application_projection=application_projection, scenario_id=scenario_id,
+                                          followup_context=followup_context)
             evidence = self.workflow.complete_scenario(actor, run_id, scenario_id, result)
             return self._fact(evidence)
         except asyncio.CancelledError:
