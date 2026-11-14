@@ -6,11 +6,11 @@ pair, with browser review and independently replayable native design evidence.
 Completed: backend HTTP subset of master §2.13 milestone 5: a separately
 reviewed hypothetical follow-up checks the original selected pair and exports
 independently replayable lineage. Actual-observation support remains blocked.
-Current task: integration handoff, stacked on the open design PR; supported
-backend implementation and acceptance are complete.
+Current task: release integration; design PR #9 and follow-up PR #11 are merged
+into main. Supported backend implementation and acceptance are complete.
 
 Branch: `backend/followup`, based on design `8451c1f`; integrated `main` at
-`9cc90e0` (PRs #7–8). PR #9 remains open with release checks outstanding.
+`f6ab24a` (PRs #9 and #11 merged). Release checks remain outstanding.
 Verified on Linux, backend Python 3.12.14, scientific CPython 3.11.18.
 Interfaces: DB-SC-1 / GF-2, `counterdex.bridge.v1`,
 `DB-SC-1-to-groundwork-v1`, `counterdex.application-bundle.v1`.
@@ -77,7 +77,8 @@ Model providers remain disabled; no calls or credential checks were performed.
   must distinguish exited zombies from live computation. Recovery and follow-up
   expectations in the broader evaluator still need fresh independent qualification.
 - Native design currently admits requests for checked pair separation; returned
-  outcomes remain evidence-based. PR #9 stays open pending the release checks.
+  outcomes remain evidence-based. PRs #9 and #11 were merged at user request;
+  merge status does not establish release qualification.
 - Engine limitation: one hypothetical row at the checked design's selected time
   and allowance. Actual observations, changed time/allowance and repeated readings
   need Owner 1 to extend `native_packet.validate_followup` and bridge review
