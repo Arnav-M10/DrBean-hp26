@@ -2,6 +2,58 @@
 
 Owner: Person 1 / Counterdex.
 
+## Current review — integrated candidate and browser handoff
+
+Reviewed merged main `37d8f6f6010e2fe8be3e55323bd6cc18f9112760`, PR #19,
+and newer backend, product, AI and Claude branches in separate worktrees.
+No reset to the historical `fca07fe` reference. Adopted Owner 2's actual new
+candidate **`4f6c580553b666286177de8080a5e4e5d3d4d2b9`** by fast-forward,
+preserving its ledger/bounded-fact/cleanup implementation and teammate history.
+During testing main advanced to `4b5f1f5b4f3e08223422106d8c6e8c6554611d76`
+with the reviewed product changes. Merged Owner 2's updated
+`c44b010f4697c74cf9f3f05da6122f877df79a2e`, which already includes that main,
+without replacing either owner's work. This user's assignment retains Owner 1 production ownership; no backend,
+frontend, provider or evaluator implementation was edited here.
+
+Exact clean Mac candidate results: **588 backend tests passed in 86.03 s**;
+ordinary guarded HTTP **7/7 passed**, no diagnostics or limit relaxation;
+additional unresolved HTTP/native replay **1 passed in 2.52 s**. Initial main
+control: **207 scientific/publication/recovery tests passed in 55.90 s**.
+Backend Python 3.13.18; installed Counterdex 0.3.0 / CPython 3.11.17; source
+`90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
+
+Added one meaningful package bridge regression covering reference survives,
+outside survives, both excluded and genuinely unresolved, at each proposal's
+own exact time/allowance, with fixed vectors, full history and separate-process
+replay. Corrected the synthetic proposal helper's original spellings to match
+its supplied values. No scientific implementation, protocol or package-version
+change. At clean pre-product-merge owner commit `1a678f6`: 292 package tests
+(291 passed, one backend dependency skip), the authoritative DTO check separately
+passed under backend Python, 7/7 ordinary HTTP, 22/22 native controls and the
+unresolved HTTP/installed replay passed again. The final combined owner-branch
+commit is retested and its exact SHA/results recorded in the PR.
+
+Unresolved HTTP output correctly remains inconclusive despite valid packet
+verification and successful installed CLI replay. Candidate exclusion carries
+no global-model conclusion. Current publication/tier/reuse/adversarial controls
+pass. Genuine EPERM stays visible; timeout, adapter failure, worker loss,
+retained evidence and no redispatch pass under ordinary policy.
+
+[Detailed predicates, reproducible unresolved bytes/anchors and evidence](../../packages/groundwork_adapter/docs/CURRENT_INTEGRATION_REVIEW.md)
+distinguish these Owner 1 executions from Claude's older independent previews.
+Claude needs a fresh ordinary retest of this candidate, including unresolved
+recheck and the positive source-materialization join. Owner 2 owns any further
+backend correction; do not duplicate it. Owner 3's source branch and Owner 2's
+researcher features must integrate onto current safeguards before qualification.
+
+Owner 4 has an exact handoff for `9ba9c6a`: current `recheck` bypasses its new
+`review`-only feedback table, and aggregate dataset ancestry must not be labelled
+observation origin. Full source-review and follow-up entry/review/approval UI
+remain G4 work. The scientific side is ready for browser completion; stop
+engine expansion and retest the actual resulting integration when it arrives.
+No application model-provider calls, credential inspection, public deployment
+or PyPI publication. Other owners' logs and historical evidence remain intact.
+
 ## Current milestone 6 — independent acceptance and clean reproduction
 
 The user explicitly authorized the next checkpoint: integrate latest main,
