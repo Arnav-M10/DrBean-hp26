@@ -1,6 +1,6 @@
 # Sponsor evidence matrix (Workstream 5, for Owner 4)
 
-**Status at candidate `e12c512`:**
+**Status at candidate `c2803a4`:**
 - Application code is `main` `b8c5952`, plus labelled previews of open sprint PRs.
 - Every row states what was actually observed. The four lanes are separate kinds of evidence: controlled callbacks, controlled science, live Gemini and historical replay.
 - **No live Gemini request has been made**. Live qualification is `not_run`. A configured key is not evidence that any integration works.
@@ -26,8 +26,8 @@
 
 | Feature | Actual behaviour observed | Proof artifact | Limitation | Demo step |
 |---|---|---|---|---|
-| Complete scientific loop through the ordinary HTTP API | At candidate `e12c512` (application = `main` `b8c5952`):<br>- real Counterdex discovery with a certified counterexample;<br>- changed input gives fresh identities;<br>- design needs a separate approval, and the checked fixed-pair separation is confirmed by an independent decimal oracle;<br>- candidate-specific follow-ups;<br>- native download and fresh replay, with tampering rejected;<br>- cancel and restart leave no orphan processes;<br>- verified zero external model dispatch. | `evaluation/results/integration/qualification-e12c512.md`; `gates-latest.json` (exit 0) | Scientific acceptance on this Mac only. Owner 4's G0–G4 browser workflow is not established here | Owner 4's launcher → hero investigation → design → follow-up → download → replay |
-| Useful abstention | A paper outside the supported model should still be reviewable. Not yet observable on `main`. Open PR #36 (Owner 4) adds PDF admission and a page review panel with an evidence map and SD/SEM/CI and approval-text warnings, but it needs Owner 2's route patch and has not yet been previewed by Owner 5. | sealed H4-class variant (after the freeze); `test_paper_trust_boundaries.py` NOT_AVAILABLE | Pending Owner 4's paper path | none yet |
+| Complete scientific loop through the ordinary HTTP API | At candidate `c2803a4` (application = `main` `b8c5952`):<br>- real Counterdex discovery with a certified counterexample;<br>- changed input gives fresh identities;<br>- design needs a separate approval, and the checked fixed-pair separation is confirmed by an independent decimal oracle;<br>- candidate-specific follow-ups;<br>- native download and fresh replay, with tampering rejected;<br>- cancel and restart leave no orphan processes;<br>- verified zero external model dispatch. | `evaluation/results/integration/qualification-c2803a4.md`; `gates-latest.json` (exit 0) | Scientific acceptance on this Mac only. Owner 4's G0–G4 browser workflow is not established here | Owner 4's launcher → hero investigation → design → follow-up → download → replay |
+| Useful abstention | A paper outside the supported model should still be reviewable. Not yet observable on `main`. Open PR #36 (Owner 4) adds PDF admission and a page review panel with an evidence map and SD/SEM/CI and approval-text warnings. In my preview, with Owner 2's unreviewed route patch, its admission handled 19 hostile assets safely, but page rendering on macOS is not memory-bounded (F-PAPER-RENDER-MEMORY, P1). | sealed H4-class variant (after the freeze); `test_paper_trust_boundaries.py` NOT_AVAILABLE | Pending Owner 4's paper path | none yet |
 
 ## Not claimed
 

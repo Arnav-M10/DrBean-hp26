@@ -8,23 +8,23 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 |---|---|
 | Branch | `claude/adversarial-validation` (PR #22). `main` `b8c5952` (PR #32: PRs #20 + #28 + fixes) merged in as `c51bbae`, after `cbfa5ef` as `6997efb`; nothing reverted |
 | Sprint brief | `05_Claude_Independent_Validation.md` (papers → Gemini → Deep Agents → Counterdex → design → follow-up → replay). Owner 5 deliverables are listed below with their state |
-| Final candidate | `e12c512` (application code = `main` `b8c5952`). Record: `evaluation/results/integration/qualification-e12c512.md`; `c51bbae` and `62704be` also passed the gate on the way |
+| Final candidate | `c2803a4` (application code = `main` `b8c5952`). Record: `evaluation/results/integration/qualification-c2803a4.md`; `c51bbae` and `62704be` also passed the gate on the way |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); engine CPython 3.11.17 (`.venv-engine`, identical to the source, which the application's child imports first anyway); checkout under iCloud-synced `~/Documents` |
 | AI mode | zero external model dispatch, verified by the egress guard in every lane report; live Gemini `not_run` (no user-enabled budget, no key inspected) |
-| Findings | `evaluation/findings.json` → `FINDINGS.md`. No open P0. One open P1 on an **unmerged** PR: F-PAPER-CITATION-SUBSTRING (Owner 3, PR #35). Closed by retest on `main` `b8c5952`: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES. Open P2: F-NARRATION-OVERSUPPRESSION (narrowed), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT, F-PAPER-EXPONENT-FLATTENING (PR #35), F-TEST-VAR-LEAK, F-SIBLING-FORKS; harness H-LANE-ENGINE-PRECONDITION fixed |
-| Release gate | `gate --require release` exit 0 at `e12c512` (`evaluation/results/gates-latest.json`), now including the required `evidence_lanes` gate. This is scientific acceptance of `main` `b8c5952` on this Mac only. It is not the paper/Gemini/Deep Agents product (not built yet), not Owner 4's G0–G4, and not live Gemini |
+| Findings | `evaluation/findings.json` → `FINDINGS.md`. No open P0. Two open P1s, both on **unmerged** PRs: F-PAPER-CITATION-SUBSTRING (Owner 3, PR #35) and F-PAPER-RENDER-MEMORY (Owner 4, PR #36). Closed by retest on `main` `b8c5952`: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES. Open P2: F-NARRATION-OVERSUPPRESSION (narrowed), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT, F-PAPER-EXPONENT-FLATTENING (PR #35), F-TEST-VAR-LEAK, F-SIBLING-FORKS; harness H-LANE-ENGINE-PRECONDITION fixed |
+| Release gate | `gate --require release` exit 0 at `c2803a4` (`evaluation/results/gates-latest.json`), now including the required `evidence_lanes` gate. This is scientific acceptance of `main` `b8c5952` on this Mac only. It is not the paper/Gemini/Deep Agents product (not built yet), not Owner 4's G0–G4, and not live Gemini |
 
 ## Sprint deliverables (Owner 5) and their state
 
 | Deliverable | State | Where |
 |---|---|---|
 | 1. Four evidence lanes with machine-readable, identity-bound reports; gates reject dirty, incompatible or foreign-identity evidence | **done**; `controlled_callbacks`, `controlled_science` and `historical_replay` run on every candidate; `live_gemini` is `not_run` by construction | `evaluation/drbean_eval/lanes.py`, `cli.py lanes`, `evaluation/results/lanes/reports.jsonl`, gate `evidence_lanes` |
-| 2. Paper corpus: at least 6 development documents plus 4 sealed held-aside variants, with gold from renderings | **holdouts sealed** (H1–H4, commitment `ad8a6913…`); development set **awaited from Owner 4** (none rendered yet); live subset predeclared, `not_run` | `evaluation/corpus/` |
+| 2. Paper corpus: at least 6 development documents plus 4 sealed held-aside variants, with gold from renderings | **holdouts sealed** (H1–H4, commitment `ad8a6913…`); development: **4 of 6** rendered by Owner 4 (PR #36), and my gold from renderings agrees with Owner 4's manifest field by field; live subset predeclared, `not_run` | `evaluation/corpus/` |
 | 3. Trust-boundary attacks (10 categories) | current-route attacks pass on `main`; library-level gateway (20/20 pass) and validator attacks (4 defects) run on the PR #35 preview; paper-route, citation, statistics, authority, identity, metered-model and resume attacks are explicit `NOT_AVAILABLE` until advertised | `evaluation/attack_matrix.json`, `tests/integration/test_paper_trust_boundaries.py`, `test_gemini_gateway_attacks.py`, `test_paper_proposal_validation.py` |
 | 4. Integration metrics (precision, coverage, citations, adaptivity) | scorer ready (`paper_scoring.py`); **no measurement yet**: no paper path, and live is `not_run` | `evaluation/drbean_eval/paper_scoring.py` |
 | 5. Ordinary-user acceptance on the final combined commit with Owner 4's launcher | **not possible yet**: no combined paper product exists (PR #34 is interface-only; PRs #33 and #35 are unwired) | — |
 | 6. Sponsor evidence matrix | **done for the current state**; truthful about what is not built or not run | `evaluation/results/sponsor-evidence.md` |
-| 7. Release judgment, gate table, rehearsal script | scientific gate for `main` passes; paper product judgment pending; rehearsal script for the current loop in the qualification record | `evaluation/results/integration/qualification-e12c512.md` |
+| 7. Release judgment, gate table, rehearsal script | scientific gate for `main` passes; paper product judgment pending; rehearsal script for the current loop in the qualification record | `evaluation/results/integration/qualification-c2803a4.md` |
 
 ## Gate evidence (current)
 
@@ -88,6 +88,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
+| PR #36 `claude/dreamy-lamport-dsttgm` (Owner 4: PDF admission, page panel, live opt-in) on `c2803a4` plus Owner 2's **unreviewed** route patch and an unlocked pypdf/pypdfium2 resolution | `f063b10` (`081bbdc`) | Owner 4's 36 paper tests pass on macOS; my five paper-route attacks pass (hostile assets bounded with named refusals, inert names, workspace scope and key binding, honest citation checks, bounded page selections); development gold agrees with Owner 4's manifest 23/23, 23/23, 10/10; **F-PAPER-RENDER-MEMORY (P1)**: on macOS a 4.2 MB page inflating to 4 GiB drives the process tree to 2440 MiB |
 | PR #35 `codex/gemini-metered-adapter` on `62704be` | `3a7816e` (`c952c35`) | lanes controlled_callbacks 111 passed + 10 xfail and controlled_science 17 + 7 NOT_AVAILABLE (both passed after the H-LANE-ENGINE-PRECONDITION fix); gateway attacks 20/20; paper validator: 4 defects (F-PAPER-CITATION-SUBSTRING P1 and three P2) |
 | PR #33 `codex/paper-science-mapping` on `62704be` | `d0148aa` (`b397c05`) | lanes passed; engine controls 22/22 with PR #33's engine; its package packets: 21 replay, 4 older packets refused as `source_version_mismatch` (correct strictness; historical replay needs the original checker after merge) |
 | PR #34 `backend/deepagents-durable` | `33dc7f4` | interface documents only (`research-agent.v1`); nothing executable |
@@ -104,12 +105,13 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 ## Next exact actions
 
-1. **Owner 3 (before PR #35 merges):** F-PAPER-CITATION-SUBSTRING (P1). Require whole-token boundaries in the page text, not only in the quote. Then F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2). Each has a strict-xfail regression in `tests/integration/test_paper_proposal_validation.py`, which turns into a failure when fixed so the marker is retired by retest.
-2. **Owner 4:** PR #36 brings 4 development PDFs; the brief asks for at least 6 (missing: a mixed-units document such as Owner 1's minutes/ng-per-mL variant, and a missing-raw-data or graph-only document). Owner 5 previews PR #36: development gold from renderings, the hostile PDF assets through its admission and worker on this Mac, and its live opt-in launcher with dummy configuration only.
-3. **Owner 2:** apply or review PR #36's route patch and publish the `research-agent.v1` implementation (PR #34). The paper-route, identity and resume attacks switch from NOT_AVAILABLE to HARNESS_PENDING when advertised, and Owner 5 then writes them against the published routes.
-4. **Harness (Owner 5):** after PR #33 merges, historical replay must use the engine at each packet's recorded commit, because the new engine source refuses older packets as `source_version_mismatch`.
-5. **Freeze:** when Owners 2–4 record the frozen implementation and prompt versions, reveal H1–H4 (verify the commitment `ad8a6913…`) and run them in the controlled lanes; live only within a user-enabled budget.
-6. Any later relevant code change: refresh `.venv-engine` if the engine changed, then rerun the acceptance lane, controls, the three evidence lanes and the gate on a clean candidate. Never edit the checkout during a run.
+1. **Owner 4 (before PR #36 merges):** F-PAPER-RENDER-MEMORY (P1). Bound page rendering by memory on macOS, which has no `RLIMIT_AS`: either pre-inflate each page's streams with a capped decoder, or have the parent sample the worker's RSS and kill it above `WORKER_MEMORY_BYTES`. Opt-in regression: `DRBEAN_HEAVY_RESOURCE_ATTACKS=1 pytest tests/integration/test_paper_trust_boundaries.py::test_maximum_size_inflate_bomb_preview_stays_within_memory`.
+2. **Owner 3 (before PR #35 merges):** F-PAPER-CITATION-SUBSTRING (P1). Require whole-token boundaries in the page text, not only in the quote. Then F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2). Each has a strict-xfail regression in `tests/integration/test_paper_proposal_validation.py`, which turns into a failure when fixed so the marker is retired by retest.
+3. **Owner 4:** two more development PDFs are needed to reach the brief's six: a mixed-units document (Owner 1's minutes/ng-per-mL variant from PR #33) and a missing-raw-data or graph-only document. Gold for the four delivered papers is in `evaluation/corpus/development/`.
+4. **Owner 2:** apply or review PR #36's route patch and publish the `research-agent.v1` implementation (PR #34). The paper-route, identity and resume attacks switch from NOT_AVAILABLE to HARNESS_PENDING when advertised, and Owner 5 then writes them against the published routes.
+5. **Harness (Owner 5):** after PR #33 merges, historical replay must use the engine at each packet's recorded commit, because the new engine source refuses older packets as `source_version_mismatch`.
+6. **Freeze:** when Owners 2–4 record the frozen implementation and prompt versions, reveal H1–H4 (verify the commitment `ad8a6913…`) and run them in the controlled lanes; live only within a user-enabled budget.
+7. Any later relevant code change: refresh `.venv-engine` if the engine changed, then rerun the acceptance lane, controls, the three evidence lanes and the gate on a clean candidate. Never edit the checkout during a run.
 
 ## Conditional future work (not authorized now)
 
