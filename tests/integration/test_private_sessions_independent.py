@@ -159,15 +159,21 @@ def test_rotation_keeps_identity_and_expiry_refuses_without_erasing_work(tmp_pat
             assert successor.get(PREFIX + f"/records/{record}").status_code == 404
 
 
-@pytest.mark.xfail(strict=True, reason="F-SESSION-CAPACITY-EXHAUSTION (B): anonymous bootstraps consume permanent "
-                                       "issuance capacity, including revoked and expired sessions")
-def test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors(tmp_path):
-    """Availability probe: once every issued session is logged out or expired, a new visitor can still start a
-    private workspace. Capacity is reduced to 3 here only to make the probe fast; the default is 4096."""
+@pytest.mark.parametrize("ending", ["logout", "expiry"])
+def test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors(tmp_path, ending):
+    """Availability probe (F-SESSION-CAPACITY-EXHAUSTION, fixed on main 070b697 and retested): once every issued
+    session is logged out or has expired, a new visitor can still start a private workspace, and the earlier
+    workspaces are retained. Capacity is reduced to 3 here only to make the probe fast; the default is 4096."""
     app, headers, _ = build(tmp_path, browser_session_capacity=3)
     for _ in range(3):
         with visitor(app, headers) as anyone:
             bootstrap(anyone)
-            assert anyone.post(PREFIX + "/shared-session/logout").status_code == 200
+            if ending == "logout":
+                assert anyone.post(PREFIX + "/shared-session/logout").status_code == 200
+    if ending == "expiry":
+        clock = app.state.sessions.clock
+        app.state.sessions.clock = lambda: clock() + app.state.sessions.ttl_seconds + 1
     with visitor(app, headers) as newcomer:
         assert newcomer.get(PREFIX + "/shared-session").status_code == 200
+    with sqlite3.connect(tmp_path / "app.sqlite3") as conn:  # history is retained, never reset to make room
+        assert conn.execute("SELECT count(*) FROM browser_sessions").fetchone()[0] >= 4

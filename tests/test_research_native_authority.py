@@ -112,7 +112,33 @@ def test_real_children_separate_reviews_new_reading_snapshot_updates_and_replay(
     assert_native_replay(client, design_record, replay_python, tmp_path / "design")
     after = run(ports.publish_report())
     assert after["id"] != before["id"] and len(after["evidence_ids"]) == 2
+    report = client.get(PREFIX + "/reports/" + after["id"]).json()["body"]
+    assert report["report_profile"] == "research-report.v2"
+    assert {item["evidence_id"] for item in report["native_evidence"]} == {baseline_record["id"], design_record["id"]}
+    assert {item["kind"] for item in report["included_operations"]} == {"run", "design_job"}
+    assert {item["id"] for item in report["scientific_approvals"]} == {baseline_job["approval_id"], design_job["approval_id"]}
+    for child in (baseline_job, design_job):
+        receipt = client.get(PREFIX + "/approvals/" + child["approval_id"])
+        assert receipt.status_code == 200
+        assert receipt.json()["plan_id"] == child["scope"]["plan_id"]
+        assert receipt.json() in report["scientific_approvals"]
+        private = client.get(PREFIX + "/approvals/" + child["approval_id"], headers={"Authorization": "Bearer " + "b" * 40})
+        assert private.status_code == 404
+    for packet in report["native_evidence"]:
+        downloaded = client.get(packet["download_path"])
+        anchors = client.get(packet["anchor_path"])
+        assert downloaded.status_code == anchors.status_code == 200
+        assert packet["native_filename"] in packet["replay_command"]
+        assert packet["anchor_filename"] in packet["replay_command"]
+    # An older immutable report is retained. New profile snapshots do not
+    # silently reuse a record that lacks the complete evidence manifest.
+    with client.app.state.workflow.store.transaction() as conn:
+        legacy = dict(report)
+        legacy.pop("report_profile")
+        legacy.pop("native_evidence")
+        old = client.app.state.workflow._insert(conn, "alice", context.workspace_id, "report", legacy, context.research_session_id)
     assert run(ports.publish_report()) == after
+    assert client.get(PREFIX + "/reports/" + old["id"]).json()["body"] == legacy
     assert client.get(PREFIX + "/reports/" + before["id"]).json() == before_record
     altered = run(ports.prepare_design(constraints("100/1")))
     assert altered["review_id"] != design["review_id"] and altered["review_digest"] != design["review_digest"]

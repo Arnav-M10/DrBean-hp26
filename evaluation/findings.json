@@ -1,8 +1,8 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T14:38:39Z",
-  "application_code_commit": "4a0c616",
+  "updated_at": "2026-11-14T15:14:59Z",
+  "application_code_commit": "070b697",
   "observed_at_harness_commit": "c6307df",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
@@ -1882,7 +1882,7 @@
       "id": "F-SESSION-CAPACITY-EXHAUSTION",
       "severity": "P2",
       "owner": "B (private browser sessions, shared gateway)",
-      "status": "open",
+      "status": "retested",
       "title": "Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors",
       "minimal_input": "trusted-gateway request to GET /api/bean/v1/shared-session without a cookie, repeated capacity times (default 4096), each followed by logout",
       "command": ".venv/bin/python -m pytest -q tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors (capacity 3 for speed; strict xfail)",
@@ -1894,7 +1894,15 @@
         "candidate": "main 299a356 (application tree identical on the C branch)",
         "regression": "tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "main 070b697 (B's PR #41 merge, tested head 0cabe92); macOS 26.7 arm64",
+          "result": "Fixed by B: capacity now counts only active credentials (not revoked, not expired), and rotation no longer consumes a slot; issuance history and private work are retained. The strict xfail turned into XPASS(strict) on main. C promoted the probe to an ordinary assertion and added the expiry half the original probe did not exercise. Both variants (logout, expiry) pass on 070b697 and fail on the pre-fix sessions.py (scratch worktree at cfbedd9). Residual, not a lockout: anonymous issuance history still grows without a rate limit. Closed by retest.",
+          "evidence": {
+            "tests": "tests/integration/test_private_sessions_independent.py::test_anonymous_bootstraps_cannot_permanently_lock_out_new_visitors[logout|expiry]"
+          }
+        }
+      ]
     },
     {
       "id": "H-LAUNCHER-OPTIN-FORMAT",
@@ -1970,7 +1978,7 @@
       "id": "F-CI-BROWSER-CHECK-INTERMITTENT",
       "severity": "P3",
       "owner": "B (apps/web/check-backend.mjs and CI wiring)",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "title": "B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s",
       "minimal_input": "CI job 'browser review, approved design and native replay' (node apps/web/check-backend.mjs, BEAN_AI_MODE=placeholder) on the application tree of main 299a356",
       "command": "GitHub Actions run 43599924443 (pull_request event, head d6d2792), job 132462300488",
@@ -1989,10 +1997,48 @@
           "43594992900"
         ]
       },
+      "retests": [
+        {
+          "at_commit": "main 070b697",
+          "result": "B added a deterministic wait (button enabled or backend error visible) and failure diagnostics (screenshot, visible status text, last API response, credential redacted) to apps/web/check-backend.mjs. Main's merge CI browser job passed. C closes this after consecutive passing runs on the final merge.",
+          "evidence": {}
+        }
+      ]
+    },
+    {
+      "id": "F-RESEARCH-WORKER-UNGUARDED",
+      "severity": "P2",
+      "owner": "B (worker loop and ResearchRunner)",
+      "status": "open",
+      "title": "An exception outside ResearchRunner's handled types escapes Worker.tick; the unguarded worker loop then exits, and the research action stays 'running' with no error recorded",
+      "minimal_input": "after an approved child completes, the coordinator's model raises RuntimeError (any type other than DomainError, CoordinatorFailure, ProviderFailure, LedgerBudgetExceeded, TimeoutError, ValueError, ImportError)",
+      "command": "in-process create_app + ordinary Worker on A's PR #44 39930b8 (main 070b697 + factory); bean_api.research_controlled.build_controlled_research_model patched to a test double",
+      "expected": "the action fails or is marked for reconciliation with an error code, and the worker keeps serving other jobs; the completed child evidence is kept",
+      "observed": "Worker.tick raises RuntimeError. Every later tick shows the session and action 'running' with error_code null and nothing executing. worker.main() runs 'while True: worker.tick()' without a guard, so in the launched process the same exception would end the worker and stop all queued science until a restart; the process exit follows from code inspection and was not run. The completed child and its evidence are kept. A ProviderFailure, which is what the metered gateway raises, is handled correctly: the action fails with provider_request_failed_unknown_outcome.",
+      "impact": "availability and honesty: one unexpected SDK or adapter exception can halt the shared worker and leave a session showing 'running' indefinitely during a demo; no scientific result is altered",
+      "suggested_fix": "treat any exception from an action as an action failure (or needs_reconciliation) inside ResearchRunner, and guard the worker loop so one failure cannot end the process",
+      "evidence": {
+        "reproducer": "C scratch probe at overlay 39ab35f (A 39930b8 + C db7098b); demo check DEMO-09 uses the handled ProviderFailure path"
+      },
+      "retests": []
+    },
+    {
+      "id": "F-RESEARCH-PLAN-PROGRESS-PENDING",
+      "severity": "P3",
+      "owner": "B (plan projection) with A (planning tool output)",
+      "status": "open",
+      "title": "After a completed investigation every maintained plan step is shown as pending, including steps the agent marked completed",
+      "minimal_input": "any controlled research session that completes with a report (witness or no-witness case)",
+      "command": "tests/integration/test_langchain_demo.py and langchain_demo_browser.mjs on A's PR #44 39930b8",
+      "expected": "the plan shows progress honestly: steps with linked completed evidence can show completed; others stay proposals",
+      "observed": "A's policy rewrites its todos with the first two steps 'completed' and the evidence-dependent next step 'pending', but the projected research-plan.v1 shows all three as 'pending' while the session is 'completed' with a report",
+      "impact": "conservative, never overclaims, but a demo viewer sees no progress on a finished investigation; the next step title is still evidence-dependent",
+      "suggested_fix": "project a step as completed when it references the completed child or evidence; or show the agent's proposed status labelled as a proposal",
+      "evidence": {},
       "retests": []
     }
   ],
-  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed). 2026-11-14T13:30:28Z: added F-UPLOAD-LIMIT-MESSAGE (P3, B) from the PR #40 producer refusing both supplied papers with a generic boundary message. 2026-11-14T13:55:53Z: F-NARRATION-OVERSUPPRESSION fix reproduced on A's PR #42 051b4d6 (component overlay, not on main) and set to fixed_pending_retest; C's converse cases at f278de6 hold on v2 and v3. Added F-CI-BROWSER-CHECK-INTERMITTENT (P3, B). Header now names the 299a356 baseline (observed at bb503a7). 2026-11-14T14:15:47Z: C added SCI-05/06/07 cases at 644ad8c (five required engine controls; RS-FOLLOWUP both-compatible branch, separating-scope and SCI-07 checks); fixed harness H-REPLAY-CLASS-RECORDED-MISMATCH and retested it in the clean batch. 2026-11-14T14:20:49Z: main moved to 4a0c616 (A's PR #42). F-NARRATION-OVERSUPPRESSION retested on main and closed (retested). B's PR #41 4d33f0b previewed: the DB-RESEARCH-1 route probes pass 7/7 for the first time; advance honestly refuses while research dispatch is disabled. 2026-11-14T14:32:57Z: C added SCI-02, SCI-05 (application) and SCI-08 cases at e3c36bc and tightened the DB-RESEARCH-1 probes; no new product finding. On main 4a0c616 every exercisable scientific predicate now passes. 2026-11-14T14:38:39Z: C probed A's metered gateway at c6307df (6/6); no new finding.",
+  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed). 2026-11-14T13:30:28Z: added F-UPLOAD-LIMIT-MESSAGE (P3, B) from the PR #40 producer refusing both supplied papers with a generic boundary message. 2026-11-14T13:55:53Z: F-NARRATION-OVERSUPPRESSION fix reproduced on A's PR #42 051b4d6 (component overlay, not on main) and set to fixed_pending_retest; C's converse cases at f278de6 hold on v2 and v3. Added F-CI-BROWSER-CHECK-INTERMITTENT (P3, B). Header now names the 299a356 baseline (observed at bb503a7). 2026-11-14T14:15:47Z: C added SCI-05/06/07 cases at 644ad8c (five required engine controls; RS-FOLLOWUP both-compatible branch, separating-scope and SCI-07 checks); fixed harness H-REPLAY-CLASS-RECORDED-MISMATCH and retested it in the clean batch. 2026-11-14T14:20:49Z: main moved to 4a0c616 (A's PR #42). F-NARRATION-OVERSUPPRESSION retested on main and closed (retested). B's PR #41 4d33f0b previewed: the DB-RESEARCH-1 route probes pass 7/7 for the first time; advance honestly refuses while research dispatch is disabled. 2026-11-14T14:32:57Z: C added SCI-02, SCI-05 (application) and SCI-08 cases at e3c36bc and tightened the DB-RESEARCH-1 probes; no new product finding. On main 4a0c616 every exercisable scientific predicate now passes. 2026-11-14T14:38:39Z: C probed A's metered gateway at c6307df (6/6); no new finding. 2026-11-14T15:03:39Z: scope change to the narrow LangChain demo profile. Main moved to 070b697 (B's PR #41). F-SESSION-CAPACITY-EXHAUSTION closed by retest (probe promoted, expiry variant added); F-CI-BROWSER-CHECK-INTERMITTENT fixed_pending_retest. 2026-11-14T15:14:59Z: narrow-demo checks on A's PR #44 39930b8: 10/10 controlled HTTP claims and 10/10 browser checks pass; added F-RESEARCH-WORKER-UNGUARDED (P2, B) and F-RESEARCH-PLAN-PROGRESS-PENDING (P3, B/A).",
   "check_catalog": {
     "note": "Finding ids that a check names when it fails. They are not observed findings: an id appears in `findings` only after a check actually failed or was blocked. Every id cited by evaluation/drbean_eval or tests/integration must be a finding or listed here (enforced by evaluation/tests).",
     "ids": {

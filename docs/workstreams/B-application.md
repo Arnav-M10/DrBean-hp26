@@ -1,4 +1,23 @@
-# B — stable backend/UI stopping point
+# B — narrow ordinary-browser investigation
+
+Current PR43 builds on merged PR41/main070b697 and incorporates A0491939's
+controlled factory/coordinator and Cdb7098b's narrow predicates/capacity retest.
+The actual launcher → browser → maintained plan → canonical approval → real
+Counterdex → agent evidence read/report → explicit next action → separate design
+approval → complete report/native downloads and fresh replay now passes locally.
+Focused assembled checks54 passed; web81 passed; actual new browser7 checks,
+two real children and two downloaded native replays, zero provider calls.
+
+Current task: publish the clean assembled candidate for C, run focused independent
+demo/private-session checks and required CI, then merge. Live gateway is wired to
+the same graph and shared ledger; live qualification remains not_run because no
+approved shared-server allocation is available to this checkout. No grant/reset.
+Observation ingestion, amendments, larger PDFs and broad restart qualification
+remain deferred. Existing app processes were not restarted or stopped; the new
+browser driver uses isolated launcher ports/store. Full reproduction and exact
+results: [browser milestone](../integration/BROWSER_AGENT_MILESTONE.md).
+
+## Historical PR41 stopping point
 
 Assignment DB-COORDINATOR-3OWNER-1. PR41, branch codex/durable-research-application;
 base main97e0e8c (A051b4d6 and C7038093 incorporated). Python3.12.14 backend, matching

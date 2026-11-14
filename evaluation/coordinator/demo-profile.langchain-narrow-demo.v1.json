@@ -1,0 +1,289 @@
+{
+  "schema_version": "coordinator-demo-profile.v1",
+  "profile": "langchain-narrow-demo.v1",
+  "assignment": "DB-COORDINATOR-3OWNER-1, urgent scope change to one narrow LangChain demo",
+  "author": "C (Claude, independent validation)",
+  "release_qualification": false,
+  "statement": "Passing this profile qualifies only the narrow demo claims below, on the exact candidate, lanes and evidence named in its observation. It never implies full coordinator release qualification under predicates.v1. Related predicates are exercised in part and are NOT passed by this profile. Deferred predicates are unqualified, not passed.",
+  "frozen_predicates": {
+    "file": "evaluation/coordinator/predicates.v1.json",
+    "canonical_sha256": "46a8ae089996e7936cd5d0bba9a4224b6e81bc5a0b4e6184afbf975bad418e68"
+  },
+  "status_vocabulary": [
+    "passed",
+    "failed",
+    "not_available",
+    "not_run"
+  ],
+  "rules": [
+    "A claim passes only when every listed check runs on the exact candidate and passes; an absent producer is not_available, a live claim without a coordinated admitted sample is not_run.",
+    "Controlled model decisions demonstrate controlled integration only; live reasoning needs the live claim's own evidence.",
+    "Blockers even when every claim passes: an open P0, an open P1 in demo-reachable code, a real safety or scientific defect, or a feature exposed in the demo path without an honest unavailable label.",
+    "Known findings stay visible: every observation lists the open findings at observation time.",
+    "The browser path is part of the demo: claims 02, 06 and 08 must also be observed through the ordinary browser application, not only HTTP."
+  ],
+  "browser_claims": [
+    "DEMO-02",
+    "DEMO-06",
+    "DEMO-08"
+  ],
+  "claims": [
+    {
+      "id": "DEMO-01",
+      "claim": "The actual Deep Agents graph and its planning tool execute.",
+      "pass": "Through the ordinary routes and worker, the coordinator records a write_todos plan revision (research-plan.v1) and tool events from the compiled create_deep_agent graph, whose inventory equals the declared allowlist.",
+      "related_predicates": [
+        "LOOP-02",
+        "LOOP-09"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_01_graph_and_planning_execute",
+        "tests/integration/test_research_graph_inventory.py"
+      ]
+    },
+    {
+      "id": "DEMO-02",
+      "claim": "Human approval binds the operation actually dispatched.",
+      "pass": "No scientific child exists before the canonical decision; the dispatched child binds the approved review's exact scope and digest; forged, stale or edited decisions and raw graph commands are refused.",
+      "related_predicates": [
+        "LOOP-03",
+        "AUTH-04",
+        "AUTH-06"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_02_approval_binds_the_dispatched_operation",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "DEMO-03",
+      "claim": "Real Counterdex runs and its evidence reaches the agent.",
+      "pass": "The approved child is an actual Counterdex job with native evidence; the graph's next tool call or plan revision references that evidence ID.",
+      "related_predicates": [
+        "LOOP-04",
+        "SCI-01",
+        "SCI-03"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_03_counterdex_evidence_reaches_the_agent"
+      ]
+    },
+    {
+      "id": "DEMO-04",
+      "claim": "Changed inputs or evidence lead to a meaningful changed next action.",
+      "pass": "Two sessions that differ only in the reviewed claim (outside witness versus no counterexample) take different permitted next actions, graded as acceptable action sets. Controlled decisions show controlled integration, not live reasoning.",
+      "related_predicates": [
+        "LOOP-05",
+        "SCI-03"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_04_changed_evidence_changes_the_next_action"
+      ]
+    },
+    {
+      "id": "DEMO-05",
+      "claim": "Missing assumptions or inconclusive results produce honest limitations.",
+      "pass": "An inconclusive or no-counterexample result is reported as such (no proof or whole-model claim); missing assumptions produce a clarification request, not fabricated values.",
+      "related_predicates": [
+        "LOOP-07",
+        "SCI-02",
+        "SCI-07"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_05_inconclusive_results_are_reported_honestly"
+      ]
+    },
+    {
+      "id": "DEMO-06",
+      "claim": "Report and native downloads keep correct identities and replay.",
+      "pass": "The research report snapshot binds the actual evidence IDs and the exact question; native bytes match recorded SHA-256 and size; the separately authenticated anchor binds the run; fresh replay with the matching checker passes and keeps the recorded outcome.",
+      "related_predicates": [
+        "SCI-09",
+        "LOOP-01"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_06_report_and_native_downloads_replay"
+      ]
+    },
+    {
+      "id": "DEMO-07",
+      "claim": "A duplicate approval or request does not duplicate scientific execution.",
+      "pass": "Repeating the same decision (same or new idempotency key) or a stale advance returns the existing action; child jobs and scientific reservations do not increase.",
+      "related_predicates": [
+        "CRASH-06",
+        "LOOP-04"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_07_duplicate_decisions_do_not_duplicate_science"
+      ]
+    },
+    {
+      "id": "DEMO-08",
+      "claim": "Private research and provider credentials remain private.",
+      "pass": "Another identity gets 404 on the session, events, report and native artifacts; no key, dummy credential marker or private path appears in responses; the thread stays private; secret scan 0.",
+      "related_predicates": [
+        "AUTH-01",
+        "AUTH-02",
+        "AUTH-06",
+        "AUTH-07"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_08_research_and_credentials_stay_private",
+        "tests/integration/test_private_sessions_independent.py"
+      ]
+    },
+    {
+      "id": "DEMO-09",
+      "claim": "A model failure preserves completed scientific evidence.",
+      "pass": "After a completed child, a model failure in the actual research runner leaves the evidence, native bytes and replay intact and records an honest failure.",
+      "related_predicates": [
+        "SCI-08"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_09_model_failure_preserves_completed_evidence",
+        "tests/integration/test_post_science_failure_independent.py"
+      ]
+    },
+    {
+      "id": "DEMO-10",
+      "claim": "A live-labelled demonstration actually uses Gemini through the metered gateway; controlled fixtures are clearly labelled.",
+      "pass": "Controlled sessions are labelled controlled everywhere (mode, events, attempts) and record zero physical provider calls. A live label requires a ledger attempt through the metered gateway with live execution mode, provider gemini and recorded usage; without a coordinated live sample this claim is not_run.",
+      "related_predicates": [
+        "METER-01",
+        "METER-06",
+        "METER-07",
+        "REL-02"
+      ],
+      "checks": [
+        "tests/integration/test_langchain_demo.py::test_demo_10_controlled_runs_are_labelled_controlled",
+        "tests/integration/test_research_gateway_independent.py"
+      ]
+    }
+  ],
+  "deferred_predicates": [
+    {
+      "id": "SCI-04",
+      "reason": "pair design through the agent is outside the narrow demo (qualified only for the manual loop)"
+    },
+    {
+      "id": "SCI-05",
+      "reason": "design tiers through the agent are outside the narrow demo (manual loop only)"
+    },
+    {
+      "id": "SCI-06",
+      "reason": "follow-up readings through the agent are outside the narrow demo (manual loop only)"
+    },
+    {
+      "id": "SCI-10",
+      "reason": "general files and unsupported models are outside the narrow demo"
+    },
+    {
+      "id": "LOOP-06",
+      "reason": "the complete design/observation/recheck loop in one session is outside the narrow demo"
+    },
+    {
+      "id": "LOOP-08",
+      "reason": "read-only routes are probed, but browser restore and uploads are not demo claims"
+    },
+    {
+      "id": "LOOP-10",
+      "reason": "no specialists exist; delegation is not a demo claim"
+    },
+    {
+      "id": "LOOP-11",
+      "reason": "public trace safety is not a demo claim"
+    },
+    {
+      "id": "AUTH-03",
+      "reason": "session rotation with a pending research operation is not a demo claim"
+    },
+    {
+      "id": "AUTH-05",
+      "reason": "prompt-injection resistance is not a demo claim"
+    },
+    {
+      "id": "CRASH-01",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "CRASH-02",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "CRASH-03",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "CRASH-04",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "CRASH-05",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "CRASH-07",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "CRASH-08",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "CRASH-09",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "CRASH-10",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "METER-02",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "METER-03",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "METER-04",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "METER-05",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "FILE-01",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "FILE-02",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "FILE-03",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "FILE-04",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "FILE-05",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "FILE-06",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "FILE-07",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    },
+    {
+      "id": "REL-01",
+      "reason": "outside the narrow demo scope (crash matrix, metering beyond labelling, general files, release gate)"
+    }
+  ]
+}

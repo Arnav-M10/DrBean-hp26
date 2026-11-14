@@ -71,7 +71,14 @@ export class ResearchController {
     const connection = this.connection, generation = this.generation
     this.state.pending = { path, body: clone(body), key }; this.state.busy = true; this.state.error = ''; this.persist(); this.emit()
     try {
-      const result = researchSnapshot(await connection.api.json(path, body, key), connection.workspaceId)
+      let response = await connection.api.json(path, body, key)
+      if (path.endsWith('/provider-consents')) {
+        if (!response || response.kind !== 'research_provider_consent' || response.workspace_id !== connection.workspaceId
+            || response.body?.research_session_id !== this.state.snapshot?.id || response.body?.model !== body.model
+            || response.body?.context_digest !== body.expected_context_digest || response.body?.accepted !== true) throw new Error('Provider consent acknowledgement is not bound to this disclosure.')
+        response = await connection.api.json(`/research-sessions/${response.body.research_session_id}`)
+      }
+      const result = researchSnapshot(response, connection.workspaceId)
       if (generation !== this.generation) return
       this.state.snapshot = result; this.state.pending = null; this.persist()
     } catch (error) {
@@ -89,7 +96,7 @@ export class ResearchController {
       if (!draft.question.goal.trim()) throw new Error('Enter your research question in Question before starting.')
       inputs = await connection.saveReviewedInputs()
       body = { objective: draft.question.goal.trim(), problem_id: inputs.problem.id, expected_problem_digest: inputs.problem.digest,
-        source_ids: this.state.form.attachSources ? sources.map(asset => asset.id) : [], mode: 'controlled', design_constraints: constraints }
+        source_ids: this.state.form.attachSources ? sources.map(asset => asset.id) : [], mode: this.configuredMode(), design_constraints: constraints }
     } catch (error) { if (generation === this.generation) this.state.error = error.message }
     if (generation !== this.generation) return
     this.state.busy = false
@@ -99,7 +106,15 @@ export class ResearchController {
   async createFromSources() {
     const objective = this.getSourceQuestion().trim(), sources = clone(this.getSources())
     if (!objective || objective.length > 2000 || !sources.length) throw new Error('Select retained files and enter a research question of at most 2,000 characters above.')
-    await this.mutate(`/workspaces/${this.connection.workspaceId}/research-sessions`, { objective, source_ids: sources.map(asset => asset.id), mode: 'controlled' })
+    await this.mutate(`/workspaces/${this.connection.workspaceId}/research-sessions`, { objective, source_ids: sources.map(asset => asset.id), mode: this.configuredMode() })
+  }
+  configuredMode() { return this.connection.capabilities?.deepagents?.execution_mode === 'live' ? 'live' : 'controlled' }
+  async consent() {
+    const s = this.state.snapshot, model = this.connection.capabilities?.gemini?.model
+    if (s?.mode !== 'live' || !this.state.providerAccepted || !model) throw new Error('Review the exact provider disclosure and consent before live coordination.')
+    await this.mutate(`/research-sessions/${s.id}/provider-consents`, { model, expected_context_digest: s.provider_disclosure.context_digest, accepted: true })
+    if (!this.state.pending && !this.state.error) this.state.error = 'Provider consent saved. Starting coordination still requires an explicit remaining allocation.'
+    this.state.providerAccepted = false; this.emit()
   }
   async advance() { const s = this.state.snapshot; if (s) await this.mutate(`/research-sessions/${s.id}/advance`, { expected_revision: s.revision }) }
   async decide(decision) {
@@ -169,7 +184,8 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion })
     root.append(element('p', 'The coordinator plans and proposes. You review the meanings and separately approve each scientific operation. Counterdex determines supported mathematical results.'))
     if (!connection.api || !connection.workspaceId) { root.append(element('p', 'Connect to a private workspace to retain a research question and plan.')); return }
     if (state.error) { const error = element('p', state.error); error.setAttribute('role', 'alert'); root.append(error) }
-    if (caps?.execution_mode !== 'controlled' || !caps?.dispatch_enabled) root.append(element('p', `Coordination unavailable: ${caps?.unavailable_reason || 'No admitted controlled coordinator is configured'}. Saved evidence remains available. Live coordination requires separate disclosure and explicitly allocated provider capacity.`))
+    if (!caps?.dispatch_enabled) root.append(element('p', `Coordination unavailable: ${caps?.unavailable_reason || 'No admitted coordinator is configured'}. Saved evidence remains available.`))
+    else root.append(element('p', caps.execution_mode === 'live' ? `Configured coordinator: Gemini ${connection.capabilities.gemini?.model || ''}, separately metered and restricted to explicit free-tier allocation. Saving reviewed inputs does not call the provider.` : 'Configured coordinator: local controlled policy through Deep Agents; scientific results are computed by Counterdex. No provider requests.'))
     if (state.pending) { root.append(element('p', 'This request has an uncertain response. Refresh is read-only; deliberately retry the same frozen request to reconcile it.')); details(root, 'Pending request', state.pending.body); button(root, 'Retry same request', () => controller.retry()); button(root, 'Refresh saved state', () => controller.refresh()) }
     if (!s) {
       if (controller.getSources().length) {
@@ -186,21 +202,33 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion })
     }
     root.append(element('h4', s.objective), element('p', `State: ${s.state} · ${s.mode === 'controlled' ? 'controlled model; real scientific children' : 'live model; separately metered'} · revision ${s.revision}`))
     root.append(element('p', `Used: ${s.usage.logical_turns} logical model turns, ${s.usage.tool_calls} tools, ${s.usage.child_count} scientific reservations. Human waiting releases the worker and does not consume active time.`))
+    if (s.mode === 'live') {
+      const remaining = Math.max(0, (s.provider_allocation?.physical_requests || 0) - s.usage.physical_calls)
+      root.append(element('p', `Explicit provider allocation: ${remaining} physical requests remain. Unknown outcomes remain reserved. Free-tier use is an operator assertion; billing is not independently verified.`))
+      details(root, 'Exact provider disclosure', { provider: 'gemini', model: connection.capabilities.gemini?.model, ...s.provider_disclosure })
+      checkbox(root, 'I consent to sending this research question, reviewed inputs, plan, retained evidence and source references to the disclosed Gemini model.', Boolean(state.providerAccepted), value => { state.providerAccepted = value })
+      button(root, 'Save provider consent', () => controller.consent(), !caps?.dispatch_enabled || Boolean(state.pending))
+      if (!remaining) root.append(element('p', 'Coordination is blocked until the server operator explicitly allocates capacity. Consent does not grant capacity.'))
+    }
     const plan = element('ol')
     for (const step of s.plan?.body?.steps || []) { const item = element('li', `${step.title}: ${step.status}. ${step.reason || ''}`); plan.append(item) }
     root.append(plan)
     if (!s.plan) root.append(element('p', 'No maintained plan has been recorded yet.'))
     details(root, 'Exact historical reviewed inputs', s.reviewed_context)
-    if (s.state === 'ready' || s.state === 'paused') button(root, 'Advance research plan', () => controller.advance(), !caps?.dispatch_enabled || Boolean(state.pending))
+    if (s.state === 'ready' || s.state === 'paused') button(root, 'Advance research plan', () => controller.advance(), !caps?.dispatch_enabled || Boolean(state.pending) || (s.mode === 'live' && (s.provider_allocation?.physical_requests || 0) <= s.usage.physical_calls))
+    if (s.state === 'completed' && s.reports.length && !s.children.some(child => child.kind === 'design_job')) {
+      root.append(element('p', 'The investigation report is retained. Planning a next step does not approve a design; its exact pair, times and allowance require a separate review.'))
+      button(root, 'Plan next step for separate review', () => controller.advance(), !caps?.dispatch_enabled || Boolean(state.pending) || (s.mode === 'live' && (s.provider_allocation?.physical_requests || 0) <= s.usage.physical_calls))
+    }
     const review = s.pending_review
     if (review && ['plan', 'design_plan'].includes(review.kind)) {
       root.append(element('h4', review.kind === 'design_plan' ? 'Review the separate pair-design operation' : review.body.followup ? 'Review the separate original-candidate recheck' : 'Review the investigation operation'))
       root.append(element('p', `Exact review: ${review.id} · digest ${review.digest}. Data acceptance and plan preparation have not approved computation.`))
       details(root, 'Exact frozen scientific scope, tools and limits', review.body)
-      checkbox(root, 'I approve only this frozen scientific scope and its limits.', state.reviewAccepted === `${review.id}:${review.digest}`, value => { state.reviewAccepted = value ? `${review.id}:${review.digest}` : '' })
-      button(root, 'Approve exact operation and continue', () => controller.decide('approve'), Boolean(state.pending))
+      checkbox(root, 'I approve only this frozen scientific scope and its limits.', state.reviewAccepted === `${review.id}:${review.digest}`, value => { state.reviewAccepted = value ? `${review.id}:${review.digest}` : ''; render() })
+      button(root, 'Approve exact operation and continue', () => controller.decide('approve'), Boolean(state.pending) || state.reviewAccepted !== `${review.id}:${review.digest}`)
       button(root, 'Reject operation', () => controller.decide('reject'), Boolean(state.pending))
-    } else if (review && s.state === 'waiting_observation') {
+    } else if (review && s.state === 'waiting_observation' && caps?.supported_operations?.includes('observation')) {
       root.append(element('h4', 'Review a new reading'), element('p', 'A physical measurement may take as long as needed. Keep the declared time and allowance of this reading; changing them does not reuse a separation guarantee. Actual origin is a human declaration, not instrument authentication.'))
       field(root, 'Elapsed reading time (hours)', 'readingTime'); field(root, 'Concentration (mg/L)', 'readingValue'); field(root, 'This reading’s hard allowance (mg/L)', 'readingAllowance')
       field(root, 'Reading origin', 'readingOrigin', [['', 'Choose origin'], ['actual', 'Actual, declared acquisition'], ['hypothetical', 'Hypothetical, explicitly generated']])
@@ -213,7 +241,8 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion })
       checkbox(root, 'I reviewed this answer and any new measurement constraints.', state.dataAccepted, value => { state.dataAccepted = value; state.acceptedDraft = value ? JSON.stringify(getDraft()) : '' })
       button(root, 'Accept clarified input and continue planning', () => controller.adopt(), Boolean(state.pending))
     }
-    if (s.state === 'needs_reconciliation') { root.append(element('p', 'The previous action was interrupted. Recovery reuses the same journal, budget and scientific child; an unknown provider outcome remains reserved.')); button(root, 'Reconcile interrupted action', () => controller.reconcile(), Boolean(state.pending)) }
+    if (s.state === 'waiting_observation' && !caps?.supported_operations?.includes('observation')) root.append(element('p', 'Observation ingestion is unavailable in this coordinator milestone. Retained evidence and the manual scientific workflow remain available.'))
+    if (s.state === 'needs_reconciliation') { root.append(element('p', 'The previous action was interrupted. Completed evidence and accounting are retained. This coordinator has not been qualified for automatic restart continuation.')); button(root, 'Reconcile interrupted action', () => controller.reconcile(), Boolean(state.pending)) }
     if (s.action?.error_code) root.append(element('p', `Action stopped: ${s.action.error_code}. Completed evidence is retained.`))
     button(root, 'Refresh saved state', () => controller.refresh())
     if (!['completed', 'failed', 'cancelled'].includes(s.state)) button(root, 'Cancel research and owned work', () => controller.cancel(), Boolean(state.pending))

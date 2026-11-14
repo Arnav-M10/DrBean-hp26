@@ -107,6 +107,15 @@ class Workflow:
                 return self._job(conn, actor, record_id, kind)
             return self._get(conn, actor, record_id, kind)
 
+    def get_approval(self, actor: str, approval_id: str) -> dict:
+        """Read the immutable scientific receipt, including after consumption/expiry."""
+        with self.store.read() as conn:
+            row = conn.execute("SELECT * FROM approvals WHERE id=?", (approval_id,)).fetchone()
+            if row is None:
+                raise DomainError("not_found", "Workspace or approval was not found.", 404)
+            self.authorize(actor, row["workspace_id"], conn)
+            return dict(row)
+
     def list_records(self, actor: str, workspace_id: str, kind: str, limit: int = 100) -> list[dict]:
         with self.store.read() as conn:
             self.authorize(actor, workspace_id, conn)

@@ -1,4 +1,14 @@
-# Current backend/UI integration — DB-COORDINATOR-3OWNER-1
+# Current narrow browser investigation
+
+PR43 incorporates A0491939 and Cdb7098b on merged PR41/main070b697.
+Actual launcher/browser maintained-plan → canonical approval → Counterdex →
+evidence-dependent report → explicit next planning action → separate pair-design
+approval → complete report/native downloads and replay passes locally.
+See [current reproduction and scope](integration/BROWSER_AGENT_MILESTONE.md).
+Live qualification remains not_run without explicit existing shared-server
+allocation; observation/amendment/restart/PDF expansion remains deferred.
+
+## Historical PR41 backend/UI integration — DB-COORDINATOR-3OWNER-1
 
 PR41 integrates real general-file services, typed durable research authority,
 private research-review UI, shared ledger admission and supervised worker storage
