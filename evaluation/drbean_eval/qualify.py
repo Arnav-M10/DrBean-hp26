@@ -27,7 +27,8 @@ import os
 
 from . import native
 
-EVIDENCE_CLASSES = ("executed_acceptance", "validated_trace", "imported_claim")
+EVIDENCE_CLASSES = ("executed_acceptance", "preview", "diagnostic", "validated_trace", "imported_claim")
+EXECUTED = ("executed_acceptance", "preview", "diagnostic")  # executed and re-checked by this runner
 
 
 def _load(evidence_dir: str, rel: str):
@@ -167,7 +168,7 @@ def qualify(observation: dict, *, evidence_dir: str | None, evidence_class: str,
     if evidence_class not in EVIDENCE_CLASSES:
         raise ValueError(f"unknown evidence class {evidence_class!r}")
     result = {"evidence_class": evidence_class, "qualifier_checks": []}
-    if evidence_class != "executed_acceptance":
+    if evidence_class not in EXECUTED:
         return {**result, "status": "failed",
                 "reason": "imported observation: claims are never qualification; rerun the lane with --subject "
                           "http-launch so the runner executes and corroborates the acceptance itself"}

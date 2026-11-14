@@ -107,12 +107,19 @@ class LaunchedHttpSubject:
     accepts_context = True
     executes_acceptance = True
 
-    def __init__(self, repo: str, *, stack_env: dict | None = None, poll_timeout: float = 240.0):
+    def __init__(self, repo: str, *, stack_env: dict | None = None, poll_timeout: float = 240.0,
+                 app_repo: str | None = None, diagnostic_overrides: tuple[str, ...] = ()):
         from . import launcher
-        self.repo = os.path.abspath(repo)
+        self.repo = os.path.abspath(repo)  # the harness: packets, guard, evaluation code
+        self.app_repo = os.path.abspath(app_repo or repo)  # the application under test (may be a teammate checkout)
         self.stack_env = stack_env or {}
         self.poll_timeout = poll_timeout
-        self.package_dir = os.path.join(self.repo, "packages", "groundwork_adapter")
+        self.diagnostic_overrides = tuple(diagnostic_overrides)
+        self.package_dir = os.path.join(self.app_repo, "packages", "groundwork_adapter")
+        self.app_under_test = {**launcher.git_commit(self.app_repo), "is_harness_checkout": self.app_repo == self.repo}
+        # A relaxed product guard or a different application checkout is never release acceptance.
+        self.evidence_class = ("diagnostic" if self.diagnostic_overrides else
+                               "preview" if self.app_repo != self.repo else "executed_acceptance")
         try:
             self.science_python = launcher.science_python()
             self.science_error = None
@@ -126,9 +133,10 @@ class LaunchedHttpSubject:
     def describe(self) -> dict:
         from . import launcher
         info = {"subject": "http-launch", "launch": "fresh temporary API + worker, allowlisted environment, "
-                "egress guard loaded", "host": launcher.host_identity()}
+                "egress guard loaded", "host": launcher.host_identity(), "app_under_test": self.app_under_test,
+                "evidence_class": self.evidence_class, "diagnostic_overrides": list(self.diagnostic_overrides)}
         try:
-            info["backend_python"] = launcher.interpreter_identity(launcher.backend_python(self.repo))
+            info["backend_python"] = launcher.interpreter_identity(launcher.backend_python(self.app_repo))
         except launcher.StackError as error:
             info["backend_python_error"] = str(error)
         info["science_python"] = (launcher.interpreter_identity(self.science_python) if self.science_python
@@ -140,8 +148,10 @@ class LaunchedHttpSubject:
     def begin_lane(self, lane: str, results_dir: str) -> dict:
         from . import launcher, science_flow
         from .http_client import ApiClient
-        self.stack = launcher.LocalStack(self.repo, stack_env=self.stack_env).start()
+        self.stack = launcher.LocalStack(self.app_repo, stack_env=self.stack_env,
+                                         diagnostic_overrides=self.diagnostic_overrides).start()
         self.readiness = self.stack.readiness()
+        self.readiness["startup_path"] = self.stack.startup_path()
         client = ApiClient(self.stack.base_url, self.stack.tokens[launcher.REVIEWER])
         other = ApiClient(self.stack.base_url, self.stack.tokens[launcher.OTHER_ACTOR])
         scratch = os.path.join(self.stack.workdir, "evidence-scratch")
@@ -224,6 +234,7 @@ class LaunchedHttpSubject:
             "scientific_jobs": len(self.flow.jobs_executed - jobs_before),
             "evidence_index": self.flow.evidence_index(), "native_artifacts": self.flow.native_saved,
             "exchanges": list(self.flow.client.exchanges), "readiness": self.readiness,
+            "app_under_test": self.app_under_test, "diagnostic_overrides": list(self.diagnostic_overrides),
             "timings": _timings(self.flow.client.exchanges),
         }
 
@@ -240,11 +251,13 @@ def _timings(exchanges: list[dict]) -> dict:
             "basis": "local loopback wall time measured by the harness; not provider latency"}
 
 
-def make_subject(spec: str, repo: str | None = None, stack_env: dict | None = None):
+def make_subject(spec: str, repo: str | None = None, stack_env: dict | None = None, app_repo: str | None = None,
+                 diagnostic_overrides: tuple[str, ...] = ()):
     if spec in ("", "none"):
         return NoSubject()
     if spec == "http-launch":
-        return LaunchedHttpSubject(repo or os.getcwd(), stack_env=stack_env)
+        return LaunchedHttpSubject(repo or os.getcwd(), stack_env=stack_env, app_repo=app_repo,
+                                   diagnostic_overrides=diagnostic_overrides)
     kind, _, rest = spec.partition(":")
     if kind == "recorded" and rest:
         return RecordedSubject(rest)

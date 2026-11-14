@@ -106,6 +106,25 @@ def _wrap_client(module) -> None:
     client.__init__ = guarded_init
 
 
+def _relax_nproc(module) -> None:
+    """DIAGNOSTIC ONLY (opt-in): lift the per-user RLIMIT_NPROC cap that blocks spawning on macOS (F-MAC-NPROC).
+
+    Never active unless DRBEAN_DIAGNOSTIC_OVERRIDES contains relax_nproc. Every other guard stays as configured.
+    Runs recorded with it are diagnostic evidence about downstream behaviour, never acceptance.
+    """
+    original = getattr(module, "apply_limits", None)
+    if original is None or getattr(original, "_drbean_relaxed", False):
+        return
+
+    def relaxed(**kwargs):
+        kwargs["processes"] = 1_000_000  # apply_limits caps this at the inherited hard limit
+        _record("diagnostic_override_applied", override="relax_nproc", module=module.__name__)
+        return original(**kwargs)
+
+    relaxed._drbean_relaxed = True  # type: ignore[attr-defined]
+    module.apply_limits = relaxed
+
+
 class _WrapAfterImport:
     """Meta-path finder that patches google.genai.client once Python finishes loading it."""
     targets = {"google.genai.client": _wrap_client}
@@ -143,6 +162,10 @@ def install(log_path: str | None) -> bool:
     present = sorted(name for name in _CREDENTIAL_NAMES if os.environ.get(name) is not None)
     _record("guard_installed", python=sys.version.split()[0], credential_names_present=present)
     sys.addaudithook(_audit)
+    overrides = set(filter(None, os.environ.get("DRBEAN_DIAGNOSTIC_OVERRIDES", "").split(",")))
+    if "relax_nproc" in overrides:
+        _WrapAfterImport.targets = {**_WrapAfterImport.targets, "bean_api.science": _relax_nproc}
+        _record("diagnostic_override_enabled", override="relax_nproc")
     sys.meta_path.insert(0, _WrapAfterImport())
     if "google.genai.client" in sys.modules:
         _wrap_client(sys.modules["google.genai.client"])

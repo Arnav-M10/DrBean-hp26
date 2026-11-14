@@ -80,6 +80,11 @@ def main(argv=None) -> int:
     run.add_argument("--results", default=RESULTS)
     run.add_argument("--stack-env", action="append", default=[], metavar="BEAN_NAME=VALUE",
                      help="non-credential BEAN_* setting passed to the launched test stack (repeatable)")
+    run.add_argument("--app-repo", help="preview another checkout (e.g. a teammate worktree) as the application "
+                     "under test; recorded as preview evidence, never acceptance; requires --results")
+    run.add_argument("--diagnostic", action="append", default=[], choices=("relax_nproc",),
+                     help="DIAGNOSTIC: relax one named product guard to observe downstream behaviour; never "
+                          "acceptance; requires --results")
     controls = sub.add_parser("controls")
     controls.add_argument("--results", default=RESULTS)
     gate = sub.add_parser("gate")
@@ -129,8 +134,13 @@ def main(argv=None) -> int:
         return 0
     if args.command == "run":
         stack_env = dict(item.split("=", 1) for item in args.stack_env if "=" in item)
-        records = runner.run_lane(args.lane, make_subject(args.subject, REPO, stack_env), ROOT, args.results, REPO,
-                                  args.only, LEDGER)
+        if (args.app_repo or args.diagnostic) and os.path.abspath(args.results) == os.path.abspath(RESULTS):
+            print("refused: previews and diagnostics must write to a separate --results directory "
+                  "(for example evaluation/results/preview); they are never release acceptance")
+            return 1
+        subject = make_subject(args.subject, REPO, stack_env, app_repo=args.app_repo,
+                               diagnostic_overrides=tuple(args.diagnostic))
+        records = runner.run_lane(args.lane, subject, ROOT, args.results, REPO, args.only, LEDGER)
         tally = {}
         for record in records:
             tally[record["status"]] = tally.get(record["status"], 0) + 1

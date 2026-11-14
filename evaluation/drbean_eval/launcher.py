@@ -41,6 +41,8 @@ GUARD_DIR = os.path.join(HERE, "guard")
 REVIEWER = "eval-reviewer"
 OTHER_ACTOR = "eval-other-workspace"
 DUMMY_VALUE = re.compile(r"^DRBEAN-DUMMY-[A-Z0-9-]{4,64}$")
+# Opt-in diagnostics that relax one named product guard to observe downstream behaviour. Never acceptance evidence.
+DIAGNOSTIC_OVERRIDES = {"relax_nproc"}
 _CREDENTIAL_NAME = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|^GEMINI_|^GOOGLE_|^LANGSMITH_|^LANGCHAIN_)")
 # Non-credential configuration a teammate's stack may legitimately need.
 _PASSTHROUGH = re.compile(r"^BEAN_[A-Z0-9_]+$")
@@ -123,7 +125,7 @@ class LocalStack:
 
     def __init__(self, repo: str, *, workdir: str | None = None, worker: bool = True,
                  stack_env: dict[str, str] | None = None, allow_dummy_provider_config: bool = False,
-                 startup_timeout: float = 60.0):
+                 startup_timeout: float = 60.0, diagnostic_overrides: tuple[str, ...] = ()):
         self.repo = os.path.abspath(repo)
         self.python = backend_python(self.repo)
         self._own_workdir = workdir is None
@@ -145,6 +147,10 @@ class LocalStack:
         self.seen_descendants: dict[int, dict] = {}
         self.events: list[dict] = []
         self.extra_env = self._checked_extra_env(stack_env or {}, allow_dummy_provider_config)
+        unknown = set(diagnostic_overrides) - DIAGNOSTIC_OVERRIDES
+        if unknown:
+            raise StackError(f"unknown diagnostic override(s) {sorted(unknown)}; known: {sorted(DIAGNOSTIC_OVERRIDES)}")
+        self.diagnostic_overrides = tuple(sorted(set(diagnostic_overrides)))
 
     # -- environment -------------------------------------------------------
     @staticmethod
@@ -190,6 +196,8 @@ class LocalStack:
         }
         if self.counterdex_python:
             env["BEAN_COUNTERDEX_PYTHON"] = self.counterdex_python
+        if self.diagnostic_overrides:
+            env["DRBEAN_DIAGNOSTIC_OVERRIDES"] = ",".join(self.diagnostic_overrides)
         env.update(self.extra_env)
         return env
 
@@ -200,7 +208,8 @@ class LocalStack:
                 "worker": "python -m bean_api.worker", "pythonpath": ["evaluation guard", "apps/api"],
                 "science_adapter": self.environment().get("BEAN_SCIENCE_ADAPTER"),
                 "counterdex_python_configured": bool(self.counterdex_python),
-                "state": "fresh temporary SQLite, sources and artifacts; in-memory bearer tokens"}
+                "state": "fresh temporary SQLite, sources and artifacts; in-memory bearer tokens",
+                "diagnostic_overrides": list(self.diagnostic_overrides)}
 
     # -- lifecycle ---------------------------------------------------------
     def _spawn(self, name: str, argv: list[str]) -> subprocess.Popen:
@@ -383,3 +392,13 @@ def host_identity() -> dict:
     import platform
     return {"system": platform.system(), "release": platform.release(), "machine": platform.machine(),
             "harness_python": platform.python_version(), "executable": os.path.basename(sys.executable)}
+
+
+def git_commit(repo: str) -> dict:
+    def run(*args):
+        return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout.strip()
+    changed = [line[3:] for line in subprocess.run(["git", "-C", repo, "status", "--porcelain", "--untracked-files=no"],
+                                                   capture_output=True, text=True).stdout.splitlines()
+               if line.strip() and not line[3:].startswith(("evaluation/results/", "evaluation/ledger/"))]
+    return {"commit": run("rev-parse", "HEAD") or None, "branch": run("rev-parse", "--abbrev-ref", "HEAD") or None,
+            "dirty": bool(changed)}

@@ -50,9 +50,12 @@ def _entry_gate(name: str, latest: dict, entries: tuple[str, ...], description: 
             states[entry] = {"status": "blocked", "reason": "no attempt at the tested commit"}
             continue
         status = attempt["status"]
+        app = attempt.get("app_under_test") or {}
+        foreign_app = bool(app) and (app.get("commit") != attempt.get("tested_commit") or app.get("dirty"))
         if status == "passed" and (attempt.get("evidence_class") != "executed_acceptance" or attempt.get(
-                "worktree_dirty")):
-            status, reason = "blocked", "passed only as an imported claim or on a dirty worktree"
+                "worktree_dirty") or foreign_app):
+            status, reason = "blocked", ("passed only as an imported claim, preview, diagnostic, foreign application "
+                                         "commit or dirty worktree; not release acceptance")
         else:
             reason = attempt.get("reason")
         states[entry] = {"status": {"passed": "passed", "failed": "failed", "error": "failed"}.get(status, "blocked"),

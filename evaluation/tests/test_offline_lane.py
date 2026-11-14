@@ -443,3 +443,26 @@ class Projection(unittest.TestCase):
         self.assertEqual(out["source_ref"]["region_xywh_px"], [100, 200, 60, 30])
         self.assertEqual(out["source_ref"]["asset_sha256"], "a" * 64)
         self.assertEqual(out["source_ref"]["source_label"], "needs_human_verification")
+
+
+class PreviewAndDiagnosticSeparation(unittest.TestCase):
+    def test_previews_and_diagnostics_never_satisfy_a_release_gate(self):
+        base = {"entry_id": "RS-HERO-FULL", "lane": "offline_real_science", "tested_commit": "c" * 40,
+                "status": "passed", "attempt_id": "att_x", "reason": None, "worktree_dirty": False}
+        for change in ({"evidence_class": "preview"}, {"evidence_class": "diagnostic"},
+                       {"evidence_class": "executed_acceptance", "app_under_test": {"commit": "d" * 40, "dirty": False}},
+                       {"evidence_class": "executed_acceptance", "app_under_test": {"commit": "c" * 40, "dirty": True}}):
+            gate = gates._entry_gate("real_science_http", {"RS-HERO-FULL": {**base, **change}}, ("RS-HERO-FULL",), "")
+            self.assertEqual(gate["status"], "blocked", change)
+        own = {**base, "evidence_class": "executed_acceptance", "app_under_test": {"commit": "c" * 40, "dirty": False}}
+        self.assertEqual(gates._entry_gate("g", {"RS-HERO-FULL": own}, ("RS-HERO-FULL",), "")["status"], "passed")
+
+    def test_cli_refuses_previews_or_diagnostics_in_the_acceptance_results(self):
+        self.assertEqual(cli.main(["run", "--lane", "offline_real_science", "--subject", "http-launch",
+                                   "--diagnostic", "relax_nproc"]), 1)
+        self.assertEqual(cli.main(["run", "--lane", "offline_real_science", "--subject", "http-launch",
+                                   "--app-repo", REPO]), 1)
+
+    def test_unknown_diagnostic_override_is_refused(self):
+        with self.assertRaises(launcher.StackError):
+            launcher.LocalStack(REPO, diagnostic_overrides=("disable_all_guards",))

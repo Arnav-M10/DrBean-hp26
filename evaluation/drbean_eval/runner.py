@@ -279,8 +279,8 @@ def _run_entry(entry, lane, rules, subject, root, results_dir, manifest, manifes
             trusted = False
             record.update(status="error", reason="attestation rejected: " + problem)
         elif not case_id:
-            evidence_class = ("executed_acceptance" if getattr(subject, "executes_acceptance", False)
-                              and evidence_dir else "imported_claim")
+            evidence_class = (getattr(subject, "evidence_class", "executed_acceptance")
+                              if getattr(subject, "executes_acceptance", False) and evidence_dir else "imported_claim")
             outcome = qualify.qualify(observation, evidence_dir=evidence_dir, evidence_class=evidence_class,
                                       science_python=getattr(subject, "science_python", None),
                                       package_dir=getattr(subject, "package_dir", None))
@@ -332,7 +332,8 @@ def _run_entry(entry, lane, rules, subject, root, results_dir, manifest, manifes
             record["external_model_requests"] = {"value": 0 if verified else None,
                                                  "basis": "verified by egress guard" if verified else "unknown"}
             record["external_dispatch"] = sanitize.sanitize(dispatch)
-        for key in ("records", "placeholder_identity", "job_ids", "input_digest"):
+        for key in ("records", "placeholder_identity", "job_ids", "input_digest", "app_under_test",
+                    "diagnostic_overrides"):
             if key in observation:
                 record[key] = sanitize.sanitize(observation[key])
         trace = {"attempt_id": attempt_id, "entry_id": entry["entry_id"], "lane": lane,
