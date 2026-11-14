@@ -111,17 +111,17 @@ try {
   async function prepareApproveAndRun(expectCounterexample = true, prepared = false) {
     const manual = page.locator('#manual-path')
     if (await manual.getAttribute('open') === null) await manual.getByText('Run a manual check without the assistant', { exact: true }).click()
-    if (!prepared) await page.getByRole('button', { name: 'Save inputs and prepare plan' }).click()
+    if (!prepared) await page.getByRole('button', { name: 'Save inputs and prepare check' }).click()
     await page.waitForSelector('#approve-scope')
-    assert.equal(await page.getByRole('button', { name: 'Approve reviewed plan' }).isDisabled(), true)
-    assert.equal(await page.getByRole('button', { name: 'Queue approved manual run' }).isDisabled(), true)
+    assert.equal(await page.getByRole('button', { name: 'Approve check' }).isDisabled(), true)
+    assert.equal(await page.getByRole('button', { name: 'Run approved check' }).isDisabled(), true)
     assert.match(await page.locator('#backend-review').textContent(), /No witness found does not prove the claim/)
     await page.check('#approve-scope')
-    await page.getByRole('button', { name: 'Approve reviewed plan' }).click()
-    await page.getByRole('button', { name: 'Plan approved', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Approve check' }).click()
+    await page.getByRole('button', { name: 'Check approved', exact: true }).waitFor()
     const previousRunId = await page.locator('#run-id').inputValue()
     const response = page.waitForResponse(r => /\/plans\/[^/]+\/runs$/.test(r.url()) && r.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Queue approved manual run' }).click()
+    await page.getByRole('button', { name: 'Run approved check' }).click()
     assert.equal((await response).status(), 202)
     await page.waitForFunction(previous => {
       const id = document.querySelector('#run-id').value
@@ -204,13 +204,13 @@ try {
   async function downloadAndReplay(result, name, design = false) {
     const reference = result.artifacts[0]
     await go(design ? 'next' : 'result')
-    const [nativeDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download native design evidence' : 'Download native scientific evidence', exact: true }).first().click()])
+    const [nativeDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download comparison evidence file' : 'Download evidence file', exact: true }).first().click()])
     const nativePath = join(temp, `${name}.native.json`)
     await nativeDownload.saveAs(nativePath)
     const nativeBytes = await readFile(nativePath)
     assert.equal(nativeBytes.length, reference.byte_size)
     assert.equal(createHash('sha256').update(nativeBytes).digest('hex'), reference.sha256)
-    const [anchorDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download design replay anchors' : 'Download replay anchors', exact: true }).first().click()])
+    const [anchorDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: design ? 'Download comparison replay anchors' : 'Download replay anchors', exact: true }).first().click()])
     const anchorPath = join(temp, `${name}.anchors.json`)
     await anchorDownload.saveAs(anchorPath)
     const replay = start(enginePython, ['-I', '-m', 'counterdex', 'replay-native', nativePath, '--anchors', anchorPath],
@@ -242,13 +242,13 @@ try {
   await page.check('#design-allowContinuation')
 
   async function prepareDesign() {
-    const preview = page.locator('#backend-design details').filter({ has: page.getByText('Exact frozen measurement design', { exact: true }) }).locator('pre')
+    const preview = page.locator('#backend-design details').filter({ has: page.getByText('Exact comparison plan', { exact: true }) }).locator('pre')
     const previous = await preview.count() ? await preview.textContent() : ''
     const response = page.waitForResponse(r => /\/runs\/[^/]+\/design-proposals$/.test(r.url()) && r.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Prepare measurement design', exact: true }).click()
+    await page.getByRole('button', { name: 'Prepare comparison', exact: true }).click()
     assert.equal((await response).status(), 201)
     await page.waitForFunction(previous => {
-      const details = [...document.querySelectorAll('#backend-design details')].find(item => item.querySelector('summary').textContent === 'Exact frozen measurement design')
+      const details = [...document.querySelectorAll('#backend-design details')].find(item => item.querySelector('summary').textContent === 'Exact comparison plan')
       return details && details.querySelector('pre').textContent !== previous
     }, previous)
     const plan = JSON.parse(await preview.textContent())
@@ -263,13 +263,13 @@ try {
   }
   async function approveDesign() {
     await page.check('#approve-design-scope')
-    await page.getByRole('button', { name: 'Approve reviewed design', exact: true }).click()
-    await page.getByRole('button', { name: 'Design approved', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Approve comparison', exact: true }).click()
+    await page.getByRole('button', { name: 'Comparison approved', exact: true }).waitFor()
   }
   async function runDesign(expectedTier, name) {
     const previousJobId = await page.locator('#design-job-id').inputValue()
     const response = page.waitForResponse(r => /\/design-plans\/[^/]+\/jobs$/.test(r.url()) && r.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Queue approved design', exact: true }).click()
+    await page.getByRole('button', { name: 'Run approved comparison', exact: true }).click()
     assert.equal((await response).status(), 202)
     // The application streams bounded bodies. Read its displayed returned ID
     // instead of depending on Chromium retaining a DevTools copy of that body.
@@ -300,7 +300,7 @@ try {
   await page.fill('#design-allowance', '10')
   assert.equal(await page.locator('#approve-design-scope').isDisabled(), true)
   assert.equal(await page.locator('#queue-design').isDisabled(), true)
-  assert.match(await page.locator('#design-draft-state').textContent(), /Design inputs changed/)
+  assert.match(await page.locator('#design-draft-state').textContent(), /You changed the comparison inputs/)
   const noSeparationPlan = await prepareDesign()
   assert.notEqual(noSeparationPlan.id, designPlan.id)
   await approveDesign()
@@ -308,7 +308,7 @@ try {
   assert.match(await page.locator('#backend-design').textContent(), /does not rule out a useful time elsewhere/)
   assert.equal((await api(`/records/${positive.suggestion.id}`)).digest, positive.suggestion.digest)
   await page.fill('#design-job-id', positive.finished.id)
-  await page.getByRole('button', { name: 'Open or refresh design', exact: true }).click()
+  await page.getByRole('button', { name: 'Open comparison', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('#backend-design').textContent.includes('Design tier: checked_pair_separation'))
   assert.equal((await api(`/design-jobs/${noSeparation.finished.id}`)).state, 'completed')
 
@@ -321,12 +321,12 @@ try {
   }
   await page.fill('#followup-value', '3.4')
   await page.fill('#followup-reason', `Synthetic test of ${followupOrigin} declaration; reviewed acquisition log at 7 h and hard bound 0.3 mg/L. No real measurement claimed.`)
-  await page.getByRole('button', { name: `Prepare ${followupOrigin} observation`, exact: true }).click()
-  await page.getByRole('button', { name: `Accept reviewed ${followupOrigin} observation`, exact: true }).click()
-  await page.getByRole('button', { name: 'Prepare follow-up investigation plan', exact: true }).click()
+  await page.getByRole('button', { name: `Prepare ${followupOrigin} reading`, exact: true }).click()
+  await page.getByRole('button', { name: `Accept ${followupOrigin} reading`, exact: true }).click()
+  await page.getByRole('button', { name: 'Prepare recheck', exact: true }).click()
   await page.locator('#followup-approve-scope').check()
-  await page.getByRole('button', { name: 'Approve reviewed follow-up', exact: true }).click()
-  await page.getByRole('button', { name: 'Queue approved follow-up', exact: true }).click()
+  await page.getByRole('button', { name: 'Approve recheck', exact: true }).click()
+  await page.getByRole('button', { name: 'Run approved recheck', exact: true }).click()
   await page.waitForFunction(baselineId => {
     const status = document.querySelector('#backend-investigations [role="status"]')?.textContent
     const match = status?.match(/^(run_[a-zA-Z0-9]+) · execution:/)
@@ -353,7 +353,7 @@ try {
   assert.equal(followupEvidence.body.result.native_replay.operation, 'recheck')
   assert.equal(followupEvidence.body.result.native_replay.dataset_origin, followupOrigin === 'actual' ? 'synthetic' : 'hypothetical')
   await go('result')
-  await page.getByRole('region', { name: 'Follow-up candidate checks', exact: true }).waitFor()
+  await page.getByRole('region', { name: 'Recheck of the compared candidates', exact: true }).waitFor()
   assert.match(await page.locator('#backend-results').textContent(), new RegExp(`Dataset origin: ${followupOrigin === 'actual' ? 'synthetic' : 'hypothetical'}`))
 
   await downloadAndReplay(followupEvidence.body.result, 'followup')
@@ -363,14 +363,14 @@ try {
   await page.getByRole('textbox', { name: 'Row 1, concentration', exact: true }).fill('4.85')
   await page.getByRole('link', { name: 'Review', exact: true }).click()
   assert.equal(await page.locator('#approve-scope').isDisabled(), true)
-  assert.match(await page.locator('#backend-review').textContent(), /Draft changed/)
+  assert.match(await page.locator('#backend-review').textContent(), /You edited the draft after saving it/)
   const changed = await prepareApproveAndRun(false)
   assert.notEqual(changed.id, run.id)
   const changedEvidence = await api(`/records/${changed.scenarios[0].result_id}`)
   assert.notEqual(changedEvidence.body.result.problem_digest, evidence.body.result.problem_digest)
   assert.notEqual(changedEvidence.body.result.artifacts[0].sha256, reference.sha256)
   assert.equal(await page.locator('#design-job-id').inputValue(), '')
-  assert.equal(await page.getByRole('button', { name: 'Download native design evidence', exact: true }).count(), 0)
+  assert.equal(await page.getByRole('button', { name: 'Download comparison evidence file', exact: true }).count(), 0)
   await downloadAndReplay(changedEvidence.body.result, 'changed')
   assert.equal((await api(`/records/${evidence.id}`)).digest, evidence.digest)
   // Changed bytes cannot reuse a controlled extraction; accepted science stays intact.
@@ -391,8 +391,8 @@ try {
   assert.deepEqual(await api(`/workspaces/${workspace}/provider-attempts`), [])
 
   await page.getByRole('link', { name: 'Report', exact: true }).click()
-  await page.getByRole('button', { name: 'Create report for selected run' }).click()
-  const [reportDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download exact report JSON' }).click()])
+  await page.getByRole('button', { name: 'Create report' }).click()
+  const [reportDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download report (JSON)' }).click()])
   assert.equal(JSON.parse(await readFile(await reportDownload.path(), 'utf8')).body.run.id, changed.id)
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)

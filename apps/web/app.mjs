@@ -246,7 +246,7 @@ function renderReview() {
   for (const [symbol, label, units, lower, upper] of bounds) {
     exactList.append(element('dt', `${label} (${symbol}, ${units})`), element('dd', `[${exact[lower]}, ${exact[upper]}]`))
   }
-  details.append(element('summary', 'Exact model bounds and target interval'), exactList)
+  details.append(element('summary', 'Exact search limits and claimed range'), exactList)
   summary.append(details)
 }
 
@@ -376,7 +376,7 @@ function renderResume(status) {
     items.push(item)
   }
   if (!items.length) {
-    const empty = element('p', status.connected ? 'No saved investigations in this workspace yet. To reopen an earlier check by its run identifier, go to ' : 'Your saved investigations appear when the private workspace is ready. To reopen a check by its run identifier, go to ', { class: 'fine' })
+    const empty = element('p', status.connected ? 'No saved checks in this workspace yet. To reopen an earlier check by its ID, go to ' : 'Your saved checks appear when the private workspace is ready. To reopen a check by its ID, go to ', { class: 'fine' })
     empty.append(element('a', 'run history', { href: '#run-history' }), '.')
     items.push(empty)
   }
@@ -463,7 +463,7 @@ byId('csv-file').addEventListener('change', async event => {
     const hash = globalThis.crypto?.subtle ? await crypto.subtle.digest('SHA-256', bytes) : null
     const digest = hash && Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
     if (token !== previewToken) return
-    showImportPreview(imported, { name: file.name, digest, description: 'CSV field text is kept in this draft. The original file bytes stay with you.' })
+    showImportPreview(imported, { name: file.name, digest, description: 'The CSV values are copied into this draft. The file itself is not uploaded.' })
   } catch (error) {
     if (token !== previewToken) return
     const message = element('p', `${file.name}: ${error.message}`, { role: 'alert' })
@@ -476,7 +476,7 @@ byId('example').addEventListener('click', () => {
   previewToken++
   showImportPreview(parseMeasurementsCsv(exampleCsv), {
     name: 'Synthetic two-rate example',
-    description: 'Synthetic five-row research example. Historical hard allowances are team-selected at 0.50 mg/L. Review the model domain and closed claim separately; investigation results are computed from the submitted inputs.',
+    description: 'Synthetic example with five readings. The team chose the 0.50 mg/L allowances. Review the search limits and the claim on the next page; results come only from the inputs you save.',
   })
 })
 
@@ -529,11 +529,11 @@ renderWorkflow = setupWorkflow(currentDraft, (review, source) => {
     accepted.set(index, row)
   }
   if (!accepted.size) throw new Error('This review has no supported measurement rows. Enter measurements manually.')
-  rows = []; sources = [{ id: source.id, name: 'Reviewed source image', description: 'Explicitly accepted controlled-source values; inspect the retained source review for original strings and corrections.' }]
+  rows = []; sources = [{ id: source.id, name: 'Reviewed source image', description: 'Values you accepted from the reviewed source image. The source review keeps the original text and every correction.' }]
   for (const [, values] of [...accepted].sort((a, b) => a[0] - b[0])) addRow(values, source.id)
   rowsReviewed = false; questionReviewed = false
   byId('dataset-origin').value = source.body.origin === 'synthetic' ? 'synthetic' : ''
-  renderRows(); location.hash = 'inputs'; announce('Reviewed source values copied to the measurement draft. Review missing fields and the question before preparing science.')
+  renderRows(); location.hash = 'inputs'; announce('Reviewed values copied into the measurement table. Fill in any missing fields and the claim before saving inputs.')
 }, { onConnectionChange: async connection => { await Promise.all([general.connectionChanged(connection), research.connectionChanged(connection)]) }, onRender: () => updateChrome() })
 
 byId('start-example').addEventListener('click', () => {

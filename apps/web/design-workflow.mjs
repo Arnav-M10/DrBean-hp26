@@ -13,7 +13,7 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
   function edited() {
     if (plan && !currentPlan()) approval = undefined
     const notice = document.getElementById('design-draft-state')
-    if (notice) notice.textContent = currentPlan() ? 'The prepared plan matches these design inputs.' : 'Design inputs changed. Prepare a new design before approving or queueing.'
+    if (notice) notice.textContent = currentPlan() ? 'The prepared comparison matches these inputs.' : 'You changed the comparison inputs. Prepare the comparison again before approving or running it.'
     for (const id of ['approve-design-scope', 'approve-design', 'queue-design']) {
       const control = document.getElementById(id)
       if (control && !currentPlan()) { control.disabled = true; if (control.type === 'checkbox') control.checked = false }
@@ -37,7 +37,7 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
   async function refresh(id = jobId) {
     const { api, workspace } = context()
     const loaded = await api.json(`/design-jobs/${encodeURIComponent(id.trim())}`)
-    if (loaded.workspace_id !== workspace) throw new Error('Select the design’s workspace before opening it.')
+    if (loaded.workspace_id !== workspace) throw new Error('Choose the workspace this comparison belongs to, then open it.')
     const [record, historicalPlan] = await Promise.all([
       loaded.result_id ? api.json(`/records/${encodeURIComponent(loaded.result_id)}`) : undefined,
       api.json(`/records/${encodeURIComponent(loaded.plan_id)}`),
@@ -57,7 +57,7 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
     if (!evidence) { const empty = node('p', 'This needs a finished check that found two different candidates which both fit your readings. A single counterexample cannot be compared with anything. Run a check, then come back here.'); empty.className = 'note'; section.append(empty) }
     else {
       if (eligible.length > 1) {
-        const label = node('label', 'Historical scenario'); label.className = 'stack'
+        const label = node('label', 'Earlier check'); label.className = 'stack'
         const select = node('select', ''); select.id = 'design-scenario'; select.disabled = busy
         for (const item of eligible) { const option = node('option', item.body.scenario_id); option.value = item.id; select.append(option) }
         select.value = evidenceId
@@ -84,41 +84,41 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
       field(section, 'horizon', 'Latest elapsed time the comparison may consider (hours)')
       field(section, 'allowConstruction', 'Allow the checker to build exact certificates for these two candidates', { check: true })
       field(section, 'allowContinuation', 'Allow those certificates to extend up to the latest time above', { check: true })
-      section.append(node('p', 'Possible outcomes: a checked separating time, numerical guidance only, no separating time, or unavailable. Limits: 120 seconds, two certificate constructions, two pair checks and a 4 MiB evidence file. No AI model is called.'))
-      button(section, 'Prepare measurement design', async () => {
+      section.append(node('p', 'Possible results: a checked separating time, numerical guidance only, no separating time found, or unavailable. Limits: 120 seconds, two certificate builds, two pair checks and a 4 MiB evidence file. No AI model is used.'))
+      button(section, 'Prepare comparison', async () => {
         const request = designRequest(run, evidence, draft), snapshot = fingerprint()
         const prepared = await api.json(`/runs/${encodeURIComponent(run.id)}/design-proposals`, request)
         plan = prepared; frozen = snapshot; approval = undefined
       }, !api || !workspace || !available)
       if (plan) {
-        const status = node('p', currentPlan() ? 'The prepared plan matches these design inputs.' : 'Design inputs changed. Prepare a new design before approving or queueing.'); status.id = 'design-draft-state'
-        section.append(status, exactRecord('Exact frozen measurement design', plan))
+        const status = node('p', currentPlan() ? 'The prepared comparison matches these inputs.' : 'You changed the comparison inputs. Prepare the comparison again before approving or running it.'); status.id = 'design-draft-state'
+        section.append(status, exactRecord('Exact comparison plan', plan))
         const label = node('label', ' I reviewed the pair, times, allowance, latest time, permissions and limits, and approve only this comparison.')
         const check = document.createElement('input'); check.type = 'checkbox'; check.id = 'approve-design-scope'; check.disabled = busy || Boolean(approval) || !currentPlan()
         label.prepend(check); section.append(label)
-        const approve = button(section, approval ? 'Design approved' : 'Approve reviewed design', async () => {
-          if (!check.checked || !currentPlan()) throw new Error('Review the current design and check its separate approval box.')
+        const approve = button(section, approval ? 'Comparison approved' : 'Approve comparison', async () => {
+          if (!check.checked || !currentPlan()) throw new Error('Read what this approval covers, then tick its box. It is separate from the check approval.')
           approval = await api.json(`/design-plans/${plan.id}/approvals`, { accepted: true, expected_plan_digest: plan.digest, expected_current_revision_id: plan.body.request.problem_id })
         }, true); approve.id = 'approve-design'
         check.addEventListener('change', () => { approve.disabled = busy || Boolean(approval) || !currentPlan() || !check.checked })
-        if (approval) section.append(exactRecord('Design approval receipt', approval))
-        const queue = button(section, 'Queue approved design', async () => {
-          if (!currentPlan() || !approval) throw new Error('A matching reviewed design approval is required.')
+        if (approval) section.append(exactRecord('Comparison approval receipt', approval))
+        const queue = button(section, 'Run approved comparison', async () => {
+          if (!currentPlan() || !approval) throw new Error('Running the comparison needs a current approval of this exact comparison.')
           job = await api.json(`/design-plans/${plan.id}/jobs`, { approval_id: approval.id, expected_plan_digest: plan.digest })
           jobId = job.id; jobPlan = plan; suggestion = undefined
         }, !available || !currentPlan() || !approval || job?.plan_id === plan.id); queue.id = 'queue-design'
       }
     }
-    const label = node('label', 'Comparison identifier'); label.className = 'stack'
+    const label = node('label', 'Comparison ID'); label.className = 'stack'
     const input = document.createElement('input'); input.type = 'text'; input.id = 'design-job-id'; input.value = jobId; input.disabled = busy
     input.addEventListener('input', () => { jobId = input.value }); label.append(input); section.append(label)
-    button(section, 'Open or refresh design', () => refresh(), !api || !workspace)
-    section.append(node('p', 'Keep this identifier to reopen the comparison later. A running comparison updates by itself and is never repeated.'))
+    button(section, 'Open comparison', () => refresh(), !api || !workspace)
+    section.append(node('p', 'Keep this ID to reopen the comparison later. A running comparison updates by itself and is never repeated.'))
     if (job) {
       const line = node('p', `${job.id} · design execution: ${job.state}`); line.className = 'tech'
-      section.append(line, exactRecord('Persisted design job', job))
-      if (jobPlan) { const scope = node('p', `Design result scope: historical run ${jobPlan.body.request.historical_run_id}, scenario ${jobPlan.body.request.scenario_id}, pair ${jobPlan.body.request.candidate_ids.join(' and ')}.`); scope.className = 'tech'; section.append(scope, exactRecord('Approved scope for this design job', jobPlan)) }
-      if (job.error_code) section.append(node('p', `Design execution stopped: ${job.error_code}.`))
+      section.append(line, exactRecord('Recorded comparison', job))
+      if (jobPlan) { const scope = node('p', `Design result scope: historical run ${jobPlan.body.request.historical_run_id}, scenario ${jobPlan.body.request.scenario_id}, pair ${jobPlan.body.request.candidate_ids.join(' and ')}.`); scope.className = 'tech'; section.append(scope, exactRecord('Approved scope for this comparison', jobPlan)) }
+      if (job.error_code) section.append(node('p', `The comparison stopped before finishing (${job.error_code}). Check the comparison inputs and prepare it again.`))
     }
     if (suggestion) {
       const result = suggestion.body
@@ -158,10 +158,10 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
       section.append(exactRecord('Exact design evidence record', suggestion))
       for (const reference of result.artifacts ?? []) {
         const name = `dr-bean-${reference.id}`
-        section.append(node('h4', 'Download comparison evidence'), node('p', `Native design evidence: ${reference.byte_size.toLocaleString()} bytes, SHA-256 ${reference.sha256}`)); section.lastChild.className = 'tech'
-        button(section, 'Download native design evidence', async () => { const file = await api.download(`/artifacts/${encodeURIComponent(reference.id)}`, reference); save(file.bytes, `${name}.native.json`) })
-        button(section, 'Download design replay anchors', async () => { const file = await api.download(`/artifacts/${encodeURIComponent(reference.id)}/anchor?download=true`); save(file.bytes, `${name}.anchors.json`) })
-        section.append(node('p', 'Replay the retained design and baseline history with the matching Counterdex CPython 3.11 package. Native replay checks supported mathematical facts; browser download hashes establish byte integrity only.'), node('pre', `python3.11 -m counterdex replay-native ${name}.native.json --anchors ${name}.anchors.json`))
+        section.append(node('h4', 'Download comparison evidence'), node('p', `Comparison evidence file: ${reference.byte_size.toLocaleString()} bytes, SHA-256 ${reference.sha256}`)); section.lastChild.className = 'tech'
+        button(section, 'Download comparison evidence file', async () => { const file = await api.download(`/artifacts/${encodeURIComponent(reference.id)}`, reference); save(file.bytes, `${name}.native.json`) })
+        button(section, 'Download comparison replay anchors', async () => { const file = await api.download(`/artifacts/${encodeURIComponent(reference.id)}/anchor?download=true`); save(file.bytes, `${name}.anchors.json`) })
+        section.append(node('p', 'Replay this comparison and the check it came from with the matching Counterdex package for CPython 3.11. Replay recomputes the supported mathematical facts; a matching download hash only shows the file is intact.'), node('pre', `python3.11 -m counterdex replay-native ${name}.native.json --anchors ${name}.anchors.json`))
       }
       followup.render(section, job, suggestion, jobPlan)
     }

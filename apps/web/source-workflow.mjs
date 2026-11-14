@@ -35,8 +35,8 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
       && capabilities.source_intake.application_review_integration === 'available'
     const section = node('section', ''); section.id = 'source-review'; parent.append(section)
     section.append(node('h3', 'Source and value review'), node('p', live
-      ? `Gemini (${capabilities.gemini.model}) can propose values from one public or synthetic image after your permission. Upload alone retains the source locally. You must review each proposal before it changes scientific inputs. CSV files belong in Measurements; this upload accepts PNG or JPEG images.`
-      : 'Gemini is a disabled placeholder. Upload retains a source locally without extraction or scientific approval. Enter measurements manually when no reviewed proposal is available.'))
+      ? `With your permission, Gemini (${capabilities.gemini.model}) can propose values from one public or synthetic image. Uploading only stores the image on this server. You review every proposed value before it reaches the measurement table. This upload takes PNG or JPEG; import CSV files on the Measurements page.`
+      : 'Image reading with Gemini is off on this server. You can still upload an image to keep it with your study, but no values are read from it. Type the readings into the table instead.'))
     const fileLabel = node('label', 'Public or synthetic source image'); fileLabel.className = 'stack'
     const file = node('input', ''); file.type = 'file'; file.accept = 'image/png,image/jpeg'; file.id = 'source-image-file'; file.disabled = busy
     file.addEventListener('change', () => { selectedFile = file.files[0] })
@@ -59,7 +59,7 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
       const image = node('img', ''); image.src = imageUrl; image.alt = 'Retained source for transcription review'; image.style.maxWidth = '100%'; section.append(image)
     }
     const controlled = capabilities?.source_intake?.execution_mode === 'controlled' && capabilities.source_intake.application_review_integration === 'available'
-    section.append(node('p', controlled ? 'Controlled examples are enabled for exact supported synthetic images only. These authored values are not image understanding or Gemini transcription. Unknown or changed images require manual entry.' : 'Controlled proposals are unavailable in this server configuration. Manual entry remains available.'))
+    section.append(node('p', controlled ? 'Test mode: for one known synthetic image, Dr. Bean fills in prepared values. This is not image reading or Gemini transcription. Any other image needs manual entry.' : 'Prepared example values are not available on this server. Type the readings into the table instead.'))
     button(section, live ? 'Use sample source image' : 'Use controlled example image', async () => {
       const response = await fetch('/examples/controlled-source.png')
       if (!response.ok) throw new Error('The controlled example image is unavailable. Upload a source or enter measurements manually.')
@@ -100,8 +100,8 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
       return
     }
     section.append(node('p', liveProposal
-      ? 'Review every proposed value and source locator against the retained image. Gemini can misread values. A source quotation or model proposal does not establish a scientific result.'
-      : 'Review every proposed value against the retained image. Controlled proposals are test output; no live Gemini qualification is claimed.'), exactRecord('Proposal and source locators', proposal))
+      ? 'Compare every proposed value and its location with the stored image. Gemini can misread values, and a quoted value is not a checked result.'
+      : 'Compare every proposed value with the stored image. These prepared values are test output, not live Gemini reading.'), exactRecord('Proposal and source locators', proposal))
     fields.forEach((field, index) => {
       const original = proposal.body.fields[index]
       if (!field.value || original.ambiguity) section.append(node('p', `Needs review: ${field.field_path} — ${original.ambiguity || 'No proposed value; enter a reviewed value or assumption.'}`))
@@ -128,7 +128,7 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
     if (!review) return
     button(section, 'Revise source review', () => { review = prepared = materialized = undefined })
     button(section, 'Use reviewed values in measurement draft', () => applyReviewedFields(review, source))
-    section.append(exactRecord('Source review receipt', review), node('p', 'Use the reviewed values in the measurement draft (replacing its rows), then complete Measurements and Question. Explain the remaining assumptions before creating executable inputs. The server checks exact agreement with this review.'))
+    section.append(exactRecord('Source review receipt', review), node('p', 'Copy the reviewed values into the measurement table (this replaces its rows), then finish the Measurements and Claim pages. Explain any remaining assumptions before saving inputs. The server checks that the saved inputs match this review exactly.'))
     const assumptionLabel = node('label', 'Explanation for the remaining manually reviewed inputs and assumptions'); assumptionLabel.className = 'stack'
     const assumption = node('textarea', ''); assumption.value = explanation; assumption.disabled = busy || Boolean(prepared); assumption.maxLength = 2000
     assumption.addEventListener('input', () => { explanation = assumption.value }); assumptionLabel.append(assumption); section.append(assumptionLabel)
@@ -147,7 +147,7 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
       materialized = materialized ?? await api.json(`/workspaces/${workspace}/intake-reviews/${review.id}/materialize`, prepared)
       await useInputs(materialized)
     })
-    section.append(node('p', 'The investigation plan requires its own explicit approval before execution.'))
+    section.append(node('p', 'The check still needs your approval before it runs.'))
   }
   return { render, reset }
 }

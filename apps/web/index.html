@@ -64,13 +64,13 @@
       <section id="start" class="page" aria-labelledby="start-title">
         <header class="page-head">
           <h1 id="start-title" tabindex="-1">Bring your measurements and check a claim</h1>
-          <p class="lede">Dr. Bean tests a claimed range for a drug's elimination rate against your concentration measurements. It searches for parameter values that fit every reading within its allowance but fall outside the claim, then helps you choose the next measurement that would tell two explanations apart.</p>
+          <p class="lede">Dr. Bean tests a claimed range for a drug’s elimination rate against your concentration readings. It looks for parameter values that fit every reading within its allowance but lie outside the claim. If it finds two that fit, it helps you pick the next measurement that could tell them apart.</p>
         </header>
 
         <div class="begin">
           <div class="begin-main">
             <h2>Start a study</h2>
-            <p>You will review the measurements and the claim, approve one bounded check, and read what the checker found.</p>
+            <p>You review the readings and the claim, approve one check, and then read what the checker found.</p>
             <div class="actions">
               <button type="button" id="start-example">Start with the example study</button>
               <a class="button secondary" href="#inputs" id="start-manual">Enter measurements myself</a>
@@ -81,7 +81,7 @@
             <div><dt>Model</dt><dd>Two-rate concentration curve, C(t) = A·(e<sup>−ke·t</sup> − e<sup>−ka·t</sup>)</dd></div>
             <div><dt>Units</dt><dd>Elapsed hours, mg/L, rates per hour</dd></div>
             <div><dt>Data you can bring</dt><dd>Typed values, a CSV with <code>time,concentration,epsilon</code>, or a PNG/JPEG lab sheet read under review</dd></div>
-            <div><dt>Who decides what</dt><dd>You review inputs and approve each operation. The Counterdex checker decides mathematical results. AI never does.</dd></div>
+            <div><dt>Who decides what</dt><dd>You review the inputs and approve each step. Mathematical results come only from the Counterdex checker, never from an AI model.</dd></div>
           </dl>
         </div>
 
@@ -103,7 +103,7 @@
 
         <section id="research" class="block" aria-labelledby="research-title">
           <h2 id="research-title" tabindex="-1">Ask about a paper or data file</h2>
-          <p>A separate path for general questions about your own files. Answers are AI analysis with citations, not mathematical verification, and they never fill in the measurement table on their own.</p>
+          <p>Ask general questions about your own files. Answers are AI analysis with citations. They are not a mathematical check, and they never fill in the measurement table for you.</p>
           <details class="files-path" id="files-path"><summary>Open file questions</summary>
             <div id="general-workspace"></div>
           </details>
@@ -115,7 +115,7 @@
         <header class="page-head">
           <p class="crumb">Step 2 of 5 · Check inputs</p>
           <h1 id="inputs-title" tabindex="-1">Measurements</h1>
-          <p class="lede">Add the readings the check will rely on: elapsed hours since dosing, concentration in mg/L, and each reading's allowance.</p>
+          <p class="lede">Add the readings for the check: hours since dosing, concentration in mg/L, and each reading’s allowance.</p>
         </header>
         <div class="block import-card">
           <div>
@@ -130,7 +130,7 @@
         </div>
         <form id="measurements" class="block" novalidate>
           <h2>Measurement table</h2>
-          <p id="allowance-help">An allowance is the largest discrepancy you accept between the model and that reading, in mg/L. A standard deviation is not an allowance unless you have a separate rule that turns it into a hard bound.</p>
+          <p id="allowance-help">An allowance is the largest gap you accept between the model curve and that reading, in mg/L. A standard deviation is not an allowance unless you have a rule that turns it into a hard bound.</p>
           <div id="rows-errors" class="errors" tabindex="-1" hidden></div>
           <div class="table-region" role="region" aria-label="Editable measurements" tabindex="0">
             <table class="edit-table">
@@ -156,11 +156,11 @@
         <header class="page-head">
           <p class="crumb">Step 2 of 5 · Check inputs</p>
           <h1 id="question-title" tabindex="-1">Claim and assumptions</h1>
-          <p class="lede">State the range you want to test and the search limits for each parameter. The check asks: do all parameter values that fit your readings keep ke inside this range?</p>
+          <p class="lede">Set the range you want to test and the search limits for each parameter. The check asks whether every set of values that fits your readings keeps ke inside that range.</p>
         </header>
         <form id="question-form" class="block" novalidate>
           <div id="question-errors" class="errors" tabindex="-1" hidden></div>
-          <p id="example-note" class="note" hidden>Prefilled from the synthetic example study. Review every value before you continue; you can change any of them.</p>
+          <p id="example-note" class="note" hidden>Filled in from the synthetic example. Check each value before you continue; you can change any of them.</p>
           <fieldset class="group">
             <legend>About this dataset</legend>
             <label class="stack">Experiment name<span class="help">A short identifier you will recognise later, such as <code>pk_trial_3</code>.</span><input id="experiment-id" type="text" required></label>
@@ -174,13 +174,13 @@
           </div>
           <fieldset class="group">
             <legend>Search limits</legend>
-            <p class="help">The checker only considers parameter values inside these ranges. Wider limits search more; any result holds only within them.</p>
+            <p class="help">The checker only searches inside these ranges, and every result holds only within them. Wider limits cover a wider range; the search stays bounded.</p>
             <div id="search-limits"></div>
             <details><summary>Model equation</summary><p><code>C(t) = A × (exp(−ke × t) − exp(−ka × t))</code></p></details>
           </fieldset>
           <fieldset class="group">
             <legend>Why you trust the allowances</legend>
-            <label class="stack">Origin of the allowances<span class="help">Say where ±0.50 mg/L (or your values) comes from: assay specification, team choice, synthetic setting.</span><textarea id="allowanceOrigin" rows="2" required></textarea></label>
+            <label class="stack">Origin of the allowances<span class="help">Say where your allowance values come from, for example an assay specification, a team decision or a synthetic setting.</span><textarea id="allowanceOrigin" rows="2" required></textarea></label>
             <label class="stack">Methods or source notes <span class="optional">Optional</span><textarea id="methods" rows="2"></textarea></label>
             <label class="stack">Your question in your own words <span class="optional">Optional. Left blank, Dr. Bean asks the precise claim question.</span><textarea id="goal" rows="2" maxlength="2000" placeholder="Could ke plausibly be faster than 0.17 per hour given these readings?"></textarea></label>
           </fieldset>
@@ -205,7 +205,7 @@
         <header class="page-head">
           <p class="crumb">Step 3 of 5</p>
           <h1 id="investigations-title" tabindex="-1">Investigate</h1>
-          <p class="lede">Review the proposed check, approve it when you’re ready, and follow its progress.</p>
+          <p class="lede">Follow your check and research plan: what is running, what finished and what needs you. Everything here is read from the server.</p>
         </header>
         <div id="durable-research" class="block" aria-live="polite"></div>
         <details class="block" id="manual-investigations"><summary>Manual check and run history</summary><div id="backend-investigations"></div></details>
@@ -227,7 +227,7 @@
         <header class="page-head">
           <p class="crumb">Step 5 of 5</p>
           <h1 id="next-title" tabindex="-1">Choose the next measurement</h1>
-          <p class="lede">When the check finds two different candidates that both fit, one new reading at the right time can rule one of them out. Give the times you could actually measure and how precise that reading would be.</p>
+          <p class="lede">When two different candidates both fit your readings, one new reading at the right time can rule one of them out. Enter the times you could actually measure and the allowance that reading would have.</p>
         </header>
         <div id="research-next"></div>
         <div id="backend-next" class="block"></div>
@@ -240,7 +240,7 @@
 
       <footer class="workspace-status" aria-label="Draft storage">
         <p><span id="draft-storage-text">Drafts live in this tab until you save reviewed inputs.</span> <button id="export-draft" type="button" class="linklike">Download draft</button></p>
-        <p class="attribution">Investigation planning uses LangChain Deep Agents when the server enables it. Mathematical results come only from the Counterdex checker.</p>
+        <p class="attribution">The research plan uses LangChain Deep Agents when the server turns it on. Mathematical results come only from the Counterdex checker.</p>
       </footer>
       <div id="status" class="sr-only" role="status"></div>
     </main>
