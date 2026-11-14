@@ -12,6 +12,9 @@
    ],
    "pending": [
     "tests/integration/test_paper_trust_boundaries.py::test_page_citations_must_point_at_real_page_content"
+   ],
+   "library_level_on_previews": [
+    "tests/integration/test_paper_proposal_validation.py (corrupted citations refused; F-PAPER-CITATION-SUBSTRING, F-PAPER-EXPONENT-FLATTENING strict xfail) - runs where the paper-proposal validator exists (PR #35 preview)"
    ]
   },
   {
@@ -23,6 +26,9 @@
    ],
    "pending": [
     "tests/integration/test_paper_trust_boundaries.py::test_statistical_summaries_never_become_hard_scientific_inputs"
+   ],
+   "library_level_on_previews": [
+    "tests/integration/test_paper_proposal_validation.py::test_statistical_spread_is_never_accepted_as_a_hard_allowance and F-PAPER-HARD-BOUND-CONTEXT - PR #35 preview"
    ]
   },
   {
@@ -63,6 +69,9 @@
    ],
    "pending": [
     "tests/integration/test_paper_trust_boundaries.py::test_metered_chat_model_failures_and_accounting"
+   ],
+   "library_level_on_previews": [
+    "tests/integration/test_gemini_gateway_attacks.py (invalid/wrong output, refusal, truncation, 429/404/503, interruption, timeout, cancellation, usage over reservation, negative and missing usage, model-version mismatch) - PR #35 preview: all pass"
    ]
   },
   {
@@ -76,6 +85,9 @@
    ],
    "pending": [
     "tests/integration/test_paper_trust_boundaries.py::test_metered_chat_model_failures_and_accounting"
+   ],
+   "library_level_on_previews": [
+    "tests/integration/test_gemini_gateway_attacks.py (one reservation per transport call, no hidden retry in gateway or agent chat model, uncertain outcomes recorded unknown_outcome) - PR #35 preview: all pass; shared session ceilings need Owner 2's ledger"
    ]
   },
   {
@@ -126,7 +138,13 @@
    ],
    "pending": [
     "extend to specialists and the metered adapter when advertised (test_metered_chat_model_failures_and_accounting)"
+   ],
+   "library_level_on_previews": [
+    "tests/integration/test_gemini_gateway_attacks.py::test_no_reservation_and_no_transport_when_dispatch_is_not_permitted (disabled mode; live mode with dummy key and gate flags but no atomic session accounting) - PR #35 preview: pass"
    ]
   }
- ]
+ ],
+ "previews": {
+  "pr35": "preview f413922 = c51bbae + PR #35 c952c35: test_gemini_gateway_attacks 20/20 pass; test_paper_proposal_validation 10 pass + 6 strict xfail (F-PAPER-CITATION-SUBSTRING P1, F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT, F-PAPER-EXPONENT-FLATTENING)"
+ }
 }

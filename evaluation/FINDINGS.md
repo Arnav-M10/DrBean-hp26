@@ -1,6 +1,6 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
@@ -35,17 +35,21 @@ Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7
 | F-LAUNCHER-HIDDEN-PTH | P1 | 4 | retested | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
 | F-LAUNCHER-ENV-READ | P2 | 4 | retested | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 | H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
-| F-EXPLANATION-QUALIFIER | P2 | 3 | fixed_pending_retest | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
-| F-EXPLANATION-NUMBER-FORMS | P2 | 3 | fixed_pending_retest | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
-| F-EXPLANATION-PARAPHRASE | P2 | 3 | fixed_pending_retest | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
+| F-EXPLANATION-QUALIFIER | P2 | 3 | retested | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
+| F-EXPLANATION-NUMBER-FORMS | P2 | 3 | retested | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
+| F-EXPLANATION-PARAPHRASE | P2 | 3 | retested | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
 | F-RESTART-EPERM | P0 | 2 | retested | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
 | H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
 | F-LEDGER-TOTALS | P2 | 2 | retested | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
 | F-LEDGER-MALFORMED | P2 | 2 | retested | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
-| F-EXPLANATION-CHECKED-GATES | P2 | 3 | fixed_pending_retest | 'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates |
+| F-EXPLANATION-CHECKED-GATES | P2 | 3 | retested | 'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates |
 | H-GATE-CONTROLS-DIRTY | P1 | 5 | retested | native_engine_controls gate admitted dirty (and otherwise unqualified) control records |
-| F-NARRATION-OVERSUPPRESSION | P2 | 3 | open | PR #28's evidence-bound guard withholds correct limiting statements grounded in the cited record; with PR #20 it fails PR #20's own coordinator test |
+| F-NARRATION-OVERSUPPRESSION | P2 | 3 | open | The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record |
 | H-SOURCE-RETRY-KEY | P2 | 5 | retested | Harness source-review test treated a new idempotency key as a retry |
+| F-PAPER-CITATION-SUBSTRING | P1 | 3 | open | A paper citation that is only a fragment of a longer printed number is accepted as the exact cited value (4.6 for 4.62; 538 ng/mL for 5380 ng/mL) |
+| F-PAPER-QUOTE-NORMALIZATION | P2 | 3 (with 4: parser text normalization) | open | An authentic quote that crosses a text-layer line break, or uses an NFKC-equivalent character (µ U+00B5 vs μ U+03BC), discards the whole paper proposal |
+| F-PAPER-HARD-BOUND-CONTEXT | P2 | 3 | open | A stated hard bound is refused, and the whole proposal discarded, when an unrelated SD or CI appears anywhere on the same page |
+| F-PAPER-EXPONENT-FLATTENING | P2 | 3 (with 4: parser) | open | A superscript exponent flattened by the PDF text layer ('1.1 × 10' + superscript '1' read as '1.1 × 101') is accepted as the exact value 101 with no visual-review flag |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -316,7 +320,7 @@ Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7
 - **Evidence:** {"results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier (first attempt)"}
 - **Retest at f992b48 on merged main 80f95a4:** the orphan (spawn child) was terminated before the barrier release; teardown found nothing left and no stack process outlived the CLI (evidence: {"attempts": ["att_593e67a5ca214685"], "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier"})
 
-## F-EXPLANATION-QUALIFIER (P2, owner 3, fixed_pending_retest)
+## F-EXPLANATION-QUALIFIER (P2, owner 3, retested)
 
 - **Input:** 'Without any doubt this proves the interval.' / 'It is not an exaggeration to say this proves the interval.'
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
@@ -327,8 +331,9 @@ Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7
 - **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
 - **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there). (evidence: {"pytest": "72 passed, 28 xfailed at e791e91"})
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate. (evidence: {"pytest": "73 passed, 27 xfailed"})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Fixed on main b8c5952: PR #32 brought PR #28's evidence-bound guard (declared COMMENTARY_POLICY_VERSION evidence-bound-statements.*), so the gap markers no longer apply and every case is an ordinary passing assertion. Closed by retest. (evidence: {"lane": "controlled_callbacks 81 passed, 4 xfailed (evaluation/results/lanes/reports.jsonl)", "pytest": "tests/integration: 98 passed, 11 xfailed (4 F-NARRATION-OVERSUPPRESSION, 7 NOT_AVAILABLE paper attacks); test_explanation_guard attack cases all pass"})
 
-## F-EXPLANATION-NUMBER-FORMS (P2, owner 3, fixed_pending_retest)
+## F-EXPLANATION-NUMBER-FORMS (P2, owner 3, retested)
 
 - **Input:** 'Sample again at 7hrs to separate them.' (no 7 h in any cited fact)
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
@@ -339,8 +344,9 @@ Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7
 - **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
 - **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there). (evidence: {"pytest": "72 passed, 28 xfailed at e791e91"})
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate. (evidence: {"pytest": "73 passed, 27 xfailed"})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Fixed on main b8c5952: PR #32 brought PR #28's evidence-bound guard (declared COMMENTARY_POLICY_VERSION evidence-bound-statements.*), so the gap markers no longer apply and every case is an ordinary passing assertion. Closed by retest. (evidence: {"lane": "controlled_callbacks 81 passed, 4 xfailed (evaluation/results/lanes/reports.jsonl)", "pytest": "tests/integration: 98 passed, 11 xfailed (4 F-NARRATION-OVERSUPPRESSION, 7 NOT_AVAILABLE paper attacks); test_explanation_guard attack cases all pass"})
 
-## F-EXPLANATION-PARAPHRASE (P2, owner 3, fixed_pending_retest)
+## F-EXPLANATION-PARAPHRASE (P2, owner 3, retested)
 
 - **Input:** 'This establishes that the interval is correct.', 'Every other model is ruled out by these data.', 'We identified the actual parameter of the drug.', '8 h is the optimal sampling time for any experiment.'
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
@@ -351,6 +357,7 @@ Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7
 - **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
 - **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there). (evidence: {"pytest": "72 passed, 28 xfailed at e791e91"})
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate. (evidence: {"pytest": "73 passed, 27 xfailed"})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Fixed on main b8c5952: PR #32 brought PR #28's evidence-bound guard (declared COMMENTARY_POLICY_VERSION evidence-bound-statements.*), so the gap markers no longer apply and every case is an ordinary passing assertion. Closed by retest. (evidence: {"lane": "controlled_callbacks 81 passed, 4 xfailed (evaluation/results/lanes/reports.jsonl)", "pytest": "tests/integration: 98 passed, 11 xfailed (4 F-NARRATION-OVERSUPPRESSION, 7 NOT_AVAILABLE paper attacks); test_explanation_guard attack cases all pass"})
 
 ## F-RESTART-EPERM (P0, owner 2, retested)
 
@@ -386,7 +393,7 @@ Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7
 - **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py. (evidence: {"pytest": "66 passed, 19 xfailed"})
 - **Retest at main 2d2993d (ledger fixes merged) via branch merge f29066d:** Closed by retest: the original assertion passes with --runxfail (15/15); the strict-xfail marker is removed and the test is an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -> 15 passed"})
 
-## F-EXPLANATION-CHECKED-GATES (P2, owner 3, fixed_pending_retest)
+## F-EXPLANATION-CHECKED-GATES (P2, owner 3, retested)
 
 - **Input:** commentary_rejection('The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.', [fact]) with fact lacking design_tier/verification/replay/expected_binding, or with any of them negative, or with a known-bad native_replay on the same record
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -k needs_every_verification_gate --runxfail`
@@ -396,6 +403,7 @@ Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7
 - **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
 - **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** Still present on main 2d2993d (strict xfail at the candidate); fixed in PR #28 (33/33 there). (evidence: {"pytest": "72 passed, 28 xfailed at e791e91"})
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still present on main 22c9a24 (PR #28 not merged): strict xfail at the candidate. (evidence: {"pytest": "73 passed, 27 xfailed"})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Fixed on main b8c5952: PR #32 brought PR #28's evidence-bound guard (declared COMMENTARY_POLICY_VERSION evidence-bound-statements.*), so the gap markers no longer apply and every case is an ordinary passing assertion. Closed by retest. (evidence: {"lane": "controlled_callbacks 81 passed, 4 xfailed (evaluation/results/lanes/reports.jsonl)", "pytest": "tests/integration: 98 passed, 11 xfailed (4 F-NARRATION-OVERSUPPRESSION, 7 NOT_AVAILABLE paper attacks); test_explanation_guard attack cases all pass"})
 
 ## H-GATE-CONTROLS-DIRTY (P1, owner 5, retested)
 
@@ -416,6 +424,39 @@ Application code commit `22c9a24`, observed with harness `1bc3604` on macOS 26.7
 - **Observed:** PR #28 returns unsupported_claim for all four (main's guard keeps them). The PR #20 test passes on PR #20 alone and fails in the combination ('failed' != 'completed', explanation_unsupported_claim): 1 failed, 688 passed in the combined backend suite. Neither PR shows it alone.
 - **Evidence:** {"combined_backend": "1 failed, 688 passed at local merge 6a69a55", "tests": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept (strict xfail under the declared policy; passes on main)"}
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Main 22c9a24 has PR #27's source review but neither PR #20's coordinator change nor PR #28; the conflict between those two open PRs is unchanged. (evidence: {})
+- **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Still present on main b8c5952: the evidence-bound guard withholds all four correct limiting statements (4 strict xfails hold). The cross-PR coordinator failure is resolved: PR #32 changed the coordinator fixture to neutral narration (eaa9d809), and the backend suite passes (704). The finding is narrowed to useful narration being suppressed; nothing is overclaimed. (evidence: {"backend": "704 passed", "pytest": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept: 4 xfailed (strict)"})
+
+## F-PAPER-CITATION-SUBSTRING (P1, owner 3, open)
+
+- **Input:** validate_paper_proposal: page text 'Table 2. Individual plasma concentrations.\n0.5 4.62 µg/mL\n4.0 5380 ng/mL'; finding measurement/table_transcription raw_value '538', candidate_exact '538/1', unit 'ng/mL' (reported), citations quote '538' and quote 'ng/mL' (also raw '4.6' with quote '4.6')
+- **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_a_fragment_of_a_longer_printed_number_is_not_a_citation`
+- **Expected:** refused (or a blocking diagnostic): the page never prints the token 538 or 4.6; a quoted number must be a whole token in the page text, not a substring of a longer number
+- **Observed:** accepted; '538 ng/mL' passes with no diagnostic at all, '4.6' only with missing_unit. The quote check is a raw substring test against the page and the numeric-token boundary check runs on the quote, not on the page context
+- **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "repro": "10 controls pass, 6 known-defect xfails on the preview", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail; NOT_AVAILABLE on main)"}
+
+## F-PAPER-QUOTE-NORMALIZATION (P2, owner 3 (with 4: parser text normalization), open)
+
+- **Input:** page text 'a hard bound on the error of each individual reading in\nTable 2.' quoted as '... reading in Table 2'; page '0.5 4.62 \u00b5g/mL' quoted as '4.62 \u03bcg/mL'
+- **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_layout_whitespace_and_equivalent_characters_do_not_discard_an_authentic_quote`
+- **Expected:** the authentic quote is located (whitespace collapsed, Unicode-normalized on both sides) or only that citation is marked unresolved
+- **Observed:** PaperProposalError paper_citation_quote_mismatch for the whole proposal; through the gateway the request is charged and the extraction lost (retry policy none)
+- **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
+
+## F-PAPER-HARD-BOUND-CONTEXT (P2, owner 3, open)
+
+- **Input:** page: "The assay's maximum absolute error is 0.25 mg/L; we use 0.25 mg/L as a hard bound on each reading.\nIn the parent trial the mean at 2 h was 3.9 ± 0.8 mg/L (mean ± SD)."; hard_allowance finding quoting the first sentence
+- **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_unrelated_statistics_elsewhere_on_the_page_do_not_discard_a_stated_hard_bound`
+- **Expected:** accepted with the hard_allowance_requires_modeling_review diagnostic; the statistical words belong to another sentence
+- **Observed:** PaperProposalError paper_hard_allowance_unjustified: the statistical and negation patterns are searched in the whole retained text of the cited page
+- **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
+
+## F-PAPER-EXPONENT-FLATTENING (P2, owner 3 (with 4: parser), open)
+
+- **Input:** page text 'The mean plasma concentration at the first sample (5 min) was 1.1 × 101 mg/L.'; finding raw_value '101', candidate_exact '101/1', unit mg/L, quote '1.1 × 101 mg/L'
+- **Command:** `PR #35 preview: .venv/bin/python -m pytest -q tests/integration/test_paper_proposal_validation.py::test_a_flattened_exponent_is_flagged_for_visual_review`
+- **Expected:** a number adjacent to a multiplication sign and '10' (or any glyph raised off the baseline, reported by the parser) is refused as exact or carries a blocking visual-review diagnostic
+- **Observed:** accepted with no diagnostic; the text layer cannot represent the superscript, so the citation looks authentic
+- **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
 
 ## Check-level finding ids (raised only when the check fails)
 
