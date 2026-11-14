@@ -73,3 +73,47 @@ PR #41 `4d33f0b`, see `evaluation/results/previews/pr41-4d33f0b/README.md`:
 
 Still **not releasable as the coordinator product**: Gates 1-6 are unmet on main. The manual scientific loop stays
 qualified on this candidate.
+
+## Revision 2 at e3c36bc: SCI-02, SCI-05, SCI-08 and AUTH-07 passed
+
+C harness commit `e3c36bc` added independent cases:
+
+- **SCI-02, through HTTP with actual Counterdex.**
+  - With the claim widened to the whole admitted ke domain, the bounded search (16384 attempts) ends
+    `no_counterexample_found`, with no flag and no proof wording.
+  - A reviewed optional comparison is recorded `skipped` (`budget_preserved`, no result).
+  - A worker interruption leaves the run `interrupted` (`worker_restart`) with no evidence and no outcome.
+- **SCI-05, through the application.**
+  - A requested numerical-guidance design keeps every approved option without margins, and its replay is
+    unsupported (`numerical_only`).
+  - The run report embeds the record unchanged.
+  - The UI's own label stays guidance-only, even with a forged tier field. The no-separation design's label is
+    the no-separation text.
+  - A design time beyond the reviewed horizon is refused (422), so unavailable rows arise only inside the engine,
+    which the engine controls cover.
+- **SCI-08, in process with the actual adapter and Worker.**
+  - A controlled model fails after the completed child, and the run fails with
+    `provider_request_failed_unknown_outcome`.
+  - The evidence, native bytes, authenticated anchor and fresh replay are unchanged, and the outcome is never
+    upgraded.
+- **AUTH-07.**
+  - The secret scan finds 0.
+  - The launched web child's environment check passed in CI on Linux (run 43604455409, job 132476044599, at
+    `7038093`, application = main `4a0c616`). Locally it is NOT_RUN because ports 8000/4173 are held by a separate
+    instance.
+- **DB-RESEARCH-1 probes.** They now count the research tables and require an honest `advance` refusal while
+  dispatch is disabled: 8 NOT_AVAILABLE on main, 8/8 on B's `4d33f0b` preview.
+
+The clean batch at `e3c36bc`:
+- acceptance 7/7;
+- controls 27/27;
+- `controlled_callbacks` `lane_fbbad491ed6a476a`: 110 passed, 1 xfail, 44 NOT_AVAILABLE;
+- `controlled_science` `lane_0446b7256b4e4969`: 22 passed, 11 NOT_AVAILABLE, 2 not_run;
+- `historical_replay` `lane_72ba8e3b0d1f4bc4`: 203 replayed, 1 incompatible;
+- gate exit 0.
+
+**Predicates (revision 2, `evaluation/results/coordinator/baseline-4a0c616-r2.json`): 18 passed, 1 not_run
+(METER-07: no live allocation, by policy), 35 not_available, 0 failed.** Every exercisable scientific predicate
+(SCI-01..09) now passes on main. Everything still not available depends on B's integration of research
+sessions, the checkpointer, the decision path, the action journal, the crash matrix, research metering and the
+general-file producer.
