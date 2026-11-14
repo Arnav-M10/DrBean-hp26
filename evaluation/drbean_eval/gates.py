@@ -15,7 +15,7 @@ import json
 import os
 import subprocess
 
-from . import history, manifest as manifest_mod
+from . import engine_controls, history, manifest as manifest_mod
 from .runner import read_attempts
 
 REQUIRED_SCIENCE = ("RS-HERO-FULL",)
@@ -59,6 +59,57 @@ def _latest(attempts: list[dict], commits, lane: str) -> dict[str, dict]:
         if attempt.get("lane") == lane and attempt.get("tested_commit") in commits:
             latest[attempt["entry_id"]] = attempt
     return latest
+
+
+def control_record_problems(run: dict, expected_source: str | None) -> list[str]:
+    """Why a control run cannot count as acceptance evidence; empty when it is fully qualified."""
+    problems = []
+    if run.get("worktree_dirty") is not False:
+        problems.append("worktree dirty or not recorded")
+    if run.get("evidence_class") != "executed_acceptance" or run.get("app_under_test"):
+        problems.append(f"not executed acceptance of this checkout ({run.get('evidence_class') or 'unclassified'})")
+    interpreter = run.get("interpreter") or {}
+    if interpreter.get("implementation") != "CPython" or not str(interpreter.get("version", "")).startswith("3.11."):
+        problems.append("engine interpreter is not the qualified CPython 3.11")
+    engine = run.get("engine") or {}
+    if not engine.get("source_sha256"):
+        problems.append("engine identity not recorded")
+    elif engine.get("imported_from") != "repository":
+        problems.append("engine was not imported from the repository source")
+    elif expected_source is None or engine["source_sha256"] != expected_source:
+        problems.append("engine source differs from the tested code")
+    return problems
+
+
+def native_controls_gate(runs: list[dict], expected_source: str | None) -> dict:
+    """Each required control is decided by its newest relevant run (file order = time order).
+
+    An unqualified newest run (dirty, preview, wrong interpreter or engine) blocks that control: older passing
+    evidence never overrides newer invalid evidence. A qualified newest run counts only with ``passed is True``.
+    """
+    newest: dict[str, tuple[dict, dict]] = {}
+    for run in runs:
+        for item in run.get("results") or []:
+            if isinstance(item, dict) and item.get("id"):
+                newest[item["id"]] = (run, item)
+    missing, failed, unqualified, used = [], [], {}, {}
+    for control in REQUIRED_CONTROLS:
+        if control not in newest:
+            missing.append(control)
+            continue
+        run, item = newest[control]
+        used[run.get("at") or "?"] = run.get("tested_commit")
+        problems = control_record_problems(run, expected_source)
+        if problems:
+            unqualified[control] = problems
+        elif item.get("passed") is not True:
+            failed.append(control)
+    return {"gate": "native_engine_controls", "description": "fixed-pair constraint controls, three distinct "
+            "defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP); each "
+            "decided by its newest clean, executed, CPython 3.11 run of the tested engine source",
+            "status": "failed" if failed else "blocked" if missing or unqualified else "passed",
+            "missing": missing, "failed": failed, "unqualified": unqualified,
+            "expected_engine_source_sha256": expected_source, "runs_used": used}
 
 
 def read_jsonl(path: str) -> list[dict]:
@@ -115,17 +166,10 @@ def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path
     if unverified and zero["status"] == "passed":
         zero.update(status="failed", reason=f"entries without verified zero dispatch: {unverified}")
     gates.append(zero)
-    controls = [c for c in all_controls if c.get("tested_commit") in same]
-    latest_controls = {}
-    for run in controls:
-        for item in run.get("results", []):
-            latest_controls[item["id"]] = {**item, "dirty": run.get("worktree_dirty")}
-    missing = [c for c in REQUIRED_CONTROLS if c not in latest_controls]
-    failed = [c for c in REQUIRED_CONTROLS if c in latest_controls and not latest_controls[c]["passed"]]
-    gates.append({"gate": "native_engine_controls", "description": "fixed-pair constraint controls, three distinct "
-                  "defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP)",
-                  "status": "failed" if failed else "blocked" if missing else "passed",
-                  "missing": missing, "failed": failed})
+    gates.append(native_controls_gate([c for c in all_controls if c.get("tested_commit") in same],
+                                      engine_controls.engine_source_identity(
+                                          os.path.join(repo or os.path.dirname(os.path.abspath(root)), "packages",
+                                                       "groundwork_adapter"))["source_sha256"]))
     platform_entry = latest.get("RS-HERO-FULL")
     platform_checks = {c["id"]: c for c in ((platform_entry or {}).get("qualification") or {}).get(
         "executed_checks") or []}

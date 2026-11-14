@@ -264,7 +264,9 @@ def run_controls(results_dir: str, guard_log: str | None = None, app_repo: str |
     results = engine_controls.run(python, os.path.join(app, "packages", "groundwork_adapter"), REPO)
     entry = {"schema": "drbean-engine-controls/v1", "tested_commit": state["commit"],
              "worktree_dirty": state["dirty"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             "interpreter": launcher.interpreter_identity(python), "results": results,
+             "interpreter": launcher.interpreter_identity(python),
+             "engine": engine_controls.engine_identity(python, os.path.join(app, "packages", "groundwork_adapter")),
+             "results": results,
              "evidence_class": "preview" if app_repo else "executed_acceptance",
              "app_under_test": launcher.git_commit(app) if app_repo else None,
              "scope": "engine public operations, not HTTP; fresh replay re-runs the project checker"}

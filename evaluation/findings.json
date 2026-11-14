@@ -1167,7 +1167,7 @@
       "impact": "an AI explanation can assert proof of the interval; today only scripted controlled models write explanations and the route labels them unverified, so P2; becomes P1 before any live model writes user-visible prose",
       "owner": "3",
       "severity": "P2",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "command": ".venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX",
       "evidence": {
         "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
@@ -1179,6 +1179,13 @@
           "result": "Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py).",
           "evidence": {
             "pytest": "66 passed, 19 xfailed"
+          }
+        },
+        {
+          "at_commit": "preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged",
+          "result": "fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges.",
+          "evidence": {
+            "pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"
           }
         }
       ]
@@ -1192,7 +1199,7 @@
       "impact": "the guard's strongest property (every number grounded exactly) is bypassed by common spellings; P2 at the controlled tier, P1 before live explanations",
       "owner": "3",
       "severity": "P2",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "command": ".venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX",
       "evidence": {
         "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
@@ -1204,6 +1211,13 @@
           "result": "Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py).",
           "evidence": {
             "pytest": "66 passed, 19 xfailed"
+          }
+        },
+        {
+          "at_commit": "preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged",
+          "result": "fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges.",
+          "evidence": {
+            "pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"
           }
         }
       ]
@@ -1217,7 +1231,7 @@
       "impact": "string checks are regressions, not a semantic detector: human assessment remains required for explanations; consider typed explanation templates for the four categories",
       "owner": "3",
       "severity": "P2",
-      "status": "open",
+      "status": "fixed_pending_retest",
       "command": ".venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX",
       "evidence": {
         "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
@@ -1229,6 +1243,13 @@
           "result": "Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py).",
           "evidence": {
             "pytest": "66 passed, 19 xfailed"
+          }
+        },
+        {
+          "at_commit": "preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged",
+          "result": "fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges.",
+          "evidence": {
+            "pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"
           }
         }
       ]
@@ -1308,7 +1329,7 @@
       "impact": "no spend today (dispatch disabled); before live activation the shared cap could be exceeded",
       "owner": "2",
       "severity": "P2",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail",
       "evidence": {
         "tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"
@@ -1326,6 +1347,13 @@
           "result": "Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py.",
           "evidence": {
             "pytest": "66 passed, 19 xfailed"
+          }
+        },
+        {
+          "at_commit": "main 2d2993d (ledger fixes merged) via branch merge f29066d",
+          "result": "Closed by retest: the original assertion passes with --runxfail (15/15); the strict-xfail marker is removed and the test is an ordinary regression.",
+          "evidence": {
+            "pytest": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -> 15 passed"
           }
         }
       ]
@@ -1339,7 +1367,7 @@
       "impact": "fails closed but as an unhandled error; providers.sanitize_usage keeps the live path to integers, so reachable only through other callers or old rows",
       "owner": "2",
       "severity": "P2",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail",
       "evidence": {
         "tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"
@@ -1358,6 +1386,59 @@
           "evidence": {
             "pytest": "66 passed, 19 xfailed"
           }
+        },
+        {
+          "at_commit": "main 2d2993d (ledger fixes merged) via branch merge f29066d",
+          "result": "Closed by retest: the original assertion passes with --runxfail (15/15); the strict-xfail marker is removed and the test is an ordinary regression.",
+          "evidence": {
+            "pytest": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -> 15 passed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "F-EXPLANATION-CHECKED-GATES",
+      "severity": "P2",
+      "owner": "3",
+      "status": "fixed_pending_retest",
+      "title": "'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates",
+      "minimal_input": "commentary_rejection('The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.', [fact]) with fact lacking design_tier/verification/replay/expected_binding, or with any of them negative, or with a known-bad native_replay on the same record",
+      "command": ".venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -k needs_every_verification_gate --runxfail",
+      "expected": "unsupported_claim unless the cited record shows checked_pair_separation, verification valid, replay passed and binding matches (that supported statement must be kept)",
+      "observed": "main's phrase-list guard returns None (keeps the claim) in all 10 cases; this branch's former positive fixture relied on that and was scientifically invalid (PR #28's reported disagreement)",
+      "impact": "an explanation could call numerical or unverified evidence a checked design; P2 at the controlled tier, P1 before live narration",
+      "evidence": {
+        "tests": "tests/integration/test_explanation_guard.py (strict xfail on guards without the declared evidence-bound policy)"
+      },
+      "retests": [
+        {
+          "at_commit": "preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged",
+          "result": "fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges.",
+          "evidence": {
+            "pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "H-GATE-CONTROLS-DIRTY",
+      "severity": "P1",
+      "owner": "5",
+      "status": "retested",
+      "title": "native_engine_controls gate admitted dirty (and otherwise unqualified) control records",
+      "minimal_input": "controls.jsonl record naming the tested commit with worktree_dirty: true and every required control passed",
+      "command": "python3.11 -m unittest evaluation.tests.test_gates_controls",
+      "expected": "a dirty, preview, wrong-interpreter or wrong-engine record cannot satisfy the gate; the newest relevant record decides each control",
+      "observed": "gates.compute copied worktree_dirty into its per-control map but never enforced it: the gate reported passed (audit reproduction; the end-to-end regression fails with 'passed' != 'blocked' on the pre-fix gates.py). This defect did not by itself make the audited release pass: other gates were not passing at that audit.",
+      "fixed_in": "control records now carry the imported engine identity (version, repository source digest); the gate admits a control only from its newest run that is clean, executed acceptance of this checkout, CPython 3.11 and the tested engine source; older passes never override newer invalid evidence",
+      "evidence": {
+        "tests": "evaluation/tests/test_gates_controls.py (9 regressions incl. the audited case end to end)"
+      },
+      "retests": [
+        {
+          "at_commit": "this branch after merging main 2d2993d",
+          "result": "9/9 regressions pass; the same end-to-end test fails on the pre-fix gate",
+          "evidence": {}
         }
       ]
     }

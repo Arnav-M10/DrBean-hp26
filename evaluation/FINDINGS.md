@@ -35,13 +35,15 @@ Application code commit `4b5f1f5`, observed with harness `c8d39b5` on macOS 26.7
 | F-LAUNCHER-HIDDEN-PTH | P1 | 4 | retested | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
 | F-LAUNCHER-ENV-READ | P2 | 4 | retested | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 | H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
-| F-EXPLANATION-QUALIFIER | P2 | 3 | open | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
-| F-EXPLANATION-NUMBER-FORMS | P2 | 3 | open | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
-| F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
+| F-EXPLANATION-QUALIFIER | P2 | 3 | fixed_pending_retest | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
+| F-EXPLANATION-NUMBER-FORMS | P2 | 3 | fixed_pending_retest | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
+| F-EXPLANATION-PARAPHRASE | P2 | 3 | fixed_pending_retest | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
 | F-RESTART-EPERM | P0 | 2 | retested | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
 | H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
-| F-LEDGER-TOTALS | P2 | 2 | fixed_pending_retest | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
-| F-LEDGER-MALFORMED | P2 | 2 | fixed_pending_retest | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
+| F-LEDGER-TOTALS | P2 | 2 | retested | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
+| F-LEDGER-MALFORMED | P2 | 2 | retested | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
+| F-EXPLANATION-CHECKED-GATES | P2 | 3 | fixed_pending_retest | 'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates |
+| H-GATE-CONTROLS-DIRTY | P1 | 5 | retested | native_engine_controls gate admitted dirty (and otherwise unqualified) control records |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -302,7 +304,7 @@ Application code commit `4b5f1f5`, observed with harness `c8d39b5` on macOS 26.7
 - **Evidence:** {"results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier (first attempt)"}
 - **Retest at f992b48 on merged main 80f95a4:** the orphan (spawn child) was terminated before the barrier release; teardown found nothing left and no stack process outlived the CLI (evidence: {"attempts": ["att_593e67a5ca214685"], "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier"})
 
-## F-EXPLANATION-QUALIFIER (P2, owner 3, open)
+## F-EXPLANATION-QUALIFIER (P2, owner 3, fixed_pending_retest)
 
 - **Input:** 'Without any doubt this proves the interval.' / 'It is not an exaggeration to say this proves the interval.'
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
@@ -310,8 +312,9 @@ Application code commit `4b5f1f5`, observed with harness `c8d39b5` on macOS 26.7
 - **Observed:** accepted (None); `_QUALIFIER` matches 'without'/'not'/'whether' anywhere in the clause prefix, so an intensifier exempts the claim
 - **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
 - **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
 
-## F-EXPLANATION-NUMBER-FORMS (P2, owner 3, open)
+## F-EXPLANATION-NUMBER-FORMS (P2, owner 3, fixed_pending_retest)
 
 - **Input:** 'Sample again at 7hrs to separate them.' (no 7 h in any cited fact)
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
@@ -319,8 +322,9 @@ Application code commit `4b5f1f5`, observed with harness `c8d39b5` on macOS 26.7
 - **Observed:** accepted (None): `_NUMBER`'s lookarounds skip digits glued to letters or hyphens, and words/unicode fractions are never parsed
 - **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
 - **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
 
-## F-EXPLANATION-PARAPHRASE (P2, owner 3, open)
+## F-EXPLANATION-PARAPHRASE (P2, owner 3, fixed_pending_retest)
 
 - **Input:** 'This establishes that the interval is correct.', 'Every other model is ruled out by these data.', 'We identified the actual parameter of the drug.', '8 h is the optimal sampling time for any experiment.'
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
@@ -328,6 +332,7 @@ Application code commit `4b5f1f5`, observed with harness `c8d39b5` on macOS 26.7
 - **Observed:** accepted (None)
 - **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
 - **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still reproduces on the combined candidate: its strict xfails hold (tests/integration/test_explanation_guard.py). (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
 
 ## F-RESTART-EPERM (P0, owner 2, retested)
 
@@ -339,7 +344,7 @@ Application code commit `4b5f1f5`, observed with harness `c8d39b5` on macOS 26.7
 - **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Closed by independent retest. The original reproduction (trivial adapter through run_bounded) now returns its result instead of PermissionError; PR #19's _kill_owned_session reaps the leader and retries on Darwin EPERM. All 7 lane entries pass with real computation (10 follow-up jobs complete normally), cancellation and worker loss leave no live process with and without the barrier. integration 66 passed + 19 strict xfail (known P2 gaps only); backend 559 passed; engine 291 OK; harness 131 unit tests; 22/22 engine controls. (evidence: {"attempts": ["att_b9610a6030064d38", "att_33baea51713b4574", "att_a114e020f44547b2", "att_ee0e6b5f53c346ec"], "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md (probe rerun on 30ab5f8)"})
 - **Retest at final candidate c8d39b5 = main 4b5f1f5 (PR #19 + PR #12) + this branch; macOS 26.7 arm64, no diagnostics:** Still holds after PR #12 merged: harness path 7/7, Owner 4's unmodified launcher 6/7 (cancel/restart is harness-path only), 22/22 engine controls, integration 66 passed + 19 strict xfail, web 30/30; no backend or engine code changed since 30ab5f8. (evidence: {"attempts": ["att_2b31cc969d37437d", "att_913292d16ae64365", "att_906bef01ac57453d"]})
 
-## F-LEDGER-TOTALS (P2, owner 2, fixed_pending_retest)
+## F-LEDGER-TOTALS (P2, owner 2, retested)
 
 - **Input:** isolated store; reserve 100/20; reconcile usage {input 100, output 20, thought 0, total 5000} (the shape providers.sanitize_usage produces; Gemini totals include e.g. tool-use prompt tokens)
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail`
@@ -348,8 +353,9 @@ Application code commit `4b5f1f5`, observed with harness `c8d39b5` on macOS 26.7
 - **Evidence:** {"tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"}
 - **Retest at preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in:** fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges. (evidence: {"command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"})
 - **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py. (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at main 2d2993d (ledger fixes merged) via branch merge f29066d:** Closed by retest: the original assertion passes with --runxfail (15/15); the strict-xfail marker is removed and the test is an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -> 15 passed"})
 
-## F-LEDGER-MALFORMED (P2, owner 2, fixed_pending_retest)
+## F-LEDGER-MALFORMED (P2, owner 2, retested)
 
 - **Input:** isolated store; reconcile usage {input_tokens: '5000'}; then reserve again
 - **Command:** `.venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rxX --runxfail`
@@ -358,6 +364,25 @@ Application code commit `4b5f1f5`, observed with harness `c8d39b5` on macOS 26.7
 - **Evidence:** {"tests": "tests/integration/test_ledger_attacks.py (strict xfail on main)"}
 - **Retest at preview of backend/controlled-acceptance 731afdc (PR #13) with this suite copied in:** fixed there: the strict xfail XPASSes (13 safety regressions also pass; PR #13 additionally refuses negative/boolean counts at reconciliation). Remove the marker when PR #13 merges. (evidence: {"command": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -rX (in the PR #13 checkout)"})
 - **Retest at combined candidate 30ab5f8 = main 37d8f6f (PR #19) + this branch; macOS 26.7 arm64, iCloud-synced checkout, no diagnostics unless named:** Still present on main (PR #13 is not merged; ledger.py unchanged): strict xfail holds in tests/integration/test_ledger_attacks.py. (evidence: {"pytest": "66 passed, 19 xfailed"})
+- **Retest at main 2d2993d (ledger fixes merged) via branch merge f29066d:** Closed by retest: the original assertion passes with --runxfail (15/15); the strict-xfail marker is removed and the test is an ordinary regression. (evidence: {"pytest": ".venv/bin/python -m pytest -q tests/integration/test_ledger_attacks.py -> 15 passed"})
+
+## F-EXPLANATION-CHECKED-GATES (P2, owner 3, fixed_pending_retest)
+
+- **Input:** commentary_rejection('The checked design selects 8 h with a hard allowance of 0.2 mg/L for this reviewed pair.', [fact]) with fact lacking design_tier/verification/replay/expected_binding, or with any of them negative, or with a known-bad native_replay on the same record
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -k needs_every_verification_gate --runxfail`
+- **Expected:** unsupported_claim unless the cited record shows checked_pair_separation, verification valid, replay passed and binding matches (that supported statement must be kept)
+- **Observed:** main's phrase-list guard returns None (keeps the claim) in all 10 cases; this branch's former positive fixture relied on that and was scientifically invalid (PR #28's reported disagreement)
+- **Evidence:** {"tests": "tests/integration/test_explanation_guard.py (strict xfail on guards without the declared evidence-bound policy)"}
+- **Retest at preview of codex/ai-grounded-explanations 623ae19 (PR #28) with tests/integration/test_explanation_guard.py copied unchanged:** fixed there: with --runxfail all 33 assertions pass (every attack and missing/negative checked-design gate refused; the fully supported checked-design statement kept). The gap markers apply only to guards that do not declare the evidence-bound statement policy, so they become ordinary passing assertions when PR #28 merges. (evidence: {"pytest": "33 passed (PR #28); 6 passed + 27 xfailed (main 2d2993d)"})
+
+## H-GATE-CONTROLS-DIRTY (P1, owner 5, retested)
+
+- **Input:** controls.jsonl record naming the tested commit with worktree_dirty: true and every required control passed
+- **Command:** `python3.11 -m unittest evaluation.tests.test_gates_controls`
+- **Expected:** a dirty, preview, wrong-interpreter or wrong-engine record cannot satisfy the gate; the newest relevant record decides each control
+- **Observed:** gates.compute copied worktree_dirty into its per-control map but never enforced it: the gate reported passed (audit reproduction; the end-to-end regression fails with 'passed' != 'blocked' on the pre-fix gates.py). This defect did not by itself make the audited release pass: other gates were not passing at that audit.
+- **Evidence:** {"tests": "evaluation/tests/test_gates_controls.py (9 regressions incl. the audited case end to end)"}
+- **Retest at this branch after merging main 2d2993d:** 9/9 regressions pass; the same end-to-end test fails on the pre-fix gate (evidence: {})
 
 ## Check-level finding ids (raised only when the check fails)
 

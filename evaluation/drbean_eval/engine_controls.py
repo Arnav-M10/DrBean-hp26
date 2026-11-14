@@ -28,6 +28,7 @@ Fresh replay is the same project checker run again, not an independent proof.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import subprocess
@@ -155,6 +156,41 @@ GUARD_LOG: str | None = None  # set by run(); every control subprocess loads the
 
 def _replay(*args, **kwargs):
     return native.replay(*args, guard_log=GUARD_LOG, **kwargs)
+
+
+def engine_source_identity(package_dir: str) -> dict:
+    """Digest of the Counterdex source a run must exercise: sorted (file, sha256) of counterdex/*.py."""
+    root = os.path.join(os.path.abspath(package_dir), "counterdex")
+    files = sorted(name for name in os.listdir(root) if name.endswith(".py")) if os.path.isdir(root) else []
+    manifest = []
+    for name in files:
+        with open(os.path.join(root, name), "rb") as handle:
+            manifest.append([name, hashlib.sha256(handle.read()).hexdigest()])
+    digest = hashlib.sha256(json.dumps(manifest, separators=(",", ":")).encode()).hexdigest() if files else None
+    return {"source_sha256": digest, "files": len(files)}
+
+
+_ENGINE_PROBE = (
+    "import json, os, sys\n"
+    "sys.path.insert(0, os.environ['DRBEAN_COUNTERDEX_DIR'])\n"
+    "import counterdex\n"
+    "print(json.dumps({'version': getattr(counterdex, '__version__', None),\n"
+    "                  'module_dir': os.path.dirname(os.path.abspath(counterdex.__file__))}))\n")
+
+
+def engine_identity(science_python: str, package_dir: str) -> dict:
+    """Which Counterdex the control workers import (same -I + sys.path as _worker), and its source digest."""
+    package = os.path.abspath(package_dir)
+    done = subprocess.run([science_python, "-I", "-c", _ENGINE_PROBE], capture_output=True, text=True, timeout=60,
+                          env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "DRBEAN_COUNTERDEX_DIR": package})
+    try:
+        seen = json.loads(done.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return {"error": "engine identity probe failed", **engine_source_identity(package)}
+    imported = os.path.realpath(seen.get("module_dir") or "")
+    return {"version": seen.get("version"),
+            "imported_from": "repository" if imported == os.path.realpath(os.path.join(package, "counterdex"))
+            else "elsewhere", **engine_source_identity(package)}
 
 
 def _worker(science_python: str, package_dir: str, job: dict, timeout: float = 180.0) -> dict:
