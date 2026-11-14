@@ -9,6 +9,7 @@ const routes = new Map([
   ['/', ['index.html', 'text/html']],
   ['/index.html', ['index.html', 'text/html']],
   ['/app.mjs', ['app.mjs', 'text/javascript']],
+  ['/motion.mjs', ['motion.mjs', 'text/javascript']],
   ['/exact.mjs', ['exact.mjs', 'text/javascript']],
   ['/question.mjs', ['question.mjs', 'text/javascript']],
   ['/api.mjs', ['api.mjs', 'text/javascript']],

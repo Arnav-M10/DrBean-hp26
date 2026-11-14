@@ -36,6 +36,10 @@ test('local proxy disables only session bootstrap and bounds filename metadata w
     req.on('error', reject); req.end(method === 'POST' ? 'species,height\nbean,4.6' : undefined)
   })
   assert.match((await send('/session.mjs')).text, /bootstrapSharedSession/)
+  const motionModule = await send('/motion.mjs')
+  assert.equal(motionModule.status, 200)
+  assert.match(motionModule.headers['content-type'], /^text\/javascript/)
+  assert.equal(motionModule.text, await readFile(new URL('./motion.mjs', import.meta.url), 'utf8'))
   // Until the UI owner's actual module arrives, the route must stay absent
   // rather than serve a production fallback. The same test checks its exact
   // bytes once that module is integrated.

@@ -184,7 +184,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
         const figure = node('figure', ''); figure.className = 'chart'; figure.append(chart)
         const legend = node('ul', ''); legend.className = 'legend'
         const key = (text, color, cls) => { const item = node('li', ''); const sw = node('span', ''); sw.className = `swatch ${cls}`; sw.style.color = color; item.append(sw, text); legend.append(item) }
-        key('Your reading ± allowance', '#15202a', 'dot')
+        key('Your reading ± allowance', 'var(--ink)', 'dot')
         drawn.forEach(c => key(`${c.short}: ke ≈ ${readable(c.ke)} h⁻¹ (${c.outside ? 'outside' : 'inside'} the claim)`, c.color, c.dash ? 'dash' : ''))
         figure.append(legend, node('figcaption', 'Dots are your included readings and the vertical bars are their allowances. Each curve is the model drawn with one candidate\'s parameter values; a curve fits when it passes through every bar. The drawing uses decimal approximations; exact values are in the technical details.'))
         card.append(figure)
