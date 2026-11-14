@@ -1,10 +1,11 @@
 # Backend milestone progress
 
-Current task: master §2.13 milestone 6 — controlled AI with actual scientific
-evidence and strict future-provider accounting. Implementation and regression
-complete; ready for integration review.
+Current task: master §2.13 milestone 7 — worker-loss cleanup and restart
+reconciliation. Reproduced live scientific computation surviving worker SIGKILL
+and queued cancellation being misclassified on recovery. Fixes and tests running.
 
-Branch: `backend/controlled-acceptance`; base `main` at `80f95a4`.
+Branch: `backend/restart-recovery`; stacked on PR #13 at `731afdc`.
+PR #13 remains open; `main` is `80f95a4`.
 Linux, backend Python 3.12.14, scientific CPython 3.11.18.
 Interfaces: DB-SC-1 / GF-2, `counterdex.bridge.v1`,
 `DB-SC-1-to-groundwork-v1`, `counterdex.application-bundle.v1`.
@@ -20,9 +21,22 @@ Zero model-provider calls or credential checks; live dispatch remains disabled.
 | 4. Source review and immutable objective/optional scope | Implemented; regression covered |
 | 5. Design and follow-up | Design PR #9 and hypothetical follow-up PR #11 merged; actual readings blocked on engine |
 | 6. Controlled callbacks and accounting | Backend implemented; real-science controlled acceptance passed; full independent sign-off pending |
-| 7. Release stabilization and handoff | Remaining; cross-owner dependencies below |
+| 7. Release stabilization and handoff | In progress: parent-loss cleanup, queued cancellation, evidence-preserving restart |
 
 ## Verified in this change
+
+- Recovery audit: parent `finally` cleanup cannot run after SIGKILL; a live
+  scientific child can survive. Adding an owned parent-lifeline guard that stops
+  the complete scientific process group without scanning unrelated processes.
+- Recovery now acknowledges never-started cancelled jobs as cancelled. Started
+  jobs remain interrupted; queued work is preserved. Acceptance tests will kill
+  an ordinary worker after actual evidence commits and independently replay the
+  unchanged bytes after restart, proving no silent redispatch.
+- PR #13 CI exposed Linux ESRCH during process-state reading in addition to the
+  previously handled disappearing file. Both reaping errors are now covered by
+  the observer regression; seven process-boundary tests pass locally.
+
+Prior milestone 6 (PR #13), already verified:
 
 - A valid seven-row baseline previously exceeded the coordinator's 12 KB fact
   limit. `agent-evidence.v1` now supplies exact typed facts and evidence identity
@@ -69,8 +83,7 @@ Zero model-provider calls or credential checks; live dispatch remains disabled.
 - Next backend action: integrate admitted actual-reading changes when supplied,
   resolve any backend defects from independent acceptance, and finish release
   qualification/handoff. Merged code alone does not establish release readiness.
-- Planning estimate: approximately 1–3 hours of remaining active backend
-  integration/verification, assuming no major new defect. This excludes waiting
-  for Owners 1/3/4/5; full-section calendar completion is dependency-bound.
-  The current controlled milestone was initially estimated at 30–60 minutes.
-  Reassess after the producer and independent acceptance changes land.
+- Current available backend slice: approximately 30–60 minutes including tests
+  and handoff if no further defect emerges. This replaces the earlier broader
+  1–3 hour allowance; waiting on Owners 1/3/4/5 is excluded. Full-section sign-off
+  remains dependency-bound, even when the available backend queue is finished.
