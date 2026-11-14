@@ -1,7 +1,7 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T13:15:04Z",
+  "updated_at": "2026-11-14T13:30:28Z",
   "application_code_commit": "b8c5952",
   "observed_at_harness_commit": "c51bbae",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
@@ -1901,9 +1901,27 @@
           "result": "passes; the dummy key is never printed and the state is reported as configured"
         }
       ]
+    },
+    {
+      "id": "F-UPLOAD-LIMIT-MESSAGE",
+      "severity": "P3",
+      "owner": "B (upload boundary and general-file admission)",
+      "status": "open",
+      "title": "An oversized research upload is refused with a generic message that names neither the size limit nor the other limits the file exceeds",
+      "minimal_input": "POST /workspaces/{id}/research-assets with zolleral_26-converted.pdf (9,848,487 bytes, 12 pages) or sokolowskial_25.pdf (19,073,679 bytes, 11 pages), Content-Type application/pdf",
+      "command": "PR #40 producer at 3f9c2e9 (which includes main 299a356) registered on a fixture app; TestClient upload of each paper",
+      "expected": "an accurate, useful refusal (brief S8, predicate FILE-02): name the 5 MiB per-file limit and, for these papers, that they also exceed the 10-page limit; nothing truncated",
+      "observed": "413 request_too_large 'Request exceeds the admitted byte limit.' for both papers, from the RequestBoundary middleware; the advertised capabilities state max_file_bytes 5242880 and max_pdf_pages 10. Nothing is truncated or analysed (honest). The merged UI pre-validates selection and shows a clear 5 MiB message, so only API callers see the generic text",
+      "impact": "usability of direct API refusals for real papers above the limits; no data or authority impact",
+      "suggested_fix": "for the research-asset route, return the profile limit in the refusal (and the page limit when the size limit is not the only one exceeded), or document the limits next to the generic boundary code",
+      "evidence": {
+        "candidate": "PR #40 producer (author check: Claude authored PR #40; production maintenance is B's)",
+        "measurements": "zolleral_26: 9.39 MiB, 12 pages; sokolowskial_25: 18.19 MiB, 11 pages (local only, not committed)"
+      },
+      "retests": []
     }
   ],
-  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed).",
+  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14. Ordinary offline_real_science lane lane_872f1c39287144d1 at clean d821202b339ed60720e3c919d6be47e450e3b894 passes all seven entries without diagnostic overrides; the 22 expected engine controls pass at the same clean commit. These retests cover the recorded Mac/runtime and declared inputs. Controlled-AI integration, source-review materialization, launcher-specific findings and other unresolved items retain their prior status unless their own reproduction is exercised; no claim about the separately running clean-clone release checks is made here. On 2026-11-14 candidate c51bbae (application = main b8c5952, PR #32) qualified with gate exit 0: F-EXPLANATION-QUALIFIER/NUMBER-FORMS/PARAPHRASE/CHECKED-GATES closed by retest; F-NARRATION-OVERSUPPRESSION narrowed; F-PAPER-CITATION-SUBSTRING (P1), F-PAPER-QUOTE-NORMALIZATION, F-PAPER-HARD-BOUND-CONTEXT and F-PAPER-EXPONENT-FLATTENING (P2) reproduced on the PR #35 preview f413922 (Owner 3's paper-proposal validator; not on main). 2026-11-14T13:15:04Z: DB-COORDINATOR-3OWNER-1 adopted. Open findings re-mapped to owners A/B; PR #35 (c952c35) and PR #36 (081bbdc) heads are unchanged since their paper findings were observed, so those findings still describe those branches (none of that code is on main 299a356). Added F-SESSION-CAPACITY-EXHAUSTION (B) and harness H-LAUNCHER-OPTIN-FORMAT (fixed). 2026-11-14T13:30:28Z: added F-UPLOAD-LIMIT-MESSAGE (P3, B) from the PR #40 producer refusing both supplied papers with a generic boundary message.",
   "check_catalog": {
     "note": "Finding ids that a check names when it fails. They are not observed findings: an id appears in `findings` only after a check actually failed or was blocked. Every id cited by evaluation/drbean_eval or tests/integration must be a finding or listed here (enforced by evaluation/tests).",
     "ids": {

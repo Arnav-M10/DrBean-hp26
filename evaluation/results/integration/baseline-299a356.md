@@ -77,6 +77,7 @@ candidate; a predicate that names an absent feature is `not_available` even when
 | Id | Sev | Owner | State | Note |
 |---|---|---|---|---|
 | F-SESSION-CAPACITY-EXHAUSTION | P2 | B | open (new) | anonymous bootstraps permanently consume the 4096 issuance records (revoked/expired count); public link lockout; strict-xfail reproducer |
+| F-UPLOAD-LIMIT-MESSAGE | P3 | B | open (new) | the PR #40 producer (author check) refuses both supplied papers with a generic 413 that names no limit; honest, nothing analysed |
 | F-NARRATION-OVERSUPPRESSION | P2 | A | open | 4 strict xfails on main |
 | F-TEST-VAR-LEAK, F-SIBLING-FORKS | P2 | B | open | unchanged |
 | F-PAPER-CITATION-SUBSTRING (P1), QUOTE-NORMALIZATION, HARD-BOUND-CONTEXT, EXPONENT-FLATTENING | P1/P2 | A (PR #35) | open on PR #35 `c952c35` (unchanged since observed); not on main | B plans to reuse PR #40's implementation instead |

@@ -55,6 +55,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 | F-PAPER-IDENTITY-CONTRACTS | P2 | B (canonical contracts; was Owner 2) with A | open | Three incompatible page-identity and citation-coordinate conventions across PRs #34, #35 and #36; the paper proposal and the parser manifest cannot be joined as written |
 | F-SESSION-CAPACITY-EXHAUSTION | P2 | B (private browser sessions, shared gateway) | open | Anonymous GET /shared-session calls consume permanent session-issuance capacity (revoked and expired sessions still count), so a public link can be locked to new visitors |
 | H-LAUNCHER-OPTIN-FORMAT | P3 | C (harness) | retested | The launcher opt-in doctor test assumed PR #36's opt-in file format and wording, so it failed against main's stricter launcher |
+| F-UPLOAD-LIMIT-MESSAGE | P3 | B (upload boundary and general-file admission) | open | An oversized research upload is refused with a generic message that names neither the size limit nor the other limits the file exceeds |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -505,6 +506,14 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Observed:** AssertionError 'doctor did not report the opt-in state': main's launcher validates documented keys (free-tier flag, token bounds, image bound) and reports gemini_live.opt_in_state in doctor --json; the key was never printed
 - **Evidence:** {"regression": "tests/integration/test_zero_dispatch.py::test_owner4_doctor_reports_a_dummy_opt_in_without_printing_its_key"}
 - **Retest at C branch merged with main 299a356 (before commit):** passes; the dummy key is never printed and the state is reported as configured (evidence: {})
+
+## F-UPLOAD-LIMIT-MESSAGE (P3, owner B (upload boundary and general-file admission), open)
+
+- **Input:** POST /workspaces/{id}/research-assets with zolleral_26-converted.pdf (9,848,487 bytes, 12 pages) or sokolowskial_25.pdf (19,073,679 bytes, 11 pages), Content-Type application/pdf
+- **Command:** `PR #40 producer at 3f9c2e9 (which includes main 299a356) registered on a fixture app; TestClient upload of each paper`
+- **Expected:** an accurate, useful refusal (brief S8, predicate FILE-02): name the 5 MiB per-file limit and, for these papers, that they also exceed the 10-page limit; nothing truncated
+- **Observed:** 413 request_too_large 'Request exceeds the admitted byte limit.' for both papers, from the RequestBoundary middleware; the advertised capabilities state max_file_bytes 5242880 and max_pdf_pages 10. Nothing is truncated or analysed (honest). The merged UI pre-validates selection and shows a clear 5 MiB message, so only API callers see the generic text
+- **Evidence:** {"candidate": "PR #40 producer (author check: Claude authored PR #40; production maintenance is B's)", "measurements": "zolleral_26: 9.39 MiB, 12 pages; sokolowskial_25: 18.19 MiB, 11 pages (local only, not committed)"}
 
 ## Check-level finding ids (raised only when the check fails)
 
