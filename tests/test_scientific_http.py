@@ -1,8 +1,8 @@
-"""Authenticated real-science boundary tests; no discovery or model simulation claims.
+"""Authenticated real-science boundary tests with an actual baseline producer.
 
 The design control seeds explicitly named regression candidate records through
 the internal workflow. It tests new fixed-pair construction/check/replay, never
-pretends those vectors came from the unavailable baseline producer.
+pretends those vectors came from a newly executed baseline producer.
 """
 from __future__ import annotations
 
@@ -85,16 +85,19 @@ def prepare_approved_history(client):
     return workspace, dataset, problem, plan, approval, run, fixture
 
 
-def test_ordinary_http_baseline_is_honestly_blocked_without_a_producer(scientific_client):
+def test_ordinary_http_baseline_discovers_checked_evidence_once(scientific_client):
     client = scientific_client
     workspace, dataset, problem, plan, approval, run, _ = prepare_approved_history(client)
     assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 1
     finished = client.get(PREFIX + f"/runs/{run['id']}").json()
-    assert finished["state"] == "completed"
+    assert finished["state"] == "completed", finished
     evidence = client.get(PREFIX + f"/records/{finished['scenarios'][0]['result_id']}").json()["body"]["result"]
-    assert evidence["scientific_outcome"] == evidence["verification"] == evidence["replay"] == "unsupported"
-    assert evidence["reason_code"] == "baseline_producer_unavailable"
-    assert evidence["candidates"] == evidence["artifacts"] == []
+    assert evidence["scientific_outcome"] == "certified_counterexample"
+    assert evidence["verification"] == "valid" and evidence["replay"] == "passed"
+    assert evidence["expected_binding"] == "matches"
+    assert evidence["candidates"] and evidence["artifacts"]
+    assert evidence["baseline_search"]["attempted_count"] > 0
+    assert evidence["native_replay"]["operation"] == "investigate"
     assert evidence["problem_digest"] == problem["digest"]
     assert evidence["scientific_problem_digest"] not in {problem["digest"], dataset["digest"]}
     assert post(client, f"/plans/{plan['id']}/runs", {

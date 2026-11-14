@@ -55,7 +55,7 @@ try {
   for (const [id, value] of Object.entries(bounds)) await page.fill(`#${id}`, value)
 
   // A complete structured draft must not be blocked by a blank free-text goal.
-  await page.fill('#allowanceOrigin', 'Team-chosen hard allowance of 0.1 mg/L for the synthetic example.')
+  await page.fill('#allowanceOrigin', 'Team-chosen hard allowance of 0.50 mg/L for the synthetic example.')
   await page.fill('#goal', '')
   await page.click('#question-form button[type=submit]')
   await page.waitForSelector('#review:not([hidden])')
@@ -72,7 +72,7 @@ try {
   const scalars = [...draft.rows.flatMap(row => [row.time, row.concentration, row.epsilon]), ...Object.values(bounds).map((_, i) => draft.question[Object.keys(bounds)[i]])]
   check('export-format', draft.format === 'dr-bean-local-draft' && draft.version === 1, `${draft.format} v${draft.version}`)
   check('export-no-floats', scalars.length === 23 && scalars.every(value => typeof value === 'string'), 'every scientific scalar is a string')
-  check('export-keeps-source-spelling', draft.question.keMax === '0.3' && draft.rows[3].concentration === '5.34984763', 'original spellings retained')
+  check('export-keeps-source-spelling', draft.question.keMax === '0.3' && draft.rows[3].concentration === '6.80', 'original spellings retained')
   check('export-keeps-provenance', draft.sources.length === 1 && draft.rows.every(row => row.sourceId === 1 && row.original), 'rows keep their source and original values')
 
   // The web's exact parser produces DB-SC-1 canonical rationals.

@@ -236,8 +236,7 @@ def test_actual_fixed_candidate_exclusion_remains_scientific_feedback(adapter, v
     assert result["verification"] == "invalid" and result["replay"] == "failed"
 
 
-def test_no_production_fixture_lookup_for_missing_baseline(adapter):
+def test_baseline_requires_server_owned_execution_scope(adapter):
     history = reviewed_history()
     result = adapter.investigate(history["problem"], history["dataset"], {"scientific_wall_seconds": 3})
-    assert result["reason_code"] == "baseline_producer_unavailable"
-    assert result["scientific_outcome"] == "unsupported" and result["candidates"] == []
+    assert result == {"worker_error": "scientific_scope_required"}

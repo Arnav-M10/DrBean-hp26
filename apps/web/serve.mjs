@@ -3,6 +3,7 @@ import { createServer, request as upstreamRequest } from 'node:http';
 
 const host = '127.0.0.1';
 const port = Number(process.argv[2] ?? 4173);
+const apiPort = Number(process.env.BEAN_WEB_API_PORT ?? 8000);
 const routes = new Map([
   ['/', ['index.html', 'text/html']],
   ['/index.html', ['index.html', 'text/html']],
@@ -17,6 +18,9 @@ const routes = new Map([
 
 if (!Number.isInteger(port) || port < 0 || port > 65535) {
   throw new Error('Choose a local port between 0 and 65535.');
+}
+if (!Number.isInteger(apiPort) || apiPort < 1 || apiPort > 65535) {
+  throw new Error('BEAN_WEB_API_PORT must be a loopback API port between 1 and 65535.');
 }
 
 const server = createServer(async (request, response) => {
@@ -35,7 +39,7 @@ const server = createServer(async (request, response) => {
     for (const key of ['authorization', 'content-type', 'idempotency-key']) {
       if (request.headers[key]) headers[key] = request.headers[key];
     }
-    const upstream = upstreamRequest({ hostname: '127.0.0.1', port: 8000,
+    const upstream = upstreamRequest({ hostname: '127.0.0.1', port: apiPort,
       path: request.url, method: request.method, headers }, result => {
       const safeHeaders = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
       for (const key of ['content-type', 'content-disposition', 'x-artifact-sha256', 'x-request-id']) {
@@ -47,7 +51,7 @@ const server = createServer(async (request, response) => {
     upstream.setTimeout(15000, () => upstream.destroy());
     upstream.on('error', () => {
       if (!response.headersSent) response.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      response.end(JSON.stringify({ code: 'backend_unavailable', message: 'Start the local API on 127.0.0.1:8000.' }));
+      response.end(JSON.stringify({ code: 'backend_unavailable', message: `Start the local API on 127.0.0.1:${apiPort}.` }));
     });
     request.pipe(upstream);
     return;

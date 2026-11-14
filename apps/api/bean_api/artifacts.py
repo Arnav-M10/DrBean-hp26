@@ -51,7 +51,8 @@ class ArtifactService:
             kind = item.get("artifact_kind", "certificate")
             if not isinstance(content, bytes) or not content:
                 raise DomainError("invalid_artifact", "Native artifact content must be nonempty bytes.", 422)
-            if kind not in {"certificate", "bundle"} or item.get("media_type") != "application/json":
+            if kind not in {"certificate", "bundle"} or item.get("media_type") not in {
+                    "application/json", "application/vnd.counterdex.native+json"}:
                 raise DomainError("invalid_artifact", "This scientific lane exports native JSON certificates and bundles.", 422)
             if len(content) > (CERTIFICATE_LIMIT if kind == "certificate" else BUNDLE_LIMIT):
                 raise DomainError("artifact_size_limit", "The native artifact exceeds its admitted byte limit.", 422)
@@ -60,6 +61,12 @@ class ArtifactService:
                 raise DomainError("invalid_artifact_anchor", "A bounded independently supplied application anchor is required.", 422)
             metadata.append({"sha256": hashlib.sha256(content).hexdigest(), "byte_size": len(content),
                 "media_type": item["media_type"], "artifact_kind": kind, "anchor": anchor})
+            if "origin" in item:
+                origin = item["origin"]
+                if (not isinstance(origin, dict) or set(origin) != {"run_id", "scenario_id", "plan_id", "approval_id"}
+                        or any(not isinstance(value, str) or not 1 <= len(value) <= 128 for value in origin.values())):
+                    raise DomainError("invalid_artifact_origin", "A bounded originating run and scenario are required.", 422)
+                metadata[-1]["origin"] = origin
             contents.append(content)
         if sum(len(content) for content in contents) > aggregate_limit:
             raise DomainError("artifact_aggregate_limit", "Combined native bytes exceed the approved aggregate export limit.", 422)

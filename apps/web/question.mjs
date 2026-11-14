@@ -31,13 +31,13 @@ export function validateQuestion(question) {
     const upper = readBound(question, max, positive, errors);
     if (lower !== undefined) exact[min] = lower;
     if (upper !== undefined) exact[max] = upper;
-    if (lower !== undefined && upper !== undefined && compareExact(lower, upper) > 0) {
-      errors.push({ field: max, message: `${name} upper bound must be at least its lower bound.` });
+    if (lower !== undefined && upper !== undefined && (compareExact(lower, upper) > 0 || (positive && compareExact(lower, upper) === 0))) {
+      errors.push({ field: max, message: `${name} upper bound must be ${positive ? 'greater than' : 'at least'} its lower bound.` });
     }
   }
 
-  if (exact.keMin !== undefined && exact.kaMax !== undefined && compareExact(exact.kaMax, exact.keMin) <= 0) {
-    errors.push({ field: 'kaMax', message: 'The bounds must allow the absorption rate ka to exceed the elimination rate ke.' });
+  if (exact.keMax !== undefined && exact.kaMin !== undefined && compareExact(exact.keMax, exact.kaMin) >= 0) {
+    errors.push({ field: 'kaMin', message: 'Counterdex requires the entire ka interval above the ke interval: ka lower bound must exceed ke upper bound.' });
   }
 
   if (typeof question.allowanceOrigin !== 'string' || !question.allowanceOrigin.trim()) {

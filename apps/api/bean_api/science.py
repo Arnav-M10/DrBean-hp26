@@ -53,7 +53,11 @@ def _child(connection: Any, adapter: ScienceAdapter, operation: str, args: tuple
         connection.send_bytes(b'{"_worker_control":"session_started"}')
         # The scientific process needs neither provider nor application credentials.
         os.environ.clear()
-        apply_limits(memory_bytes=memory, cpu_seconds=wall + 1)
+        # RLIMIT_NPROC counts every process/thread owned by this user, including
+        # the local browser, API and worker. 32 prevents the prepared engine from
+        # starting alongside Chromium. This is a per-user guard, not a job quota;
+        # the owned session and parent wall limit still bound the entire job tree.
+        apply_limits(memory_bytes=memory, cpu_seconds=wall + 1, processes=256)
         result = getattr(adapter, operation)(*args)
         encoded = json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
         if len(encoded) > result_cap:
