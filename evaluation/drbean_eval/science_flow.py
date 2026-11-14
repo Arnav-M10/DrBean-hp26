@@ -340,7 +340,7 @@ class Flow:
                     continue
                 checks.add(f"{prefix}_anchor_from_authenticated_record", "passed",
                            f"complete application anchor ({len(full)} fields) from the artifact anchor route")
-                self._replay_one(checks, item, prefix, {}, full, expect_checked)
+                reports.append(_replay_summary(self._replay_one(checks, item, prefix, {}, full, expect_checked)))
                 continue
             if not item_anchors.get("problem_digest") or not item_anchors.get("suggestion_digest"):
                 checks.add(f"{prefix}_anchor_from_authenticated_record", "blocked",
@@ -398,6 +398,18 @@ class Flow:
 
 def result_of(evidence_record: dict) -> dict:
     return ((evidence_record or {}).get("body") or {}).get("result") or {}
+
+
+def _replay_summary(replayed: dict) -> dict:
+    """Compact record of one fresh application-packet replay (the full report stays in the run's own output)."""
+    body = replayed.get("report") or {}
+    results = body.get("candidate_results")
+    return {"artifact_id": replayed.get("artifact_id"), "status": replayed.get("status"),
+            **{key: body.get(key) for key in ("integrity", "replay", "expected_binding", "verification", "operation",
+                                              "dataset_origin", "reason_code")},
+            "candidate_results": None if results is None else [
+                {"candidate_id": c.get("candidate_id"), "verification": c.get("verification")} for c in results],
+            "error": (replayed.get("error") or {}).get("code")}
 
 
 def complete_vector(candidate: dict) -> bool:
@@ -935,7 +947,13 @@ def _nudge(rational: str) -> str:
 
 
 def scenario_followup(flow: Flow, packet: dict) -> dict:
-    """Hypothetical readings create new lineage; per-candidate outcomes are preserved and checked.
+    """Hypothetical readings create new lineage; per-candidate outcomes for the ORIGINAL pair are checked.
+
+    When the API offers Owner 2's design-bound follow-up scope (``PlanBody.followup``), each branch binds its own
+    completed checked design, the reviewed observation proposal and that design's native artifact. The run must
+    then re-check exactly the original pair (no new discovery), and the harness re-derives every candidate's
+    verdict over the whole revised dataset with its independent decimal oracle. Without that scope the follow-up is
+    an ordinary discovery run and per-candidate feedback is blocked (F-FOLLOWUP-FEEDBACK).
 
     The API keeps one current dataset per workspace, so sibling what-if forks from the same parent cannot share
     a workspace (the second review is correctly refused as stale). Branch 1 forks the hero lineage; later branches
@@ -947,10 +965,12 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
         checks.add("followup_prerequisites", "blocked", "needs the hero baseline run", finding="F-HERO-NO-PAIR")
         return {"checks": checks, "observation": {}}
     isolation = bool(flow.cache.get("hero_design_is_isolation"))
+    native_scope = "followup" in flow.schema_properties("PlanBody")[0]
     review = packet["design_review"]
-    branches = []
+    branches, earlier_scopes = [], []
     for index, branch in enumerate(packet["followups"]):
         name = branch["branch"]
+        label = f"fu-{name}"
         if index == 0:
             base, design = hero, hero_design
         else:
@@ -958,10 +978,11 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
             info = check_baseline(Checks(), base, packet, known_positive=False)
             pair = choose_pair(info)
             design = (flow.design(base, pair, feasible_times=review["feasible_times"],
-                                  allowance=review["future_hard_allowance"], label=f"fu{index}",
+                                  allowance=review["future_hard_allowance"], label=f"fu{index}-base",
                                   review={**review, "_omit_sources": isolation}) if pair else None)
-        pair_ids = (design or {}).get("request", {}).get("candidate_ids") or []
-        vectors = dict(zip(pair_ids, (design or {}).get("request", {}).get("candidate_vectors") or []))
+        request = (design or {}).get("request") or {}
+        pair_ids = request.get("candidate_ids") or []
+        vectors = dict(zip(pair_ids, request.get("candidate_vectors") or []))
         selected = (((design or {}).get("suggestion") or {}).get("body") or {}).get("selected_time")
         parent = base["dataset"]
         time_value = selected or branch["time"]
@@ -986,14 +1007,25 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
                       and revised["body"]["origin"] == "hypothetical"
                       and len(revised["body"]["rows"]) == len(parent["body"]["rows"]) + 1,
                       f"origin {revised['body']['origin']}, parent {revised.get('parent_id')}")
-        expected = {cid: kinetics.band_verdict(vec, time_value, branch["reading"], branch["allowance"])
-                    for cid, vec in vectors.items()}
+        # Independent expectation over the WHOLE revised dataset (every included row), not just the new reading.
+        expected = {cid: kinetics.history_verdict(vec, revised["body"]["rows"]) for cid, vec in vectors.items()}
         problem = flow.client.post(f"/workspaces/{base['workspace_id']}/problems",
                                    {**packet["problem"], "dataset_id": revised["id"], "dataset_digest": revised["digest"]},
                                    label=f"fu-problem-{name}")
+        plan_body = flow.plan_body(problem, revised, "Follow-up baseline")
+        scope = _followup_scope(design, proposal) if native_scope else None
+        if native_scope and scope is None:
+            checks.add(f"{name}_design_bound_followup", "blocked", "no completed design result with exactly one "
+                       "native artifact to bind", finding="F-HERO-NO-PAIR")
+        if scope:
+            plan_body["followup"] = scope
+            plan_body["scenarios"][0]["label"] = "Re-check the original design pair; no new discovery"
+            foreign = earlier_scopes[0] if earlier_scopes else None
+            _followup_binding_probes(flow, checks, name, base, problem, plan_body, foreign)
+            earlier_scopes.append({k: scope[k] for k in ("design_job_id", "design_result_id", "design_result_digest",
+                                                         "source_artifact_id")})
         plan = flow.client.post(f"/workspaces/{base['workspace_id']}/plans", {
-            "expected_current_revision_id": problem["id"], "plan": flow.plan_body(problem, revised, "Follow-up baseline")},
-            label=f"fu-plan-{name}")
+            "expected_current_revision_id": problem["id"], "plan": plan_body}, label=f"fu-plan-{name}")
         try:
             flow.client.post(f"/plans/{plan['id']}/runs", {"approval_id": base["approval"]["id"],
                              "expected_plan_digest": plan["digest"]}, label=f"fu-old-approval-{name}")
@@ -1001,48 +1033,190 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
                        finding="F-APPROVAL-REUSE")
         except ApiFailure as error:
             checks.expect(f"{name}_requires_new_approval", error.status == 403, f"{error.status} {error.code}")
+        design_approval = (design or {}).get("approval")
+        if design_approval:
+            try:
+                flow.client.post(f"/plans/{plan['id']}/runs", {"approval_id": design_approval["id"],
+                                 "expected_plan_digest": plan["digest"]}, label=f"fu-design-approval-{name}")
+                checks.add(f"{name}_design_approval_not_reused", "failed", "the design approval started new work",
+                           finding="F-APPROVAL-REUSE")
+            except ApiFailure as error:
+                checks.expect(f"{name}_design_approval_not_reused", 400 <= error.status < 500,
+                              f"{error.status} {error.code}")
         approval = flow.client.post(f"/plans/{plan['id']}/approvals", {"expected_plan_digest": plan["digest"],
                                     "expected_current_revision_id": problem["id"], "accepted": True},
                                     label=f"fu-approve-{name}")
-        run = flow.client.post(f"/plans/{plan['id']}/runs", {"approval_id": approval["id"],
-                               "expected_plan_digest": plan["digest"]}, label=f"fu-run-{name}")
+        start = {"approval_id": approval["id"], "expected_plan_digest": plan["digest"]}
+        run = flow.client.post(f"/plans/{plan['id']}/runs", start, label=f"fu-run-{name}")
         finished = flow.poll(f"/runs/{run['id']}")
         flow.jobs_executed.add(run["id"])
-        evidence = [flow.client.get(f"/records/{c['result_id']}") for c in finished.get("scenarios", [])
-                    if c.get("result_id")]
-        per_candidate = _prior_candidate_results(evidence, pair_ids)
+        if scope:
+            again = flow.client.post(f"/plans/{plan['id']}/runs", start, label=f"fu-run-retry-{name}")
+            checks.expect(f"{name}_retry_returns_same_run", again.get("id") == run["id"],
+                          f"retry with a new idempotency key -> {again.get('id')}, original {run['id']}")
+        evidence = []
+        for child in finished.get("scenarios", []):
+            if child.get("result_id"):
+                record = flow.client.get(f"/records/{child['result_id']}")
+                evidence.append(record)
+                flow.save_record(f"{label}-evidence-{child['scenario_id']}", record)
+        for suffix, record in (("parent-dataset", flow.client.get(f"/records/{parent['id']}")),
+                               ("proposal", proposal), ("dataset", revised), ("problem", problem), ("plan", plan),
+                               ("approval", approval), ("run", finished)):
+            flow.save_record(f"{label}-{suffix}", record)
+        per_candidate = _prior_candidate_results(evidence, vectors)
         if not vectors:
             checks.add(f"{name}_per_candidate_outcome", "blocked", "no selected pair from a design to re-check",
                        finding="F-HERO-NO-PAIR")
         elif per_candidate is None:
             checks.add(f"{name}_per_candidate_outcome", "blocked",
-                       f"follow-up run {finished.get('state')} exposes no candidate-specific result for the prior pair "
-                       f"(independent oracle expects {expected})", finding="F-FOLLOWUP-FEEDBACK")
+                       f"follow-up run {finished.get('state')} ({finished.get('error_code')}) exposes no "
+                       f"candidate-specific result for the prior pair (independent oracle expects {expected}); "
+                       f"design-bound follow-up scope offered by the API: {native_scope}",
+                       finding=_worker_finding(finished) or "F-FOLLOWUP-FEEDBACK")
         else:
             agree = all(expected[c] == "indeterminate" or per_candidate.get(c) == expected[c] for c in expected)
             checks.expect(f"{name}_per_candidate_outcome", agree,
                           f"application {per_candidate}, independent oracle {expected}")
-        branches.append({"branch": name, "workspace_id": base["workspace_id"], "time": time_value,
-                         "dataset_id": revised["id"], "run_id": run["id"], "run_state": finished.get("state"),
-                         "oracle_expectation": expected, "application_per_candidate": per_candidate})
+        observed = {"branch": name, "workspace_id": base["workspace_id"], "time": time_value,
+                    "dataset_id": revised["id"], "run_id": run["id"], "run_state": finished.get("state"),
+                    "design_bound": bool(scope), "oracle_expectation": expected,
+                    "application_per_candidate": per_candidate}
+        if scope and evidence:
+            observed.update(_check_native_followup(flow, checks, name, label, evidence[0], design, scope, vectors,
+                                                   row, expected, run["id"]))
+        branches.append(observed)
     check_original_unchanged(checks, flow, hero, "original_evidence_unchanged_after_followups")
-    return {"checks": checks, "observation": {"branches": branches, "design_was_isolation_probe": isolation}}
+    return {"checks": checks, "observation": {"branches": branches, "design_was_isolation_probe": isolation,
+                                              "design_bound_scope_offered": native_scope}}
 
 
-def _prior_candidate_results(evidence: list[dict], pair_ids: list[str]) -> dict | None:
-    """Candidate-specific outcomes for the prior pair, if the application exposes them."""
+def _followup_scope(design: dict | None, proposal: dict) -> dict | None:
+    """Owner 2's PlanBody.followup: the exact completed design job, its result record, and its one native artifact."""
+    job, suggestion = (design or {}).get("job") or {}, (design or {}).get("suggestion") or {}
+    refs = (suggestion.get("body") or {}).get("artifacts") or []
+    if job.get("state") != "completed" or not suggestion.get("id") or len(refs) != 1:
+        return None
+    return {"design_job_id": job["id"], "design_result_id": suggestion["id"],
+            "design_result_digest": suggestion["digest"], "observation_proposal_id": proposal["id"],
+            "source_artifact_id": refs[0]["id"]}
+
+
+def _followup_binding_probes(flow: Flow, checks: Checks, name: str, base: dict, problem: dict, plan_body: dict,
+                             foreign: dict | None) -> None:
+    """A follow-up plan may bind only its own retained design: tampered, substituted or foreign scopes are refused."""
+    scope = plan_body["followup"]
+    probes = [("tampered_design_digest", {**scope, "design_result_digest": "0" * 64})]
+    baseline_refs = result_of((base.get("evidence") or [None])[0]).get("artifacts") or []
+    if baseline_refs:
+        probes.append(("baseline_artifact_as_design_artifact", {**scope, "source_artifact_id": baseline_refs[0]["id"]}))
+    if foreign:
+        probes.append(("design_from_another_workspace", {**scope, **foreign}))
+    for probe, changed in probes:
+        body = json.dumps({"expected_current_revision_id": problem["id"], "plan": {**plan_body, "followup": changed}})
+        response = flow.client.raw("POST", f"/workspaces/{base['workspace_id']}/plans", body=body.encode(),
+                                   content_type="application/json", key=flow.client.new_key(f"fu-probe-{probe}"))
+        try:
+            code = response.json().get("code") if response.data else None
+        except ValueError:
+            code = None
+        refused = 400 <= response.status < 500
+        checks.expect(f"{name}_refuses_{probe}", refused, f"follow-up plan with {probe.replace('_', ' ')} -> "
+                      f"{response.status} {code}", finding=None if refused else "F-FOLLOWUP-BINDING")
+
+
+def _verdict(value) -> str:
+    return "compatible" if value in ("valid", "compatible") else ("excluded" if value in ("invalid", "excluded")
+                                                                 else str(value))
+
+
+def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, evidence: dict, design: dict,
+                           scope: dict, vectors: dict, row: dict, expected: dict, run_id: str) -> dict:
+    """The design-bound follow-up re-checks exactly the original pair, replays fresh and keeps its lineage."""
+    result = result_of(evidence)
+    candidates = {c.get("id"): c.get("parameter_vector") for c in result.get("candidates") or []}
+    checks.expect(f"{name}_original_pair_rechecked_without_new_discovery",
+                  candidates == vectors and result.get("baseline_search") is None,
+                  f"candidates {sorted(candidates)} (vectors identical to the design pair: {candidates == vectors}); "
+                  f"baseline_search {'absent' if result.get('baseline_search') is None else 'present'}")
+    items = [c for c in result.get("candidate_results") or [] if c.get("candidate_id") in vectors]
+    excluded = [c for c in items if c.get("verification") == "invalid"]
+    checks.expect(f"{name}_exclusions_name_the_new_reading",
+                  all(c.get("violating_observation_ids") == [row["id"]] for c in excluded),
+                  f"{len(excluded)} excluded; violating ids {[c.get('violating_observation_ids') for c in excluded]}")
+    checks.expect(f"{name}_review_certificate_valid_and_bound",
+                  result.get("verification") == "valid" and result.get("replay") == "passed"
+                  and result.get("expected_binding") == "matches",
+                  f"verification {result.get('verification')}, replay {result.get('replay')}, binding "
+                  f"{result.get('expected_binding')} (an exclusion is a computed result, not corruption)")
+    if items and len(excluded) == len(items):
+        claims = [c.get("candidate_id") for c in items if c.get("is_counterexample")]
+        checks.expect(f"{name}_no_claim_from_excluded_candidates",
+                      result.get("scientific_outcome") != "certified_counterexample" and not claims,
+                      f"outcome {result.get('scientific_outcome')}; counterexample flags {claims}")
+    downloads = [flow.download(ref, f"{label}-review") for ref in result.get("artifacts") or []]
+    reports = flow.replay_checks(checks, downloads, native.anchors_from_record(evidence), f"{name}_review_packet",
+                                 [f"{label}-evidence-baseline"])
+    fresh = next((r for r in reports if r.get("candidate_results") is not None), None)
+    application = {c.get("candidate_id"): _verdict(c.get("verification")) for c in items}
+    out = {"fresh_replay": fresh}
+    if fresh is not None:
+        fresh_verdicts = {c["candidate_id"]: _verdict(c.get("verification")) for c in fresh["candidate_results"]
+                          if c.get("candidate_id") in vectors}
+        agree = fresh_verdicts == application and all(
+            expected[c] == "indeterminate" or fresh_verdicts.get(c) == expected[c] for c in expected)
+        checks.expect(f"{name}_fresh_replay_per_candidate_agrees", agree,
+                      f"fresh replay {fresh_verdicts}, application {application}, independent oracle {expected}")
+        checks.expect(f"{name}_fresh_replay_keeps_hypothetical_review",
+                      fresh.get("operation") == "review" and fresh.get("dataset_origin") == "hypothetical",
+                      f"operation {fresh.get('operation')}, dataset origin {fresh.get('dataset_origin')}")
+    elif downloads:
+        checks.add(f"{name}_fresh_replay_per_candidate_agrees", "not_observed",
+                   "the fresh replay report carried no candidate results")
+    for ref in (((design or {}).get("suggestion") or {}).get("body") or {}).get("artifacts") or []:
+        again = flow.client.raw("GET", f"/artifacts/{ref['id']}")
+        checks.expect(f"{name}_design_bytes_unchanged", again.status == 200
+                      and hashlib.sha256(again.data).hexdigest() == ref.get("sha256"),
+                      f"design artifact re-download {again.status}")
+    bound_job = flow.client.get(f"/design-jobs/{scope['design_job_id']}")
+    bound_suggestion = flow.client.get(f"/records/{scope['design_result_id']}")
+    bound_plan = flow.client.get(f"/records/{bound_job['plan_id']}")
+    for suffix, record in (("bound-design-job", bound_job), ("bound-suggestion", bound_suggestion),
+                           ("bound-design-plan", bound_plan)):
+        flow.save_record(f"{label}-{suffix}", record)
+    checks.expect(f"{name}_design_record_unchanged",
+                  json.dumps(bound_suggestion, sort_keys=True) == json.dumps(design["suggestion"], sort_keys=True),
+                  "bound design result re-fetched byte-identical after the follow-up")
+    report = flow.client.post(f"/runs/{run_id}/reports", label=f"{label}-report")
+    lineage = (report.get("body") or {}).get("followup") or {}
+    metadata = (lineage.get("artifact") or {}).get("metadata") or {}
+    leaked = sorted({"blob_key", "storage_path", "signed_url", "content_base64"} & set(metadata))
+    checks.expect(f"{name}_report_retains_followup_lineage",
+                  (lineage.get("design_result") or {}).get("id") == scope["design_result_id"]
+                  and (lineage.get("observation_proposal") or {}).get("id") == scope["observation_proposal_id"]
+                  and not leaked, f"report follow-up lineage keys {sorted(lineage)}; storage locators exposed {leaked}")
+    return out
+
+
+def _prior_candidate_results(evidence: list[dict], vectors: dict) -> dict | None:
+    """Candidate-specific outcomes for the prior pair, only when the result re-checks those exact vectors.
+
+    A fresh discovery run can reuse candidate ids; matching ids alone would misread its results as a re-check.
+    """
     for record in evidence:
         result = result_of(record)
+        same = {c.get("id"): c.get("parameter_vector") for c in result.get("candidates") or []
+                if c.get("id") in vectors}
+        if not vectors or same != vectors:
+            continue
         for key in ("prior_candidate_results", "candidate_results", "followup_candidate_results"):
             items = result.get(key) or (record.get("body") or {}).get(key)
             if isinstance(items, list):
                 found = {}
                 for item in items:
                     cid = item.get("candidate_id") or item.get("id")
-                    if cid in pair_ids:
-                        verdict = item.get("verification") or item.get("state")
-                        found[cid] = "compatible" if verdict in ("valid", "compatible") else (
-                            "excluded" if verdict in ("invalid", "excluded") else str(verdict))
+                    if cid in vectors:
+                        found[cid] = _verdict(item.get("verification") or item.get("state"))
                 if found:
                     return found
     return None

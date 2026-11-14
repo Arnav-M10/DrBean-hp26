@@ -25,7 +25,7 @@ import hashlib
 import json
 import os
 
-from . import native
+from . import kinetics, native
 
 EVIDENCE_CLASSES = ("executed_acceptance", "preview", "diagnostic", "validated_trace", "imported_claim")
 EXECUTED = ("executed_acceptance", "preview", "diagnostic")  # executed and re-checked by this runner
@@ -122,6 +122,55 @@ def _link_checks(records: dict) -> list[dict]:
                 suggestion = records.get(f"{label}-suggestion")
                 if suggestion:
                     check(f"links:{label}:suggestion_is_job_result", job.get("result_id") == suggestion["id"])
+        scope = (plan.get("body") or {}).get("followup")
+        if scope:
+            out += _followup_links(label, scope, records)
+    return out
+
+
+def _followup_links(label: str, scope: dict, records: dict) -> list[dict]:
+    """A design-bound follow-up: re-derive its binding and per-candidate verdicts from the saved records alone."""
+    out = []
+
+    def check(check_id, condition, detail=""):
+        out.append({"id": f"links:{label}:{check_id}", "passed": bool(condition), "detail": detail})
+
+    names = ("bound-design-job", "bound-suggestion", "bound-design-plan", "proposal", "parent-dataset", "dataset",
+             "evidence-baseline")
+    job, suggestion, design_plan, proposal, parent, revised, evidence = (records.get(f"{label}-{n}") for n in names)
+    missing = [n for n, r in zip(names, (job, suggestion, design_plan, proposal, parent, revised, evidence)) if not r]
+    if missing:
+        check("followup_complete", False, f"follow-up records missing from the saved evidence: {missing}")
+        return out
+    facts, request = suggestion.get("body") or {}, (design_plan.get("body") or {}).get("request") or {}
+    refs = facts.get("artifacts") or []
+    check("followup_binds_its_design", job.get("id") == scope.get("design_job_id")
+          and job.get("result_id") == suggestion.get("id") == scope.get("design_result_id")
+          and suggestion.get("digest") == scope.get("design_result_digest") and job.get("plan_id") == design_plan["id"]
+          and len(refs) == 1 and refs[0].get("id") == scope.get("source_artifact_id"),
+          "plan scope names the saved design job, its result digest and its single native artifact")
+    row = (proposal.get("body") or {}).get("row") or {}
+    check("followup_appends_exactly_the_reviewed_row", proposal.get("id") == scope.get("observation_proposal_id")
+          and revised.get("parent_id") == parent["id"]
+          and (revised.get("body") or {}).get("rows") == [*((parent.get("body") or {}).get("rows") or []), row]
+          and (proposal.get("body") or {}).get("origin") == (revised.get("body") or {}).get("origin") == "hypothetical"
+          and row.get("time") == facts.get("selected_time")
+          and row.get("hard_allowance") == request.get("future_hard_allowance"),
+          f"row at {row.get('time')} (selected {facts.get('selected_time')}), allowance {row.get('hard_allowance')}")
+    vectors = dict(zip(request.get("candidate_ids") or [], request.get("candidate_vectors") or []))
+    result = (evidence.get("body") or {}).get("result") or {}
+    candidates = {c.get("id"): c.get("parameter_vector") for c in result.get("candidates") or []}
+    check("followup_rechecks_the_design_pair", bool(vectors) and candidates == vectors
+          and result.get("baseline_search") is None, "exact original vectors; no new discovery")
+    # Independent decimal oracle over every included row of the revised dataset.
+    expected = {cid: kinetics.history_verdict(vec, (revised.get("body") or {}).get("rows") or [])
+                for cid, vec in vectors.items()}
+    observed = {c.get("candidate_id"): ("compatible" if c.get("verification") == "valid" else
+                                        "excluded" if c.get("verification") == "invalid" else c.get("verification"))
+                for c in result.get("candidate_results") or [] if c.get("candidate_id") in vectors}
+    check("followup_verdicts_match_oracle", set(observed) == set(vectors) and all(
+        expected[c] == "indeterminate" or observed[c] == expected[c] for c in vectors),
+        f"application {observed}, independent oracle {expected}")
     return out
 
 
