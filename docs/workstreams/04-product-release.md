@@ -8,7 +8,7 @@ Standing brief: master document DB-MASTER-1, section 2. This log is a navigation
 |---|---|
 | Branch | `claude/dreamy-lamport-dsttgm` |
 | Integrated base | `main` at `adac945` (PR #3 backend scientific integration, PR #4 engine discovery) |
-| Platform of all fresh checks below | Linux x86_64; uv 0.11.32; backend Python 3.13.18; engine CPython 3.11.15; Node 22.23.4 |
+| Platform of all fresh checks below | Linux x86_64, **run as root** unless stated (root hides per-user limits; CI is the non-root lane); uv 0.11.32; backend Python 3.13.18; engine CPython 3.11.15; Node 22.23.4 |
 | AI mode | controlled placeholder; live Gemini disabled and not run; provider requests made: 0 |
 | Evidence | `docs/release-evidence/release-checklist.json`, `docs/release-evidence/stack-smoke.json` (each names its commit) |
 
@@ -19,7 +19,7 @@ Standing brief: master document DB-MASTER-1, section 2. This log is a navigation
 | # | Delivery criterion | State | Evidence or blocker |
 |---|---|---|---|
 | 1 | Qualified setup | passed (Linux) | `scripts/dev/setup.sh` in a clean clone via `scripts/release/clean_checkout.sh`; target Mac not run (I-015) |
-| 2 | Ordinary launch | passed (Linux) | stack smoke 31/31: one command, one store, stop, recover, restart, reopen same run and report bytes |
+| 2 | Ordinary launch | **failed for ordinary users** | as root: stack smoke 31/31. As a non-root user (GitHub runner, and `user_conditions_check.py` locally) the approved run fails: I-018, Owner 2 |
 | 3 | Real baseline over HTTP | **blocked** | backend does not call the engine's discovery bridge; baseline returns `unsupported` (I-013, Owner 2) |
 | 4 | Separately approved design | blocked by 3 | no discovered candidates to design on; backend tests cover it from a seeded regression pair only |
 | 5 | Raw native export and replay | blocked by 3 | engine CLI replays its prepared bundle; no application run has produced native bytes |
@@ -50,9 +50,12 @@ Standing brief: master document DB-MASTER-1, section 2. This log is a navigation
 | `node tests/integration/web_manual_smoke.mjs` | 14/14 (editor only) |
 | `python3 -m unittest scripts/dev/test_launcher.py` | 7 passed |
 | `python3 scripts/release/checklist.py --strict-offline` | exit 1, as it should |
+| `python3 scripts/release/user_conditions_check.py` | **failed**: 2 of 5 boundary tests fail as an unprivileged user owning 64 processes (passes at 30, fails at 34) |
+| GitHub Actions `ci` on this branch | runs 1 and 2 green (before PR #3); runs 3 to 5 red: backend 2 failed, stack smoke 28/31, both I-018 |
 
 ## Blockers and who holds them
 
+0. **I-018, Owner 2: scientific jobs fail for any non-root user.** Found by reading CI, reproduced with `scripts/release/user_conditions_check.py`. Fix before anything else: it stops the demo on a laptop.
 1. I-013, Owner 2: adopt the engine's discovery bridge in the worker. Interface request with reproduction and acceptance command is in the issue ledger.
 2. I-016, Owner 5: HTTP/invariant suite and model-dispatch guard.
 3. I-015, whoever has the target Mac: run setup and the checklist there.
@@ -73,4 +76,5 @@ Live Gemini of any kind; hosted deployment; Photon; visual redesign; additional 
 - 13 Nov (Eastern), `20dd941`..`f4786c5`: harness, sources, first release checks; repository held only the web editor. Evaluation ownership later moved to Workstream 5.
 - `3b456b1`..`06c6518`: launcher, strict gate, stack smoke, CI, docs on the integrated tree.
 - `cb8aef8`..`849f516`: merged PR #3; fixed launcher and web plan request for the new contract.
-- This update: merged PR #4; transport checks; storage and AI-mode doctor facts; role log; master-document alignment.
+- CI review: found I-018; added the ordinary-user check to the gates and CI; test suites in the checklist no longer inherit paths to the real `var/` store.
+- Earlier update: merged PR #4; transport checks; storage and AI-mode doctor facts; role log; master-document alignment.

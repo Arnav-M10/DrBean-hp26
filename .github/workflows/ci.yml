@@ -25,8 +25,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --locked
-      - run: uv run pytest -q tests --ignore=tests/integration
+      # Both declared runtimes, so the real-engine backend tests run instead of skipping.
+      - run: python3 scripts/dev/launcher.py setup
+      - name: backend tests with the qualified CPython 3.11 engine runtime
+        run: BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python" uv run pytest -q tests --ignore=tests/integration -rs
       - run: uv run ruff check apps tests scripts
       - name: exported schemas match the committed ones
         run: |
@@ -91,6 +93,8 @@ jobs:
           node-version: 22
       - run: python3 scripts/dev/launcher.py setup
       - run: python3 -m unittest scripts/dev/test_launcher.py
+      - name: scientific process boundary as an ordinary user who owns many processes
+        run: python3 scripts/release/user_conditions_check.py
       # Passes when the launch path works. It reports gate G1 separately and does not
       # claim real science until the engine bridge is integrated.
       - run: python3 scripts/release/stack_smoke.py

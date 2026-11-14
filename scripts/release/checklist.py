@@ -25,6 +25,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 
@@ -147,6 +148,30 @@ def stack_smoke():
     }
 
 
+def ordinary_user_science_boundary():
+    """Backend scientific process boundary as an unprivileged user who already owns many processes."""
+    result = run([sys.executable, "scripts/release/user_conditions_check.py"], env=dict(os.environ), timeout=400)
+    try:
+        report = json.loads(result.get("output", "").strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return result
+    detail = report.get("reason") or (f"{report.get('summary')} as uid {report.get('uid')} owning "
+                                      f"{report.get('processes_owned_by_user')} processes"
+                                      + (" (issue I-018)" if report["status"] == "failed" else ""))
+    return {**result, "status": report["status"], "detail": detail,
+            "tail": report.get("failed", [])}
+
+
+def check_env():
+    """Environment for test suites: placeholder AI, and no path to your real store or auth file."""
+    env = {k: v for k, v in ENV.items() if k not in ("BEAN_DATABASE_PATH", "BEAN_BLOB_DIR", "BEAN_AUTH_FILE",
+                                                     "BEAN_ARTIFACT_DIR")}
+    scratch = tempfile.mkdtemp(prefix="drbean-checks-")
+    env.update(BEAN_DATABASE_PATH=os.path.join(scratch, "bean.sqlite3"), BEAN_BLOB_DIR=os.path.join(scratch, "sources"),
+               BEAN_AUTH_FILE=os.path.join(scratch, "auth.json"), BEAN_ARTIFACT_DIR=os.path.join(scratch, "artifacts"))
+    return env, scratch
+
+
 def owner5_suite():
     files = sorted(glob.glob(os.path.join(REPO, "tests", "integration", "test_*.py")))
     if not files:
@@ -156,6 +181,15 @@ def owner5_suite():
 
 
 def collect(fast):
+    global ENV
+    ENV, scratch = check_env()  # suites must never read or write the real var/ store
+    try:
+        return _collect(fast)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
+def _collect(fast):
     checks = {
         "clean_tree": clean_tree(),
         "runtimes": runtimes(),
@@ -173,6 +207,7 @@ def collect(fast):
         "harness_manifest_verify": run([sys.executable, "evaluation/cli.py", "verify"]),
         "harness_grader_selftest": run([sys.executable, "evaluation/cli.py", "selftest"]),
         "secret_scan": run([sys.executable, "scripts/release/secret_scan.py"]),
+        "science_boundary_as_ordinary_user": ordinary_user_science_boundary(),
         "owner5_http_suite": owner5_suite(),
         "web_source_review_browser_check": {"status": "unrun", "detail": "no source/value review control exists "
                                                                          "in the web workspace yet"},

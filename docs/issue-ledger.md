@@ -23,6 +23,7 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 | I-015 | 2, 4 | open, target platform | `resource_policy.py` now omits `RLIMIT_AS` on macOS; still unverified on the Mac |
 | I-016 | 5 | open, blocks strict gate | HTTP/invariant suite and offline real-science lane not delivered |
 | I-017 | 4 | open, waits for G1 | Browser controls for source review, design and follow-up not built |
+| I-018 | 2 | **open, launch blocker for every ordinary user** | Scientific child's process-count limit counts all of the user's processes, so real jobs fail for anyone who is not root |
 
 ## I-011: float refusal does not name the field (Owner 2)
 
@@ -30,6 +31,18 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 - **Expected:** 422 with `field_paths` naming `rows.0.concentration`, as happens for the non-canonical string `"4.8"`.
 - **Actual:** 422 `invalid_json`, `field_paths: []`. The value is correctly refused, not repaired. The browser never sends floats, so this affects other clients only.
 - **Evidence:** `docs/release-evidence/stack-smoke.json`, fact `float_refusal_names_the_field: false`.
+
+## I-018: scientific jobs fail for an ordinary (non-root) user (Owner 2)
+
+- **Blocking gate:** G0 and G1. This affects every teammate's laptop and the presentation device.
+- **Observed:** GitHub Actions run 43552209712 on `5e4d76b` (ubuntu runner, user `runner`): backend job `2 failed, 233 passed, 29 skipped`; stack smoke `worker-finished-the-run: failed`, 28 of 31. The same commit passes locally, where the container runs as root.
+- **Minimal reproduction (any Linux, no network):** `python3 scripts/release/user_conditions_check.py`. It runs Owner 2's `tests/test_science_boundary.py` as an unprivileged user who already owns 64 processes. Result: `2 failed, 3 passed`: `test_cancellation_terminates_descendants` and `test_descendant_cannot_escape_by_outliving_adapter` return `{'worker_error': 'scientific_worker_failed'}`.
+- **Threshold measured:** passes when that user owns 30 processes, fails at 34 (`--processes 30`, `--processes 34`).
+- **Cause, as far as the evidence shows:** `apps/api/bean_api/resource_policy.py` applies `RLIMIT_NPROC` with `processes=32` in the scientific child. On Linux and macOS that limit counts every process owned by the same user, not just the child's descendants, and it is not enforced for root. A desktop user owns far more than 32 processes, so the first process the child tries to start is refused. The Counterdex adapter must start the CPython 3.11 engine process, so real science cannot run. Owner 2 should confirm the cause.
+- **Expected:** an approved run completes for a non-root user under normal desktop load, while the worker still bounds the job's own process tree (for example by tracking and killing the owned process group or session, which the code already does, instead of a per-user count).
+- **Not acceptable:** removing every guard, or requiring the stack to run as root.
+- **Acceptance:** `python3 scripts/release/user_conditions_check.py` exits 0; the CI `backend` and `stack` jobs go green.
+- **Why earlier evidence missed it:** all local runs by Workstream 4 were as root. Earlier statements that the launch path "passed (Linux)" were true only for root and are corrected in the status documents.
 
 ## I-012: provider must be disabled by default in code (Owner 3)
 

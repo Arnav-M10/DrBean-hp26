@@ -12,7 +12,7 @@ scripts/dev/start.sh
 
 ## Gate status
 
-G0 passed (Linux). G1 to G4 not passed. See [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md). The one blocker for G1 and G2 is baseline discovery through the application, [issue I-013](issue-ledger.md): the engine can now discover candidates, but the backend does not call that operation yet.
+No gate fully passes. G0 holds for root only: for an ordinary user every approved run fails ([I-018](issue-ledger.md)). See [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md). The one blocker for G1 and G2 is baseline discovery through the application, [issue I-013](issue-ledger.md): the engine can now discover candidates, but the backend does not call that operation yet.
 
 ## Manual demo steps that work today (placeholder AI, no science)
 
@@ -31,7 +31,8 @@ The domain, claim and any future times are team-selected assumptions for review,
 
 | Lane | Result |
 |---|---|
-| Launch path and transport boundary (stack smoke, isolated store) | 31 of 31 checks passed |
+| Launch path and transport boundary (stack smoke, isolated store) | 31 of 31 as root; 28 of 31 on the GitHub runner (the approved run fails, I-018) |
+| Scientific boundary as an ordinary user owning 64 processes | failed: 2 of 5 tests |
 | Gate G1 through the API | not passed: Counterdex adapter available, baseline discovery unavailable, outcome `unsupported` |
 | Backend unit and HTTP tests (controlled AI; real engine from a seeded regression pair) | 264 passed |
 | Backend lint and schema export | clean; exported schemas match committed |

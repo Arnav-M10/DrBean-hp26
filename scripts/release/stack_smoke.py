@@ -202,7 +202,10 @@ def main(argv):
                 break
             time.sleep(1)
         execution = current.get("state")
-        check("worker-finished-the-run", execution == "completed", execution)
+        check("worker-finished-the-run", execution == "completed",
+              execution if execution == "completed" else
+              f"{execution}, error_code={current.get('error_code')}, scenario reasons="
+              f"{[s.get('reason_code') for s in current.get('scenarios', [])]}")
         results = []
         for scenario in current.get("scenarios", []):
             if scenario.get("result_id"):
@@ -276,6 +279,10 @@ def main(argv):
     commit = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     record = {"recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "tested_commit": commit,
               "platform": f"{platform.system()} {platform.release()} {platform.machine()}",
+              "ran_as_root": os.getuid() == 0,
+              "representativeness": "run as root: per-user process limits are not enforced, so this does not show "
+                                    "what an ordinary laptop user gets; see science_boundary_as_ordinary_user"
+              if os.getuid() == 0 else "run as an ordinary user",
               "lane": "offline actual stack; AI placeholder; zero provider dispatch by construction",
               "launch_path": {"passed": launch_ok, "passed_checks": sum(c["passed"] for c in checks),
                               "total_checks": len(checks)},
