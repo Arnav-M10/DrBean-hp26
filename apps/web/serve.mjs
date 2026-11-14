@@ -12,8 +12,11 @@ const routes = new Map([
   ['/exact.mjs', ['exact.mjs', 'text/javascript']],
   ['/question.mjs', ['question.mjs', 'text/javascript']],
   ['/api.mjs', ['api.mjs', 'text/javascript']],
+  ['/session.mjs', ['session.mjs', 'text/javascript']],
+  ['/general-workspace.mjs', ['general-workspace.mjs', 'text/javascript']],
   ['/manual.mjs', ['manual.mjs', 'text/javascript']],
   ['/source-workflow.mjs', ['source-workflow.mjs', 'text/javascript']],
+  ['/assistant-workflow.mjs', ['assistant-workflow.mjs', 'text/javascript']],
   ['/workflow.mjs', ['workflow.mjs', 'text/javascript']],
   ['/design.mjs', ['design.mjs', 'text/javascript']],
   ['/followup-workflow.mjs', ['followup-workflow.mjs', 'text/javascript']],
@@ -40,8 +43,19 @@ const server = createServer(async (request, response) => {
     if (!['GET', 'POST'].includes(request.method) || request.url.includes('\\')) {
       response.writeHead(405).end(); return;
     }
+    // Browser sessions belong to the HTTPS gateway, which reaches the API
+    // directly. This local bearer-only transport has no trusted session hop.
+    if (request.method === 'GET' && request.url.split('?')[0] === '/api/bean/v1/shared-session') {
+      response.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+      response.end(JSON.stringify({ code: 'shared_access_unavailable', message: 'Private browser sessions are available through the shared HTTPS link.' }));
+      return;
+    }
     const headers = {};
-    for (const key of ['authorization', 'content-type', 'idempotency-key']) {
+    const sourceName = request.headers['x-source-name'];
+    if (sourceName !== undefined && (typeof sourceName !== 'string' || sourceName.length > 255 || !/^[\x20-\x7e]+$/.test(sourceName) || /[/\\]/.test(sourceName))) {
+      response.writeHead(400).end(); return;
+    }
+    for (const key of ['authorization', 'content-type', 'idempotency-key', 'x-source-name']) {
       if (request.headers[key]) headers[key] = request.headers[key];
     }
     const upstream = upstreamRequest({ hostname: '127.0.0.1', port: apiPort,
@@ -53,7 +67,8 @@ const server = createServer(async (request, response) => {
       response.writeHead(result.statusCode, safeHeaders);
       result.pipe(response);
     });
-    upstream.setTimeout(15000, () => upstream.destroy());
+    const providerOperation = /^\/api\/bean\/v1\/workspaces\/[^/]+\/(intake-proposals|assistant-turns|research-analyses)$/.test(request.url);
+    upstream.setTimeout(providerOperation ? 75000 : 15000, () => upstream.destroy());
     upstream.on('error', () => {
       if (!response.headersSent) response.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       response.end(JSON.stringify({ code: 'backend_unavailable', message: `Start the local API on 127.0.0.1:${apiPort}.` }));

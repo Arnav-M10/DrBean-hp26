@@ -1,0 +1,43 @@
+# Shared Dr. Bean development server
+
+The owner runs one API, worker and web process on one Mac. One private `var/gemini.local.json` supplies the owner's Gemini configuration to the API and worker. Every browser session uses that configuration and the same durable provider budget. Visitors open the shared URL without installing the app or copying an access token. Each browser receives a separate private workspace; knowing the URL does not grant access to the owner's or another visitor's work.
+
+## Owner setup
+
+1. Prepare and start the app using the root README. The optional Gemini configuration remains on this machine with permissions `0600`. The normal launcher reads it only to configure the API and worker. Confirm the local app works before sharing.
+2. Install Cloudflare's official tunnel client. On macOS, `brew install cloudflared` installs it through Homebrew.
+3. Run `python3 scripts/dev/share.py start`. It requires the launcher-owned API and web process, prepares a private gateway credential, and checks that the running API advertises browser-session support. It starts a separate loopback gateway on port 4174 and a temporary HTTPS Quick Tunnel, then prints the URL. The API, worker, existing credentials and data remain in place. On macOS, a separate `caffeinate` process prevents idle sleep while the tunnel is alive; closing the lid may still suspend the host.
+4. Give the HTTPS URL to the intended visitors. Each browser automatically receives its own bounded session. Anyone with the URL can create a session and consume the server's remaining allowance through explicitly consented operations, so distribute it thoughtfully.
+5. `python3 scripts/dev/share.py status` retrieves the current URL. `python3 scripts/dev/share.py stop` first closes public-origin admission, then stops only recorded sharing processes. It retains the gateway credential, browser-session records, workspaces, provider history and local app.
+
+Stopping the main app automatically closes shared-origin admission and stops proven-owned sharing processes before freeing the API and web ports. If sharing-process ownership is unproven, its record is preserved and public-origin admission stays closed. Sharing and normal launcher start/stop/recovery commands use the same private operating-system lock. Repeated sharing starts reuse a healthy sharing process pair; an incomplete owned sharing start is cleaned up before retry. If a process record cannot prove ownership, startup refuses to guess. Inspect that record locally instead of killing an arbitrary PID. A failed startup leaves the public origin closed and retains the gateway credential for retry. No sharing command restarts the API, reads the Gemini configuration, edits `auth.json`, or changes provider budgets.
+
+The gateway credential is `var/share-gateway.json`, an owner-only regular file with permissions `0600`. Both the API and gateway validate it at request time. Keep it private; it is a server boundary credential, not a browser session or provider key. A malformed, symlinked, oversized or incorrectly permissioned file disables sharing rather than being replaced silently. The launcher refuses to expose an old API that does not advertise the current session capability; update and restart the local app first, preserving the existing store.
+
+The URL works only while the Mac, app and network are available. A Quick Tunnel restart normally creates a new hostname. Browser cookies belong to their original hostname: opening a new URL starts a new session rather than transferring old private work. Keep any needed exports before the session expires or its temporary URL is retired. This is temporary development hosting, not persistent account recovery or an uptime guarantee.
+
+The server retains at most 4,096 session issuance records, including expired and revoked credentials; rotations count toward this limit. When full, it refuses new sessions instead of deleting private work or resetting accounting. The current implementation has no automatic history cleanup or account recovery.
+
+## Visitor use
+
+1. Open the shared HTTPS URL supplied by the owner. Automatic connection creates or reopens this browser's private session; the default maximum session lifetime is 24 hours.
+2. Add data or a paper, inspect the admitted sources, then ask a question. Uploading or connecting does not make a Gemini request.
+3. Review the selected sources, question, model and consent disclosure before requesting analysis. General AI interpretation is not mathematical verification; checker evidence is a separate supported workflow.
+4. Reloading the same URL with the same unexpired browser cookie reopens that session. A separate browser profile, cleared cookie, expired session or new temporary hostname does not inherit its private files.
+
+Local owner access remains available through the existing bearer login on the local app. The public gateway never forwards a browser-supplied owner credential. Explicit cross-user invitations and account recovery are not implemented; sharing the URL alone does not share workspaces.
+
+**Show Gemini call budget** reads application reservations without making a model call. All browser sessions and owner work use the existing shared store and global budget. The default trial ceilings are eight requests, 64,000 conservatively reserved input tokens and 16,000 output tokens. Earlier tests, failures and uncertain outcomes remain counted. A remaining request count does not guarantee enough token capacity; exhaustion is refused before dispatch. The free-tier flag records the owner's account assertion, not a billing verification or Google quota reading. Sharing neither raises limits nor resets accounting.
+
+## Boundary and verification
+
+- API, local web and gateway listen on `127.0.0.1`; the tunnel reaches only the gateway.
+- The gateway requires the exact recorded HTTPS hostname, HTTPS forwarding metadata and acceptable browser metadata. Cross-site API calls, mutations and subresources are refused. A GET/HEAD document navigation to the public entry page may originate from an external link; it grants no API authority. Missing or invalid origin configuration is refused. Upstreams remain fixed loopback destinations: API port 8000 and static web port 4173.
+- Each browser session uses an opaque random credential in a Secure, HttpOnly, SameSite cookie. The backend stores only the session credential hash and validates identity and expiry. The browser receives nonsecret session metadata, never a bearer credential in JavaScript or JSON.
+- The gateway discards visitor bearer credentials and untrusted identity headers before supplying its own private boundary credential. Backend authorization still checks every private workspace, asset, analysis and scientific record.
+- The gateway reads only its origin and gateway configuration files. The tunnel receives neither gateway configuration path nor provider credentials. Neither sharing process reads owner authentication, Gemini configuration or the database. The sharing launcher does not read any provider key. The ordinary app launcher reads the private opt-in file when starting the API and worker.
+- Process records are written atomically with owner-only permissions. Stop operations verify the recorded PID, start time and separate process group before signaling; unrelated processes are left alone. Process-control locking covers parallel sharing starts, sharing start/stop races, and app start/stop/recovery commands.
+
+Offline launcher tests cover credential retention, owner-data preservation, malformed/private-file refusal, failed-start recovery, parallel start/stop, fixed capability preflight and process ownership. Gateway/backend tests cover request admission, cookie sessions and private-workspace authorization. These controlled checks do not establish public HTTPS availability or a live Gemini result. Record public connectivity and any separately authorized bounded provider smoke only after actually running them.
+
+Cloudflare documents temporary URLs, installation prerequisites and preview limitations in its [Quick Tunnels guide](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). A Quick Tunnel is reachable by anyone with its URL, while research data remains session-authorized.

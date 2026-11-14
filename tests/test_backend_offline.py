@@ -39,7 +39,7 @@ def test_ordinary_provider_configuration_never_reads_provider_environment(monkey
     assert config.account_gate_passed is False
     with pytest.raises(ProviderFailure, match="provider_not_configured"):
         config.check_ready()
-    assert not queried
+    assert queried == ["BEAN_AI_MODE"]
 
 
 def test_present_key_and_legacy_approval_flags_cannot_enable_configuration(monkeypatch):
@@ -56,7 +56,7 @@ def test_present_key_and_legacy_approval_flags_cannot_enable_configuration(monke
     monkeypatch.setattr(os, "getenv", fake_getenv)
     config = provider_config_from_env()
     assert config.api_key is None and config.model is None
-    assert not queried
+    assert queried == ["BEAN_AI_MODE"]
 
 
 def test_http_intake_and_conversation_keep_provider_attempts_zero(tmp_path, monkeypatch):

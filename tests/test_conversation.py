@@ -189,6 +189,56 @@ def test_new_model_numbers_are_withheld(setup):
     assert response["body"]["commentary_suppression_reason"] == "unsupported_numeric_claim"
 
 
+def test_baseline_explanation_prompt_teaches_complete_v2_templates_and_real_fact_ids(setup):
+    from test_workflow import create_problem, dataset_body
+    workflow, workspace = setup
+    dataset = workflow.create_dataset("alice", workspace, dataset_body(), "baseline-data")
+    problem = create_problem(workflow, workspace, dataset)
+    target_id = f"{problem['id']}:target"
+    text = ("The reviewed interval is [1/10 1/h, 1/5 1/h]. "
+            "The claim lower bound is 1/10 1/h. The claim upper bound is 1/5 1/h. "
+            "Compatibility does not identify the true model.")
+    authored = output(text)
+    authored["explanation"]["fact_ids"] = [target_id]
+    provider = FakeProvider(authored)
+    result = asyncio.run(ConversationService(workflow, provider).submit(
+        "alice", workspace, request(problem_id=problem["id"]), "turn1"))["body"]
+    assert result["model_commentary"] == text
+    assert result["commentary_status"] == "unverified_model_commentary"
+    prompt, = provider.prompts
+    assert "evidence-bound-statements.v2" in prompt
+    assert "The reviewed interval is [<lower> 1/h, <upper> 1/h]." in prompt
+    assert "The claim lower bound is <lower> 1/h." in prompt
+    assert "The claim upper bound is <upper> 1/h." in prompt
+    assert "Never paraphrase scientific verdicts" in prompt
+    assert "Never substitute domain bounds or candidate rates for claim bounds" in prompt
+    assert "actual id strings in explanation.fact_ids" in prompt and target_id in prompt
+    assert "For explain, return no drafts. For interpret_design, extract only explicitly supplied" in prompt
+    assert "For interpret_observation, distinguish explicitly hypothetical from actual data" in prompt
+
+
+@pytest.mark.parametrize("text,reason", [
+    ("A compatible value outside your range was verified under these assumptions.", "unsupported_claim"),
+    ("Without any doubt this proves the interval.", "unsupported_claim"),
+    ("The claim lower bound is 1/5 1/h.", "unsupported_numeric_claim"),
+    ("The reviewed interval is [1/5 1/h, 1/10 1/h].", "unsupported_numeric_claim"),
+])
+def test_revised_baseline_prompt_keeps_unsupported_prose_and_wrong_role_values_suppressed(setup, text, reason):
+    """Authored controls, not the unretained wording from the live model response."""
+    from test_workflow import create_problem, dataset_body
+    workflow, workspace = setup
+    dataset = workflow.create_dataset("alice", workspace, dataset_body(), "baseline-data")
+    problem = create_problem(workflow, workspace, dataset)
+    authored = output(text)
+    authored["explanation"]["fact_ids"] = [f"{problem['id']}:target"]
+    result = asyncio.run(ConversationService(workflow, FakeProvider(authored)).submit(
+        "alice", workspace, request(problem_id=problem["id"]), "turn1"))["body"]
+    assert result["model_commentary"] is None
+    assert result["commentary_suppression_reason"] == reason
+    assert result["facts"] and result["critical_statements"]
+    assert result["execution_approved"] is False
+
+
 def test_real_workflow_evidence_envelope_supplies_outcome_and_candidate_scope(setup):
     from test_workflow import completed_pair
     workflow, workspace = setup

@@ -95,7 +95,7 @@ jobs:
         with:
           node-version: 22
       - run: python3 scripts/dev/launcher.py setup
-      - run: python3 -m unittest scripts/dev/test_launcher.py
+      - run: python3 -m unittest scripts/dev/test_launcher.py scripts/dev/test_share.py
       - name: scientific process boundary as an ordinary user who owns many processes
         run: python3 scripts/release/user_conditions_check.py
       # Passes when the launch path works. It reports gate G1 separately and does not
@@ -130,6 +130,9 @@ jobs:
         run: node tests/integration/node_modules/playwright/cli.js install --with-deps chromium
       - name: manual editor browser check
         run: node tests/integration/web_manual_smoke.mjs
+      - name: private sessions through actual HTTPS gateway and API
+        if: always()
+        run: node tests/integration/shared-session-browser.mjs
       - name: real browser API and science workflow
         run: |
           export NODE_PATH="$PWD/tests/integration/node_modules"

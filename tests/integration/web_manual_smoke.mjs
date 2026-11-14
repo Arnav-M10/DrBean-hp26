@@ -36,10 +36,21 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   const page = await context.newPage()
   const external = []
   const errors = []
+  let localSessionProbe = false
+  page.on('response', response => {
+    if (response.url() === `${url}/api/bean/v1/shared-session` && response.status() === 404) localSessionProbe = true
+  })
   page.on('request', request => { if (!request.url().startsWith(url) && !/^(blob|data):/.test(request.url())) external.push(request.url()) })
   page.on('pageerror', error => errors.push(String(error)))
-  page.on('console', message => { if (message.type() === 'error') errors.push(`${message.text()} ${message.location().url}`) })
-  await page.goto(url)
+  page.on('console', message => {
+    // The frozen session contract deliberately uses 404 at the local owner
+    // boundary. Chromium reports that expected network probe as console noise;
+    // actual JS exceptions and all other console errors still fail this lane.
+    const expectedLocalProbe = message.location().url === `${url}/api/bean/v1/shared-session` && message.text().includes('404')
+    if (message.type() === 'error' && !expectedLocalProbe) errors.push(`${message.text()} ${message.location().url}`)
+  })
+  // General research is now the primary entry; science remains an explicit path.
+  await page.goto(url + '#inputs')
 
   // Invalid input: a non-number must block progress with a linked, focused error.
   await page.fill('#row-1-time', 'six o\'clock')
@@ -92,6 +103,7 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   check('exact-canonical', exact.every(value => rational.test(value)), exact.slice(0, 4).join(' '))
 
   check('no-external-requests', external.length === 0, external.join(' ') || 'no request left 127.0.0.1 (no provider call, offline assets)')
+  check('local-session-boundary-is-unavailable', localSessionProbe, 'local owner mode returns the required 404 instead of provisioning a public/shared identity')
   check('no-page-errors', errors.length === 0, errors.join(' | '))
   check('no-credentials-in-browser-storage', await page.evaluate(() => localStorage.length + sessionStorage.length === 0) && (await context.cookies()).length === 0, 'no cookies or storage')
 } finally {
