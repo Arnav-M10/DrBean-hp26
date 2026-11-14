@@ -1,0 +1,103 @@
+name: ci
+
+# Offline only. No model secrets are configured and no job contacts a model provider:
+# AI stays in placeholder mode. A green run here is NOT a live-Gemini qualification
+# and is not, by itself, a release qualification (see scripts/release/checklist.py).
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BEAN_AI_MODE: placeholder
+
+jobs:
+  backend:
+    name: backend tests, lint, schemas (Python 3.13)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run pytest -q tests --ignore=tests/integration
+      - run: uv run ruff check apps tests scripts
+      - name: exported schemas match the committed ones
+        run: |
+          uv run python scripts/export_contracts.py
+          git diff --exit-code -- shared/contracts
+
+  engine:
+    name: engine tests and native replay (CPython 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --no-deps ./packages/groundwork_adapter
+      - run: python -m unittest discover -s packages/groundwork_adapter/tests
+      - name: fresh native replay of the prepared synthetic bundle
+        run: |
+          python -m counterdex replay packages/groundwork_adapter/fixtures/checked_success.bundle.json \
+            --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json > replay.json
+          python -c "import json; r=json.load(open('replay.json')); assert r['replay']=='passed' and r['expected_binding']=='matches' and r['verification']=='valid', r"
+
+  web:
+    name: web unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test
+        working-directory: apps/web
+
+  harness:
+    name: evaluation harness self-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python -W error -m unittest discover -s evaluation/tests
+      - run: python evaluation/cli.py verify
+      - run: python evaluation/cli.py selftest
+      - run: python scripts/release/secret_scan.py
+
+  stack:
+    name: provider-free actual-stack smoke (one-command launch, restart, reopen)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python3 scripts/dev/launcher.py setup
+      - run: python3 -m unittest scripts/dev/test_launcher.py
+      # Passes when the launch path works. It reports gate G1 separately and does not
+      # claim real science until the engine bridge is integrated.
+      - run: python3 scripts/release/stack_smoke.py
+      - name: Owner 5 HTTP/invariant suite, when delivered
+        run: |
+          if ls tests/integration/test_*.py >/dev/null 2>&1; then
+            .venv/bin/python -m pytest -q tests/integration
+          else
+            echo "not delivered yet: recorded as unrun, not as passed"
+          fi

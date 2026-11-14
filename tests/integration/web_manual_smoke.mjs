@@ -1,5 +1,7 @@
-// Manual-path smoke for the installed web workspace (early handoff, work order section 2).
-// Drives the real page in a real browser. No backend, no provider key.
+// Editor-only smoke for the web workspace: local draft entry, validation and export.
+// It starts no backend and is NOT an end-to-end science test. The connected path is
+// apps/web/check-backend.mjs; deeper HTTP invariants are Owner 5's suite. Its request monitor
+// sees browser requests only and cannot prove the backend made no model call.
 //   node tests/integration/web_manual_smoke.mjs
 // Exit 0: all checks passed. Exit 1: a check failed. Exit 3: unrun (Playwright absent).
 import { spawn } from 'node:child_process'
@@ -27,8 +29,9 @@ const url = await new Promise((resolve, reject) => {
   setTimeout(() => reject(new Error('serve.mjs did not start within 10 s')), 10000)
 })
 
-const browser = await chromium.launch()
+let browser
 try {
+  browser = await chromium.launch() // inside try: a missing browser must not leave the web server running
   const context = await browser.newContext({ acceptDownloads: true })
   const page = await context.newPage()
   const external = []
@@ -82,8 +85,10 @@ try {
   check('no-external-requests', external.length === 0, external.join(' ') || 'no request left 127.0.0.1 (no provider call, offline assets)')
   check('no-page-errors', errors.length === 0, errors.join(' | '))
   check('no-credentials-in-browser-storage', await page.evaluate(() => localStorage.length + sessionStorage.length === 0) && (await context.cookies()).length === 0, 'no cookies or storage')
+} catch (error) {
+  check('smoke-completed', false, String(error).slice(0, 300))
 } finally {
-  await browser.close()
+  await browser?.close()
   server.kill()
 }
 const failed = checks.filter(item => !item.passed)

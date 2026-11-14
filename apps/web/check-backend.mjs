@@ -6,11 +6,15 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import assert from 'node:assert/strict'
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
+import { createRequire } from 'node:module'
+// require() honours NODE_PATH and CommonJS builds; PLAYWRIGHT_MODULE may name an explicit entry file.
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = new URL('../../', import.meta.url).pathname
 const temp = await mkdtemp(join(tmpdir(), 'drbean-web-'))
 const token = randomBytes(40).toString('hex')
-const env = { ...process.env, BEAN_DATABASE_PATH: join(temp, 'test.sqlite'), BEAN_BLOB_DIR: join(temp, 'sources'), BEAN_AUTH_TOKENS_JSON: JSON.stringify({ 'web-test': token }) }
+// Placeholder AI: provider credentials in the caller's shell never reach the launched backend.
+const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GEMINI_|GOOGLE_|BEAN_GEMINI_|LANGSMITH_|LANGCHAIN_|ANTHROPIC_|OPENAI_|DATABASE_URL$)/.test(name)))
+const env = { ...inherited, BEAN_AI_MODE: 'placeholder', BEAN_DATABASE_PATH: join(temp, 'test.sqlite'), BEAN_BLOB_DIR: join(temp, 'sources'), BEAN_AUTH_TOKENS_JSON: JSON.stringify({ 'web-test': token }) }
 const children = []
 const start = (command, args) => { const child = spawn(command, args, { cwd: root, env, stdio: 'ignore' }); children.push(child); return child }
 const python = process.env.BEAN_TEST_PYTHON || resolve(root, '.venv/bin/python')
@@ -27,7 +31,7 @@ try {
     try { await api('/capabilities'); break } catch (e) { if (i > 60) throw e; await new Promise(r => setTimeout(r, 100)) }
   }
   start(python, ['-m', 'bean_api.worker'])
-  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] })
+  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] })
   const context = await browser.newContext({ acceptDownloads: true })
   const page = await context.newPage(), errors = []
   page.on('pageerror', e => errors.push(e.message))
