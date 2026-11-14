@@ -54,7 +54,7 @@ try {
     await page.keyboard.press('Enter')
     await page.waitForFunction(() => document.activeElement.id === 'inputs-title')
     assert.equal(await page.locator('.page:not([hidden])').count(), 1)
-    assert.ok(await page.evaluate(() => window.motionCalls.some(call => call.target === 'inputs')))
+    await page.waitForFunction(() => window.motionCalls.some(call => call.target === 'inputs'))
     // A real CSV import keeps long names and values readable/scrollable locally.
     const filename = 'reviewed-measurements-with-a-long-instrument-and-experiment-name-'.repeat(3) + '.csv'
     await page.locator('#csv-file').setInputFiles({ name: filename, mimeType: 'text/csv', buffer: Buffer.from('time,concentration,epsilon\n1,4.123456789012345678901234567890,0.5\n2,3.10,0.5\n') })
@@ -82,10 +82,23 @@ try {
     await page.goForward(); await page.waitForFunction(() => document.activeElement.id === 'question-title')
     assert.equal(await page.locator('.page:not([hidden])').count(), 1)
     assert.equal(await page.evaluate(() => Boolean(document.activeElement.closest('[hidden]'))), false)
+    // Hold an actual page animation so a cancellation assertion cannot pass
+    // merely because its normal220ms duration elapsed before the next RPC.
+    const held = await page.evaluate(async () => {
+      const ready = new Promise(resolve => addEventListener('hashchange', () => requestAnimationFrame(() => requestAnimationFrame(() => {
+        const animation = document.getAnimations().find(item => item.effect?.target?.id === 'inputs')
+        if (animation) { animation.pause(); window.motionHeld = animation }
+        resolve(Boolean(animation))
+      })), { once: true }))
+      location.hash = 'inputs'; return ready
+    })
+    assert.equal(held, true)
     // The live preference change cancels WAAPI as well as CSS motion.
     await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.waitForFunction(() => window.motionHeld?.playState === 'idle')
     await page.evaluate(() => { window.motionCalls = []; location.hash = 'result' })
     await page.waitForFunction(() => document.activeElement.id === 'result-title')
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     assert.equal(await page.evaluate(() => document.getAnimations().length), 0)
     assert.equal(await page.evaluate(() => window.motionCalls.length), 0)
     await page.screenshot({ path: `${output}/${name}-empty-result-reduced.png`, fullPage: true })
@@ -115,6 +128,22 @@ try {
       assert.equal(probes.added, probes.initial + 1); assert.equal(probes.replayed, probes.added)
       assert.equal(probes.click, probes.beforeClick); assert.equal(probes.ready, probes.click + 1)
       check('activity-deduplication-and-confirmed-download-hook', probes)
+      await page.evaluate(() => {
+        const region = document.createElement('section'); region.id = 'disclosure-focus-probe'; region.setAttribute('aria-label', 'Disclosure keyboard regression fixture')
+        const details = document.createElement('details'), summary = document.createElement('summary'), inside = document.createElement('button'), after = document.createElement('button')
+        details.id = 'focus-details'; details.open = true; summary.textContent = 'Keyboard regression fixture'; inside.id = 'focus-inside'; inside.textContent = 'Inside'; after.id = 'focus-after'; after.textContent = 'After'
+        details.append(summary, inside); region.append(details, after); document.querySelector('main').append(region)
+      })
+      await page.evaluate(async () => { await Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))) })
+      // No wait after closing: a delayed focus exclusion is a real regression.
+      for (let repeat = 0; repeat < 3; repeat++) {
+        await page.evaluate(() => { const details = document.querySelector('#focus-details'); details.open = true; details.querySelector('summary').focus() })
+        await page.evaluate(() => { const details = document.querySelector('#focus-details'); details.open = false; details.querySelector('summary').focus() })
+        await page.keyboard.press('Tab')
+        assert.equal(await page.evaluate(() => document.activeElement.id), 'focus-after')
+      }
+      await page.evaluate(() => document.querySelector('#disclosure-focus-probe').remove())
+      check('closing-disclosure-immediately-excludes-hidden-controls-from-tab-order', 'Normal motion, no post-close delay; repeated rapid open/close.')
     }
     check(`${name}-responsive-keyboard-disclosure-history-validation-reduced-motion`, dimensions)
     const afterMetrics = Object.fromEntries((await profiler.send('Performance.getMetrics')).metrics.map(metric => [metric.name, metric.value]))

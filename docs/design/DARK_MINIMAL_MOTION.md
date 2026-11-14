@@ -35,8 +35,9 @@ outgoing clone, screenshot overlay or focusable ghost page.
 
 - Controls:120ms color/press feedback, no delayed hit targets.
 - Pages:220ms, `cubic-bezier(.2,.8,.2,1)`, cancel on another navigation.
-- Native details:220ms intrinsic-size transition where supported; native instant
-  fallback elsewhere. Closing keeps native keyboard/visibility semantics.
+- Native details:220ms intrinsic-size opening transition where supported; native
+  instant fallback elsewhere. Closing is immediate: delaying native content
+  visibility keeps controls keyboard-focusable, so no closing transition is used.
 - Real result charts:one restrained opacity reveal per distinct result geometry;
   no interpolation of scientific values or animated counters.
 - Activity:optional `data-motion-stream="session-id"` and
@@ -84,10 +85,12 @@ NODE_PATH="$PWD/tests/integration/node_modules" CHROMIUM_PATH=/usr/bin/chromium 
   node tests/integration/shared-session-browser.mjs
 ```
 
--81 web checks pass. Design runner9 grouped checks pass at320/390/834/1440px:
+-81 web checks pass. Design runner10 grouped checks pass at320/390/834/1440px:
   keyboard focus, validation, long CSV names/values, native disclosures, rapid
   navigation and Back/Forward,200% CSS zoom/reflow, empty/unavailable states,
   preference changes, activity deduplication and response-only download feedback.
+  The immediate-Tab close regression explicitly checks a focusable child with no
+  post-close delay, including repeated rapid reopening/closing.
   Its API failure and hook probes are explicitly labelled presentation fixtures.
 - Real launcher/browser agent path7 checks passes: two separate approvals,
   actual baseline/design, both native downloads and fresh installed-engine replay.
@@ -100,13 +103,15 @@ NODE_PATH="$PWD/tests/integration/node_modules" CHROMIUM_PATH=/usr/bin/chromium 
   placeholder/disabled6.15; semantic text6.94–8.69; focus11.23;
   control borders3.81; plot lines8.47–9.98 on raised surfaces.
 - Chromium layout CPU across each scripted viewport's interactions/captures:
-  53–84ms total, style38–73ms total. This is an observed local trace, not a
-  cross-device frame-rate or Core Web Vitals claim. Motion module is5.7KB source,
+  totals are recorded per viewport in the presentation receipt. These are local
+  observations, not a cross-device frame-rate or Core Web Vitals claim. Motion module is5.7KB source,
   no request/dependency/font imports and no permanent animation loop.
 
 The checks found and fixed a genuinely overflowing absolutely positioned screen
 reader label inside the narrow table, and preserved secondary step links needed
 by the manual path. They do not hide overflowing scientific data or weaken tests.
+Owner1's review also caught focusable children during the native closing transition;
+the final opening-only rule and immediate-Tab regression resolve that defect.
 
 Selected before/after/real-result captures and receipts: [evidence](evidence/README.md).
 Other captures remain under ignored `var/design-evidence/`. Screenshots are review
