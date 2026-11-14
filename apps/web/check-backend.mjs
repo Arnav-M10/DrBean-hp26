@@ -162,8 +162,17 @@ try {
   await page.getByRole('button', { name: 'Accept reviewed source values', exact: true }).click()
   await page.getByRole('button', { name: 'Use reviewed values in measurement draft', exact: true }).click()
   await page.click('#measurements button[type=submit]')
+  await page.waitForFunction(() => location.hash === '#question'
+    && !document.querySelector('#question').hidden && document.activeElement?.id === 'question-title')
   await page.click('#question-form button[type=submit]')
-  await page.getByLabel('Explanation for the remaining manually reviewed inputs and assumptions', { exact: true }).fill('Reviewed synthetic example measurements, units, domain and claim entered explicitly for this browser test')
+  // Hash navigation rebuilds the source controls, then focuses the heading.
+  // Its textarea can already be visible while that navigation is pending.
+  await page.waitForFunction(() => location.hash === '#review'
+    && !document.querySelector('#review').hidden && document.activeElement?.id === 'review-title')
+  const assumptionExplanation = 'Reviewed synthetic example measurements, units, domain and claim entered explicitly for this browser test'
+  const assumptionField = page.getByLabel('Explanation for the remaining manually reviewed inputs and assumptions', { exact: true })
+  await assumptionField.fill(assumptionExplanation)
+  assert.equal(await assumptionField.inputValue(), assumptionExplanation)
   await page.getByRole('button', { name: 'Preview source-bound inputs', exact: true }).click()
   await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some(button => button.textContent === 'Accept preview and prepare investigation plan' && !button.disabled) || !document.querySelector('#backend-error').hidden)
   assert.equal(await page.locator('#backend-error').isVisible(), false, await page.locator('#backend-error').textContent())

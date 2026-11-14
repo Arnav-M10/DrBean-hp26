@@ -129,3 +129,22 @@ source equality before dispatch. Existing ordinary science runners remain
 `apps/web/check-backend.mjs` (also with `BEAN_TEST_FOLLOWUP_ORIGIN=actual`) and
 `apps/web/check-research.mjs`; editor/general smoke remain in ordinary CI.
 No external HTTPS tunnel or live provider qualification is claimed.
+
+## CI navigation synchronization
+
+At `6dee207`, CI passed the real HTTPS private-session checks, maintained-plan/
+separate-design investigation, and ordinary manual science loop. The declared-
+actual repeat failed before science: it filled the source-assumption textarea
+while hash navigation to Review was still rebuilding that panel and moving focus.
+
+The retained browser runner now waits for the actual Question/Review view and
+focused heading, then asserts the exact explanation value before preview. No
+sleep, retry of a scientific action, assertion removal or production change was
+introduced. The full declared-actual workflow passed again on the pinned local
+runtime, including its own 7-hour time and 0.3 allowance, both design outcomes,
+native downloads/fresh replay, private session revocation and zero providers.
+
+Teammate review handoffs are posted on PR48 (neutral result wording and connection
+ownership), PR49 (closed disclosure keyboard focus during animation), and PR50
+(two scientific wording corrections and six UI merge conflicts). Those are
+owner-specific corrections, not duplicated implementations or combined acceptance.
