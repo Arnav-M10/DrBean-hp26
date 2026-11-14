@@ -762,6 +762,22 @@
         ]
       },
       "retests": []
+    },
+    {
+      "id": "H-ORPHAN-TEARDOWN",
+      "severity": "P1",
+      "owner": "5",
+      "status": "fixed_pending_retest",
+      "title": "Harness teardown let an orphaned scientific computation resume and outlive the run",
+      "minimal_input": "RS-CANCEL-RESTART with --diagnostic relax_nproc --diagnostic science_barrier on merged main b827c61",
+      "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --diagnostic relax_nproc --diagnostic science_barrier --results <dir> --only RS-CANCEL-RESTART",
+      "expected": "an orphan the scenario already reported (F-ORPHAN-WORKER-KILL) is terminated by the harness before anything lets it continue; no process from the stack outlives the CLI",
+      "observed": "the scenario released the barrier while the orphaned spawn child was alive; the child resumed and started its CPython 3.11 engine grandchild after the last descendant snapshot; teardown tracked only by parent pid, reported no orphans, and the grandchild ran past the CLI's exit before finishing on its own",
+      "fixed_in": "orphans are found by tracked pid and by process group (the scientific child's own session), and are killed before the barrier is released and again at teardown",
+      "evidence": {
+        "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier (first attempt)"
+      },
+      "retests": []
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14.",

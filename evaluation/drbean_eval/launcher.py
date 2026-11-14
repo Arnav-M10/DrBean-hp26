@@ -299,6 +299,31 @@ class LocalStack:
         self.seen_descendants.update(found)
         return found
 
+    def orphans(self) -> dict[int, dict]:
+        """Live processes the harness's stack created that no live owned root still parents.
+
+        Found by tracked pid *and* by process group: the scientific child starts its own session, so a grandchild
+        it spawns after the last snapshot stays in that group even once it is reparented to launchd/init.
+        """
+        table = process_table()
+        roots = {p.pid for p in self.processes.values() if p.poll() is None}
+        attached = set(descendants(roots, table)) | roots if roots else set()
+        groups = {row["pgid"] for row in self.seen_descendants.values()} - {os.getpgrp()}
+        return {pid: row for pid, row in table.items() if pid not in attached and pid != os.getpid()
+                and (pid in self.seen_descendants or row["pgid"] in groups)}
+
+    def kill_orphans(self) -> list[dict]:
+        """Terminate orphaned computations (already recorded as findings by the caller) and report them."""
+        found = self.orphans()
+        for pid in found:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        if found:
+            self.events.append({"event": "orphans_killed", "pids": sorted(found), "at": time.time()})
+        return [{"pid": pid, **row} for pid, row in found.items()]
+
     def capabilities(self) -> dict:
         with urllib.request.urlopen(self.base_url + API_PREFIX + "/capabilities", timeout=10) as response:
             return json.loads(response.read().decode("utf-8"))
@@ -373,13 +398,8 @@ class LocalStack:
                     pass
                 process.wait(timeout=5)
         time.sleep(0.3)
-        orphans = {pid: row for pid, row in self.seen_descendants.items() if alive(pid)}
-        for pid in orphans:  # clean up, but the report keeps them as a finding
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-        report = {"orphans": [{"pid": pid, **row} for pid, row in orphans.items()],
+        orphans = self.kill_orphans()  # clean up, but the report keeps them as a finding
+        report = {"orphans": orphans,
                   "tracked_descendants": len(self.seen_descendants),
                   "exit_codes": {name: p.returncode for name, p in self.processes.items()}}
         self.events.append({"event": "stopped", "at": time.time(), **report})
@@ -566,14 +586,14 @@ class Owner4LauncherStack(LocalStack):
         self.snapshot_descendants()
         stopped = self._launcher("stop", import_path=self.workaround is not None)
         time.sleep(0.3)
-        orphans = {pid: row for pid, row in self.seen_descendants.items() if alive(pid)}
         roots = {name: p.pid for name, p in self.processes.items() if alive(p.pid)}
-        for pid in [*orphans, *roots.values()]:  # started on the harness's behalf; cleaned up, still reported
+        for pid in roots.values():  # started on the harness's behalf; cleaned up, still reported
             try:
                 os.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-        report = {"orphans": [{"pid": pid, **row} for pid, row in orphans.items()],
+        orphans = self.kill_orphans()
+        report = {"orphans": orphans,
                   "roots_alive_after_launcher_stop": roots, "tracked_descendants": len(self.seen_descendants),
                   "launcher_stop_exit": stopped["exit"], "launcher_runs": self.launcher_runs,
                   "launcher_side_guard_events": [{**{k: e.get(k) for k in ("kind", "python", "name",

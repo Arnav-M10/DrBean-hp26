@@ -1256,7 +1256,9 @@ def scenario_cancel_restart(flow: Flow, packet: dict, stack) -> dict:
     try:
         return _cancel_running_and_restart(flow, packet, stack, workspace, checks, observation, queued)
     finally:
-        if barrier:
+        if barrier:  # an orphan held at the barrier must never resume: terminate it first, then release
+            observation["orphans_terminated_before_barrier_release"] = [
+                {"pid": o["pid"], "command": o.get("command", "")[:80]} for o in stack.kill_orphans()]
             stack.release_barrier()
 
 

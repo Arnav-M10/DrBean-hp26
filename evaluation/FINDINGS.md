@@ -34,6 +34,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `3b55843` on macOS
 | H-CI-ENGINE | P1 | 5 | fixed_pending_retest | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
 | F-LAUNCHER-HIDDEN-PTH | P1 | 4 | open | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
 | F-LAUNCHER-ENV-READ | P2 | 4 | open | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
+| H-ORPHAN-TEARDOWN | P1 | 5 | fixed_pending_retest | Harness teardown let an orphaned scientific computation resume and outlive the run |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
 
@@ -251,6 +252,14 @@ Application code commit `9cc90e0 (ori`, observed with harness `3b55843` on macOS
 - **Expected:** names-only filtering (iterate keys, read only the values that are kept) and a scrubbed environment for every child, including probes
 - **Observed:** the guard records a credential_read of each dummy value in the launcher process during cmd_start -> child_env() (`os.environ.items()` reads every value; the code comment says values are never read), and the doctor's backend probe (`.venv/bin/python -c ...`, env=None) starts with all three names present. The API and worker receive none of them: the scrubbing that matters works.
 - **Evidence:** {"attempts": ["att_acd3a5749edf4d22"], "results": "evaluation/results/owner4-launcher (lane-runs.jsonl subject_end.launcher_side_guard_events: credential_read in launcher.py, probe guard_installed with names present; product processes credential_names_present [])"}
+
+## H-ORPHAN-TEARDOWN (P1, owner 5, fixed_pending_retest)
+
+- **Input:** RS-CANCEL-RESTART with --diagnostic relax_nproc --diagnostic science_barrier on merged main b827c61
+- **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --diagnostic relax_nproc --diagnostic science_barrier --results <dir> --only RS-CANCEL-RESTART`
+- **Expected:** an orphan the scenario already reported (F-ORPHAN-WORKER-KILL) is terminated by the harness before anything lets it continue; no process from the stack outlives the CLI
+- **Observed:** the scenario released the barrier while the orphaned spawn child was alive; the child resumed and started its CPython 3.11 engine grandchild after the last descendant snapshot; teardown tracked only by parent pid, reported no orphans, and the grandchild ran past the CLI's exit before finishing on its own
+- **Evidence:** {"results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier (first attempt)"}
 
 ## Check-level finding ids (raised only when the check fails)
 

@@ -71,5 +71,45 @@ class Owner4LaunchEnvironment(unittest.TestCase):
         self.assertIn("separate --results", out.stdout)
 
 
+class _Root:
+    def __init__(self, pid, alive=True):
+        self.pid, self._alive = pid, alive
+
+    def poll(self):
+        return None if self._alive else 0
+
+
+class OrphanDetection(unittest.TestCase):
+    """A reparented grandchild in an orphaned session is still found; attached and unrelated processes are not."""
+
+    def stack(self, table, roots, seen):
+        stack = launcher.LocalStack.__new__(launcher.LocalStack)
+        stack.processes = {name: _Root(pid, alive) for name, (pid, alive) in roots.items()}
+        stack.seen_descendants = {pid: table[pid] for pid in seen}
+        stack.events = []
+        original = launcher.process_table
+        launcher.process_table = lambda: table
+        self.addCleanup(setattr, launcher, "process_table", original)
+        return stack
+
+    def table(self):
+        row = lambda ppid, pgid, command: {"ppid": ppid, "pgid": pgid, "command": command}  # noqa: E731
+        return {100: row(1, 100, "python -m bean_api.worker"),
+                101: row(100, 100, "python -c from multiprocessing.resource_tracker"),
+                200: row(1, 200, "python -c from multiprocessing.spawn import spawn_main"),   # orphaned child
+                201: row(1, 200, "python3.11 -m counterdex"),                                # its reparented grandchild
+                300: row(1, 300, "unrelated process")}
+
+    def test_orphan_session_members_are_found_even_after_reparenting(self):
+        stack = self.stack(self.table(), {"worker": (100, True)}, seen=[101, 200])
+        self.assertEqual(set(stack.orphans()), {200, 201})
+
+    def test_after_teardown_everything_left_in_tracked_groups_is_reported(self):
+        # The root no longer counts as owned-and-alive, so its surviving group members (even itself, had it
+        # ignored the stop) and the orphaned session are all leftovers; the unrelated process never is.
+        stack = self.stack(self.table(), {"worker": (100, False)}, seen=[101, 200])
+        self.assertEqual(set(stack.orphans()), {100, 101, 200, 201})
+
+
 if __name__ == "__main__":
     unittest.main()
