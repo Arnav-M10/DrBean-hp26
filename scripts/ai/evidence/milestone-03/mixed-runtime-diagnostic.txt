@@ -11,7 +11,7 @@ tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-61/test_reviewed_controlled_so
     def test_reviewed_controlled_source_correction_reaches_actual_science_and_unknown_sources_preserve_it(
             controlled_intake_science_client, replay_python, tmp_path):
         """Simulated human review, actual API/worker/checker and fresh native replay.
-    
+
         The deliberate correction is synthetic test input, not evidence that the
         authored fixture misread the image or that a live model understood it.
         """
@@ -23,18 +23,18 @@ tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-61/test_reviewed_controlled_so
         from bean_api.source_materialization import reviewed_input_values
         from bean_api.worker import Worker
         from test_scientific_http import post
-    
+
         client = controlled_intake_science_client
         root = Path(__file__).resolve().parents[1]
         raw = (root / "fixtures/intake/clean.png").read_bytes()
         workspace = post(client, "/workspaces", {"name": "Reviewed controlled source with actual science"}, "source-workspace")["id"]
-    
+
         def upload(content, key):
             response = client.post(PREFIX + f"/workspaces/{workspace}/source-assets?origin=synthetic&retention=retain",
                 content=content, headers={"Content-Type": "image/png", "Idempotency-Key": key})
             assert response.status_code == 201, response.text
             return response.json()
-    
+
         source = upload(raw, "clean-source")
         assert source["body"]["sha256"] == hashlib.sha256(raw).hexdigest()
         assert client.get(PREFIX + f"/source-assets/{source['id']}/content").content == raw
@@ -56,7 +56,7 @@ tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-61/test_reviewed_controlled_so
         assert post(client, f"/workspaces/{workspace}/intake-proposals", request_body, "controlled-source")["id"] == proposal["id"]
         assert client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json() == local_attempts
         assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
-    
+
         reviewed_fields = []
         for field in body["fields"]:
             changed = field["field_path"] == "rows[0].concentration"
@@ -86,7 +86,7 @@ tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-61/test_reviewed_controlled_so
         assert dataset["body"]["rows"][0]["original_values"]["concentration"] == "4.80"
         assert all(row["source_asset_id"] == source["id"] for row in dataset["body"]["rows"])
         assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
-    
+
         plan_body = PlanBody(problem_id=problem["id"], problem_digest=problem["digest"], dataset_id=dataset["id"],
             scientific_profile="counterdex.v1", objective={"question": "Does the reviewed synthetic correction admit an outside assignment?",
                 "success_criterion": "Retain actual checked scientific evidence bound to accepted source-review values."},
