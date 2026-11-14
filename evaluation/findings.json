@@ -43,6 +43,13 @@
               "att_593e67a5ca214685"
             ]
           }
+        },
+        {
+          "at_commit": "merged main 80f95a4, harness a1b28ae, tests/integration (science_barrier only; no product guard relaxed)",
+          "result": "Reproduces without relax_nproc: the deterministic pytest test fails no_orphan_after_worker_kill (1 live scientific child after the worker SIGKILL). The barrier holds the child after setsid and the product's limits, so this is the product's own kill/recovery path.",
+          "evidence": {
+            "pytest": "evaluation/results/integration/pytest-merged-main-a1b28ae.md"
+          }
         }
       ]
     },
