@@ -158,9 +158,12 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None,
     from .research_routes import register_research_routes
     from .research_runtime import research_capabilities
     from .general_research import general_research_capabilities, register_general_routes
+    from .model_comparison.routes import register_comparison_routes
+    from .model_comparison.service import comparison_capabilities
     register_research_routes(app)
     register_general_routes(app, transport=general_transport_factory(app) if general_transport_factory else None,
                             controlled_responder=controlled_general_responder)
+    register_comparison_routes(app)
 
     @app.get("/healthz")
     def health():
@@ -190,6 +193,7 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None,
                 "gemini": provider_capabilities,
                 "deepagents": research_capabilities(settings, provider_config),
                 "general_research": general_research_capabilities(app),
+                "model_comparison": comparison_capabilities(),
                 "transport": {"web": True, "photon": False}}
 
     @app.post(PREFIX + "/exact/decimal")

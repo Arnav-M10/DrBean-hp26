@@ -1,0 +1,2841 @@
+{
+  "schema_version": "DB-MODEL-COMPARISON-RESULT-1",
+  "status": "completed",
+  "request": {
+    "schema_version": "DB-MODEL-COMPARISON-1",
+    "approval": "approved_for_this_request",
+    "review": {
+      "reviewed": true,
+      "origin": "synthetic",
+      "description": "New synthetic zero-drift electron distribution; density 1e15 m^-3, parallel 4 eV, perpendicular 16 eV. Exact forward means with declared independent Gaussian measurement standard deviations; not acquired data."
+    },
+    "instrument": {
+      "kind": "idealized_normal_energy_planar_collector",
+      "acceptance": "full_incident_half_space",
+      "current_convention": "electron_current_magnitude",
+      "area_m2": "0.000001",
+      "efficiency": "0.8"
+    },
+    "channels": [
+      {
+        "id": "a0_e0",
+        "angle_deg": "0",
+        "energy_min_eV": "0",
+        "energy_max_eV": null
+      },
+      {
+        "id": "a0_e8",
+        "angle_deg": "0",
+        "energy_min_eV": "8",
+        "energy_max_eV": null
+      },
+      {
+        "id": "a45_e0",
+        "angle_deg": "45",
+        "energy_min_eV": "0",
+        "energy_max_eV": null
+      },
+      {
+        "id": "a45_e8",
+        "angle_deg": "45",
+        "energy_min_eV": "8",
+        "energy_max_eV": null
+      },
+      {
+        "id": "a90_e0",
+        "angle_deg": "90",
+        "energy_min_eV": "0",
+        "energy_max_eV": null
+      },
+      {
+        "id": "a90_e8",
+        "angle_deg": "90",
+        "energy_min_eV": "8",
+        "energy_max_eV": null
+      }
+    ],
+    "observations": [
+      {
+        "channel_id": "a0_e0",
+        "current_A": "4.28895155689738e-05",
+        "sigma_A": "0.0000002"
+      },
+      {
+        "channel_id": "a0_e8",
+        "current_A": "5.80446473740818e-06",
+        "sigma_A": "0.0000002"
+      },
+      {
+        "channel_id": "a45_e0",
+        "current_A": "6.78142784696049e-05",
+        "sigma_A": "0.0000002"
+      },
+      {
+        "channel_id": "a45_e8",
+        "current_A": "3.04709194971044e-05",
+        "sigma_A": "0.0000002"
+      },
+      {
+        "channel_id": "a90_e0",
+        "current_A": "8.57790311379476e-05",
+        "sigma_A": "0.0000002"
+      },
+      {
+        "channel_id": "a90_e8",
+        "current_A": "5.20276123456099e-05",
+        "sigma_A": "0.0000002"
+      }
+    ],
+    "selected_channel_ids": [
+      "a0_e0",
+      "a0_e8",
+      "a45_e0",
+      "a45_e8",
+      "a90_e0",
+      "a90_e8"
+    ],
+    "fit": {
+      "density_min_m3": "100000000000000",
+      "density_max_m3": "10000000000000000",
+      "temperature_grid_eV": [
+        "2",
+        "4",
+        "8",
+        "12",
+        "16",
+        "24"
+      ],
+      "max_evaluations": 100,
+      "max_reduced_chi_square": "10"
+    },
+    "noise": {
+      "kind": "independent_gaussian",
+      "sigma_grid_A": [
+        "0.0000001",
+        "0.000002",
+        "0.00002"
+      ],
+      "z_thresholds": [
+        "2"
+      ],
+      "seed": 1729,
+      "samples": 128
+    },
+    "feasible_settings": [
+      {
+        "id": "next_a0_e0",
+        "angle_deg": "0",
+        "energy_min_eV": "0",
+        "energy_max_eV": null
+      },
+      {
+        "id": "next_a0_e4",
+        "angle_deg": "0",
+        "energy_min_eV": "4",
+        "energy_max_eV": null
+      },
+      {
+        "id": "next_a0_e8",
+        "angle_deg": "0",
+        "energy_min_eV": "8",
+        "energy_max_eV": null
+      },
+      {
+        "id": "next_a0_e16",
+        "angle_deg": "0",
+        "energy_min_eV": "16",
+        "energy_max_eV": null
+      },
+      {
+        "id": "next_a90_e0",
+        "angle_deg": "90",
+        "energy_min_eV": "0",
+        "energy_max_eV": null
+      },
+      {
+        "id": "next_a90_e4",
+        "angle_deg": "90",
+        "energy_min_eV": "4",
+        "energy_max_eV": null
+      },
+      {
+        "id": "next_a90_e8",
+        "angle_deg": "90",
+        "energy_min_eV": "8",
+        "energy_max_eV": null
+      },
+      {
+        "id": "next_a90_e16",
+        "angle_deg": "90",
+        "energy_min_eV": "16",
+        "energy_max_eV": null
+      }
+    ]
+  },
+  "input_digest": "17b29949f4ccd328f15a07c754a698e1e3b60c17da74bd38de40aae746d9ae3e",
+  "source_digest": "70492f1e361601e2f9f546920e9bb5cc8c9c1924262f497e1179220db653caad",
+  "numerical_backend": "drbean_bounded_grid_reference.v1",
+  "exact_verification": "not_performed",
+  "methods": {
+    "fit": "bounded temperature grid with analytic clipped WLS density profile",
+    "sensitivity": "central differences with log-parameter step 0.0001; numerical rank tolerance 1e-7",
+    "simulation": "conditional fixed-prediction independent Gaussian rectangular bands; no parameter refit",
+    "random": "CPython random.Random.gauss; common standardized draws across sweep cases",
+    "interval": "Wilson 95% interval for Monte Carlo sampling frequency only",
+    "runtime": "CPython 3.13.18"
+  },
+  "simulation_seed": 1729,
+  "simulation_samples": 128,
+  "model_ids": [
+    "electron_isotropic_maxwellian.v1",
+    "electron_gyrotropic_bimaxwellian.v1"
+  ],
+  "units": {
+    "current": "A (electron magnitude)",
+    "density": "m^-3",
+    "temperature": "eV = k_B*T/e",
+    "energy": "eV (normal kinetic energy)",
+    "area": "m^2",
+    "angle": "degree to parallel axis"
+  },
+  "fits": [
+    {
+      "model_id": "electron_isotropic_maxwellian.v1",
+      "status": "bounded_grid_completed",
+      "parameter_count": 2,
+      "evaluations": 6,
+      "parameters": {
+        "temperature_eV": "12",
+        "density_m3": "858714774872191"
+      },
+      "predictions": [
+        {
+          "observation_index": 0,
+          "channel_id": "a0_e0",
+          "observed_A": "4.28895155689738e-05",
+          "predicted_A": "6.37911899788033e-05",
+          "residual_A": "-2.09016744098295e-05",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 1,
+          "channel_id": "a0_e8",
+          "observed_A": "5.80446473740818e-06",
+          "predicted_A": "3.2751488978578e-05",
+          "residual_A": "-2.69470242411698e-05",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 2,
+          "channel_id": "a45_e0",
+          "observed_A": "6.78142784696049e-05",
+          "predicted_A": "6.37911899788033e-05",
+          "residual_A": "4.02308849080156e-06",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 3,
+          "channel_id": "a45_e8",
+          "observed_A": "3.04709194971044e-05",
+          "predicted_A": "3.2751488978578e-05",
+          "residual_A": "-2.28056948147357e-06",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 4,
+          "channel_id": "a90_e0",
+          "observed_A": "8.57790311379476e-05",
+          "predicted_A": "6.37911899788033e-05",
+          "residual_A": "2.19878411591443e-05",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 5,
+          "channel_id": "a90_e8",
+          "observed_A": "5.20276123456099e-05",
+          "predicted_A": "3.2751488978578e-05",
+          "residual_A": "1.92761233670319e-05",
+          "sigma_A": "0.0000002"
+        }
+      ],
+      "chi_square": "50986.0609413539",
+      "reduced_chi_square": "12746.5152353385",
+      "degrees_of_freedom": 4,
+      "rmse_A": "1.84365689037402e-05",
+      "adequate_under_declared_threshold": false,
+      "boundary_limited": false,
+      "sensitivity": [
+        {
+          "parameter": "temperature_eV",
+          "derivative": "d_current_d_log_parameter",
+          "unit": "A",
+          "values": [
+            "3.18955950027138e-05",
+            "3.82100704707252e-05",
+            "3.18955950027138e-05",
+            "3.82100704707252e-05",
+            "3.18955950027138e-05",
+            "3.82100704707252e-05"
+          ],
+          "relative_step": "0.0001"
+        },
+        {
+          "parameter": "density_m3",
+          "derivative": "d_current_d_log_parameter",
+          "unit": "A",
+          "values": [
+            "6.37911900851841e-05",
+            "3.2751489033188e-05",
+            "6.37911900851841e-05",
+            "3.2751489033188e-05",
+            "6.37911900851841e-05",
+            "3.2751489033188e-05"
+          ],
+          "relative_step": "0.0001"
+        }
+      ],
+      "rank_estimate": 2,
+      "rank_deficient": false
+    },
+    {
+      "model_id": "electron_gyrotropic_bimaxwellian.v1",
+      "status": "bounded_grid_completed",
+      "parameter_count": 3,
+      "evaluations": 36,
+      "parameters": {
+        "parallel_eV": "4",
+        "perpendicular_eV": "16",
+        "density_m3": "1e+15"
+      },
+      "predictions": [
+        {
+          "observation_index": 0,
+          "channel_id": "a0_e0",
+          "observed_A": "4.28895155689738e-05",
+          "predicted_A": "4.28895155689738e-05",
+          "residual_A": "-1.35525271560688e-20",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 1,
+          "channel_id": "a0_e8",
+          "observed_A": "5.80446473740818e-06",
+          "predicted_A": "5.80446473740818e-06",
+          "residual_A": "-2.5410988417629e-21",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 2,
+          "channel_id": "a45_e0",
+          "observed_A": "6.78142784696049e-05",
+          "predicted_A": "6.78142784696049e-05",
+          "residual_A": "1.35525271560688e-20",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 3,
+          "channel_id": "a45_e8",
+          "observed_A": "3.04709194971044e-05",
+          "predicted_A": "3.04709194971044e-05",
+          "residual_A": "3.72694496791892e-20",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 4,
+          "channel_id": "a90_e0",
+          "observed_A": "8.57790311379476e-05",
+          "predicted_A": "8.57790311379476e-05",
+          "residual_A": "-2.71050543121376e-20",
+          "sigma_A": "0.0000002"
+        },
+        {
+          "observation_index": 5,
+          "channel_id": "a90_e8",
+          "observed_A": "5.20276123456099e-05",
+          "predicted_A": "5.20276123456099e-05",
+          "residual_A": "0",
+          "sigma_A": "0.0000002"
+        }
+      ],
+      "chi_square": "6.2437375415228e-26",
+      "reduced_chi_square": "2.08124584717427e-26",
+      "degrees_of_freedom": 3,
+      "rmse_A": "2.0402185408305e-20",
+      "adequate_under_declared_threshold": true,
+      "boundary_limited": false,
+      "sensitivity": [
+        {
+          "parameter": "parallel_eV",
+          "derivative": "d_current_d_log_parameter",
+          "unit": "A",
+          "values": [
+            "2.14447577934657e-05",
+            "1.45111618689234e-05",
+            "6.78142785510787e-06",
+            "7.9224390798203e-06",
+            "0",
+            "0"
+          ],
+          "relative_step": "0.0001"
+        },
+        {
+          "parameter": "perpendicular_eV",
+          "derivative": "d_current_d_log_parameter",
+          "unit": "A",
+          "values": [
+            "0",
+            "0",
+            "2.71257114004415e-05",
+            "3.168975628479e-05",
+            "4.28895155869314e-05",
+            "5.20276123456092e-05"
+          ],
+          "relative_step": "0.0001"
+        },
+        {
+          "parameter": "density_m3",
+          "derivative": "d_current_d_log_parameter",
+          "unit": "A",
+          "values": [
+            "4.28895156404639e-05",
+            "5.80446474708232e-06",
+            "6.78142785826561e-05",
+            "3.04709195479126e-05",
+            "8.57790312809277e-05",
+            "5.20276124323115e-05"
+          ],
+          "relative_step": "0.0001"
+        }
+      ],
+      "rank_estimate": 3,
+      "rank_deficient": false
+    }
+  ],
+  "settings": [
+    {
+      "setting": {
+        "id": "next_a0_e0",
+        "angle_deg": "0",
+        "energy_min_eV": "0",
+        "energy_max_eV": null
+      },
+      "predictions_A": {
+        "electron_isotropic_maxwellian.v1": "6.37911899788033e-05",
+        "electron_gyrotropic_bimaxwellian.v1": "4.28895155689738e-05"
+      },
+      "absolute_difference_A": "2.09016744098295e-05"
+    },
+    {
+      "setting": {
+        "id": "next_a0_e4",
+        "angle_deg": "0",
+        "energy_min_eV": "4",
+        "energy_max_eV": null
+      },
+      "predictions_A": {
+        "electron_isotropic_maxwellian.v1": "4.57083849585735e-05",
+        "electron_gyrotropic_bimaxwellian.v1": "1.5778171019628e-05"
+      },
+      "absolute_difference_A": "2.99302139389456e-05"
+    },
+    {
+      "setting": {
+        "id": "next_a0_e8",
+        "angle_deg": "0",
+        "energy_min_eV": "8",
+        "energy_max_eV": null
+      },
+      "predictions_A": {
+        "electron_isotropic_maxwellian.v1": "3.2751488978578e-05",
+        "electron_gyrotropic_bimaxwellian.v1": "5.80446473740818e-06"
+      },
+      "absolute_difference_A": "2.69470242411698e-05"
+    },
+    {
+      "setting": {
+        "id": "next_a0_e16",
+        "angle_deg": "0",
+        "energy_min_eV": "16",
+        "energy_max_eV": null
+      },
+      "predictions_A": {
+        "electron_isotropic_maxwellian.v1": "1.68151751154092e-05",
+        "electron_gyrotropic_bimaxwellian.v1": "7.85548879274066e-07"
+      },
+      "absolute_difference_A": "1.60296262361351e-05"
+    },
+    {
+      "setting": {
+        "id": "next_a90_e0",
+        "angle_deg": "90",
+        "energy_min_eV": "0",
+        "energy_max_eV": null
+      },
+      "predictions_A": {
+        "electron_isotropic_maxwellian.v1": "6.37911899788033e-05",
+        "electron_gyrotropic_bimaxwellian.v1": "8.57790311379476e-05"
+      },
+      "absolute_difference_A": "2.19878411591443e-05"
+    },
+    {
+      "setting": {
+        "id": "next_a90_e4",
+        "angle_deg": "90",
+        "energy_min_eV": "4",
+        "energy_max_eV": null
+      },
+      "predictions_A": {
+        "electron_isotropic_maxwellian.v1": "4.57083849585735e-05",
+        "electron_gyrotropic_bimaxwellian.v1": "6.680477662134e-05"
+      },
+      "absolute_difference_A": "2.10963916627665e-05"
+    },
+    {
+      "setting": {
+        "id": "next_a90_e8",
+        "angle_deg": "90",
+        "energy_min_eV": "8",
+        "energy_max_eV": null
+      },
+      "predictions_A": {
+        "electron_isotropic_maxwellian.v1": "3.2751488978578e-05",
+        "electron_gyrotropic_bimaxwellian.v1": "5.20276123456099e-05"
+      },
+      "absolute_difference_A": "1.92761233670319e-05"
+    },
+    {
+      "setting": {
+        "id": "next_a90_e16",
+        "angle_deg": "90",
+        "energy_min_eV": "16",
+        "energy_max_eV": null
+      },
+      "predictions_A": {
+        "electron_isotropic_maxwellian.v1": "1.68151751154092e-05",
+        "electron_gyrotropic_bimaxwellian.v1": "3.15563420392559e-05"
+      },
+      "absolute_difference_A": "1.47411669238467e-05"
+    }
+  ],
+  "noise_sweep": [
+    {
+      "sigma_A": "0.0000001",
+      "z_threshold": "2",
+      "selected_channel_bands_separated_numerically": true,
+      "decision": "The selected fitted predictions have disjoint numerical bands in at least one reviewed channel.",
+      "selected_channel_simulations": [
+        {
+          "generating_model_id": "electron_isotropic_maxwellian.v1",
+          "samples": 128,
+          "failures": 0,
+          "outcomes": {
+            "generating_band_only": {
+              "count": 85,
+              "frequency": "0.6640625",
+              "wilson_95": [
+                "0.578518209011038",
+                "0.740046227211717"
+              ]
+            },
+            "other_band_only": {
+              "count": 0,
+              "frequency": "0",
+              "wilson_95": [
+                "0",
+                "0.0291369562735084"
+              ]
+            },
+            "both_bands": {
+              "count": 0,
+              "frequency": "0",
+              "wilson_95": [
+                "0",
+                "0.0291369562735084"
+              ]
+            },
+            "neither_band": {
+              "count": 43,
+              "frequency": "0.3359375",
+              "wilson_95": [
+                "0.259953772788283",
+                "0.421481790988962"
+              ]
+            }
+          }
+        },
+        {
+          "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+          "samples": 128,
+          "failures": 0,
+          "outcomes": {
+            "generating_band_only": {
+              "count": 92,
+              "frequency": "0.71875",
+              "wilson_95": [
+                "0.635365808717157",
+                "0.789386772913183"
+              ]
+            },
+            "other_band_only": {
+              "count": 0,
+              "frequency": "0",
+              "wilson_95": [
+                "0",
+                "0.0291369562735084"
+              ]
+            },
+            "both_bands": {
+              "count": 0,
+              "frequency": "0",
+              "wilson_95": [
+                "0",
+                "0.0291369562735084"
+              ]
+            },
+            "neither_band": {
+              "count": 36,
+              "frequency": "0.28125",
+              "wilson_95": [
+                "0.210613227086817",
+                "0.364634191282843"
+              ]
+            }
+          }
+        }
+      ],
+      "settings": [
+        {
+          "setting_id": "next_a0_e0",
+          "signal_to_noise": "209.016744098295",
+          "numerical_band_margin_A": "2.05016744098295e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e4",
+          "signal_to_noise": "299.302139389456",
+          "numerical_band_margin_A": "2.95302139389456e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e8",
+          "signal_to_noise": "269.470242411698",
+          "numerical_band_margin_A": "2.65470242411698e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e16",
+          "signal_to_noise": "160.296262361351",
+          "numerical_band_margin_A": "1.56296262361351e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e0",
+          "signal_to_noise": "219.878411591443",
+          "numerical_band_margin_A": "2.15878411591443e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e4",
+          "signal_to_noise": "210.963916627665",
+          "numerical_band_margin_A": "2.06963916627665e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e8",
+          "signal_to_noise": "192.761233670319",
+          "numerical_band_margin_A": "1.88761233670319e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e16",
+          "signal_to_noise": "147.411669238467",
+          "numerical_band_margin_A": "1.43411669238467e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "suggested_setting_id": "next_a0_e4"
+    },
+    {
+      "sigma_A": "0.000002",
+      "z_threshold": "2",
+      "selected_channel_bands_separated_numerically": true,
+      "decision": "The selected fitted predictions have disjoint numerical bands in at least one reviewed channel.",
+      "selected_channel_simulations": [
+        {
+          "generating_model_id": "electron_isotropic_maxwellian.v1",
+          "samples": 128,
+          "failures": 0,
+          "outcomes": {
+            "generating_band_only": {
+              "count": 85,
+              "frequency": "0.6640625",
+              "wilson_95": [
+                "0.578518209011038",
+                "0.740046227211717"
+              ]
+            },
+            "other_band_only": {
+              "count": 0,
+              "frequency": "0",
+              "wilson_95": [
+                "0",
+                "0.0291369562735084"
+              ]
+            },
+            "both_bands": {
+              "count": 0,
+              "frequency": "0",
+              "wilson_95": [
+                "0",
+                "0.0291369562735084"
+              ]
+            },
+            "neither_band": {
+              "count": 43,
+              "frequency": "0.3359375",
+              "wilson_95": [
+                "0.259953772788283",
+                "0.421481790988962"
+              ]
+            }
+          }
+        },
+        {
+          "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+          "samples": 128,
+          "failures": 0,
+          "outcomes": {
+            "generating_band_only": {
+              "count": 92,
+              "frequency": "0.71875",
+              "wilson_95": [
+                "0.635365808717157",
+                "0.789386772913183"
+              ]
+            },
+            "other_band_only": {
+              "count": 0,
+              "frequency": "0",
+              "wilson_95": [
+                "0",
+                "0.0291369562735084"
+              ]
+            },
+            "both_bands": {
+              "count": 0,
+              "frequency": "0",
+              "wilson_95": [
+                "0",
+                "0.0291369562735084"
+              ]
+            },
+            "neither_band": {
+              "count": 36,
+              "frequency": "0.28125",
+              "wilson_95": [
+                "0.210613227086817",
+                "0.364634191282843"
+              ]
+            }
+          }
+        }
+      ],
+      "settings": [
+        {
+          "setting_id": "next_a0_e0",
+          "signal_to_noise": "10.4508372049148",
+          "numerical_band_margin_A": "1.29016744098295e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e4",
+          "signal_to_noise": "14.9651069694728",
+          "numerical_band_margin_A": "2.19302139389456e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e8",
+          "signal_to_noise": "13.4735121205849",
+          "numerical_band_margin_A": "1.89470242411698e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e16",
+          "signal_to_noise": "8.01481311806755",
+          "numerical_band_margin_A": "8.0296262361351e-06",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e0",
+          "signal_to_noise": "10.9939205795721",
+          "numerical_band_margin_A": "1.39878411591443e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e4",
+          "signal_to_noise": "10.5481958313833",
+          "numerical_band_margin_A": "1.30963916627665e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e8",
+          "signal_to_noise": "9.63806168351595",
+          "numerical_band_margin_A": "1.12761233670319e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e16",
+          "signal_to_noise": "7.37058346192335",
+          "numerical_band_margin_A": "6.7411669238467e-06",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 125,
+                  "frequency": "0.9765625",
+                  "wilson_95": [
+                    "0.933356254948568",
+                    "0.991997583603245"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 3,
+                  "frequency": "0.0234375",
+                  "wilson_95": [
+                    "0.00800241639675548",
+                    "0.0666437450514322"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 124,
+                  "frequency": "0.96875",
+                  "wilson_95": [
+                    "0.922402368738639",
+                    "0.987781734754947"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "both_bands": {
+                  "count": 0,
+                  "frequency": "0",
+                  "wilson_95": [
+                    "0",
+                    "0.0291369562735084"
+                  ]
+                },
+                "neither_band": {
+                  "count": 4,
+                  "frequency": "0.03125",
+                  "wilson_95": [
+                    "0.0122182652450534",
+                    "0.0775976312613608"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "suggested_setting_id": "next_a0_e4"
+    },
+    {
+      "sigma_A": "0.00002",
+      "z_threshold": "2",
+      "selected_channel_bands_separated_numerically": false,
+      "decision": "These measurements do not distinguish the selected models under the declared noise and band threshold.",
+      "selected_channel_simulations": [
+        {
+          "generating_model_id": "electron_isotropic_maxwellian.v1",
+          "samples": 128,
+          "failures": 0,
+          "outcomes": {
+            "generating_band_only": {
+              "count": 45,
+              "frequency": "0.3515625",
+              "wilson_95": [
+                "0.274272872814072",
+                "0.437502161079625"
+              ]
+            },
+            "other_band_only": {
+              "count": 10,
+              "frequency": "0.078125",
+              "wilson_95": [
+                "0.0429873750509822",
+                "0.137846931804791"
+              ]
+            },
+            "both_bands": {
+              "count": 40,
+              "frequency": "0.3125",
+              "wilson_95": [
+                "0.238655302785362",
+                "0.397271055817204"
+              ]
+            },
+            "neither_band": {
+              "count": 33,
+              "frequency": "0.2578125",
+              "wilson_95": [
+                "0.189869020899412",
+                "0.339869192295569"
+              ]
+            }
+          }
+        },
+        {
+          "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+          "samples": 128,
+          "failures": 0,
+          "outcomes": {
+            "generating_band_only": {
+              "count": 53,
+              "frequency": "0.4140625",
+              "wilson_95": [
+                "0.332451505775144",
+                "0.500681408584365"
+              ]
+            },
+            "other_band_only": {
+              "count": 5,
+              "frequency": "0.0390625",
+              "wilson_95": [
+                "0.0167986107978037",
+                "0.0881870207668369"
+              ]
+            },
+            "both_bands": {
+              "count": 39,
+              "frequency": "0.3046875",
+              "wilson_95": [
+                "0.231605615152392",
+                "0.389151008391947"
+              ]
+            },
+            "neither_band": {
+              "count": 31,
+              "frequency": "0.2421875",
+              "wilson_95": [
+                "0.176187379992421",
+                "0.323211363086106"
+              ]
+            }
+          }
+        }
+      ],
+      "settings": [
+        {
+          "setting_id": "next_a0_e0",
+          "signal_to_noise": "1.04508372049147",
+          "numerical_band_margin_A": "-5.90983255901705e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 27,
+                  "frequency": "0.2109375",
+                  "wilson_95": [
+                    "0.14921308750498",
+                    "0.289506715340642"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 1,
+                  "frequency": "0.0078125",
+                  "wilson_95": [
+                    "0.00138043189287424",
+                    "0.0429262594388606"
+                  ]
+                },
+                "both_bands": {
+                  "count": 98,
+                  "frequency": "0.765625",
+                  "wilson_95": [
+                    "0.685164568891771",
+                    "0.830606423087927"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 19,
+                  "frequency": "0.1484375",
+                  "wilson_95": [
+                    "0.0971346311535001",
+                    "0.220227291226311"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 105,
+                  "frequency": "0.8203125",
+                  "wilson_95": [
+                    "0.744783737132444",
+                    "0.87717540025484"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e4",
+          "signal_to_noise": "1.49651069694728",
+          "numerical_band_margin_A": "-5.00697860610544e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 38,
+                  "frequency": "0.296875",
+                  "wilson_95": [
+                    "0.224581660835667",
+                    "0.381005227650446"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 1,
+                  "frequency": "0.0078125",
+                  "wilson_95": [
+                    "0.00138043189287424",
+                    "0.0429262594388606"
+                  ]
+                },
+                "both_bands": {
+                  "count": 87,
+                  "frequency": "0.6796875",
+                  "wilson_95": [
+                    "0.594634112445217",
+                    "0.754269793893991"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 31,
+                  "frequency": "0.2421875",
+                  "wilson_95": [
+                    "0.176187379992421",
+                    "0.323211363086106"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 93,
+                  "frequency": "0.7265625",
+                  "wilson_95": [
+                    "0.643592314493147",
+                    "0.79633000219542"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e8",
+          "signal_to_noise": "1.34735121205849",
+          "numerical_band_margin_A": "-5.30529757588302e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 34,
+                  "frequency": "0.265625",
+                  "wilson_95": [
+                    "0.196755010163573",
+                    "0.348152938089634"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 1,
+                  "frequency": "0.0078125",
+                  "wilson_95": [
+                    "0.00138043189287424",
+                    "0.0429262594388606"
+                  ]
+                },
+                "both_bands": {
+                  "count": 91,
+                  "frequency": "0.7109375",
+                  "wilson_95": [
+                    "0.627166844250139",
+                    "0.782416002321974"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 27,
+                  "frequency": "0.2109375",
+                  "wilson_95": [
+                    "0.14921308750498",
+                    "0.289506715340642"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 97,
+                  "frequency": "0.7578125",
+                  "wilson_95": [
+                    "0.676788636913894",
+                    "0.823812620007578"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a0_e16",
+          "signal_to_noise": "0.801481311806755",
+          "numerical_band_margin_A": "-6.39703737638649e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 13,
+                  "frequency": "0.1015625",
+                  "wilson_95": [
+                    "0.0603186487268409",
+                    "0.166024863303611"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 1,
+                  "frequency": "0.0078125",
+                  "wilson_95": [
+                    "0.00138043189287424",
+                    "0.0429262594388606"
+                  ]
+                },
+                "both_bands": {
+                  "count": 112,
+                  "frequency": "0.875",
+                  "wilson_95": [
+                    "0.806573729182485",
+                    "0.921573553612383"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 16,
+                  "frequency": "0.125",
+                  "wilson_95": [
+                    "0.0784264463876166",
+                    "0.193426270817515"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 108,
+                  "frequency": "0.84375",
+                  "wilson_95": [
+                    "0.77095189057103",
+                    "0.896516451990933"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e0",
+          "signal_to_noise": "1.09939205795721",
+          "numerical_band_margin_A": "-5.80121588408557e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 22,
+                  "frequency": "0.171875",
+                  "wilson_95": [
+                    "0.116331159481473",
+                    "0.246539968073017"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 103,
+                  "frequency": "0.8046875",
+                  "wilson_95": [
+                    "0.727559280099209",
+                    "0.864060387171622"
+                  ]
+                },
+                "neither_band": {
+                  "count": 1,
+                  "frequency": "0.0078125",
+                  "wilson_95": [
+                    "0.00138043189287424",
+                    "0.0429262594388606"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 21,
+                  "frequency": "0.1640625",
+                  "wilson_95": [
+                    "0.109883316459193",
+                    "0.23781807603707"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 103,
+                  "frequency": "0.8046875",
+                  "wilson_95": [
+                    "0.727559280099209",
+                    "0.864060387171622"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e4",
+          "signal_to_noise": "1.05481958313832",
+          "numerical_band_margin_A": "-5.89036083372335e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 20,
+                  "frequency": "0.15625",
+                  "wilson_95": [
+                    "0.103483548009067",
+                    "0.22904810942897"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 105,
+                  "frequency": "0.8203125",
+                  "wilson_95": [
+                    "0.744783737132444",
+                    "0.87717540025484"
+                  ]
+                },
+                "neither_band": {
+                  "count": 1,
+                  "frequency": "0.0078125",
+                  "wilson_95": [
+                    "0.00138043189287424",
+                    "0.0429262594388606"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 20,
+                  "frequency": "0.15625",
+                  "wilson_95": [
+                    "0.103483548009067",
+                    "0.22904810942897"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 104,
+                  "frequency": "0.8125",
+                  "wilson_95": [
+                    "0.736150819292826",
+                    "0.870638583036232"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e8",
+          "signal_to_noise": "0.963806168351595",
+          "numerical_band_margin_A": "-6.07238766329681e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 15,
+                  "frequency": "0.1171875",
+                  "wilson_95": [
+                    "0.0723168234935573",
+                    "0.184366158653348"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 110,
+                  "frequency": "0.859375",
+                  "wilson_95": [
+                    "0.788647507621038",
+                    "0.909160305057377"
+                  ]
+                },
+                "neither_band": {
+                  "count": 1,
+                  "frequency": "0.0078125",
+                  "wilson_95": [
+                    "0.00138043189287424",
+                    "0.0429262594388606"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 17,
+                  "frequency": "0.1328125",
+                  "wilson_95": [
+                    "0.0846022853184039",
+                    "0.202420166944954"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 107,
+                  "frequency": "0.8359375",
+                  "wilson_95": [
+                    "0.76218192396293",
+                    "0.890116683540807"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "setting_id": "next_a90_e16",
+          "signal_to_noise": "0.737058346192335",
+          "numerical_band_margin_A": "-6.52588330761533e-05",
+          "conditional_simulations": [
+            {
+              "generating_model_id": "electron_isotropic_maxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 10,
+                  "frequency": "0.078125",
+                  "wilson_95": [
+                    "0.0429873750509822",
+                    "0.137846931804791"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 1,
+                  "frequency": "0.0078125",
+                  "wilson_95": [
+                    "0.00138043189287424",
+                    "0.0429262594388606"
+                  ]
+                },
+                "both_bands": {
+                  "count": 115,
+                  "frequency": "0.8984375",
+                  "wilson_95": [
+                    "0.833975136696389",
+                    "0.939681351273159"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            },
+            {
+              "generating_model_id": "electron_gyrotropic_bimaxwellian.v1",
+              "samples": 128,
+              "failures": 0,
+              "outcomes": {
+                "generating_band_only": {
+                  "count": 14,
+                  "frequency": "0.109375",
+                  "wilson_95": [
+                    "0.0662787957070011",
+                    "0.175234451381677"
+                  ]
+                },
+                "other_band_only": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                },
+                "both_bands": {
+                  "count": 110,
+                  "frequency": "0.859375",
+                  "wilson_95": [
+                    "0.788647507621038",
+                    "0.909160305057377"
+                  ]
+                },
+                "neither_band": {
+                  "count": 2,
+                  "frequency": "0.015625",
+                  "wilson_95": [
+                    "0.00429544971014408",
+                    "0.0551809766798172"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "suggested_setting_id": null
+    }
+  ],
+  "failures": [],
+  "limitations": [
+    "Idealized synthetic planar normal-energy instrument; no calibration to MRX, PPPL, an EEA or a real Langmuir probe.",
+    "Zero drift, nonrelativistic electrons, fixed known area/efficiency, full tangential acceptance and sharp energy edges; no sheath or background model.",
+    "A completed bounded grid is not a continuous/global optimum. Fit residuals alone never identify a true model; the anisotropic family has an additional parameter.",
+    "Monte Carlo conditions on fitted parameter vectors; it does not refit model families or propagate parameter-estimation uncertainty.",
+    "Frequencies describe the specified simulation and Wilson intervals describe finite Monte Carlo sampling only; neither is a probability a model is true.",
+    "Rectangular per-channel bands have no automatic simultaneous or multiple-comparison error guarantee; feasible-grid ranking is a point-prediction heuristic.",
+    "A single collector angle sees only projected temperature; parallel/perpendicular temperatures may be unidentifiable.",
+    "All fits and sensitivity are floating-point numerical calculations. No exact Counterdex verification or native mathematical certificate is produced."
+  ],
+  "decision": "Selected fitted predictions are numerically distinguishable in some declared noise cases; this does not establish a correct model."
+}

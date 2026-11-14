@@ -1,0 +1,440 @@
+{
+  "$defs": {
+    "Channel": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9_-]{1,48}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "angle_deg": {
+          "title": "Angle Deg",
+          "type": "string"
+        },
+        "energy_min_eV": {
+          "title": "Energy Min Ev",
+          "type": "string"
+        },
+        "energy_max_eV": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Energy Max Ev"
+        }
+      },
+      "required": [
+        "id",
+        "angle_deg",
+        "energy_min_eV",
+        "energy_max_eV"
+      ],
+      "title": "Channel",
+      "type": "object"
+    },
+    "FitScope": {
+      "additionalProperties": false,
+      "properties": {
+        "density_min_m3": {
+          "title": "Density Min M3",
+          "type": "string"
+        },
+        "density_max_m3": {
+          "title": "Density Max M3",
+          "type": "string"
+        },
+        "temperature_grid_eV": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 25,
+          "minItems": 2,
+          "title": "Temperature Grid Ev",
+          "type": "array"
+        },
+        "max_evaluations": {
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Evaluations",
+          "type": "integer"
+        },
+        "max_reduced_chi_square": {
+          "title": "Max Reduced Chi Square",
+          "type": "string"
+        }
+      },
+      "required": [
+        "density_min_m3",
+        "density_max_m3",
+        "temperature_grid_eV",
+        "max_evaluations",
+        "max_reduced_chi_square"
+      ],
+      "title": "FitScope",
+      "type": "object"
+    },
+    "Instrument": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "idealized_normal_energy_planar_collector",
+          "title": "Kind",
+          "type": "string"
+        },
+        "acceptance": {
+          "const": "full_incident_half_space",
+          "title": "Acceptance",
+          "type": "string"
+        },
+        "current_convention": {
+          "const": "electron_current_magnitude",
+          "title": "Current Convention",
+          "type": "string"
+        },
+        "area_m2": {
+          "title": "Area M2",
+          "type": "string"
+        },
+        "efficiency": {
+          "title": "Efficiency",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "acceptance",
+        "current_convention",
+        "area_m2",
+        "efficiency"
+      ],
+      "title": "Instrument",
+      "type": "object"
+    },
+    "ModelComparisonRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "DB-MODEL-COMPARISON-1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "approval": {
+          "const": "approved_for_this_request",
+          "title": "Approval",
+          "type": "string"
+        },
+        "review": {
+          "$ref": "#/$defs/Review"
+        },
+        "instrument": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Instrument"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "channels": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 24,
+          "minItems": 1,
+          "title": "Channels",
+          "type": "array"
+        },
+        "observations": {
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Observations",
+          "type": "array"
+        },
+        "selected_channel_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 24,
+          "minItems": 1,
+          "title": "Selected Channel Ids",
+          "type": "array"
+        },
+        "fit": {
+          "$ref": "#/$defs/FitScope"
+        },
+        "noise": {
+          "$ref": "#/$defs/NoiseScope"
+        },
+        "feasible_settings": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Feasible Settings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "approval",
+        "review",
+        "channels",
+        "observations",
+        "selected_channel_ids",
+        "fit",
+        "noise",
+        "feasible_settings"
+      ],
+      "title": "ModelComparisonRequest",
+      "type": "object"
+    },
+    "NoiseScope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "independent_gaussian",
+          "title": "Kind",
+          "type": "string"
+        },
+        "sigma_grid_A": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Sigma Grid A",
+          "type": "array"
+        },
+        "z_thresholds": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Z Thresholds",
+          "type": "array"
+        },
+        "seed": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "samples": {
+          "maximum": 1024,
+          "minimum": 32,
+          "title": "Samples",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "sigma_grid_A",
+        "z_thresholds",
+        "seed",
+        "samples"
+      ],
+      "title": "NoiseScope",
+      "type": "object"
+    },
+    "Observation": {
+      "additionalProperties": false,
+      "properties": {
+        "channel_id": {
+          "title": "Channel Id",
+          "type": "string"
+        },
+        "current_A": {
+          "title": "Current A",
+          "type": "string"
+        },
+        "sigma_A": {
+          "title": "Sigma A",
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel_id",
+        "current_A",
+        "sigma_A"
+      ],
+      "title": "Observation",
+      "type": "object"
+    },
+    "Review": {
+      "additionalProperties": false,
+      "properties": {
+        "reviewed": {
+          "const": true,
+          "title": "Reviewed",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "synthetic",
+          "title": "Origin",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewed",
+        "origin",
+        "description"
+      ],
+      "title": "Review",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "DB-MODEL-COMPARISON-RESULT-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "unsupported",
+        "fit_failed",
+        "budget_exceeded"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "request": {
+      "$ref": "#/$defs/ModelComparisonRequest"
+    },
+    "input_digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Input Digest",
+      "type": "string"
+    },
+    "source_digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Digest",
+      "type": "string"
+    },
+    "numerical_backend": {
+      "title": "Numerical Backend",
+      "type": "string"
+    },
+    "exact_verification": {
+      "const": "not_performed",
+      "title": "Exact Verification",
+      "type": "string"
+    },
+    "methods": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Methods",
+      "type": "object"
+    },
+    "simulation_seed": {
+      "title": "Simulation Seed",
+      "type": "integer"
+    },
+    "simulation_samples": {
+      "title": "Simulation Samples",
+      "type": "integer"
+    },
+    "model_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Model Ids",
+      "type": "array"
+    },
+    "units": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Units",
+      "type": "object"
+    },
+    "fits": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Fits",
+      "type": "array"
+    },
+    "settings": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Settings",
+      "type": "array"
+    },
+    "noise_sweep": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Noise Sweep",
+      "type": "array"
+    },
+    "failures": {
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Failures",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "decision": {
+      "title": "Decision",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "request",
+    "input_digest",
+    "source_digest",
+    "numerical_backend",
+    "exact_verification",
+    "methods",
+    "simulation_seed",
+    "simulation_samples",
+    "model_ids",
+    "units",
+    "fits",
+    "settings",
+    "noise_sweep",
+    "failures",
+    "limitations",
+    "decision"
+  ],
+  "title": "ModelComparisonResult",
+  "type": "object"
+}
