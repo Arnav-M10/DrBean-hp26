@@ -62,6 +62,11 @@ function repeatedHeader(request) {
 const routes = new Map([
   ['/workspace-preview/', ['../../workspace-preview/index.html', 'text/html']],
   ['/workspace-preview/index.html', ['../../workspace-preview/index.html', 'text/html']],
+  ['/workspace-preview/comparison.mjs', ['../../workspace-preview/comparison.mjs', 'text/javascript']],
+  ['/workspace-preview/comparison-core.mjs', ['../../workspace-preview/comparison-core.mjs', 'text/javascript']],
+  ['/workspace-preview/comparison-view.mjs', ['../../workspace-preview/comparison-view.mjs', 'text/javascript']],
+  ['/workspace-preview/comparison.css', ['../../workspace-preview/comparison.css', 'text/css']],
+  ['/workspace-preview/saved-example.html', ['../../workspace-preview/saved-example.html', 'text/html']],
   ['/workspace-preview/app.mjs', ['../../workspace-preview/app.mjs', 'text/javascript']],
   ['/workspace-preview/styles.css', ['../../workspace-preview/styles.css', 'text/css']],
   ['/workspace-preview/reference.json', ['../../workspace-preview/reference.json', 'application/json']],
