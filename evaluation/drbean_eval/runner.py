@@ -54,11 +54,16 @@ def _utc() -> str:
 
 def git_state(repo: str) -> dict:
     def run(*args):
-        return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout.strip()
+        return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout
     # Recorded results and the budget ledger are evidence outputs, not inputs to the tested code.
-    changed = [line for line in run("status", "--porcelain").splitlines()
-               if not line[3:].startswith(("evaluation/results/", "evaluation/ledger/"))]
-    return {"commit": run("rev-parse", "HEAD") or None, "dirty": bool(changed)}
+    # Porcelain lines are "XY path"; never strip the whole output, which would eat the first line's
+    # leading status space and make that path unrecognisable (harness 0.1.0 marked every record dirty).
+    changed = []
+    for line in run("status", "--porcelain", "--untracked-files=all").splitlines():
+        path = line[3:].split(" -> ")[-1].strip('"')
+        if line.strip() and not path.startswith(("evaluation/results/", "evaluation/ledger/")):
+            changed.append(path)
+    return {"commit": run("rev-parse", "HEAD").strip() or None, "dirty": bool(changed), "changed": changed[:20]}
 
 
 def read_attempts(results_dir: str) -> list[dict]:

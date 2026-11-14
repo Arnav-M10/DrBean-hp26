@@ -207,6 +207,34 @@ class AppendOnlyHistory(Base):
         self.assertEqual(history.verify(os.path.join(ROOT, "results")), [])
 
 
+class DirtyFlag(unittest.TestCase):
+    def test_evidence_output_on_the_first_status_line_is_not_dirty(self):
+        """Regression: harness 0.1.0 stripped porcelain output and lost the first line's leading space."""
+        work = tempfile.mkdtemp()
+        try:
+            def git(*args):
+                subprocess.run(["git", "-C", work, *args], check=True, capture_output=True)
+            git("init", "-q")
+            git("config", "user.email", "harness@example.invalid")
+            git("config", "user.name", "harness")
+            os.makedirs(os.path.join(work, "evaluation", "results"))
+            for rel in ("evaluation/results/attempts.jsonl", "code.py"):
+                with open(os.path.join(work, rel), "w", encoding="utf-8") as handle:
+                    handle.write("x\n")
+            git("add", ".")
+            git("commit", "-q", "-m", "init")
+            with open(os.path.join(work, "evaluation/results/attempts.jsonl"), "a", encoding="utf-8") as handle:
+                handle.write("y\n")
+            self.assertFalse(runner.git_state(work)["dirty"])
+            with open(os.path.join(work, "code.py"), "a", encoding="utf-8") as handle:
+                handle.write("y\n")
+            state = runner.git_state(work)
+            self.assertTrue(state["dirty"])
+            self.assertEqual(state["changed"], ["code.py"])
+        finally:
+            shutil.rmtree(work)
+
+
 class Gates(Base):
     def test_absent_evidence_blocks_release_but_inventory_succeeds(self):
         result = gates.compute(ROOT, self.results, "0" * 40, False)

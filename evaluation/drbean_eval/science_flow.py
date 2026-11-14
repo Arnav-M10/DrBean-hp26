@@ -892,7 +892,7 @@ def scenario_cancel_restart(flow: Flow, packet: dict, stack) -> dict:
                       finding="F-ORPHAN" if leftover else None)
     else:
         checks.add("no_orphan_after_cancel", "not_observed",
-                   "no live scientific child process existed at the cancellation point, so the orphan check "
+                   "no sustained scientific computation existed at the cancellation point, so the orphan check "
                    "would be vacuous (for example the child failed immediately)")
     # C. Worker killed mid-run, explicit recovery, no silent redispatch.
     third = _approved_run(flow, packet, workspace, "cx-restart")
@@ -916,7 +916,7 @@ def scenario_cancel_restart(flow: Flow, packet: dict, stack) -> dict:
                               f"alive: {survivors}", finding="F-ORPHAN" if survivors else None)
             else:
                 checks.add("no_orphan_after_worker_kill", "not_observed",
-                           "no live scientific child process existed when the worker was killed; check would be vacuous")
+                           "no sustained scientific computation existed when the worker was killed; check would be vacuous")
             recover = stack.start_worker("--recover")
             recover.wait(timeout=60)
             stack.start_worker()
@@ -969,17 +969,27 @@ def _wait_running(flow: Flow, run_id: str, timeout: float = 20.0) -> bool:
 
 
 def _live_science_children(stack, flow: Flow | None = None, run_id: str | None = None,
-                           timeout: float = 5.0) -> list[int]:
-    """Scientific children alive now; waits briefly because the API marks a scenario running before spawning."""
+                           timeout: float = 5.0, sustain: float = 0.5) -> list[int]:
+    """Scientific children in a *sustained* computation: alive across ``sustain`` seconds while the run is running.
+
+    The API marks a scenario running before it spawns the child, and a child that exits on its own
+    within moments (for example a failed resource setup) proves nothing about cancellation. Only a
+    child observed alive twice, ``sustain`` apart, with the run still running, counts.
+    """
     deadline = time.monotonic() + timeout
-    while True:
+    while time.monotonic() <= deadline:
         stack.snapshot_descendants()
         live = [pid for pid in _science_children(stack) if _alive(pid)]
-        if live or time.monotonic() > deadline:
-            return live
         if flow is not None and run_id and flow.client.get(f"/runs/{run_id}").get("state") in TERMINAL:
             return []
+        if live:
+            time.sleep(sustain)
+            still = [pid for pid in live if _alive(pid)]
+            running = flow is None or not run_id or flow.client.get(f"/runs/{run_id}").get("state") == "running"
+            if still and running:
+                return still
         time.sleep(0.05)
+    return []
 
 
 def _science_children(stack) -> list[int]:
