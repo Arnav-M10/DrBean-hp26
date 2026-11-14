@@ -1,7 +1,6 @@
 {
   "evidence_commits": [
-    "1bc3604d04bf225ba6477b419a54ba67fb1bf9a1",
-    "ae61801ee4d1dc4f2d12b964c5c409e09175aee0"
+    "c51bbaeb10a3857d9116ce779902eb563ec8fabf"
   ],
   "evidence_only_paths": [
     "evaluation/results/",
@@ -22,7 +21,7 @@
       "description": "actual HTTP -> science -> separate design -> raw download -> fresh native replay",
       "entries": {
         "RS-HERO-FULL": {
-          "attempt_id": "att_b6fc5431663f4693",
+          "attempt_id": "att_a759c62ebb444f68",
           "reason": "",
           "status": "passed"
         }
@@ -34,27 +33,27 @@
       "description": "duplicate starts, design authority, cancellation/restart, changed input, follow-up",
       "entries": {
         "RS-CANCEL-RESTART": {
-          "attempt_id": "att_f66513d7ec274c82",
+          "attempt_id": "att_b5cbc882f4f0419c",
           "reason": "",
           "status": "passed"
         },
         "RS-CHANGED-INPUT": {
-          "attempt_id": "att_7be2aa66d50a4db3",
+          "attempt_id": "att_2847977e03144dae",
           "reason": "",
           "status": "passed"
         },
         "RS-DESIGN-AUTHORITY": {
-          "attempt_id": "att_6906808bd0a84750",
+          "attempt_id": "att_13dc13ae78cc4b22",
           "reason": "",
           "status": "passed"
         },
         "RS-FOLLOWUP": {
-          "attempt_id": "att_b23a80e864994363",
+          "attempt_id": "att_d953913334aa4a4f",
           "reason": "",
           "status": "passed"
         },
         "RS-RETRY-CONCURRENT": {
-          "attempt_id": "att_dd4506b7b1ab4d90",
+          "attempt_id": "att_bfde7b3d9ad24415",
           "reason": "",
           "status": "passed"
         }
@@ -66,7 +65,7 @@
       "description": "guard active in API and worker; zero external model attempts in the lane",
       "entries": {
         "RS-ZERO-DISPATCH": {
-          "attempt_id": "att_2a649963d2af498a",
+          "attempt_id": "att_97317168731740b3",
           "reason": "",
           "status": "passed"
         }
@@ -81,7 +80,7 @@
       "gate": "native_engine_controls",
       "missing": [],
       "runs_used": {
-        "2026-11-14T07:10:46+00:00": "1bc3604d04bf225ba6477b419a54ba67fb1bf9a1"
+        "2026-11-14T09:19:55+00:00": "c51bbaeb10a3857d9116ce779902eb563ec8fabf"
       },
       "status": "passed",
       "unqualified": {}
@@ -100,13 +99,73 @@
       "status": "passed"
     },
     {
+      "description": "controlled_callbacks, controlled_science and historical_replay each pass in their newest clean, executed report at the tested source identity (application, harness, fixtures and engine digests); live_gemini is not_run and not required",
+      "gate": "evidence_lanes",
+      "history_problems": [],
+      "lanes": {
+        "controlled_callbacks": {
+          "counts": {
+            "failed": 0,
+            "harness_pending": 0,
+            "not_available": 0,
+            "passed": 81,
+            "skipped": 0,
+            "xfailed": 4
+          },
+          "external_model_requests": "verified_zero",
+          "problems": [],
+          "report_id": "lane_c665b16688cc4bfd",
+          "reports_at_other_identities": 2,
+          "status": "passed"
+        },
+        "controlled_science": {
+          "counts": {
+            "failed": 0,
+            "harness_pending": 0,
+            "not_available": 7,
+            "passed": 17,
+            "skipped": 0,
+            "xfailed": 0
+          },
+          "external_model_requests": "verified_zero",
+          "problems": [],
+          "report_id": "lane_cd2b2834b47b4282",
+          "reports_at_other_identities": 2,
+          "status": "passed"
+        },
+        "historical_replay": {
+          "counts": {
+            "incompatible_version": 1,
+            "replayed": 104
+          },
+          "external_model_requests": "verified_zero",
+          "problems": [],
+          "report_id": "lane_022c22f5f4764cd5",
+          "reports_at_other_identities": 2,
+          "status": "passed"
+        },
+        "live_gemini": {
+          "reason": "not_run: no user-enabled live budget exists for this qualification; no key was inspected and no provider was called. There is deliberately no command here that starts live requests.",
+          "required": false,
+          "status": "not_run"
+        }
+      },
+      "status": "passed",
+      "tested_identity": {
+        "application_tree_sha256": "4cba7f6628cb50afa2d4e5876ed063a2d425c0b71f501690028cffa13286ace8",
+        "engine_source_sha256": "ed5a8fb2216dcf4f0113799bd3e341fc464e204492fa3bc673460dec19777750",
+        "fixtures_tree_sha256": "e7b96d10c6931b014d81a05d635a0b32bd606922bfcb4f10337b132c90bcc602",
+        "harness_tree_sha256": "89efee9e85120ea745ce12c1868c74bef96ecd40eacdbe3130262ff006c132c5"
+      }
+    },
+    {
       "description": "evaluation/findings.json lists no open P0",
       "gate": "no_unresolved_p0",
       "open_p0": [],
       "status": "passed"
     },
     {
-      "description": "NOT a current acceptance gate. Live lanes are disabled; activation needs a new explicit user instruction. Placeholder runs are not Gemini evidence.",
+      "description": "NOT a current acceptance gate. Live requests need the user to enable provider consent and one bounded shared qualification budget; none exists. Controlled placeholder runs are never Gemini evidence.",
       "gate": "live_gemini_qualification",
       "required": false,
       "status": "not_run"
@@ -115,6 +174,6 @@
   "overall": "passed",
   "schema": "drbean-release-gates/v1",
   "statement": "Gates read recorded evidence only; they dispatch no provider or scientific work.",
-  "tested_commit": "ae61801ee4d1dc4f2d12b964c5c409e09175aee0",
+  "tested_commit": "c51bbaeb10a3857d9116ce779902eb563ec8fabf",
   "worktree_dirty": false
 }
