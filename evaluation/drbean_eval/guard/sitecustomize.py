@@ -125,6 +125,36 @@ def _relax_nproc(module) -> None:
     module.apply_limits = relaxed
 
 
+def _science_barrier(module) -> None:
+    """DIAGNOSTIC ONLY (opt-in): deterministic barrier inside the scientific child, after setsid and limits.
+
+    Wraps CounterdexAdapter.investigate/design so a spawned child waits while the harness-owned barrier file
+    exists (at most 120 s). The path is captured at import because the child clears its environment before it
+    calls the adapter. Cancellation and kill handling under test remain the product's own code.
+    """
+    barrier = os.environ.get("DRBEAN_DIAGNOSTIC_BARRIER")
+    adapter = getattr(module, "CounterdexAdapter", None)
+    if not barrier or adapter is None or getattr(adapter, "_drbean_barrier", False):
+        return
+
+    def hold(method):
+        def wrapped(self, *args, **kwargs):
+            started = time.time()
+            if os.path.exists(barrier):
+                _record("diagnostic_barrier_wait", method=method.__name__)
+                while os.path.exists(barrier) and time.time() - started < 120:
+                    time.sleep(0.05)
+                _record("diagnostic_barrier_released", method=method.__name__, waited=round(time.time() - started, 3))
+            return method(self, *args, **kwargs)
+        wrapped.__name__ = method.__name__
+        return wrapped
+
+    for name in ("investigate", "design"):
+        if hasattr(adapter, name):
+            setattr(adapter, name, hold(getattr(adapter, name)))
+    adapter._drbean_barrier = True
+
+
 class _WrapAfterImport:
     """Meta-path finder that patches google.genai.client once Python finishes loading it."""
     targets = {"google.genai.client": _wrap_client}
@@ -166,6 +196,9 @@ def install(log_path: str | None) -> bool:
     if "relax_nproc" in overrides:
         _WrapAfterImport.targets = {**_WrapAfterImport.targets, "bean_api.science": _relax_nproc}
         _record("diagnostic_override_enabled", override="relax_nproc")
+    if "science_barrier" in overrides:
+        _WrapAfterImport.targets = {**_WrapAfterImport.targets, "bean_api.counterdex_adapter": _science_barrier}
+        _record("diagnostic_override_enabled", override="science_barrier")
     sys.meta_path.insert(0, _WrapAfterImport())
     if "google.genai.client" in sys.modules:
         _wrap_client(sys.modules["google.genai.client"])

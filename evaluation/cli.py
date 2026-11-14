@@ -82,7 +82,7 @@ def main(argv=None) -> int:
                      help="non-credential BEAN_* setting passed to the launched test stack (repeatable)")
     run.add_argument("--app-repo", help="preview another checkout (e.g. a teammate worktree) as the application "
                      "under test; recorded as preview evidence, never acceptance; requires --results")
-    run.add_argument("--diagnostic", action="append", default=[], choices=("relax_nproc",),
+    run.add_argument("--diagnostic", action="append", default=[], choices=("relax_nproc", "science_barrier"),
                      help="DIAGNOSTIC: relax one named product guard to observe downstream behaviour; never "
                           "acceptance; requires --results")
     controls = sub.add_parser("controls")

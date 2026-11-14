@@ -42,7 +42,7 @@ REVIEWER = "eval-reviewer"
 OTHER_ACTOR = "eval-other-workspace"
 DUMMY_VALUE = re.compile(r"^DRBEAN-DUMMY-[A-Z0-9-]{4,64}$")
 # Opt-in diagnostics that relax one named product guard to observe downstream behaviour. Never acceptance evidence.
-DIAGNOSTIC_OVERRIDES = {"relax_nproc"}
+DIAGNOSTIC_OVERRIDES = {"relax_nproc", "science_barrier"}
 _CREDENTIAL_NAME = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|^GEMINI_|^GOOGLE_|^LANGSMITH_|^LANGCHAIN_)")
 # Non-credential configuration a teammate's stack may legitimately need.
 _PASSTHROUGH = re.compile(r"^BEAN_[A-Z0-9_]+$")
@@ -145,6 +145,7 @@ class LocalStack:
         self.database = os.path.join(self.workdir, "state", "bean.sqlite3")
         self.blob_dir = os.path.join(self.workdir, "state", "sources")
         self.artifact_dir = os.path.join(self.workdir, "state", "artifacts")
+        self.barrier_path = os.path.join(self.workdir, "science.barrier")
         try:  # Owner 2's declared runtime selection: an absolute, operator-chosen CPython 3.11
             self.counterdex_python = science_python(self.repo)
         except StackError:
@@ -200,6 +201,8 @@ class LocalStack:
             env["BEAN_COUNTERDEX_PYTHON"] = self.counterdex_python
         if self.diagnostic_overrides:
             env["DRBEAN_DIAGNOSTIC_OVERRIDES"] = ",".join(self.diagnostic_overrides)
+        if "science_barrier" in self.diagnostic_overrides:
+            env["DRBEAN_DIAGNOSTIC_BARRIER"] = self.barrier_path
         env.update(self.extra_env)
         return env
 
@@ -262,6 +265,21 @@ class LocalStack:
                 raise StackError("worker did not take the SQLite worker lock before the startup deadline")
             time.sleep(0.2)
         return process
+
+    @property
+    def has_barrier(self) -> bool:
+        return "science_barrier" in self.diagnostic_overrides
+
+    def hold_barrier(self) -> None:
+        """Diagnostic: scientific children started from now on wait inside the adapter until released."""
+        with open(self.barrier_path, "w", encoding="utf-8") as handle:
+            handle.write("held by the evaluation harness\n")
+
+    def release_barrier(self) -> None:
+        try:
+            os.unlink(self.barrier_path)
+        except FileNotFoundError:
+            pass
 
     def worker_holds_lock(self) -> bool:
         path = os.path.realpath(self.database) + ".worker.lock"

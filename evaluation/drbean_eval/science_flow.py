@@ -1022,7 +1022,20 @@ def scenario_cancel_restart(flow: Flow, packet: dict, stack) -> dict:
     checks.expect("queued_cancel_acknowledged_without_science", final.get("state") == "cancelled"
                   and not final.get("scenarios"), f"state {final.get('state')}, {len(final.get('scenarios', []))} "
                   "scenario reservation(s)")
-    # B. Running cancellation through the API.
+    # B. Running cancellation through the API. With the diagnostic barrier the scientific child is held inside
+    # the adapter (after setsid and limits), so "running" is deterministic instead of a timing race.
+    barrier = bool(getattr(stack, "has_barrier", False))
+    observation["deterministic_barrier"] = barrier
+    if barrier:
+        stack.hold_barrier()
+    try:
+        return _cancel_running_and_restart(flow, packet, stack, workspace, checks, observation, queued)
+    finally:
+        if barrier:
+            stack.release_barrier()
+
+
+def _cancel_running_and_restart(flow, packet, stack, workspace, checks, observation, queued) -> dict:
     running = _approved_run(flow, packet, workspace, "cx-running")
     observed = _wait_running(flow, running["id"])
     live_before = _live_science_children(stack, flow, running["id"]) if observed else []
