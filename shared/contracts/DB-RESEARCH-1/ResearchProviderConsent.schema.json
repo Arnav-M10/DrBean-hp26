@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "model": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "expected_context_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Expected Context Digest",
+      "type": "string"
+    },
+    "accepted": {
+      "const": true,
+      "title": "Accepted",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "model",
+    "expected_context_digest",
+    "accepted"
+  ],
+  "title": "ResearchProviderConsent",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-RESEARCH-1:ResearchProviderConsent"
+}

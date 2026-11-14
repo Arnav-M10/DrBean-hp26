@@ -1,0 +1,171 @@
+{
+  "$defs": {
+    "AllowanceOrigin": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "hypothetical",
+            "reviewed_hard_bound"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "description"
+      ],
+      "title": "AllowanceOrigin",
+      "type": "object"
+    },
+    "ResearchDesignConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "feasible_times": {
+          "items": {
+            "maxLength": 514,
+            "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Feasible Times",
+          "type": "array"
+        },
+        "future_hard_allowance": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Future Hard Allowance",
+          "type": "string"
+        },
+        "maximum_horizon": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Maximum Horizon",
+          "type": "string"
+        },
+        "allowance_origin": {
+          "$ref": "#/$defs/AllowanceOrigin"
+        },
+        "requested_tier": {
+          "enum": [
+            "numerical_guidance",
+            "checked_pair_separation"
+          ],
+          "title": "Requested Tier",
+          "type": "string"
+        },
+        "allow_construction": {
+          "default": false,
+          "title": "Allow Construction",
+          "type": "boolean"
+        },
+        "allow_continuation": {
+          "default": false,
+          "title": "Allow Continuation",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "feasible_times",
+        "future_hard_allowance",
+        "maximum_horizon",
+        "allowance_origin",
+        "requested_tier"
+      ],
+      "title": "ResearchDesignConstraints",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "expected_revision": {
+      "minimum": 0,
+      "title": "Expected Revision",
+      "type": "integer"
+    },
+    "pending_review_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Pending Review Id",
+      "type": "string"
+    },
+    "expected_review_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Expected Review Digest",
+      "type": "string"
+    },
+    "accepted": {
+      "const": true,
+      "title": "Accepted",
+      "type": "boolean"
+    },
+    "problem_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Problem Id"
+    },
+    "expected_problem_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Problem Digest"
+    },
+    "design_constraints": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResearchDesignConstraints"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "answers": {
+      "additionalProperties": {
+        "maxLength": 2000,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxProperties": 16,
+      "title": "Answers",
+      "type": "object"
+    }
+  },
+  "required": [
+    "expected_revision",
+    "pending_review_id",
+    "expected_review_digest",
+    "accepted"
+  ],
+  "title": "ResearchInputReview",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-RESEARCH-1:ResearchInputReview"
+}

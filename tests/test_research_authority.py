@@ -202,7 +202,7 @@ def test_migration_preserves_existing_records_and_repeat_start(research):
     reopened = ResearchService(Workflow(Store(service.store.path)))
     assert reopened.get("alice", session["id"]) == session
     with reopened.store.read() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == Store.SCHEMA_VERSION
 
 
 def test_published_valid_refused_examples_and_producer_fixture():
@@ -217,3 +217,33 @@ def test_published_valid_refused_examples_and_producer_fixture():
     fixture = json.loads((root / "event-plan.fixture.json").read_text())
     ResearchEvent.model_validate(fixture["event"])
     ResearchPlanRevision.model_validate(fixture["plan"])
+
+
+def test_human_input_adoption_queues_advance_and_does_not_approve_science(research):
+    service, context, ports = acquired(research)
+    pending = run(ports.request_clarification(["design_constraints"], "Which future times and hard allowance are feasible?"))
+    service.release(context, "waiting_review")
+    current = service.get("alice", context.research_session_id)
+    body = {"expected_revision": current["revision"], "pending_review_id": pending["id"], "expected_review_digest": pending["review_digest"], "accepted": True,
+        "design_constraints": {"feasible_times": ["6/1"], "future_hard_allowance": "1/5", "maximum_horizon": "8/1",
+            "allowance_origin": {"kind": "hypothetical", "description": "Researcher-reviewed prospective bound"}, "requested_tier": "numerical_guidance"},
+        "answers": {"sampling_window": "The instrument is available after six elapsed hours."}}
+    adopted = service.adopt_inputs("alice", current["id"], body, "answer")
+    assert service.adopt_inputs("alice", current["id"], body, "answer") == adopted
+    with service.store.read() as conn:
+        action = service._action(conn, "alice", adopted["action"]["id"])
+        assert action["resume_required"] == 0
+        assert conn.execute("SELECT count(*) FROM approvals").fetchone()[0] == 0
+    next_context = service.acquire("alice", adopted["action"]["id"], "new-input-worker")
+    actual = run(ApplicationResearchPorts(service, next_context).context())
+    assert actual["design_constraints"]["feasible_times"] == ["6/1"]
+    assert actual["reviewed_context"]["input_reviews"][0]["body"]["answers"] == body["answers"]
+    assert actual["reviewed_context"]["input_reviews"][0]["body"]["execution_approved"] is False
+
+
+def test_revoked_membership_blocks_saved_research_and_checkpoint_history(research):
+    service, context, _ = acquired(research)
+    with service.store.transaction() as conn:
+        conn.execute("DELETE FROM memberships WHERE actor_id='alice'")
+    code("not_found", lambda: service.get("alice", context.research_session_id))
+    code("not_found", lambda: ResearchCheckpointer(service, context).get_tuple({"configurable": {"thread_id": context.thread_id}}))

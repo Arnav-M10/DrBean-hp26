@@ -25,8 +25,11 @@ class Settings:
     shared_gateway_file: str | None = None
     browser_session_ttl_seconds: int = 86400
     browser_session_capacity: int = 4096
+    research_mode: str = "controlled"
 
     def __post_init__(self):
+        if self.research_mode not in {"disabled", "controlled", "live"}:
+            raise ValueError("Research mode must be disabled, controlled or live")
         if self.source_intake_mode not in {"disabled", "controlled", "live"}:
             raise ValueError("Source intake mode must be disabled, controlled or live")
         if self.source_intake_mode == "controlled" and not self.controlled_source_manifest_path:
@@ -56,6 +59,7 @@ class Settings:
             counterdex_python=os.getenv("BEAN_COUNTERDEX_PYTHON", "python3.11"),
             source_intake_mode=os.getenv("BEAN_SOURCE_INTAKE_MODE", "disabled"),
             controlled_source_manifest_path=os.getenv("BEAN_CONTROLLED_SOURCE_MANIFEST"),
+            research_mode=os.getenv("BEAN_RESEARCH_MODE", "controlled"),
             shared_gateway_file=os.getenv("BEAN_SHARE_GATEWAY_FILE", str(Path(os.getenv("BEAN_DATABASE_PATH", "var/bean.sqlite3")).parent / "share-gateway.json")) or None,
             allowed_origins=tuple(
                 origin.strip() for origin in os.getenv(

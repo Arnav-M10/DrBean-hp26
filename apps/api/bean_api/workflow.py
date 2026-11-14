@@ -246,17 +246,23 @@ class Workflow:
         from .contracts import ProblemBody
         body = ProblemBody.model_validate(_body(body)).model_dump(mode="json")
         def action(conn: sqlite3.Connection) -> dict:
-            dataset = self._get(conn, actor, body["dataset_id"], "dataset")
-            self._same_workspace(workspace_id, dataset)
-            current = self.authorize(actor, workspace_id, conn)
-            if current["current_dataset_id"] != dataset["id"]:
-                raise DomainError("stale_revision", "Review the current dataset before creating a problem.", current_revision_id=current["current_dataset_id"])
-            if body["dataset_digest"] != dataset["digest"]:
-                raise DomainError("binding_mismatch", "The dataset digest does not match the reviewed record.", 422, ["dataset_digest"])
-            result = self._insert(conn, actor, workspace_id, "problem", body)
-            conn.execute("UPDATE workspaces SET current_problem_id=? WHERE id=?", (result["id"], workspace_id))
-            return result
+            return self._create_problem_in_transaction(conn, actor, workspace_id, body)
         return self._perform(actor, workspace_id, "create:problem", key, body, action)
+
+    def _create_problem_in_transaction(self, conn, actor, workspace_id, body):
+        """Canonical data review reusable under an atomic application boundary."""
+        from .contracts import ProblemBody
+        body = ProblemBody.model_validate(_body(body)).model_dump(mode="json")
+        dataset = self._get(conn, actor, body["dataset_id"], "dataset")
+        self._same_workspace(workspace_id, dataset)
+        current = self.authorize(actor, workspace_id, conn)
+        if current["current_dataset_id"] != dataset["id"]:
+            raise DomainError("stale_revision", "Review the current dataset before creating a problem.", current_revision_id=current["current_dataset_id"])
+        if body["dataset_digest"] != dataset["digest"]:
+            raise DomainError("binding_mismatch", "The dataset digest does not match the reviewed record.", 422, ["dataset_digest"])
+        result = self._insert(conn, actor, workspace_id, "problem", body)
+        conn.execute("UPDATE workspaces SET current_problem_id=? WHERE id=?", (result["id"], workspace_id))
+        return result
 
     def create_plan(self, actor: str, workspace_id: str, body: dict, key: str) -> dict:
         from .contracts import PlanBody
@@ -823,46 +829,59 @@ class Workflow:
         from .contracts import ObservationProposalBody
         body = ObservationProposalBody.model_validate(_body(body)).model_dump(mode="json")
         def action(conn: sqlite3.Connection) -> dict:
-            dataset = self._get(conn, actor, body["dataset_id"], "dataset")
-            self._same_workspace(workspace_id, dataset)
-            if dataset["body"]["experiment_id"] != body["experiment_id"]:
-                raise DomainError("experiment_mismatch", "The observation must name its parent experiment.", 422)
-            if any(row["id"] == body["row"]["id"] for row in dataset["body"]["rows"]):
-                raise DomainError("duplicate_row", "An observation needs a new row identity.", 422, ["row.id"])
-            source_id = body["row"].get("source_asset_id")
-            if source_id:
-                self._same_workspace(workspace_id, self._get(conn, actor, source_id, "source_asset"))
-                raise DomainError("source_review_required", "Source-derived observations must be materialized from an exact intake review.", 422, ["row.source_asset_id"])
-            return self._insert(conn, actor, workspace_id, "observation_proposal", body, dataset["id"])
+            return self._create_observation_proposal_in_transaction(conn, actor, workspace_id, body)
         return self._perform(actor, workspace_id, "create:observation-proposal", key, body, action)
 
+    def _create_observation_proposal_in_transaction(self, conn, actor, workspace_id, body):
+        """Canonical data review reusable under an atomic application boundary."""
+        from .contracts import ObservationProposalBody
+        body = ObservationProposalBody.model_validate(_body(body)).model_dump(mode="json")
+        dataset = self._get(conn, actor, body["dataset_id"], "dataset")
+        self._same_workspace(workspace_id, dataset)
+        if dataset["body"]["experiment_id"] != body["experiment_id"]:
+            raise DomainError("experiment_mismatch", "The observation must name its parent experiment.", 422)
+        if any(row["id"] == body["row"]["id"] for row in dataset["body"]["rows"]):
+            raise DomainError("duplicate_row", "An observation needs a new row identity.", 422, ["row.id"])
+        source_id = body["row"].get("source_asset_id")
+        if source_id:
+            self._same_workspace(workspace_id, self._get(conn, actor, source_id, "source_asset"))
+            raise DomainError("source_review_required", "Source-derived observations must be materialized from an exact intake review.", 422, ["row.source_asset_id"])
+        return self._insert(conn, actor, workspace_id, "observation_proposal", body, dataset["id"])
+
     def review_observation(self, actor: str, proposal_id: str, body: dict, key: str) -> dict:
-        from .contracts import DatasetBody, ObservationReviewRequest
+        from .contracts import ObservationReviewRequest
         review = ObservationReviewRequest.model_validate(_body(body)).model_dump(mode="json")
         proposal = self.get(actor, proposal_id, "observation_proposal")
         def action(conn: sqlite3.Connection) -> dict:
-            frozen = self._get(conn, actor, proposal_id, "observation_proposal")
-            if review["proposal_digest"] != frozen["digest"] or review["parent_dataset_id"] != frozen["body"]["dataset_id"]:
-                raise DomainError("binding_mismatch", "Review must confirm this exact proposal and parent dataset.", 422)
-            if frozen["body"]["row"].get("source_asset_id"):
-                raise DomainError("source_review_required", "Source-derived observations must be materialized from an exact intake review.", 422, ["row.source_asset_id"])
-            dataset = self._get(conn, actor, review["parent_dataset_id"], "dataset")
-            current = self.authorize(actor, proposal["workspace_id"], conn)
-            if current["current_dataset_id"] != dataset["id"]:
-                raise DomainError("stale_revision", "The dataset changed while this observation was awaiting review.", current_revision_id=current["current_dataset_id"])
-            # Persist source/generator provenance on the immutable proposal. The new
-            # dataset links to that accepted proposal through a separate review record.
-            origin = "hypothetical" if frozen["body"]["origin"] == "hypothetical" or dataset["body"]["origin"] == "hypothetical" else dataset["body"]["origin"]
-            revised = DatasetBody.model_validate({**dataset["body"], "parent_id": dataset["id"],
-                "rows": [*dataset["body"]["rows"], frozen["body"]["row"]], "origin": origin,
-                "change_reason": frozen["body"]["change_reason"]}).model_dump(mode="json")
-            result = self._insert(conn, actor, proposal["workspace_id"], "dataset", revised, dataset["id"])
-            self._insert(conn, actor, proposal["workspace_id"], "observation_review", {
-                "proposal_id": proposal_id, "proposal_digest": frozen["digest"], "dataset_id": result["id"],
-                "dataset_digest": result["digest"], "accepted": True}, proposal_id)
-            conn.execute("UPDATE workspaces SET current_dataset_id=?,current_problem_id=NULL WHERE id=?", (result["id"], proposal["workspace_id"]))
-            return result
+            return self._review_observation_in_transaction(conn, actor, proposal_id, review)
         return self._perform(actor, proposal["workspace_id"], f"review:observation:{proposal_id}", key, review, action)
+
+    def _review_observation_in_transaction(self, conn, actor, proposal_id, review):
+        """Canonical data review reusable under an atomic application boundary."""
+        from .contracts import DatasetBody, ObservationReviewRequest
+        review = ObservationReviewRequest.model_validate(_body(review)).model_dump(mode="json")
+        proposal = self._get(conn, actor, proposal_id, "observation_proposal")
+        frozen = self._get(conn, actor, proposal_id, "observation_proposal")
+        if review["proposal_digest"] != frozen["digest"] or review["parent_dataset_id"] != frozen["body"]["dataset_id"]:
+            raise DomainError("binding_mismatch", "Review must confirm this exact proposal and parent dataset.", 422)
+        if frozen["body"]["row"].get("source_asset_id"):
+            raise DomainError("source_review_required", "Source-derived observations must be materialized from an exact intake review.", 422, ["row.source_asset_id"])
+        dataset = self._get(conn, actor, review["parent_dataset_id"], "dataset")
+        current = self.authorize(actor, proposal["workspace_id"], conn)
+        if current["current_dataset_id"] != dataset["id"]:
+            raise DomainError("stale_revision", "The dataset changed while this observation was awaiting review.", current_revision_id=current["current_dataset_id"])
+        # Persist source/generator provenance on the immutable proposal. The new
+        # dataset links to that accepted proposal through a separate review record.
+        origin = "hypothetical" if frozen["body"]["origin"] == "hypothetical" or dataset["body"]["origin"] == "hypothetical" else dataset["body"]["origin"]
+        revised = DatasetBody.model_validate({**dataset["body"], "parent_id": dataset["id"],
+            "rows": [*dataset["body"]["rows"], frozen["body"]["row"]], "origin": origin,
+            "change_reason": frozen["body"]["change_reason"]}).model_dump(mode="json")
+        result = self._insert(conn, actor, proposal["workspace_id"], "dataset", revised, dataset["id"])
+        self._insert(conn, actor, proposal["workspace_id"], "observation_review", {
+            "proposal_id": proposal_id, "proposal_digest": frozen["digest"], "dataset_id": result["id"],
+            "dataset_digest": result["digest"], "accepted": True}, proposal_id)
+        conn.execute("UPDATE workspaces SET current_dataset_id=?,current_problem_id=NULL WHERE id=?", (result["id"], proposal["workspace_id"]))
+        return result
 
     def metrics(self, actor: str, workspace_id: str) -> dict:
         """Operational analytics only; never a source of scientific input values."""

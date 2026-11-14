@@ -15,13 +15,24 @@ LangGraph 1.2.21/checkpoint 4.3.1. Isolated worktree; old dirty prototypes prese
   canonical approval + admitted resume in one transaction; journaled child intent
   and atomic canonical reservation/link; tenant-authorized bounded JSON checkpoints.
   No executable imports/pickle on decode. Unknown provider outcomes are retained.
-- Tested in this slice: `pytest -q tests/test_research_authority.py
-  tests/test_workflow.py`: **40 passed** (12 new authority/checkpoint controls,
-  28 preserved workflow controls). Genuine LangGraph interrupt/reconstruction is
-  component evidence; fresh-process/browser/real-science acceptance is still pending.
+- Tested: focused graph/application/ledger/native set **189 passed** under C's
+  egress guard (`/tmp/bean-B-core.log`), before the last two input/revocation
+  controls. Existing real baseline/design/follow-up workflow **19 passed**.
+  New B authority loop **2 passed**, including 3 fresh native replays, report
+  revision/immutability, changed design scope and genuine no separation.
+  These are component/backend checks, not browser or release qualification.
 - A supplied PR42 at63357c0: actual graph + exact async application adapter.
-  Next: match canonical response shapes, wire actual worker/factory, then complete
-  the real baseline/design/new-reading/recheck/report/browser loop.
+  Actual main routes and Worker now use that factory + B's disk saver/journal.
+  New input adoption uses graph advance; scientific decisions use true resume.
+  Separate observation review materializes exact inputs without approving recheck.
+- Current dependency A: production zero-provider full-loop model factory
+  `research_controlled.build_controlled_research_model` and trusted pending-tool
+  recovery (requested on PR42). Default capability remains honestly unavailable
+  while that factory is absent. B continues UI/producer integration independently.
+- Metered live wiring uses A's single gateway and B's atomic session/action/global
+  admission; default allocation0, explicit operator-only grant method (no browser
+  allocation route), scope-bound consent, unknown outcomes stay reserved. Offline
+  substituted-transport checks pass. Live qualification remains **not_run**.
 - Producer #40 now exists: inspect/reuse/register it and cross-review its carried
   parsing/citation/resource code; it is no longer a departed-owner dependency.
 - Larger-paper profile and delegates follow the durable parent/real-child loop.

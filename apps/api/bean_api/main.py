@@ -148,6 +148,10 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
         return JSONResponse(error_body(request.state.request_id, "provider_budget_exhausted",
                                        "The shared provider budget cannot admit this request. Continue manually."), status_code=409)
 
+    from .research_routes import register_research_routes
+    from .research_runtime import research_capabilities
+    register_research_routes(app)
+
     @app.get("/healthz")
     def health():
         return {"service": "dr-bean", "status": "api_reachable", "contract_version": "DB-SC-1",
@@ -174,9 +178,7 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
                 "science": adapter.capabilities(),
                 "ai_mode": "live_opt_in" if live_dispatch else "controlled_placeholder" if controlled_source_proposer else "disabled_placeholder",
                 "gemini": provider_capabilities,
-                "deepagents": {"implemented": True, "configured": False, "dispatch_enabled": False,
-                               "execution_mode": "controlled_only", "unavailable_reason": "live_coordinator_not_integrated",
-                               "reachable": None, "verified_in_environment": False},
+                "deepagents": research_capabilities(settings, provider_config),
                 "transport": {"web": True, "photon": False}}
 
     @app.post(PREFIX + "/exact/decimal")

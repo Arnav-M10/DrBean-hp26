@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, Protocol
 
 from pydantic import Field, StringConstraints, model_validator
 
-from .contracts import AllowanceOrigin, Digest, ExplicitTrue, Identifier, Rational, StrictModel
+from .contracts import AllowanceOrigin, Digest, ExplicitTrue, Identifier, ObservationProposalBody, Rational, StrictModel
 
 RESEARCH_VERSION = "DB-RESEARCH-1"
 CHECKPOINT_VERSION = "research-checkpoint.v1"
@@ -83,6 +83,49 @@ class ResearchDecision(StrictModel):
 class ResearchReconcile(StrictModel):
     expected_revision: int = Field(ge=0)
     acknowledged_unknown_outcome: ExplicitTrue
+
+
+class ResearchObservation(StrictModel):
+    expected_revision: int = Field(ge=0)
+    pending_review_id: Identifier
+    expected_review_digest: Digest
+    observation: ObservationProposalBody
+    accepted: ExplicitTrue
+
+
+class ResearchInputReview(StrictModel):
+    expected_revision: int = Field(ge=0)
+    pending_review_id: Identifier
+    expected_review_digest: Digest
+    accepted: ExplicitTrue
+    problem_id: Identifier | None = None
+    expected_problem_digest: Digest | None = None
+    design_constraints: ResearchDesignConstraints | None = None
+    answers: dict[str, Annotated[str, StringConstraints(min_length=1, max_length=2000)]] = Field(default_factory=dict, max_length=16)
+
+    @model_validator(mode="after")
+    def exact_inputs(self):
+        if bool(self.problem_id) != bool(self.expected_problem_digest):
+            raise ValueError("Problem identity and digest must be supplied together")
+        if not self.problem_id and self.design_constraints is None and not self.answers:
+            raise ValueError("Supply a reviewed input or clarification answer")
+        if any(not key or len(key) > 128 for key in self.answers):
+            raise ValueError("Answer field names must be bounded")
+        return self
+
+
+class ResearchProviderConsent(StrictModel):
+    model: Annotated[str, StringConstraints(min_length=1, max_length=128)]
+    expected_context_digest: Digest
+    accepted: ExplicitTrue
+
+
+class ResearchProviderAllocation(StrictModel):
+    policy_version: Literal["research-allocation.v1"] = "research-allocation.v1"
+    physical_requests: int = Field(ge=1, le=8)
+    input_tokens: int = Field(ge=1, le=64_000)
+    output_tokens: int = Field(ge=1, le=16_000)
+    accepted: ExplicitTrue
 
 
 class ResearchPlanStep(StrictModel):
@@ -171,6 +214,7 @@ class ResearchPorts(Protocol):
 
 
 PUBLIC_RESEARCH_SCHEMAS = {model.__name__: model for model in (
-    ResearchBudget, ResearchCreate, ResearchAdvance, ResearchDecision, ResearchReconcile, ResearchDesignConstraints,
+    ResearchBudget, ResearchCreate, ResearchAdvance, ResearchDecision, ResearchReconcile, ResearchDesignConstraints, ResearchObservation, ResearchInputReview,
+    ResearchProviderConsent, ResearchProviderAllocation,
     ResearchPlanStep, ResearchPlanRevision, ResearchEvent,
 )}

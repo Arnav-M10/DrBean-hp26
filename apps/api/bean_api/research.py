@@ -12,7 +12,8 @@ import time
 from .research_contracts import (
     ACTION_POLICY, CHECKPOINT_VERSION, RESEARCH_VERSION, ResearchAdvance,
     ResearchBudget, ResearchCreate, ResearchDecision, ResearchEvent,
-    ResearchPlanRevision, ResearchReconcile, ResearchRuntimeContext,
+    ResearchInputReview, ResearchObservation, ResearchPlanRevision, ResearchProviderAllocation, ResearchProviderConsent,
+    ResearchReconcile, ResearchRuntimeContext,
 )
 from .store import utc_now
 from .workflow import DomainError, _hash, _id, _json
@@ -23,9 +24,10 @@ ENDED = {"completed", "failed", "cancelled"}
 
 
 class ResearchService:
-    def __init__(self, workflow, *, graph_version=GRAPH_VERSION, live_enabled=False):
+    def __init__(self, workflow, *, graph_version=GRAPH_VERSION, live_enabled=False, allocation_actor=None):
         self.workflow, self.store = workflow, workflow.store
         self.graph_version, self.live_enabled = graph_version, live_enabled
+        self.allocation_actor = allocation_actor
 
     def _session(self, conn, actor, session_id):
         row = conn.execute("SELECT * FROM research_sessions WHERE id=?", (session_id,)).fetchone()
@@ -75,7 +77,19 @@ class ResearchService:
             "approval_id": approval_id, "decision": decision, "scope": {"plan_id": record["id"], "plan_digest": record["digest"],
                 "input_digest": _hash(self.root_context(conn, session))}}
 
-    def _event(self, conn, session, event_type, summary="", references=(), action_id=None):
+    def provider_scope(self, conn, session):
+        input_ids = [row[0] for row in conn.execute("SELECT id FROM entities WHERE workspace_id=? AND kind IN ('research_input_review','research_observation_acceptance') AND json_extract(body,'$.research_session_id')=? ORDER BY rowid", (session["workspace_id"], session["id"]))]
+        fields = ["research_objective", "reviewed_inputs", "research_plan", "retained_evidence", "source_references"]
+        body = {"research_session_id": session["id"], "root_input_digest": _hash(self.root_context(conn, session)),
+            "problem_id": session["problem_id"], "problem_digest": session["problem_digest"], "accepted_input_ids": input_ids,
+            "source_digests": [ref["sha256"] for ref in json.loads(session["source_refs"])], "context_fields": fields}
+        return {**body, "context_digest": _hash(body)}
+
+    def _event(self, conn, session, event_type, summary="", references=(), action_id=None, observation_key=None):
+        if observation_key:
+            existing = conn.execute("SELECT e.body FROM research_events e JOIN research_event_observations o ON o.event_id=e.id WHERE o.session_id=? AND o.observation_key=?", (session["id"], observation_key)).fetchone()
+            if existing:
+                return json.loads(existing[0])
         references = list(dict.fromkeys(references))
         for reference in references:
             # Only canonical same-workspace references, never arbitrary model text.
@@ -89,7 +103,19 @@ class ResearchService:
             action_id=action_id, event_type=event_type, timestamp=utc_now(), mode=session["mode"],
             summary=summary, reference_ids=references).model_dump(mode="json")
         conn.execute("INSERT INTO research_events VALUES (?,?,?,?,?)", (event["event_id"], session["id"], action_id, sequence, _json(event)))
+        if observation_key:
+            conn.execute("INSERT INTO research_event_observations VALUES (?,?,?)", (session["id"], observation_key, event["event_id"]))
         return event
+
+    def observe(self, context, event):
+        if (set(event) != {"event_type", "action_id", "mode", "summary", "reference_ids", "observation_key"}
+                or event["action_id"] != context.action_id or event["mode"] != context.mode
+                or not isinstance(event["observation_key"], str) or len(event["observation_key"]) != 64):
+            raise DomainError("invalid_research_event", "Only a bounded current-action event is accepted.", 422)
+        with self.store.transaction() as conn:
+            session, _ = self.assert_lease(conn, context)
+            return self._event(conn, session, event["event_type"], event["summary"], event["reference_ids"],
+                context.action_id, context.action_id + ":" + event["observation_key"])
 
     def _public(self, conn, session):
         creation = self.workflow._get(conn, session["actor_id"], session["id"], "research_session")
@@ -107,10 +133,14 @@ class ResearchService:
             "objective": creation["body"]["objective"], "mode": session["mode"], "state": session["state"], "revision": session["revision"],
             "problem_id": session["problem_id"], "problem_digest": session["problem_digest"],
             "sources": json.loads(session["source_refs"]), "plan": plan,
+            "reviewed_context": self.root_context(conn, session),
             "pending_review": review, "pending_review_digest": session["pending_review_digest"],
             "action": action, "children": children,
             "usage": {key: session[key] for key in ("logical_turns", "tool_calls", "child_count", "physical_calls")},
             "session_limits": SESSION_LIMITS, "graph_version": session["graph_version"],
+            "reports": [row[0] for row in conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind='report' ORDER BY created_at,id", (session["id"],))],
+            "provider_disclosure": self.provider_scope(conn, session),
+            "provider_allocation": {"physical_requests": session["physical_allocation"], "input_tokens": session["input_allocation"], "output_tokens": session["output_allocation"]},
             "checkpoint_version": session["checkpoint_version"], "policy_version": session["policy_version"],
             "created_at": session["created_at"], "updated_at": session["updated_at"]}
 
@@ -145,10 +175,7 @@ class ResearchService:
                     raise DomainError("unsupported_source", "This source has no admitted original-file binding. Use manual review.", 422)
                 refs.append({"id": source_id, "sha256": source["body"]["sha256"]})
             if request["provider_consent_id"]:
-                consent = self.workflow._get(conn, actor, request["provider_consent_id"], "provider_consent")
-                self.workflow._same_workspace(workspace_id, consent)
-                if consent["created_by"] != actor or consent["body"].get("accepted") is not True or consent["body"].get("problem_id") != request["problem_id"]:
-                    raise DomainError("provider_consent_mismatch", "Consent must cover this reviewed problem and actor.", 403)
+                raise DomainError("research_consent_required", "Create the research session, then separately consent to its exact provider disclosure.", 422)
             creation = self.workflow._insert(conn, actor, workspace_id, "research_session", request)
             now = utc_now()
             conn.execute("INSERT INTO research_sessions(id,workspace_id,actor_id,mode,thread_id,graph_version,checkpoint_version,policy_version,problem_id,problem_digest,input_heads,source_refs,consent_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -157,6 +184,40 @@ class ResearchService:
                  _json({key: workspace[key] for key in ("current_dataset_id", "current_problem_id")}), _json(refs), request["provider_consent_id"], now, now))
             return self._public(conn, self._session(conn, actor, creation["id"]))
         return self.workflow._perform(actor, workspace_id, "create:research", key, request, create)
+
+    def consent(self, actor, session_id, request, key):
+        request = ResearchProviderConsent.model_validate(request).model_dump(mode="json")
+        known = self.get(actor, session_id)
+        def consent(conn):
+            session = self._session(conn, actor, session_id)
+            scope = self.provider_scope(conn, session)
+            if scope["context_digest"] != request["expected_context_digest"]:
+                raise DomainError("provider_consent_mismatch", "Review the current exact source/input disclosure.", 409)
+            if session["state"] in ENDED or session["state"] == "running":
+                raise DomainError("research_consent_unavailable", "Consent must precede active dispatch.", 409)
+            record = self.workflow._insert(conn, actor, session["workspace_id"], "research_provider_consent", {
+                **scope, "input_digest": scope["root_input_digest"], "model": request["model"], "accepted": True,
+                "free_tier_only": True, "billing_verified": False, "execution_approved": False}, session["id"])
+            conn.execute("UPDATE research_sessions SET consent_id=? WHERE id=?", (record["id"], session_id))
+            return record
+        return self.workflow._perform(actor, known["workspace_id"], "consent:research:" + session_id, key, request, consent)
+
+    def allocate_provider(self, actor, session_id, request, key):
+        """Explicit operator-only grant; no browser route or automatic allocation."""
+        if self.allocation_actor is None or actor != self.allocation_actor:
+            raise DomainError("research_allocation_operator_required", "Provider capacity is not granted by a browser session or model.", 403)
+        request = ResearchProviderAllocation.model_validate(request).model_dump(mode="json")
+        known = self.get(actor, session_id)
+        def allocate(conn):
+            session = self._session(conn, actor, session_id)
+            values = {"physical_allocation": session["physical_allocation"] + request["physical_requests"],
+                "input_allocation": session["input_allocation"] + request["input_tokens"], "output_allocation": session["output_allocation"] + request["output_tokens"]}
+            if session["state"] in ENDED or values["physical_allocation"] > 8 or values["input_allocation"] > 64_000 or values["output_allocation"] > 16_000:
+                raise DomainError("research_allocation_exhausted", "Explicit cumulative grants must fit the versioned session ceilings.", 409)
+            record = self.workflow._insert(conn, actor, session["workspace_id"], "research_provider_allocation", {**request, "research_session_id": session_id}, session_id)
+            conn.execute("UPDATE research_sessions SET physical_allocation=?,input_allocation=?,output_allocation=? WHERE id=?", (*values.values(), session_id))
+            return record
+        return self.workflow._perform(actor, known["workspace_id"], "allocate:research:" + session_id, key, request, allocate)
 
     def _queue(self, conn, session, budget, *, resume_required=False):
         actor, workspace_id = session["actor_id"], session["workspace_id"]
@@ -177,6 +238,12 @@ class ResearchService:
             current = self._session(conn, actor, session_id)
             self._revision(current, request["expected_revision"])
             self._inputs(conn, current)
+            if current["mode"] == "live":
+                consent = self.workflow._get(conn, actor, current["consent_id"], "research_provider_consent") if current["consent_id"] else None
+                if not consent or consent["body"]["context_digest"] != self.provider_scope(conn, current)["context_digest"]:
+                    raise DomainError("research_provider_consent_required", "Consent to the exact current research context before live coordination.", 403)
+                if current["physical_allocation"] <= current["physical_calls"]:
+                    raise DomainError("research_provider_allocation_exhausted", "No explicit remaining research provider allocation is available.", 409)
             if current["state"] not in {"ready", "paused"}:
                 raise DomainError("research_not_advanceable", "Use the pending review, observation or reconciliation action.", 409)
             self._queue(conn, current, request["budget"], resume_required=current["state"] == "paused")
@@ -314,6 +381,89 @@ class ResearchService:
         with self.store.read() as conn:
             self._session(conn, actor, session_id)
             return [json.loads(row[0]) for row in conn.execute("SELECT body FROM research_events WHERE session_id=? AND sequence>? ORDER BY sequence LIMIT 200", (session_id, after))]
+
+    def accept_observation(self, actor, session_id, request, key):
+        request = ResearchObservation.model_validate(request).model_dump(mode="json")
+        known = self.get(actor, session_id)
+        def accept(conn):
+            session = self._session(conn, actor, session_id)
+            self._revision(session, request["expected_revision"])
+            self._inputs(conn, session)
+            if (session["state"] != "waiting_observation" or session["pending_review_id"] != request["pending_review_id"]
+                    or session["pending_review_digest"] != request["expected_review_digest"]):
+                raise DomainError("stale_review", "Review the exact pending request for a new reading.", 409)
+            pending = self.workflow._get(conn, actor, request["pending_review_id"], "research_clarification")
+            if pending["digest"] != request["expected_review_digest"] or "new_observation" not in pending["body"]["fields"]:
+                raise DomainError("stale_review", "This is not the pending new-observation review.", 409)
+            design = conn.execute("SELECT c.job_id FROM research_effects c JOIN research_effects p ON p.session_id=c.session_id AND p.plan_id=c.plan_id AND p.kind='design' WHERE c.session_id=? AND c.kind='child' ORDER BY c.rowid DESC LIMIT 1", (session_id,)).fetchone()
+            if not design or not design["job_id"]:
+                raise DomainError("followup_design_required", "A completed design is required before this reading handoff.", 409)
+            job = self.workflow._job(conn, actor, design["job_id"], "design_job")
+            if job["state"] != "completed" or not job["result_id"]:
+                raise DomainError("followup_design_required", "The selected design is not complete.", 409)
+            design_plan = self.workflow._get(conn, actor, job["plan_id"], "design_plan")
+            historical_problem = self.workflow._get(conn, actor, design_plan["body"]["request"]["problem_id"], "problem")
+            observation = request["observation"]
+            if observation["dataset_id"] != historical_problem["body"]["dataset_id"] or observation["row"]["included"] is not True:
+                raise DomainError("followup_lineage_mismatch", "Append one included reading to the original designed dataset.", 422)
+            proposal = self.workflow._create_observation_proposal_in_transaction(conn, actor, session["workspace_id"], observation)
+            dataset = self.workflow._review_observation_in_transaction(conn, actor, proposal["id"], {
+                "proposal_digest": proposal["digest"], "parent_dataset_id": observation["dataset_id"], "accepted": True})
+            problem = self.workflow._create_problem_in_transaction(conn, actor, session["workspace_id"], {
+                **historical_problem["body"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]})
+            receipt = conn.execute("SELECT id FROM entities WHERE kind='observation_review' AND parent_id=?", (proposal["id"],)).fetchone()[0]
+            accepted = self.workflow._insert(conn, actor, session["workspace_id"], "research_observation_acceptance", {
+                "research_session_id": session_id, "pending_review_id": pending["id"], "pending_review_digest": pending["digest"],
+                "observation_proposal_id": proposal["id"], "observation_review_id": receipt,
+                "dataset_id": dataset["id"], "dataset_digest": dataset["digest"], "problem_id": problem["id"], "problem_digest": problem["digest"],
+                "design_job_id": job["id"], "design_result_id": job["result_id"], "accepted": True, "execution_approved": False}, pending["id"])
+            now = utc_now()
+            old_action = self._action(conn, actor, session["active_action_id"])
+            conn.execute("INSERT INTO research_effects(id,session_id,action_id,effect_key,kind,request_digest,plan_id,state,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'accepted',?,?)",
+                (_id("effect"), session_id, old_action["id"], "accepted_observation", "accepted_observation", _hash(request), accepted["id"], now, now))
+            conn.execute("UPDATE research_actions SET state='completed',updated_at=? WHERE id=?", (now, old_action["id"]))
+            conn.execute("UPDATE operations SET state='completed',finished_at=? WHERE id=? AND state='reserved'", (now, old_action["operation_id"]))
+            conn.execute("UPDATE research_sessions SET problem_id=?,problem_digest=?,input_heads=?,pending_review_id=NULL,pending_review_digest=NULL WHERE id=?",
+                (problem["id"], problem["digest"], _json({"current_dataset_id": dataset["id"], "current_problem_id": problem["id"]}), session_id))
+            self._event(conn, session, "decision_recorded", "A person reviewed the new reading; computation still requires a separate approval.", [accepted["id"], receipt], old_action["id"])
+            self._queue(conn, session, json.loads(old_action["budget"]), resume_required=False)
+            return self._public(conn, self._session(conn, actor, session_id))
+        return self.workflow._perform(actor, known["workspace_id"], "observation:research:" + session_id, key, request, accept)
+
+    def adopt_inputs(self, actor, session_id, request, key):
+        request = ResearchInputReview.model_validate(request).model_dump(mode="json")
+        known = self.get(actor, session_id)
+        def adopt(conn):
+            session = self._session(conn, actor, session_id)
+            self._revision(session, request["expected_revision"])
+            if (session["state"] != "waiting_review" or session["pending_review_id"] != request["pending_review_id"]
+                    or session["pending_review_digest"] != request["expected_review_digest"]):
+                raise DomainError("stale_review", "Answer the current pending clarification.", 409)
+            pending = self.workflow._get(conn, actor, request["pending_review_id"], "research_clarification")
+            if pending["digest"] != request["expected_review_digest"] or "new_observation" in pending["body"]["fields"]:
+                raise DomainError("observation_review_required", "Use the separate new-observation review.", 409)
+            workspace = self.workflow.authorize(actor, session["workspace_id"], conn)
+            problem_id, digest = session["problem_id"], session["problem_digest"]
+            if request["problem_id"]:
+                problem = self.workflow._get(conn, actor, request["problem_id"], "problem")
+                self.workflow._same_workspace(session["workspace_id"], problem)
+                if (problem["id"] != workspace["current_problem_id"] or problem["digest"] != request["expected_problem_digest"]
+                        or problem["body"]["dataset_id"] != workspace["current_dataset_id"]):
+                    raise DomainError("stale_revision", "Adopt the exact current human-reviewed problem and dataset.", 409)
+                problem_id, digest = problem["id"], problem["digest"]
+            else:
+                self._inputs(conn, session)
+            accepted = self.workflow._insert(conn, actor, session["workspace_id"], "research_input_review",
+                {**request, "research_session_id": session_id, "execution_approved": False}, pending["id"])
+            old = self._action(conn, actor, session["active_action_id"])
+            conn.execute("UPDATE research_actions SET state='completed',updated_at=? WHERE id=?", (utc_now(), old["id"]))
+            conn.execute("UPDATE operations SET state='completed',finished_at=? WHERE id=? AND state='reserved'", (utc_now(), old["operation_id"]))
+            conn.execute("UPDATE research_sessions SET problem_id=?,problem_digest=?,input_heads=?,pending_review_id=NULL,pending_review_digest=NULL WHERE id=?",
+                (problem_id, digest, _json({field: workspace[field] for field in ("current_dataset_id", "current_problem_id")}), session_id))
+            self._event(conn, session, "decision_recorded", "Human-reviewed input was adopted; no scientific execution was approved.", [accepted["id"]], old["id"])
+            self._queue(conn, session, json.loads(old["budget"]), resume_required=False)
+            return self._public(conn, self._session(conn, actor, session_id))
+        return self.workflow._perform(actor, known["workspace_id"], "inputs:research:" + session_id, key, request, adopt)
 
     def cancel(self, actor, session_id, key):
         known = self.get(actor, session_id)
