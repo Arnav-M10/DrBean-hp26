@@ -1096,7 +1096,7 @@ def _cancel_running_and_restart(flow, packet, stack, workspace, checks, observat
         leftover = [pid for pid in live_before if _alive(pid)]
         checks.expect("no_orphan_after_cancel", not leftover,
                       f"{len(live_before)} live scientific child(ren) at cancel; still alive: {leftover}",
-                      finding="F-ORPHAN" if leftover else None)
+                      finding="F-ORPHAN-CANCEL" if leftover else None)
     else:
         checks.add("no_orphan_after_cancel", "not_observed",
                    "no sustained scientific computation existed at the cancellation point, so the orphan check "
@@ -1120,7 +1120,7 @@ def _cancel_running_and_restart(flow, packet, stack, workspace, checks, observat
             if live_before:
                 checks.expect("no_orphan_after_worker_kill", not survivors,
                               f"{len(live_before)} live scientific child(ren) when the worker was killed; still "
-                              f"alive: {survivors}", finding="F-ORPHAN" if survivors else None)
+                              f"alive: {survivors}", finding="F-ORPHAN-WORKER-KILL" if survivors else None)
             else:
                 checks.add("no_orphan_after_worker_kill", "not_observed",
                            "no sustained scientific computation existed when the worker was killed; check would be vacuous")
