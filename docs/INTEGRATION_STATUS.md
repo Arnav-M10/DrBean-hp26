@@ -13,3 +13,5 @@ Product candidate: [PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27), c
 - Consultation, observed user task and presentation-device rehearsal have not happened. The user requested software completion first.
 
 Start after setup: `scripts/dev/start.sh --controlled-source-examples`. See [release runbook](release-runbook.md) and [demo script](demo/demo-script.md). Live Gemini, hosting and visual expansion remain deferred.
+
+Runner stabilization: d55ff949b9ca95aa045f1bd2e5c9e17a5da66945 changes only the browser test to inspect visible follow-up status instead of a response body lost during automatic navigation. Local equivalent 3715008 has tree 74c60552cfa778ed283376098fa6aeba844ca721. Use that exact candidate and the qualification handoff commands; final results are retained in the PR conversation. The earlier failed CI run remains visible.

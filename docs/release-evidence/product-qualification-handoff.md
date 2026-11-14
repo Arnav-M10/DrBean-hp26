@@ -1,19 +1,21 @@
 # Product candidate for independent qualification
 
-Code candidate: `31a8ed3c9b66ed721cf2f37179ab3fe62ebe0d09` in PR #27.
+Code/test candidate: `d55ff949b9ca95aa045f1bd2e5c9e17a5da66945` in PR #27.
 Source handoff parent: Owner 2 `42f92b1b07f52f4336cc4449928bc781e30ae0fe`.
-Local tested equivalent: `c4d1ad63713c9fb00b2baab5aa758f3a4c505952`.
-Identical tree: `9ed03fb5bc828117f33ca015ad44a0ec6f9d3703`.
+Local equivalent: `37150085df20733756714399c9a88ba0257894f8`.
+Identical tree: `74c60552cfa778ed283376098fa6aeba844ca721`.
 Later evidence/documentation commits do not replace this code identity.
 
-All six GitHub CI jobs passed on the published candidate. Fresh local strict clean-checkout qualification passed all 5 offline gates and 12 boundaries; see [full report](offline-c4d1ad6-macos.json) and [commit/tree mapping](product-candidate.json). These are Owner 4 observations, not Claude's independent acceptance.
+Earlier production candidate 31a8ed3 passed all six CI jobs and strict clean-checkout qualification (5 offline gates, 12 boundaries); see [full report](offline-c4d1ad6-macos.json) and [commit/tree mapping](product-candidate.json). These are Owner 4 observations, not Claude's independent acceptance.
+
+The later runner-only correction d55ff94 observes visible follow-up status after automatic navigation. It fixes a Playwright response-body race; no product implementation or evaluator assertion changed. Final execution results for this exact revision are recorded in the PR #27 conversation, separately from the archived earlier report.
 
 ## Prepare the exact candidate
 
 Use a separate checkout, preserve any existing store, and run from its root:
 
 ```sh
-git checkout 31a8ed3c9b66ed721cf2f37179ab3fe62ebe0d09
+git checkout d55ff949b9ca95aa045f1bd2e5c9e17a5da66945
 scripts/dev/setup.sh
 npm ci --prefix tests/integration --ignore-scripts --no-audit --no-fund
 node tests/integration/node_modules/playwright/cli.js install chromium
