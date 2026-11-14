@@ -32,6 +32,8 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 | H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
 | H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
 | H-CI-ENGINE | P1 | 5 | fixed_pending_retest | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
+| F-LAUNCHER-HIDDEN-PTH | P1 | 4 | open | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
+| F-LAUNCHER-ENV-READ | P2 | 4 | open | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
 
@@ -232,6 +234,22 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Expected:** the launched stack receives BEAN_COUNTERDEX_PYTHON for the qualified CPython 3.11 engine that setup prepared
 - **Observed:** Reported by Owner 1 from CI run 43556610563 (PR #5 merge 4fc3add): integration suite 36 passed, 7 failed, 2 xfailed; all seven failures were plan admission 503 scientific_runtime_missing. Harness 4ea7cb3 (the copy merged into main) resolves the engine only from DRBEAN_SCIENCE_PYTHON or python3.11 on PATH; the stack job prepares .venv-engine but exports neither, so LocalStack launched the API without BEAN_COUNTERDEX_PYTHON. A harness-environment defect, not a product one.
 - **Evidence:** {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43556610563", "reported_in": "origin/codex/science-next docs/workstreams/01-science.md (Post-push CI at 8af34e4)"}
+
+## F-LAUNCHER-HIDDEN-PTH (P1, owner 4, open)
+
+- **Input:** checkout under ~/Documents on a Mac with iCloud Drive Desktop & Documents sync (an iCloud Drive File Provider domain); .venv created by `uv sync --locked`
+- **Command:** `DRBEAN_VAR_DIR=<isolated> python3 scripts/dev/launcher.py setup (then start); harness: python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher`
+- **Expected:** setup finishes (local auth created); start serves API, worker and web; the doctor's 'backend runtime ok' implies the service entry points can import bean_api
+- **Observed:** setup stops at the auth step (`.venv/bin/python -m bean_api.bootstrap`: No module named 'bean_api'); start: the API and worker exit with ModuleNotFoundError, and the launcher correctly stops everything it started and frees both ports; doctor still reports the backend runtime ok because it checks package metadata, not importability. Cause verified on this host: within about 6 s of creation the iCloud Drive File Provider sets UF_HIDDEN recursively on dot-named directories under ~/Documents (the same probe in /private/tmp stays visible), and CPython 3.11.17 and 3.13.18 `site` skip hidden .pth files (probe: visible .pth importable, hidden .pth not), so `_editable_impl_dr_bean_backend.pth` is ignored. With apps/api added to PYTHONPATH (what Owner 2's documented commands do via --app-dir/PYTHONPATH and what the harness launch path does) the same unmodified launcher starts in under a second; readiness then distinguishes API, worker and science, and the product processes receive no provider credentials.
+- **Evidence:** {"reproduction": "evaluation/results/owner4-launcher/HIDDEN-PTH-REPRO.md"}
+
+## F-LAUNCHER-ENV-READ (P2, owner 4, open)
+
+- **Input:** dummy GEMINI_API_KEY / GOOGLE_API_KEY / LANGSMITH_API_KEY (DRBEAN-DUMMY-OWNER4-SCRUB) in the launcher's own environment, egress guard on PYTHONPATH
+- **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher`
+- **Expected:** names-only filtering (iterate keys, read only the values that are kept) and a scrubbed environment for every child, including probes
+- **Observed:** the guard records a credential_read of each dummy value in the launcher process during cmd_start -> child_env() (`os.environ.items()` reads every value; the code comment says values are never read), and the doctor's backend probe (`.venv/bin/python -c ...`, env=None) starts with all three names present. The API and worker receive none of them: the scrubbing that matters works.
+- **Evidence:** {}
 
 ## Check-level finding ids (raised only when the check fails)
 

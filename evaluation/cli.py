@@ -163,9 +163,10 @@ def _main(argv, guard_log) -> int:
         return 0
     if args.command == "run":
         stack_env = dict(item.split("=", 1) for item in args.stack_env if "=" in item)
-        if (args.app_repo or args.diagnostic) and os.path.abspath(args.results) == os.path.abspath(RESULTS):
-            print("refused: previews and diagnostics must write to a separate --results directory "
-                  "(for example evaluation/results/preview); they are never release acceptance")
+        if (args.app_repo or args.diagnostic or args.subject == "http-owner4-launcher") and \
+                os.path.abspath(args.results) == os.path.abspath(RESULTS):
+            print("refused: previews, diagnostics and the Owner 4 launch path must write to a separate --results "
+                  "directory (for example evaluation/results/preview); they never mix into the release history")
             return 1
         subject = make_subject(args.subject, REPO, stack_env, app_repo=args.app_repo,
                                diagnostic_overrides=tuple(args.diagnostic))

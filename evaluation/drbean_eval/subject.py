@@ -108,8 +108,14 @@ class LaunchedHttpSubject:
     executes_acceptance = True
 
     def __init__(self, repo: str, *, stack_env: dict | None = None, poll_timeout: float = 240.0,
-                 app_repo: str | None = None, diagnostic_overrides: tuple[str, ...] = ()):
+                 app_repo: str | None = None, diagnostic_overrides: tuple[str, ...] = (), launch: str = "harness"):
         from . import launcher
+        if launch not in ("harness", "owner4"):
+            raise ValueError(f"unknown launch path {launch!r}")
+        if launch == "owner4" and stack_env:
+            raise ValueError("Owner 4's launcher takes no extra stack environment from the harness")
+        self.launch = launch
+        self.name = "http-owner4-launcher" if launch == "owner4" else "http-launch"
         self.repo = os.path.abspath(repo)  # the harness: packets, guard, evaluation code
         self.app_repo = os.path.abspath(app_repo or repo)  # the application under test (may be a teammate checkout)
         self.stack_env = stack_env or {}
@@ -132,8 +138,10 @@ class LaunchedHttpSubject:
 
     def describe(self) -> dict:
         from . import launcher
-        info = {"subject": "http-launch", "launch": "fresh temporary API + worker, allowlisted environment, "
-                "egress guard loaded", "host": launcher.host_identity(), "app_under_test": self.app_under_test,
+        info = {"subject": self.name, "launch": "Owner 4's scripts/dev/launcher.py start (unmodified), isolated "
+                "DRBEAN_VAR_DIR, egress guard via PYTHONPATH" if self.launch == "owner4" else "fresh temporary API + "
+                "worker, allowlisted environment, egress guard loaded", "host": launcher.host_identity(),
+                "app_under_test": self.app_under_test,
                 "evidence_class": self.evidence_class, "diagnostic_overrides": list(self.diagnostic_overrides)}
         try:
             info["backend_python"] = launcher.interpreter_identity(launcher.backend_python(self.app_repo))
@@ -148,8 +156,12 @@ class LaunchedHttpSubject:
     def begin_lane(self, lane: str, results_dir: str) -> dict:
         from . import launcher, science_flow
         from .http_client import ApiClient
-        self.stack = launcher.LocalStack(self.app_repo, stack_env=self.stack_env,
-                                         diagnostic_overrides=self.diagnostic_overrides).start()
+        if self.launch == "owner4":
+            self.stack = launcher.Owner4LauncherStack(self.app_repo,
+                                                      diagnostic_overrides=self.diagnostic_overrides).start()
+        else:
+            self.stack = launcher.LocalStack(self.app_repo, stack_env=self.stack_env,
+                                             diagnostic_overrides=self.diagnostic_overrides).start()
         self.readiness = self.stack.readiness()
         self.readiness["startup_path"] = self.stack.startup_path()
         client = ApiClient(self.stack.base_url, self.stack.tokens[launcher.REVIEWER])
@@ -205,6 +217,9 @@ class LaunchedHttpSubject:
         }.get(entry["entry_id"])
         if scenario is None:
             raise SubjectUnavailable(f"no scenario implements {entry['entry_id']}")
+        if self.launch == "owner4" and entry["entry_id"] == "RS-CANCEL-RESTART":
+            raise SubjectUnavailable("worker kill/restart needs per-process control that Owner 4's launcher does not "
+                                     "offer; observed on the harness launch path (--subject http-launch)")
         jobs_before = set(self.flow.jobs_executed)
         try:
             outcome = scenario()
@@ -255,12 +270,14 @@ def make_subject(spec: str, repo: str | None = None, stack_env: dict | None = No
                  diagnostic_overrides: tuple[str, ...] = ()):
     if spec in ("", "none"):
         return NoSubject()
-    if spec == "http-launch":
+    if spec in ("http-launch", "http-owner4-launcher"):
         return LaunchedHttpSubject(repo or os.getcwd(), stack_env=stack_env, app_repo=app_repo,
-                                   diagnostic_overrides=diagnostic_overrides)
+                                   diagnostic_overrides=diagnostic_overrides,
+                                   launch="owner4" if spec == "http-owner4-launcher" else "harness")
     kind, _, rest = spec.partition(":")
     if kind == "recorded" and rest:
         return RecordedSubject(rest)
     if kind == "http" and rest:
         return HttpSubject(rest)
-    raise ValueError(f"unknown subject spec {spec!r}; use none, http-launch, recorded:<dir> or http:<base-url>")
+    raise ValueError(f"unknown subject spec {spec!r}; use none, http-launch, http-owner4-launcher, recorded:<dir> "
+                     "or http:<base-url>")

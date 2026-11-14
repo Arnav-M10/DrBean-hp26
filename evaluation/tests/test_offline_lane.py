@@ -482,13 +482,15 @@ class LedgerAndHistoryIntegrity(unittest.TestCase):
         self.ledger.reserve("t", "p", "C01", 100, 10, "unit")
         with open(self.path, "a", encoding="utf-8") as handle:
             handle.write("{not json\n")
-        before = open(self.path, encoding="utf-8").read()
+        with open(self.path, encoding="utf-8") as handle:
+            before = handle.read()
         from drbean_eval.budget import BudgetStop
         with self.assertRaises(BudgetStop):
             self.ledger.reserve("t", "p", "C01", 100, 10, "unit")
         with self.assertRaises(BudgetStop):
             self.ledger.state()
-        self.assertEqual(open(self.path, encoding="utf-8").read(), before)
+        with open(self.path, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), before)
 
     def test_crash_after_reservation_keeps_the_maximum_committed(self):
         self.ledger.reserve("t", "p", "C01", 3000, 700, "unit")  # process dies here: never reconciled

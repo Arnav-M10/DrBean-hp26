@@ -400,6 +400,191 @@ class LocalStack:
         self.teardown = self.stop()
 
 
+# Obviously fake values placed in the *launcher's* environment to check that Owner 4's launcher removes
+# provider credentials before starting the API and worker. They are never real keys and never read from
+# anywhere; the egress guard blocks any non-loopback connection regardless.
+OWNER4_DUMMY_CREDENTIALS = {"GEMINI_API_KEY": "DRBEAN-DUMMY-OWNER4-SCRUB", "GOOGLE_API_KEY": "DRBEAN-DUMMY-OWNER4-SCRUB",
+                            "LANGSMITH_API_KEY": "DRBEAN-DUMMY-OWNER4-SCRUB"}
+
+
+class _Adopted:
+    """A product process started by Owner 4's launcher. The harness observes it and stops it only at teardown."""
+
+    def __init__(self, record: dict):
+        self.pid, self.started_at, self.returncode = record["pid"], record.get("started_at"), None
+
+    def poll(self):
+        return None if alive(self.pid) else 0
+
+
+class Owner4LauncherStack(LocalStack):
+    """The product's own one-command launcher (``scripts/dev/launcher.py start``), run unmodified.
+
+    The harness passes only configuration that launcher already honours: an isolated ``DRBEAN_VAR_DIR``
+    (fresh SQLite, sources and artifacts) holding an ``auth.json`` the harness wrote with its own synthetic
+    identities before start (the launcher preserves an existing file; nothing the harness did not write is
+    read), and ``PYTHONPATH`` carrying the egress guard, which the launcher passes through to the API and
+    worker. Dummy provider credentials are placed in the launcher's own environment so the guard can show
+    whether they reach the product processes. Ports are the launcher's fixed loopback ports; when either is
+    busy the launcher refuses and nothing is killed.
+
+    If the unmodified start cannot import ``bean_api`` (F-LAUNCHER-HIDDEN-PTH), that failure is recorded and
+    one retry adds ``apps/api`` to ``PYTHONPATH`` -- the import path Owner 2's documented entry points use --
+    so the rest of the acceptance path can still be observed through this launcher. Both are reported.
+    """
+
+    API_PORT, WEB_PORT = 8000, 4173
+
+    def __init__(self, repo: str, *, diagnostic_overrides: tuple[str, ...] = (), startup_timeout: float = 90.0):
+        super().__init__(repo, diagnostic_overrides=diagnostic_overrides, startup_timeout=startup_timeout)
+        self.launcher = os.path.join(self.repo, "scripts", "dev", "launcher.py")
+        if not os.path.isfile(self.launcher):
+            raise StackError("Owner 4's launcher (scripts/dev/launcher.py) is not present in the application checkout")
+        self.var = os.path.join(self.workdir, "var")
+        self.port, self.base_url = self.API_PORT, f"http://127.0.0.1:{self.API_PORT}"
+        self.database = os.path.join(self.var, "bean.sqlite3")
+        self.blob_dir = os.path.join(self.var, "sources")
+        self.artifact_dir = os.path.join(self.var, "artifacts")
+        self.workaround: str | None = None
+        self.launcher_runs: list[dict] = []
+        self.doctor: dict | None = None
+
+    def launcher_environment(self, *, import_path: bool) -> dict[str, str]:
+        home, tmp = os.path.join(self.workdir, "home"), os.path.join(self.workdir, "tmp")
+        os.makedirs(home, exist_ok=True)
+        os.makedirs(tmp, exist_ok=True)
+        tools = [os.path.dirname(found) for found in (shutil.which("uv"), shutil.which("node")) if found]
+        path = [*dict.fromkeys(tools), *(p for p in ("/usr/bin", "/bin", "/usr/sbin", "/sbin") if os.path.isdir(p))]
+        pythonpath = [GUARD_DIR] + ([os.path.join(self.repo, "apps", "api")] if import_path else [])
+        env = {"PATH": os.pathsep.join(path), "HOME": home, "TMPDIR": tmp, "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+               "DRBEAN_VAR_DIR": self.var, "PYTHONPATH": os.pathsep.join(pythonpath),
+               "PYTHONUNBUFFERED": "1", "DRBEAN_EGRESS_GUARD_LOG": self.guard_log,
+               "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost", **OWNER4_DUMMY_CREDENTIALS}
+        if self.diagnostic_overrides:
+            env["DRBEAN_DIAGNOSTIC_OVERRIDES"] = ",".join(self.diagnostic_overrides)
+        if "science_barrier" in self.diagnostic_overrides:
+            env["DRBEAN_DIAGNOSTIC_BARRIER"] = self.barrier_path
+        return env
+
+    def _launcher(self, *args: str, import_path: bool, timeout: float = 180.0) -> dict:
+        started = time.monotonic()
+        try:
+            done = subprocess.run([sys.executable, self.launcher, *args], cwd=self.repo, capture_output=True,
+                                  text=True, timeout=timeout, env=self.launcher_environment(import_path=import_path))
+            code, text = done.returncode, done.stdout + done.stderr
+        except subprocess.TimeoutExpired:
+            code, text = 124, f"launcher {' '.join(args)} timed out after {timeout} s"
+        tail = text.replace(self.workdir, "<stack>").replace(self.repo, "<repo>")[-2500:]
+        run = {"command": "scripts/dev/launcher.py " + " ".join(args), "exit": code, "import_path_added": import_path,
+               "seconds": round(time.monotonic() - started, 2), "output_tail": tail}
+        self.launcher_runs.append(run)
+        return {**run, "output": text}
+
+    def _write_auth(self) -> None:
+        os.makedirs(self.var, exist_ok=True, mode=0o700)
+        fd = os.open(os.path.join(self.var, "auth.json"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(self.tokens, handle)
+            handle.write("\n")
+
+    def _adopt(self) -> None:
+        self.processes = {}
+        for name in ("api", "worker", "web"):
+            try:
+                with open(os.path.join(self.var, "run", f"{name}.json"), encoding="utf-8") as handle:
+                    self.processes[name] = _Adopted(json.load(handle))
+            except (OSError, ValueError):
+                continue
+
+    def start(self) -> "Owner4LauncherStack":
+        self._write_auth()
+        first = self._launcher("start", import_path=False)
+        if first["exit"] != 0:
+            self._launcher("stop", import_path=False)
+            if "No module named 'bean_api'" not in first["output"]:
+                raise StackError(f"Owner 4's launcher did not start the stack (exit {first['exit']}): "
+                                 f"{first['output_tail'][-600:]}")
+            self.workaround = ("unmodified start failed: bean_api not importable (F-LAUNCHER-HIDDEN-PTH); "
+                               "retried with apps/api on PYTHONPATH")
+            second = self._launcher("start", import_path=True)
+            if second["exit"] != 0:
+                self._launcher("stop", import_path=True)
+                raise StackError(f"Owner 4's launcher did not start the stack even with apps/api on PYTHONPATH "
+                                 f"(exit {second['exit']}): {second['output_tail'][-600:]}")
+        self._adopt()
+        doctor = self._launcher("doctor", "--json", import_path=self.workaround is not None)
+        try:
+            self.doctor = json.loads(doctor["output"][doctor["output"].index("{"):])
+        except ValueError:
+            self.doctor = {"error": "doctor --json did not return JSON", "exit": doctor["exit"]}
+        deadline = time.monotonic() + self.startup_timeout
+        while not self.worker_holds_lock():
+            if time.monotonic() > deadline:
+                raise StackError("the launcher's worker did not take the SQLite worker lock before the deadline")
+            time.sleep(0.2)
+        return self
+
+    def start_worker(self, *extra: str):
+        raise StackError("worker-level restart is not offered by Owner 4's launcher; the harness launch path covers it")
+
+    def kill(self, name: str, sig: int = signal.SIGKILL) -> None:
+        raise StackError("per-process kill is not part of Owner 4's launcher; the harness launch path covers it")
+
+    def product_pids(self) -> set[int]:
+        return {p.pid for p in self.processes.values()} | set(self.seen_descendants)
+
+    def guard_events(self) -> list[dict]:
+        """Events from product processes only; the launcher's own process and probes are reported separately."""
+        product = self.product_pids()
+        return [e for e in super().guard_events() if e.get("pid") in product]
+
+    def launcher_side_events(self) -> list[dict]:
+        product = self.product_pids()
+        return [e for e in super().guard_events() if e.get("pid") not in product]
+
+    def readiness(self) -> dict:
+        result = super().readiness()
+        result["owner4_doctor"] = {"ok": (self.doctor or {}).get("ok"), "static": (self.doctor or {}).get("static"),
+                                   "service": (self.doctor or {}).get("service")}
+        return result
+
+    def startup_path(self) -> dict:
+        return {"launcher": "Owner 4 scripts/dev/launcher.py start, unmodified",
+                "launcher_commit": subprocess.run(["git", "-C", self.repo, "log", "-1", "--format=%H", "--",
+                                                   "scripts/dev/launcher.py"], capture_output=True,
+                                                  text=True).stdout.strip() or None,
+                "ports": {"api": self.API_PORT, "web": self.WEB_PORT},
+                "state": "isolated DRBEAN_VAR_DIR: fresh SQLite, sources, artifacts; auth.json written by the "
+                         "harness with synthetic identities before start",
+                "pythonpath": ["evaluation guard"] + (["apps/api (workaround)"] if self.workaround else []),
+                "workaround": self.workaround, "launcher_runs": [
+                    {k: v for k, v in run.items() if k != "output_tail"} for run in self.launcher_runs],
+                "dummy_credentials_in_launcher_environment": sorted(OWNER4_DUMMY_CREDENTIALS),
+                "diagnostic_overrides": list(self.diagnostic_overrides)}
+
+    def stop(self) -> dict:
+        self.snapshot_descendants()
+        stopped = self._launcher("stop", import_path=self.workaround is not None)
+        time.sleep(0.3)
+        orphans = {pid: row for pid, row in self.seen_descendants.items() if alive(pid)}
+        roots = {name: p.pid for name, p in self.processes.items() if alive(p.pid)}
+        for pid in [*orphans, *roots.values()]:  # started on the harness's behalf; cleaned up, still reported
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        report = {"orphans": [{"pid": pid, **row} for pid, row in orphans.items()],
+                  "roots_alive_after_launcher_stop": roots, "tracked_descendants": len(self.seen_descendants),
+                  "launcher_stop_exit": stopped["exit"], "launcher_runs": self.launcher_runs,
+                  "launcher_side_guard_events": [{**{k: e.get(k) for k in ("kind", "python", "name",
+                                                                            "credential_names_present")},
+                                                  "argv0": os.path.basename(e.get("argv0") or "")}
+                                                 for e in self.launcher_side_events()]}
+        self.events.append({"event": "stopped", "at": time.time(), **{k: v for k, v in report.items()
+                                                                      if k != "launcher_runs"}})
+        return report
+
+
 def interpreter_identity(python: str) -> dict:
     out = subprocess.run([python, "-I", "-c", "import sys,platform,json;print(json.dumps({'implementation':"
                           "platform.python_implementation(),'version':platform.python_version(),"
