@@ -93,6 +93,8 @@ jobs:
           node-version: 22
       - run: node --test
         working-directory: apps/web
+      - name: reviewed comparison state and self-contained report checks
+        run: node --test workspace-preview/tests/*.test.mjs
 
   harness:
     name: evaluation harness self-checks
@@ -166,6 +168,17 @@ jobs:
         run: node tests/integration/shared-session-browser.mjs
       - name: private model comparison transport with actual numerical computation
         run: node tests/integration/model_comparison_browser.mjs --results /tmp/drbean-comparison-browser-evidence
+      - name: reviewed comparison interface and readable numerical report
+        run: |
+          export PLAYWRIGHT_MODULE="$PWD/tests/integration/node_modules/playwright"
+          BEAN_COMPARISON_EVIDENCE_DIR=var/test-evidence/model-comparison-ui node workspace-preview/check-connected.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-comparison-ui-evidence
+          path: var/test-evidence/model-comparison-ui
+          if-no-files-found: warn
+          retention-days: 3
       - name: ordinary Deep Agents browser investigation and separate checked pair-design
         run: |
           export NODE_PATH="$PWD/tests/integration/node_modules"
