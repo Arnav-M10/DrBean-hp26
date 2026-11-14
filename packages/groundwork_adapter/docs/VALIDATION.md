@@ -1,12 +1,75 @@
 # Counterdex validation and release handoff
 
-Implementation is confined to `packages/groundwork_adapter/` on branch
-`codex/counterdex`. The checkout remote was verified as the requested
+Implementation is confined to `packages/groundwork_adapter/`. The next-sprint
+branch is `codex/science-next`, based on integrated commit `586fb9b`;
+earlier release checks below retain their historical scope. The remote was verified as the requested
 repository. No application, web, infrastructure or root manifest files changed.
 All runtime code uses the Python standard library. Build/publishing utilities
 are isolated development tools, not scientific runtime dependencies.
 The user confirmed permission for the work and requested an independent
 implementation; all supplied example measurements are newly constructed fixtures.
+
+## Counterdex 0.2.0 decision-engine checks
+
+Qualified mathematical runtime: **CPython 3.11.17**. Source-manifest digest:
+`ca6b92b74f3afb840dc847881425b4912ae6b600aa0f1490c609f475612eaac2`.
+The source suite ran **257 tests** in 9.446 seconds: 256 passed and the
+dependency-dependent authoritative DTO check skipped in the zero-dependency
+science environment. The same complete suite from a clean wheel installation,
+with `python -I` outside the checkout, ran 257 tests in 10.481 seconds with the
+same single skip. Imports resolved to the prepared environment's `site-packages`
+and its source digest matched. `pip check` passed.
+Wheel and source distribution builds passed, and both passed `twine check`.
+The wheel's Python files matched the prepared source byte for byte. The source
+distribution included the bridge/supervisor, mapping docs, generator, tests and
+complete decision examples. No distribution was uploaded.
+
+The missing-dependency check was separately executed in a CPython **3.13.18**
+environment with Pydantic: all **30** mapping/admission tests passed against
+`apps/api/bean_api/contracts.py`. The dedicated validator also accepted all
+**7 application requests and 7 results** in the decision fixtures. The Node
+DB-SC-1 canonical-byte/digest control passed. No root dependency was changed.
+
+Both CPython 3.11 and 3.13 parent environments passed **13 supervisor tests**
+without skips, including the prepared installed runtime handshake. Across those
+two runs, ten owned process groups and twenty leader/descendant liveness checks
+passed: cancellation, deadline, closed outputs and leader exit left no running
+descendants. Credential isolation and stdout/stderr caps passed. These controls
+exercise the parent example, not the application's still-unwired worker.
+
+Seven actual jobs also ran through the CPython 3.13 parent into the isolated,
+installed CPython 3.11 engine, with each design using that newly executed
+baseline's candidates and native bytes. All seven resulting native packets
+passed separate installed-CLI replay. The hero baseline took about 0.247 seconds
+including child startup/transport; the design took about 0.120 seconds. The hero
+selects 8 hours with exact margin displayed as 0.257407 mg/L. Changing the
+4-hour reading produces a new pair and no separation on the reviewed grid.
+The three hypothetical revisions retain the reference, retain the outside
+witness, or exclude both, respectively. Timings describe these local runs only.
+
+The committed generator separately records seven real bridge jobs and fresh
+replays plus three fixed-pair constraint controls. Complete exact requests,
+raw artifacts, independent anchors, observed timings, display context and
+contribution table are in [DECISION_EXAMPLE.md](DECISION_EXAMPLE.md) and
+[its fixture manifest](../fixtures/decision/manifest.json). All 31 archived
+initial-release files remain byte-identical. The seven current legacy fixtures
+were regenerated because added engine modules/version change the prepared
+source identity; their existing semantic cases and archived bytes were preserved.
+
+Automated review found and corrected three issues, with persistent regressions:
+all exact construction failures must stay inconclusive rather than resemble
+a completed absence of witnesses; replay must enforce the complete wrapper's
+approved byte cap; and all offline lineage checks must share one wall budget.
+Original external anchors reject modified bytes; a deliberately resealed
+diagnostic anchor still cannot make false enclosures pass fresh computation.
+
+Commands and Owner 2/5 seam requests are in [BRIDGE.md](BRIDGE.md). The application
+HTTP/worker/download gate remains **not run**: ordinary startup still needs the
+backend-owned adapter, persistence and cancellation wiring. No application file,
+provider configuration, secret file or live-model service was changed or used.
+Browser replay remains unavailable. Search is finite and incomplete; checks
+concern selected vectors under the reviewed model and bounds, not physical truth,
+global identifiability or the full compatible parameter set.
 
 ## Initial published release: executed checks
 
@@ -119,14 +182,14 @@ and suggestion identity. It never installs a dependency named by a bundle.
 
 ## Publishing
 
-The intended standalone release is **counterdex 0.1.0**. Counterdex is not
-published to PyPI by this rename/Git-push task. Once the distribution checks pass,
+The intended standalone release is **counterdex 0.2.0**. Counterdex is not
+published to PyPI by this sprint. Once the distribution checks pass,
 a separate explicit upload would be:
 
 ```sh
 python3 -m twine upload \
-  packages/groundwork_adapter/dist/counterdex-0.1.0-py3-none-any.whl \
-  packages/groundwork_adapter/dist/counterdex-0.1.0.tar.gz
+  packages/groundwork_adapter/dist/counterdex-0.2.0-py3-none-any.whl \
+  packages/groundwork_adapter/dist/counterdex-0.2.0.tar.gz
 ```
 
 Use your publishing account locally. The package's native scope is documented;
