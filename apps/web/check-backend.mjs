@@ -100,10 +100,15 @@ try {
     await page.check('#approve-scope')
     await page.getByRole('button', { name: 'Approve reviewed plan' }).click()
     await page.getByRole('button', { name: 'Plan approved', exact: true }).waitFor()
+    const previousRunId = await page.locator('#run-id').inputValue()
     const response = page.waitForResponse(r => /\/plans\/[^/]+\/runs$/.test(r.url()) && r.request().method() === 'POST')
     await page.getByRole('button', { name: 'Queue approved manual run' }).click()
-    const run = await (await response).json()
-    await page.waitForFunction(id => document.querySelector('#run-id').value === id, run.id)
+    assert.equal((await response).status(), 202)
+    await page.waitForFunction(previous => {
+      const id = document.querySelector('#run-id').value
+      return id && id !== previous
+    }, previousRunId)
+    const run = await api(`/runs/${await page.locator('#run-id').inputValue()}`)
     await page.waitForFunction(() => {
       const text = document.querySelector('#backend-investigations').textContent
       return /execution: (failed|cancelled|interrupted)/.test(text)
@@ -174,9 +179,16 @@ try {
   await page.check('#design-allowContinuation')
 
   async function prepareDesign() {
+    const preview = page.locator('#backend-design details').filter({ has: page.getByText('Exact frozen measurement design', { exact: true }) }).locator('pre')
+    const previous = await preview.count() ? await preview.textContent() : ''
     const response = page.waitForResponse(r => /\/runs\/[^/]+\/design-proposals$/.test(r.url()) && r.request().method() === 'POST')
     await page.getByRole('button', { name: 'Prepare measurement design', exact: true }).click()
-    const plan = await (await response).json()
+    assert.equal((await response).status(), 201)
+    await page.waitForFunction(previous => {
+      const details = [...document.querySelectorAll('#backend-design details')].find(item => item.querySelector('summary').textContent === 'Exact frozen measurement design')
+      return details && details.querySelector('pre').textContent !== previous
+    }, previous)
+    const plan = JSON.parse(await preview.textContent())
     assert.ok(plan.id, JSON.stringify(plan))
     await page.waitForSelector('#approve-design-scope')
     assert.equal(await page.locator('#approve-design').isDisabled(), true)
@@ -192,10 +204,17 @@ try {
     await page.getByRole('button', { name: 'Design approved', exact: true }).waitFor()
   }
   async function runDesign(expectedTier, name) {
+    const previousJobId = await page.locator('#design-job-id').inputValue()
     const response = page.waitForResponse(r => /\/design-plans\/[^/]+\/jobs$/.test(r.url()) && r.request().method() === 'POST')
     await page.getByRole('button', { name: 'Queue approved design', exact: true }).click()
-    const started = await (await response).json()
-    assert.ok(started.id, JSON.stringify(started))
+    assert.equal((await response).status(), 202)
+    // The application streams bounded bodies. Read its displayed returned ID
+    // instead of depending on Chromium retaining a DevTools copy of that body.
+    await page.waitForFunction(previous => {
+      const id = document.querySelector('#design-job-id').value
+      return id && id !== previous
+    }, previousJobId)
+    const started = await api(`/design-jobs/${await page.locator('#design-job-id').inputValue()}`)
     await page.waitForFunction(() => /design execution: (completed|failed|cancelled|interrupted)/.test(document.querySelector('#backend-design').textContent), null, { timeout: 125000 })
     const finished = await api(`/design-jobs/${started.id}`)
     assert.equal(finished.state, 'completed', JSON.stringify(finished))

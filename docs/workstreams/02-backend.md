@@ -1,56 +1,48 @@
 # Backend milestone progress
 
-Completed: browser baseline milestone, pushed and merged in PR #6 at `1f75bdc`.
-Current task: separately approved next-measurement design from the actual
-baseline pair, including browser review and replayable native design evidence.
+Completed: browser baseline, pushed and merged in PR #6 (`1f75bdc`).
+Completed: separately approved next-measurement design from the actual baseline
+pair, with browser review and independently replayable native design evidence.
+Current task: GitHub integration handoff; feature implementation is complete.
 
-Base: `main` at `1f75bdc` (PR #6), branch `backend/browser-design`.
-Backend: Python 3.12.14; scientific child: prepared CPython 3.11.18.
-Model providers remain disabled; no model calls or credential checks are authorized.
+Branch: `backend/browser-design`; integrated `main` at `a8dd4ed` (PR #7).
+Verified on Linux, backend Python 3.12.14, scientific CPython 3.11.18.
+Interfaces: DB-SC-1 / GF-2, `counterdex.bridge.v1`,
+`DB-SC-1-to-groundwork-v1`, `counterdex.application-bundle.v1`.
+Model providers remain disabled; no calls or credential checks were performed.
 
-## Works / reused
+## Works / verified now
 
-- Immutable input/plan/approval records, one-run reservations and scoped access.
-- Supervised scientific process boundary, native storage/downloads, source review.
-- Owner 1's real bounded discovery and application-bound replay protocol are now
-  merged. The earlier missing-producer dependency is resolved.
-- Reviewed HTTP inputs now produce real bounded baseline results, retained native
-  packets and exact replay-anchor downloads. Separate installed-engine CLI replay
-  passes, including changed-input, wrong-binding and no-witness controls.
-- Actual Chromium review/approval/queue, polling, native + anchor downloads and
-  separate installed-engine replay pass for two distinct reviewed datasets.
-  Earlier evidence remains intact; no model-provider attempts occur.
-- Resolved scientific child spawn `EAGAIN` beside Chromium: the per-user process
-  guard now allows 256 processes/threads while preserving other job limits and
-  stricter inherited hard limits.
-
-## In progress
-
-- Native design integration works through ordinary authenticated HTTP: separate
-  approval, original baseline bytes/anchors, frozen request and job scope, exact
-  grid results and independent nested replay. Positive and no-separation pass.
-- Browser design controls and downloads are implemented; actual Chromium
-  acceptance and final binding/regression checks are in progress.
-
-## Blocked / outside this milestone
-
-- No missing scientific producer dependency is currently identified.
-- Design has no missing producer dependency. Native mapping supports requests
-  for checked pair separation; other requested tiers will be rejected explicitly.
-- Follow-up observation UI, controlled AI activation, independent evaluator
-  expansion and hosted deployment remain outside this focused milestone.
-- Actual Mac qualification is not established by Linux checks.
+- Reviewed measurements → explicit baseline approval → actual bounded discovery.
+  No fixture candidates; native downloads and separate replay anchors work.
+- Two compatible discovered candidates → reviewed grid, precision, horizon and
+  permissions → separate design approval → one durable design job.
+- Checked separation, checked no-separation and honest numerical fallback retain
+  all approved grid rows. A selected measurement is conditional on this pair.
+- Native design packets retain original baseline bytes/anchors unchanged. Fresh
+  replay checks supported facts; it never reruns numerical discovery.
+- Changed design inputs require new approval. Wrong scope/anchors, corrupt bytes,
+  cancelled or expired authority cannot publish a new checked design result.
+- Browser history reopening shows the original design scope; changing baselines
+  clears the previous design display. Earlier evidence stays available.
 
 ## Evidence
 
-Completed baseline validation: 290 backend tests passed, including HTTP/CLI and
-16 adversarial binding checks. Ruff and whitespace checks pass. Engine suite: 257
-tests, 2 skipped; installed-runtime supervisor checks separately pass (13 tests),
-and application-schema compatibility passes. Browser unit checks: 18 passed;
-actual browser milestone passes. Contract export is deterministic (39 schemas).
-Synthetic examples supply input values only; production candidate results are
-always computed.
+- 326 backend tests passed, including actual HTTP design, separate installed
+  `-I` CLI replay, adversarial binding and late cancellation/expiry controls.
+- 29 browser unit tests passed after integrating the latest web/release changes.
+- Actual Chromium completed baseline, positive design and no-separation design,
+  separate approvals, native/anchor downloads, offline replay and history checks.
+- Ruff (`apps tests scripts`), schema compatibility and deterministic export pass.
+- Commands: `BEAN_COUNTERDEX_PYTHON=/path/to/prepared/python BEAN_COUNTERDEX_REPLAY_PYTHON=/path/to/prepared/python .venv/bin/python -m pytest -q`;
+  `node --test apps/web/*.test.mjs`; `PLAYWRIGHT_MODULE=/path/to/playwright/index.js CHROMIUM_PATH=/usr/bin/chromium BEAN_COUNTERDEX_PYTHON=/path/to/prepared/python node apps/web/check-backend.mjs`.
 
-Current design checks: 290 existing backend regressions pass; 2 new real HTTP
-design/replay tests pass; 38 adapter tests pass (including legacy controls).
-Browser unit checks: 24 passed. Final combined counts and browser outcome pending.
+## Remaining / next
+
+- No blocker remains for this design feature. Native design currently admits a
+  request for checked pair separation; returned outcomes remain evidence-based.
+- Next owned feature: a separately reviewed follow-up that checks the original
+  selected pair. The engine currently admits one appended hypothetical reading.
+  Actual-observation native review needs Owner 1 to extend that admission/mapping.
+- Follow-up UI, live AI, independent evaluator expansion and hosted deployment
+  were not added here. Actual Mac qualification remains not run.

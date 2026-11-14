@@ -51,11 +51,11 @@ The synthetic browser control uses feasible times `8, 6` hours and a reviewed al
 
 ```sh
 node --test apps/web/*.test.mjs
-PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.js \
 BEAN_COUNTERDEX_PYTHON=/absolute/path/to/prepared/python3.11 \
 node apps/web/check-backend.mjs
 ```
 
 `check-backend.mjs` starts an isolated API, worker and proxy on unused loopback ports, drives Chromium through review/approval/queue, submits two distinct datasets to actual discovery, and separately approves positive/no-separation designs from the first actual pair. Native baseline and design bytes plus anchors are downloaded through the browser and replayed in a separate installed `-I` interpreter. The check also covers preserved earlier evidence, zero provider attempts, stale draft/design approval, design history reopening and context clearing, reports, narrow-screen layout, memory-only credentials and proxy origin rejection. It creates no candidate records or synthetic scientific responses. Temporary test data and processes are cleaned up.
 
-Playwright is found through Node's normal resolution (`npm install` in `tests/integration`, or `NODE_PATH`); `PLAYWRIGHT_MODULE` can name an entry file. Set `BEAN_TEST_PYTHON` or `CHROMIUM_PATH` to override `.venv/bin/python` and Playwright's own Chromium. Playwright is a test-only dependency and is not shipped with the browser application. A missing runtime or failed scientific run fails this milestone check instead of being counted as a successful demonstration.
+Playwright is found through Node's normal resolution or `NODE_PATH`; `PLAYWRIGHT_MODULE` can name its `index.js` entry file. After `npm install` in `tests/integration`, set `NODE_PATH` to that directory's absolute `node_modules` path when running this browser check. Set `BEAN_TEST_PYTHON` or `CHROMIUM_PATH` to override `.venv/bin/python` and Playwright's own Chromium. Playwright is a test-only dependency and is not shipped with the browser application. A missing runtime or failed scientific run fails this milestone check instead of being counted as a successful demonstration.
