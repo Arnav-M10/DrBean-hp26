@@ -31,7 +31,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 | H-DIRTY-FLAG | P1 | 5 | retested | git_state stripped porcelain output and marked every record dirty (since harness 0.1.0) |
 | H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
 | H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
-| H-CI-ENGINE | P1 | 5 | fixed_pending_retest | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
+| H-CI-ENGINE | P1 | 5 | retested | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
 | F-LAUNCHER-HIDDEN-PTH | P1 | 4 | open | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
 | F-LAUNCHER-ENV-READ | P2 | 4 | open | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 | H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
@@ -49,6 +49,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Retest at preview of backend/followup 8525cab (harness 1760df0; diagnostics relax_nproc + science_barrier):** Still reproduces: 1 live scientific child when the worker was SIGKILLed, still alive after `worker --recover` (the run itself is correctly marked interrupted and not redispatched). Running cancellation kills its child (passes). The harness released the barrier and reaped the orphan at teardown. (evidence: {"attempts": ["att_3cf444719093428e"], "results": "evaluation/results/previews/backend-followup-8525cab/relax_nproc+science_barrier"})
 - **Retest at merged main 80f95a4 via harness b827c61 and f992b48 (diagnostics relax_nproc + science_barrier):** Still reproduces on main, twice: the scientific child survives the worker SIGKILL and `worker --recover` (the run is correctly marked interrupted and not redispatched). Running cancellation still kills its child. Since f992b48 the harness terminates the orphan before releasing the barrier (H-ORPHAN-TEARDOWN). (evidence: {"attempts": ["att_d0b306605a744db4", "att_593e67a5ca214685"], "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier"})
 - **Retest at merged main 80f95a4, harness a1b28ae, tests/integration (science_barrier only; no product guard relaxed):** Reproduces without relax_nproc: the deterministic pytest test fails no_orphan_after_worker_kill (1 live scientific child after the worker SIGKILL). The barrier holds the child after setsid and the product's limits, so this is the product's own kill/recovery path. (evidence: {"pytest": "evaluation/results/integration/pytest-merged-main-a1b28ae.md"})
+- **Retest at main 61edad7, Linux CI (ubuntu runner, no diagnostics except the harness barrier):** Reproduces on Linux too: no_orphan_after_worker_kill, 1 live scientific child after the worker SIGKILL. Not a Mac-only effect. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
 
 ## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, retested)
 
@@ -192,6 +193,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Retest at backend/browser-design 8451c1f and codex/ai-offline-milestones c6f04c2 (previews):** Present on both newer branches: plain hero baseline fails on the Mac; Owner 3's new real-Counterdex coordinator test fails with scientific_runtime_unavailable. This is now the single blocker between the Mac and a passing acceptance hero run. (evidence: {"ai": "evaluation/results/previews/ai-offline-milestones-c6f04c2", "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"})
 - **Retest at 3b55843 (app code = main 9cc90e0; engine runtime now Owner 4's .venv-engine, CPython 3.11.17):** Still fails on both launch paths: harness path and Owner 4's launcher both report scientific_runtime_unavailable for the hero and changed-input baselines. With only the process-limit guard relaxed (diagnostic), the same launcher runs discovery, changed input, design authority and zero dispatch to a pass. (evidence: {"attempts": ["att_92546adc9fac471e", "att_fe675c60b66a4801", "att_8e959bd4324c48f8"], "results": "evaluation/results, evaluation/results/owner4-launcher, evaluation/results/owner4-launcher/relax_nproc"})
 - **Retest at merged main 80f95a4 via harness b827c61:** Unchanged on both launch paths (harness and Owner 4's launcher): hero and changed-input baselines fail with scientific_runtime_unavailable. It is now the only blocker between this Mac and release acceptance of the hero, design and follow-up path, which pass in full when only this guard is relaxed. (evidence: {"attempts": ["att_568062c9c3434610", "att_98ac5a9ee88048d1", "att_1ace0e6c87124367"]})
+- **Retest at main 61edad7, Linux CI:** Contrast: the same real-science HTTP tests (hero with checked design and fresh replay, changed input, design authority, design-bound follow-up) pass on the Linux runner, which owns about 64 processes. The failure on this Mac is the per-user process cap alone. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
 
 ## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, retested)
 
@@ -242,13 +244,14 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Observed:** 409 stale_revision for the second fork (the first moved the current dataset); the harness now uses one workspace per branch
 - **Evidence:** {"note": "correct immutability behaviour; product/UX gap, not a safety defect"}
 
-## H-CI-ENGINE (P1, owner 5, fixed_pending_retest)
+## H-CI-ENGINE (P1, owner 5, retested)
 
 - **Input:** CI stack job: `python3 scripts/dev/launcher.py setup` then `.venv/bin/python -m pytest -q tests/integration` with no DRBEAN_SCIENCE_PYTHON and no python3.11 on PATH
 - **Command:** `.venv/bin/python -m pytest -q tests/integration`
 - **Expected:** the launched stack receives BEAN_COUNTERDEX_PYTHON for the qualified CPython 3.11 engine that setup prepared
 - **Observed:** Reported by Owner 1 from CI run 43556610563 (PR #5 merge 4fc3add): integration suite 36 passed, 7 failed, 2 xfailed; all seven failures were plan admission 503 scientific_runtime_missing. Harness 4ea7cb3 (the copy merged into main) resolves the engine only from DRBEAN_SCIENCE_PYTHON or python3.11 on PATH; the stack job prepares .venv-engine but exports neither, so LocalStack launched the API without BEAN_COUNTERDEX_PYTHON. A harness-environment defect, not a product one.
 - **Evidence:** {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43556610563", "reported_in": "origin/codex/science-next docs/workstreams/01-science.md (Post-push CI at 8af34e4)"}
+- **Retest at main 61edad7 (PR #16 merged 8bb1fbe), Linux CI:** Closed by retest: CI's integration suite now finds .venv-engine and runs real science: 43 passed, 3 failed (two strict-xfail XPASSes fixed by 1ae19ff, not yet in main; F-ORPHAN-WORKER-KILL). Hero, changed input, design authority and follow-up pass on Linux without diagnostics. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
 
 ## F-LAUNCHER-HIDDEN-PTH (P1, owner 4, open)
 

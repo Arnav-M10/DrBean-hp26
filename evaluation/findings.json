@@ -50,6 +50,15 @@
           "evidence": {
             "pytest": "evaluation/results/integration/pytest-merged-main-a1b28ae.md"
           }
+        },
+        {
+          "at_commit": "main 61edad7, Linux CI (ubuntu runner, no diagnostics except the harness barrier)",
+          "result": "Reproduces on Linux too: no_orphan_after_worker_kill, 1 live scientific child after the worker SIGKILL. Not a Mac-only effect.",
+          "evidence": {
+            "ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025",
+            "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite",
+            "commit": "main 61edad7 (PR #16)"
+          }
         }
       ]
     },
@@ -567,6 +576,15 @@
               "att_1ace0e6c87124367"
             ]
           }
+        },
+        {
+          "at_commit": "main 61edad7, Linux CI",
+          "result": "Contrast: the same real-science HTTP tests (hero with checked design and fresh replay, changed input, design authority, design-bound follow-up) pass on the Linux runner, which owns about 64 processes. The failure on this Mac is the per-user process cap alone.",
+          "evidence": {
+            "ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025",
+            "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite",
+            "commit": "main 61edad7 (PR #16)"
+          }
         }
       ]
     },
@@ -798,7 +816,7 @@
       "id": "H-CI-ENGINE",
       "severity": "P1",
       "owner": "5",
-      "status": "fixed_pending_retest",
+      "status": "retested",
       "title": "Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine",
       "minimal_input": "CI stack job: `python3 scripts/dev/launcher.py setup` then `.venv/bin/python -m pytest -q tests/integration` with no DRBEAN_SCIENCE_PYTHON and no python3.11 on PATH",
       "command": ".venv/bin/python -m pytest -q tests/integration",
@@ -809,7 +827,17 @@
         "ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43556610563",
         "reported_in": "origin/codex/science-next docs/workstreams/01-science.md (Post-push CI at 8af34e4)"
       },
-      "retests": []
+      "retests": [
+        {
+          "at_commit": "main 61edad7 (PR #16 merged 8bb1fbe), Linux CI",
+          "result": "Closed by retest: CI's integration suite now finds .venv-engine and runs real science: 43 passed, 3 failed (two strict-xfail XPASSes fixed by 1ae19ff, not yet in main; F-ORPHAN-WORKER-KILL). Hero, changed input, design authority and follow-up pass on Linux without diagnostics.",
+          "evidence": {
+            "ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025",
+            "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite",
+            "commit": "main 61edad7 (PR #16)"
+          }
+        }
+      ]
     },
     {
       "id": "F-LAUNCHER-HIDDEN-PTH",
