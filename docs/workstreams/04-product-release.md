@@ -155,7 +155,7 @@ Fresh results (Linux x86_64, root):
 |---|---|
 | `.venv/bin/python -m pytest -q tests/test_papers_admission.py tests/test_papers_service.py` (pypdf/pypdfium2 installed locally, not locked) | 32 passed |
 | same plus `tests/test_papers_http.py` on a scratch tree with the patch applied | 36 passed; full backend suite there: 655 passed |
-| `node --test apps/web/*.test.mjs` | 41 passed |
+| `node --test` in `apps/web` | 36 passed |
 | `node apps/web/check-paper.mjs` on the patched scratch tree | 31/31 (real certified counterexample from paper-cited, hand-entered inputs; zero provider attempts) |
 | `node apps/web/check-paper.mjs` on this branch alone | unrun: no paper routes |
 | `node apps/web/check-backend.mjs` on the patched scratch tree | passed |
