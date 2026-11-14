@@ -95,6 +95,7 @@ class Flow:
         self.native_saved: list[dict] = []
         self.other_bytes: dict[str, dict] = {}
         self._openapi = None
+        self._capabilities = None
         self.begin_entry(evidence_dir)
 
     def begin_entry(self, evidence_dir: str) -> None:
@@ -136,6 +137,18 @@ class Flow:
             self._openapi = response.json() if response.status == 200 else {}
         return self._openapi
 
+    def capabilities(self) -> dict:
+        if self._capabilities is None:
+            response = self.client.raw("GET", "/capabilities", authenticated=False)
+            self._capabilities = response.json() if response.status == 200 else {}
+        return self._capabilities
+
+    def native_design_contract(self) -> bool:
+        """The application publishes v2 native design (``capabilities.science.native_design``): the server resolves the
+        mandatory baseline history itself, prospective reuse is unsupported and ``source_artifact_ids`` must be empty.
+        Without that capability the earlier contract applies and the request names the baseline artifacts."""
+        return ((self.capabilities().get("science") or {}).get("native_design")) is True
+
     def schema_properties(self, name: str) -> tuple[set[str], set[str]]:
         schema = ((self.openapi().get("components") or {}).get("schemas") or {}).get(name) or {}
         return set((schema.get("properties") or {}).keys()), set(schema.get("required") or [])
@@ -165,10 +178,11 @@ class Flow:
         props, _ = self.schema_properties("DesignRequestBody")
         if "scientific_profile" in props:  # every reviewed scope field is explicit; nothing is inherited
             sources = []
-            for candidate in pair:
-                for artifact_id in candidate.get("artifact_ids") or []:
-                    if artifact_id not in sources:
-                        sources.append(artifact_id)
+            if not self.native_design_contract():  # earlier contract: name the baseline artifacts explicitly
+                for candidate in pair:
+                    for artifact_id in candidate.get("artifact_ids") or []:
+                        if artifact_id not in sources:
+                            sources.append(artifact_id)
             request.update(scientific_profile=SCIENTIFIC_PROFILE, requested_tier="checked_pair_separation",
                            allowance_origin={"kind": review.get("allowance_origin", "hypothetical"),
                                              "description": review.get("allowance_description",
@@ -922,6 +936,31 @@ def scenario_design_authority(flow: Flow, packet: dict) -> dict:
                        finding="F-DESIGN-AUTHORITY")
         except ApiFailure as error:
             checks.expect(f"approval_bound_to_{label}", error.status == 403, f"{error.status} {error.code}")
+    # 3b. v2 native design: prospective artifact reuse is unsupported, so a request naming baseline artifacts as
+    # reuse must never produce a checked design (refused at proposal, or failed without a checked result).
+    reuse = sorted({a for c in pair for a in c.get("artifact_ids") or []})[:2]
+    if flow.native_design_contract() and reuse:
+        try:
+            probe = flow.client.post(f"/runs/{run['id']}/design-proposals", {**first, "source_artifact_ids": reuse},
+                                     label="authority-reuse-proposal")
+        except ApiFailure as error:
+            checks.expect("nonempty_reuse_never_yields_checked_design", 400 <= error.status < 500,
+                          f"refused at proposal: {error.status} {error.code}")
+        else:
+            probe_approval = flow.client.post(f"/design-plans/{probe['id']}/approvals", {
+                "expected_plan_digest": probe["digest"], "expected_current_revision_id": problem["id"],
+                "accepted": True}, label="authority-reuse-approve")
+            job = flow.client.post(f"/design-plans/{probe['id']}/jobs", {"approval_id": probe_approval["id"],
+                                   "expected_plan_digest": probe["digest"]}, label="authority-reuse-start")
+            finished = flow.poll(f"/design-jobs/{job['id']}")
+            flow.jobs_executed.add(job["id"])
+            tier = ((flow.client.get(f"/records/{finished['result_id']}") if finished.get("result_id") else {})
+                    .get("body") or {}).get("design_tier")
+            checks.expect("nonempty_reuse_never_yields_checked_design", tier != "checked_pair_separation",
+                          f"accepted at proposal and approval; job {finished.get('state')} "
+                          f"({finished.get('error_code')}), tier {tier}")
+            checks.add("nonempty_reuse_refused_before_approval", "failed",
+                       "the unsupported reuse was only refused after a reviewer approved it", level=INFO)
     # 4. Pair scope: unknown id, duplicated candidate and altered vector are refused.
     alter = dict(pair[1]["parameter_vector"])
     alter["ke"] = _nudge(alter["ke"])

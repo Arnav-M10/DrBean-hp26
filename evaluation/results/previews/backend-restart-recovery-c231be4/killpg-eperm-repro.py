@@ -1,5 +1,8 @@
 """Darwin: killpg on a session whose only member is an exited, unreaped leader."""
-import os, signal, time, multiprocessing as mp
+import multiprocessing as mp
+import os
+import signal
+import time
 
 
 def leader():
