@@ -2,6 +2,10 @@
 import asyncio
 import hashlib
 import json
+import os
+from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -69,6 +73,32 @@ def test_account_gate_is_distinct_from_key_presence():
         asyncio.run(provider.generate("explanation", "Test", Answer, context=context()))
 
 
+@pytest.mark.parametrize("operation", ["intake", "explanation", "design_proposal", "observation_proposal"])
+def test_ready_credentials_and_old_account_decision_cannot_enable_live_dispatch(monkeypatch, operation):
+    from google import genai
+    constructors = []
+
+    def deny_client(**kwargs):
+        constructors.append(True)
+        raise AssertionError("Offline mode must reject before constructing an SDK client")
+
+    monkeypatch.setattr(genai, "Client", deny_client)
+    ledger = Ledger()
+    provider = GeminiProvider(config(), ledger)
+    # Repeated requests cannot turn a disabled operation into a live retry.
+    for _ in range(2):
+        with pytest.raises(ProviderFailure, match="provider_dispatch_disabled"):
+            asyncio.run(provider.generate(operation, "A previously consented request", Answer, context=context()))
+    assert constructors == [] and ledger.attempts == []
+    capabilities = provider.capabilities()
+    assert capabilities["configured"] is True
+    assert capabilities["execution_mode"] == "disabled"
+    assert capabilities["dispatch_enabled"] is False
+    assert capabilities["unavailable_reason"] == "provider_dispatch_disabled"
+    assert capabilities["transport_provenance"] == "not_observed"
+    assert capabilities["live_qualification"] == "not_run"
+
+
 def test_disclosed_assistant_image_uses_one_existing_turn_budget():
     data = b"controlled-transport-image"
     ledger = Ledger()
@@ -98,6 +128,12 @@ def test_valid_output_is_unaccepted_and_sdk_retries_are_disabled():
     assert ledger.attempts[0]["result"]["validation_outcome"] == "schema_valid_unaccepted"
     assert "test-only-secret" not in json.dumps(ledger.attempts)
     assert ledger.attempts[0]["result"]["usage"] is None
+    assert ledger.attempts[0]["metadata"]["provider"] == "controlled"
+    assert ledger.attempts[0]["metadata"]["actual_model_tokens"] == 0
+    assert ledger.attempts[0]["result"]["provider_request_id"] is None
+    assert ledger.attempts[0]["result"]["simulated_provider_request_id"] == "safe-request-id"
+    assert created[0].kwargs["api_key"] == "nonsecret-controlled-placeholder"
+    assert result.execution_mode == "controlled"
 
 
 @pytest.mark.parametrize("text", ['{"value":0.5}', '{"value":"a","value":"b"}', '{"value":"a","valid":true}', 'bad json'])
@@ -136,7 +172,9 @@ def test_timeout_is_unknown_outcome_not_safe_automatic_retry():
 def test_image_requires_bound_digest_and_explicit_token_reservation():
     data = b"controlled-image-transport-only"
     ledger = Ledger()
-    provider = GeminiProvider(config(), ledger)
+    def forbidden_factory(**kwargs):
+        pytest.fail("Invalid image context must be rejected before controlled transport construction")
+    provider = GeminiProvider(config(), ledger, client_factory=forbidden_factory)
     with pytest.raises(ProviderFailure, match="source_binding_mismatch"):
         asyncio.run(provider.generate("intake", "Test", Answer, context=context(), image_bytes=data, mime_type="image/png"))
     with pytest.raises(ProviderFailure, match="image_token_bound_required"):
@@ -152,3 +190,58 @@ def test_usage_overrun_is_retained_and_output_not_accepted():
         asyncio.run(GeminiProvider(config(), ledger, client_factory=lambda **k: client).generate(
             "explanation", "Test", Answer, context=context()))
     assert ledger.attempts[0]["result"]["usage"]["input_tokens"] == 99_999
+
+
+def test_offline_preflight_runs_from_any_directory_and_accounts_for_both_branches(tmp_path):
+    probe = Path(__file__).resolve().parents[1] / "scripts" / "ai" / "probe.py"
+    process = subprocess.run([sys.executable, str(probe)], cwd=tmp_path,
+        env={"PATH": os.defpath, "LANG": "C.UTF-8"}, capture_output=True, text=True, timeout=15)
+    assert process.returncode == 0, process.stdout
+    report = json.loads(process.stdout)
+    assert report["offline_preflight_passed"] is True
+    assert report["external_dispatch_attempts"] == report["actual_model_tokens"] == 0
+    assert report["live_qualification"] == "not_run"
+    assert report["evidence_level"] == "controlled_graph_with_controlled_tools"
+    branches = report["branches"]
+    assert [(b["executed"], b["skipped"]) for b in branches] == [
+        (["baseline"], ["optional"]), (["baseline", "optional"], [])]
+    assert all(b["result"]["runtime"]["tool_inventory"] for b in branches)
+    assert all(b["result"]["explanation"]["authorship"] == "controlled_commentary" for b in branches)
+
+
+def test_known_hosted_factory_is_rejected_before_construction_or_reservation():
+    class HostedFactory:
+        __module__ = "google.genai.client"
+
+        def __call__(self, **kwargs):
+            pytest.fail("A hosted factory must never be constructed in offline mode")
+
+    ledger = Ledger()
+    with pytest.raises(ProviderFailure, match="provider_dispatch_disabled"):
+        asyncio.run(GeminiProvider(config(), ledger, client_factory=HostedFactory()).generate(
+            "explanation", "Test", Answer, context=context()))
+    assert ledger.attempts == []
+
+
+def test_injected_factory_cannot_return_an_inherited_hosted_client():
+    class HostedClient(Client):
+        __module__ = "google.genai.client"
+
+    class LocalSubclass(HostedClient):
+        pass
+
+    ledger, client = Ledger(), LocalSubclass(response())
+    with pytest.raises(ProviderFailure, match="provider_dispatch_disabled"):
+        asyncio.run(GeminiProvider(config(), ledger, client_factory=lambda **_: client).generate(
+            "explanation", "Test", Answer, context=context()))
+    assert client.calls == []
+    assert ledger.attempts[0]["result"]["code"] == "provider_dispatch_disabled"
+
+
+def test_simulated_usage_is_distinct_from_observed_provider_billing():
+    client = Client(response(usage={"prompt_token_count": 100, "candidates_token_count": 10}))
+    result = asyncio.run(GeminiProvider(config(), Ledger(), client_factory=lambda **_: client).generate(
+        "explanation", "Test", Answer, context=context()))
+    assert result.execution_mode == "controlled"
+    assert result.usage is None
+    assert result.simulated_usage["input_tokens"] == 100

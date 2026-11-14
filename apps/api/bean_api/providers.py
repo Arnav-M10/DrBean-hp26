@@ -1,8 +1,10 @@
-"""Bounded official Gemini adapter; configuration never counts as live qualification.
+"""Bounded Gemini request preparation with live dispatch disabled.
 
 Inspected interfaces: googleapis/python-genai (google-genai 3.3.0),
 https://ai.google.dev/gemini-api/docs/structured-output and image-understanding.
-Each dispatch has a durable attempt before networking. SDK retries are disabled.
+Only an explicitly injected controlled transport may execute requests in this
+release. Credentials and historical account decisions cannot enable live SDK
+construction. Controlled attempts are simulations, never live qualification.
 No provider key, prompt, source bytes, raw exception or model reasoning enters logs.
 """
 from __future__ import annotations
@@ -85,6 +87,23 @@ class ProviderResult:
     model: str
     usage: dict[str, int | None] | None
     finish_reason: str | None
+    execution_mode: Literal["controlled", "unqualified"] = "unqualified"
+    simulated_usage: dict[str, int | None] | None = None
+
+
+def _hosted_sdk_object(value: Any) -> bool:
+    """Reject common accidental live injection, including inherited SDK clients.
+
+    Arbitrary injected Python remains trusted test code, not a sandbox. The
+    socket-deny preflight independently observes the local test transport.
+    """
+    candidates = (value, *getattr(value, "__mro__", ()), *type(value).__mro__)
+    return any(
+        getattr(candidate, "__module__", "") == prefix
+        or getattr(candidate, "__module__", "").startswith(prefix + ".")
+        for candidate in candidates
+        for prefix in ("google.genai", "google.generativeai", "google.cloud", "vertexai", "openai", "anthropic")
+    )
 
 
 def utc_now() -> str:
@@ -163,9 +182,11 @@ class GeminiProvider:
     def __init__(self, config: ProviderConfig, ledger: AttemptLedger, *, client_factory: Any = None):
         self.config = config
         self.ledger = ledger
-        self._client_factory = client_factory  # Explicit controlled-test injection; production uses SDK.
+        self._client_factory = client_factory  # Trusted in-process test seam, never a request option.
+        self._transport_provenance = "not_observed"
 
     def capabilities(self) -> dict[str, Any]:
+        controlled = self._client_factory is not None and not _hosted_sdk_object(self._client_factory)
         try:
             self.config.check_ready()
             gate = True
@@ -176,8 +197,12 @@ class GeminiProvider:
                 "configured": bool(self.config.api_key and self.config.model),
                 "account_gate_passed": gate, "model": self.config.model,
                 "reachable": None, "verified_in_environment": False,
-                "unavailable_reason": reason, "sdk_version": package_version("google-genai"),
-                "image_budget_configured": self.config.image_token_upper_bound is not None}
+                "unavailable_reason": reason or (None if controlled else "provider_dispatch_disabled"),
+                "sdk_version": package_version("google-genai"),
+                "image_budget_configured": self.config.image_token_upper_bound is not None,
+                "execution_mode": "controlled" if controlled else "disabled",
+                "dispatch_enabled": False, "live_qualification": "not_run",
+                "transport_provenance": self._transport_provenance}
 
     async def generate(self, operation: Operation, prompt: str, schema: type[T], *,
                        context: AttemptContext, image_bytes: bytes | None = None,
@@ -185,6 +210,11 @@ class GeminiProvider:
         if operation not in {"intake", "explanation", "design_proposal", "observation_proposal"}:
             raise ProviderFailure("provider_operation_unsupported")
         self.config.check_ready()
+        if self._client_factory is None or _hosted_sdk_object(self._client_factory):
+            # Enforce the current mode at this public boundary as well as startup
+            # and worker selection. Do not import/build a network-capable client,
+            # reserve a billable attempt, or let old consent enable this path.
+            raise ProviderFailure("provider_dispatch_disabled")
         checked_context = context.checked_dict()
         if not isinstance(prompt, str) or not prompt or len(prompt.encode("utf-8")) > 48_000:
             raise ProviderFailure("provider_context_limit")
@@ -206,7 +236,7 @@ class GeminiProvider:
         if input_reservation > self.config.max_input_tokens:
             raise ProviderFailure("provider_input_budget_exceeded")
         wall_cap = min(self.config.request_timeout_seconds, 60 if operation == "intake" else 30)
-        metadata = {"provider": "gemini", "model": self.config.model,
+        metadata = {"provider": "controlled", "intended_provider": "gemini", "model": self.config.model,
                     "sdk_version": package_version("google-genai"), "adapter_version": "gemini-v1",
                     "prompt_version": "gf2-proposal-v1", "schema_version": "DB-SC-1",
                     "operation": operation, "modality": "image" if image_bytes is not None else "text",
@@ -214,21 +244,25 @@ class GeminiProvider:
                     "account_decision_id": self.config.account_decision_id,
                     "started_at": utc_now(), "reserved_input_tokens": input_reservation,
                     "reserved_output_tokens": self.config.max_output_tokens, "max_requests": 1,
-                    "timeout_seconds": wall_cap, "retry_policy": "none", "api_surface": "Gemini Developer API v1beta",
-                    "test_transport": self._client_factory is not None}
+                    "timeout_seconds": wall_cap, "retry_policy": "none", "request_schema": "Gemini Developer API v1beta",
+                    "test_transport": True, "execution_mode": "controlled",
+                    "external_provider_calls": 0, "actual_model_tokens": 0,
+                    "usage_provenance": "controlled_simulation"}
         attempt_id = self.ledger.begin_attempt(checked_context, metadata)
         started = time.monotonic()
         client = None
         usage = None
         try:
-            from google import genai
             from google.genai import types
-            kwargs = {"api_key": self.config.api_key, "vertexai": False,
+            kwargs = {"api_key": "nonsecret-controlled-placeholder", "vertexai": False,
                       "http_options": types.HttpOptions(api_version="v1beta",
                                                          base_url="https://generativelanguage.googleapis.com",
                                                          timeout=wall_cap * 1000,
                                                          retry_options=types.HttpRetryOptions(attempts=1))}
-            client = (self._client_factory or genai.Client)(**kwargs)
+            client = self._client_factory(**kwargs)
+            if _hosted_sdk_object(client):
+                raise ProviderFailure("provider_dispatch_disabled")
+            self._transport_provenance = "controlled_injected_transport"
             parts = [types.Part.from_text(text=prompt)]
             if image_bytes is not None:
                 parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
@@ -260,9 +294,11 @@ class GeminiProvider:
                     raise ProviderFailure("provider_usage_exceeded_reservation")
             self.ledger.finish_attempt(attempt_id, {"status": "validated", "finished_at": utc_now(),
                 "duration_ms": int((time.monotonic() - started) * 1000), "usage": usage,
-                "provider_request_id": _request_id(response), "finish_reason": finish_reason,
+                "provider_request_id": None, "simulated_provider_request_id": _request_id(response),
+                "finish_reason": finish_reason,
                 "validation_outcome": "schema_valid_unaccepted"})
-            return ProviderResult(value, attempt_id, self.config.model or "", usage, finish_reason)
+            return ProviderResult(value, attempt_id, self.config.model or "", None, finish_reason,
+                                  execution_mode="controlled", simulated_usage=usage)
         except asyncio.CancelledError:
             self.ledger.finish_attempt(attempt_id, {"status": "unknown_outcome", "code": "provider_cancelled_unknown_outcome",
                 "finished_at": utc_now(), "duration_ms": int((time.monotonic() - started) * 1000), "usage": None})
