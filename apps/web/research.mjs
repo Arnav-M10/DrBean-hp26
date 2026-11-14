@@ -191,7 +191,14 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
   const save = (bytes, name) => { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/json' })); const a = element('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }
   const action = async callback => { try { await callback() } catch (error) { controller.state.error = error.message; render() } }
   const link = (text, href) => { const a = element('a', text, 'button secondary'); a.href = href; return a }
-  function button(parent, title, callback, disabled = false, className = '') { const item = element('button', title, className); item.type = 'button'; item.disabled = disabled || controller.state.busy; item.addEventListener('click', () => action(callback)); parent.append(item); return item }
+function button(parent, title, callback, disabled = false, className = '', download = false) {
+    const item = element('button', title, className); item.type = 'button'; item.disabled = disabled || controller.state.busy
+    item.addEventListener('click', () => action(async () => {
+      await callback()
+      if (download) item.dispatchEvent(new CustomEvent('bean:download-ready', { bubbles: true, detail: { target: item } }))
+    }))
+    parent.append(item); return item
+  }
   function details(parent, title, value, className = '') { const item = element('details', '', className); item.append(element('summary', title), element('pre', JSON.stringify(value, null, 2))); parent.append(item); return item }
   function field(parent, title, key, options = null) {
     const label = element('label', title, 'stack')
@@ -348,8 +355,10 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
     if (!state.events.length) root.append(element('p', 'No recorded activity yet.', 'fine'))
     else {
       const recent = element('ol', '', 'timeline')
+      recent.dataset.motionStream = s.id
       for (const event of state.events.slice(-6)) {
         const item = element('li', '', event.event_type === 'review_required' || event.event_type === 'waiting_observation' ? 'waiting' : ['tool_finished', 'evidence_observed', 'decision_recorded', 'terminal'].includes(event.event_type) ? 'done' : '')
+        item.dataset.motionEvent = event.event_id
         const time = element('time', new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })); time.dateTime = event.timestamp
         item.append(time, element('strong', EVENT_LABELS[event.event_type] ?? event.event_type), event.summary ? ` — ${event.summary}` : '')
         recent.append(item)
@@ -371,8 +380,8 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
       for (const candidate of result.candidate_results ?? []) card.append(element('p', `${candidate.candidate_id}: ${{ valid: 'still fits', invalid: 'ruled out' }[candidate.verification] || 'unresolved'}. ${candidate.reason_code || ''}`, 'fine'))
       const row = element('div', '', 'actions'); card.append(row)
       for (const ref of result.artifacts ?? []) {
-        button(row, 'Download native evidence', async () => { const data = await connection.api.download(`/artifacts/${ref.id}`, ref); save(data.bytes, `dr-bean-${ref.id}.native.json`) }, false, 'secondary')
-        button(row, 'Download independent replay anchors', async () => { const data = await connection.api.download(`/artifacts/${ref.id}/anchor?download=true`); save(data.bytes, `dr-bean-${ref.id}.anchors.json`) }, false, 'secondary')
+        button(row, 'Download native evidence', async () => { const data = await connection.api.download(`/artifacts/${ref.id}`, ref); save(data.bytes, `dr-bean-${ref.id}.native.json`) }, false, 'secondary', true)
+        button(row, 'Download independent replay anchors', async () => { const data = await connection.api.download(`/artifacts/${ref.id}/anchor?download=true`); save(data.bytes, `dr-bean-${ref.id}.anchors.json`) }, false, 'secondary', true)
       }
       const tech = details(card, 'Technical details', { verification: result.verification, expected_binding: result.expected_binding || result.verification_record?.expected_binding, replay: result.replay, candidates: result.candidates, candidate_ids: result.candidate_ids, candidate_results: result.candidate_results, options: result.options, selected_time: result.selected_time, future_hard_allowance: result.future_hard_allowance }, 'technical')
       for (const ref of result.artifacts ?? []) tech.append(element('pre', `python3.11 -m counterdex replay-native dr-bean-${ref.id}.native.json --anchors dr-bean-${ref.id}.anchors.json`))
@@ -380,7 +389,7 @@ export function setupResearch({ root, results, next, report, getDraft, getSource
     }
     if (state.evidence.some(record => !(record.body.result ?? record.body).design_tier)) results.append(link('Next measurement and report', '#next'))
     if (s.pending_review?.kind === 'design_plan') next.append(link('Review the proposed comparison', '#investigations'))
-    for (const id of s.reports) button(report, 'Download research report snapshot', async () => { const data = await connection.api.download(`/reports/${id}/download`); save(data.bytes, `dr-bean-${id}.json`) }, false, 'secondary')
+    for (const id of s.reports) button(report, 'Download research report snapshot', async () => { const data = await connection.api.download(`/reports/${id}/download`); save(data.bytes, `dr-bean-${id}.json`) }, false, 'secondary', true)
     details(root, 'Exact inputs this plan was created with', s.reviewed_context, 'technical')
     const controls = element('div', '', 'actions'); root.append(controls)
     button(controls, 'Refresh saved state', () => controller.refresh(), false, 'secondary')

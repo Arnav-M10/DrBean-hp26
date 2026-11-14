@@ -97,9 +97,9 @@ export function keLine({ domain, target, candidates }) {
   candidates.forEach((candidate, index) => {
     const cx = x(candidate.ke), labelY = 12 + (index % 3) * 14
     root.append(svg('line', { x1: cx, x2: cx, y1: labelY + 3, y2: axisY - 9, stroke: candidate.color, 'stroke-width': 1, 'stroke-dasharray': '2 2' }))
-    root.append(svg('circle', { cx, cy: axisY - 9, r: 6, fill: candidate.color, stroke: '#fff', 'stroke-width': 2 }))
+    root.append(svg('circle', { cx, cy: axisY - 9, r: 6, fill: candidate.color, stroke: 'var(--surface)', 'stroke-width': 2 }))
     const anchor = cx > width - 110 ? 'end' : cx < 110 ? 'start' : 'middle'
-    root.append(svg('text', { class: 'label', x: anchor === 'end' ? cx - 4 : anchor === 'start' ? cx + 4 : cx, y: labelY, 'text-anchor': anchor, fill: candidate.color }, `${candidate.short} · ke ≈ ${readable(candidate.ke)}`))
+    root.append(svg('text', { class: 'candidate-label', x: anchor === 'end' ? cx - 4 : anchor === 'start' ? cx + 4 : cx, y: labelY, 'text-anchor': anchor, fill: candidate.color }, `${candidate.short} · ke ≈ ${readable(candidate.ke)}`))
   })
   return root
 }
@@ -150,5 +150,5 @@ export function concentrationChart({ rows, curves = [], markTime = null, height 
 }
 
 // Bean red is reserved for the claim, so candidates never use it.
-export const CANDIDATE_COLORS = ['#1f4f8a', '#b25b0e', '#1c6740', '#5b3f8f']
+export const CANDIDATE_COLORS = ['var(--plot-a)', 'var(--plot-b)', 'var(--plot-c)', 'var(--plot-d)']
 const narrow = () => (globalThis.innerWidth ?? 1024) < 640

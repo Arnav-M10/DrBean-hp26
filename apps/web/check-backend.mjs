@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'node:net'
 import { randomBytes, createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
+import { captureDesign } from './design-capture.mjs'
 
 import { createRequire } from 'node:module'
 // require() honours NODE_PATH and CommonJS builds; PLAYWRIGHT_MODULE may name an explicit entry file.
@@ -227,6 +228,7 @@ try {
     return fresh
   }
   await downloadAndReplay(evidence.body.result, 'first')
+  await captureDesign(activePage, 'manual-checked-baseline')
 
   // Design uses the actual returned pair, its own reviewed assumptions and approval.
   assert.equal(capabilities.science.native_design, true)
@@ -287,6 +289,7 @@ try {
     assert.deepEqual(await page.locator('[aria-label="Measurement design grid"] tbody tr td:first-child').allTextContents(), ['8', '6'])
     assert.match(await page.locator('#backend-design').textContent(), new RegExp(`Design tier: ${expectedTier}`))
     await downloadAndReplay(suggestion.body, name, true)
+    await captureDesign(activePage, name)
     return { finished, suggestion }
   }
   const designPlan = await prepareDesign()

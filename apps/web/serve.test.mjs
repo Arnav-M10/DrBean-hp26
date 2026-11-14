@@ -55,7 +55,7 @@ async function fixture(t, { configured = true } = {}) {
 
 test('local session proxy retains real module routes and injects only its own private boundary', async t => {
   const { calls, state, send, origin } = await fixture(t)
-  for (const name of ['session', 'research', 'general-workspace']) {
+  for (const name of ['session', 'research', 'general-workspace', 'motion']) {
     let source
     try { source = await readFile(new URL(`./${name}.mjs`, import.meta.url), 'utf8') } catch (error) { if (error.code !== 'ENOENT') throw error }
     const result = await send(`/${name}.mjs`)
