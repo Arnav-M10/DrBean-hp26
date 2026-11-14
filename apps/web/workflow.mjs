@@ -103,6 +103,24 @@ export function setupWorkflow(getDraft) {
           }
           table.append(head, body); region.append(table); investigations.append(node('p', 'Computed candidate parameters are exact rational values. Each candidate remains bound to this reviewed problem.'), region)
         }
+        if (result.native_replay?.operation === 'review') {
+          investigations.append(node('h4', 'Follow-up candidate checks'), node('p', `Observation origin: ${result.native_replay.dataset_origin ?? 'not supplied'}. This review retains the original candidate identities.`))
+          const region = node('div', ''); region.className = 'table-region'; region.tabIndex = 0
+          region.setAttribute('role', 'region'); region.setAttribute('aria-label', 'Follow-up candidate checks')
+          const table = node('table', ''), head = node('thead', ''), headings = node('tr', ''), body = node('tbody', '')
+          for (const title of ['Candidate', 'Recorded status', 'Violating observations', 'Reason']) {
+            const th = node('th', title); th.scope = 'col'; headings.append(th)
+          }
+          head.append(headings)
+          for (const candidate of result.candidate_results ?? []) {
+            const state = { valid: 'Compatible', invalid: 'Excluded' }[candidate.verification] ?? 'Unresolved'
+            const row = node('tr', '')
+            for (const value of [candidate.candidate_id, state, (candidate.violating_observation_ids ?? []).join(', ') || 'None recorded', candidate.reason_code ?? 'None recorded']) row.append(node('td', value))
+            body.append(row)
+          }
+          table.append(head, body); region.append(table); investigations.append(region)
+          if (!result.candidate_results?.length) investigations.append(node('p', 'Candidate-specific feedback is unavailable in this record.'))
+        }
         investigations.append(exactRecord('Exact evidence record', evidence))
         button(investigations, 'Download exact evidence record', async () => {
           const artifact = await api.download(`/artifacts/${evidence.id}`); save(artifact.bytes, `dr-bean-${evidence.id}.json`)
