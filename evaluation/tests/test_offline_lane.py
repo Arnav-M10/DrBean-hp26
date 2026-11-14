@@ -403,3 +403,43 @@ class GuardAndLauncher(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Projection(unittest.TestCase):
+    def test_field_paths_round_trip_and_unknowns_refuse(self):
+        from drbean_eval import projection
+        pairs = {"rows[0].time": "row1_time", "rows[4].concentration": "row5_concentration",
+                 "rows[2].hard_allowance": "row3_allowance", "domain.A.lower": "A_min", "domain.ke.upper": "ke_max",
+                 "target.lower": "target_min", "target.upper": "target_max", "model": "model_template"}
+        for production, evaluation in pairs.items():
+            self.assertEqual(projection.field_to_eval(production), evaluation)
+            self.assertEqual(projection.field_to_production(evaluation), production)
+        self.assertEqual(projection.field_to_eval("ka.upper"), "ka_max")
+        for bad in ("rows[0].notes", "approvals[0].accepted", "row0_time"):
+            with self.assertRaises(projection.ProjectionError):
+                (projection.field_to_eval if "[" in bad or "." in bad else projection.field_to_production)(bad)
+
+    def test_bbox_corners_are_not_width_height(self):
+        from drbean_eval import projection
+        self.assertEqual(projection.bbox_to_xywh([44, 39, 685, 68], 1000, 814), [44, 39, 641, 29])
+        self.assertEqual(projection.xywh_to_bbox([44, 39, 641, 29], 1000, 814), [44, 39, 685, 68])
+        for bbox in ([10, 10, 10, 20], [0, 0, 1001, 10], [5, 5, 2, 9]):
+            with self.assertRaises(projection.ProjectionError):
+                projection.bbox_to_xywh(bbox, 1000, 814)
+        with self.assertRaises(projection.ProjectionError):
+            projection.xywh_to_bbox([990, 10, 20, 5], 1000, 814)  # would extend past the right edge
+        with self.assertRaises(projection.ProjectionError):
+            projection.bbox_to_xywh([0, 0, 5, 5], 0, 814)  # original dimensions are required
+
+    def test_intake_field_keeps_source_identity_and_spelling(self):
+        from drbean_eval import projection
+        source = {"id": "source_1", "body": {"sha256": "a" * 64, "width": 1200, "height": 1550}}
+        field = {"field_path": "rows[0].hard_allowance", "original_value": "0.05", "candidate_exact": "1/20",
+                 "unit": "mg/L", "ambiguity": "0.05 or 0.5", "grounding": "unreviewed_visual",
+                 "locator": {"page": 1, "label": "row 1", "excerpt": "0.05", "bbox": [100, 200, 160, 230]}}
+        out = projection.intake_field_to_eval(field, source)
+        self.assertEqual(out["field"], "row1_allowance")
+        self.assertEqual((out["value"], out["original_value"], out["status"]), ("1/20", "0.05", "ambiguous"))
+        self.assertEqual(out["source_ref"]["region_xywh_px"], [100, 200, 60, 30])
+        self.assertEqual(out["source_ref"]["asset_sha256"], "a" * 64)
+        self.assertEqual(out["source_ref"]["source_label"], "needs_human_verification")

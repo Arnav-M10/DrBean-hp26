@@ -11,6 +11,7 @@
                                                     machine-readable release gates; nonzero if a requested gate fails
   python3.11 evaluation/cli.py inventory            offline inventory (same gates, informational, exit 0)
   python3.11 evaluation/cli.py history              verify the append-only, hash-chained attempt history
+  python3.11 evaluation/cli.py findings             render evaluation/FINDINGS.md from evaluation/findings.json
   python3.11 evaluation/cli.py report               write evaluation/results/REPORT.md
   python3.11 evaluation/cli.py budget status
   python3.11 evaluation/cli.py admission-assets DIR generate negative admission assets
@@ -88,6 +89,7 @@ def main(argv=None) -> int:
     inventory = sub.add_parser("inventory")
     inventory.add_argument("--results", default=RESULTS)
     sub.add_parser("history")
+    sub.add_parser("findings")
     budget = sub.add_parser("budget")
     budget.add_argument("action", choices=("status", "open"))
     budget.add_argument("--cohort")
@@ -152,6 +154,25 @@ def main(argv=None) -> int:
         if args.command == "inventory":
             return 0 if result["gates"][0]["status"] == "passed" else 1
         return 0 if result["overall"] == "passed" else 3
+    if args.command == "findings":
+        with open(os.path.join(ROOT, "findings.json"), encoding="utf-8") as handle:
+            data = json.load(handle)
+        lines = ["# Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)", "",
+                 f"Application code commit `{data['application_code_commit'][:12]}`, observed with harness "
+                 f"`{data['observed_at_harness_commit']}` on {data['host']}.", "",
+                 "| ID | Sev | Owner | Status | Title |", "|---|---|---|---|---|"]
+        lines += [f"| {f['id']} | {f['severity']} | {f['owner']} | {f['status']} | {f['title']} |"
+                  for f in data["findings"]]
+        for f in data["findings"]:
+            if f.get("command"):
+                lines += ["", f"## {f['id']} ({f['severity']}, owner {f['owner']}, {f['status']})", "",
+                          f"- **Input:** {f.get('minimal_input', '')}", f"- **Command:** `{f['command']}`",
+                          f"- **Expected:** {f.get('expected', '')}", f"- **Observed:** {f.get('observed', '')}",
+                          f"- **Evidence:** {json.dumps(f.get('evidence', {}), sort_keys=True)}"]
+        with open(os.path.join(ROOT, "FINDINGS.md"), "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+        print("wrote evaluation/FINDINGS.md")
+        return 0
     if args.command == "history":
         problems = history.verify(RESULTS)
         for problem in problems:

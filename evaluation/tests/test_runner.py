@@ -133,7 +133,8 @@ class Runner(unittest.TestCase):
         self.assertEqual({r["status"] for r in records}, {"unrun"})
         self.assertTrue(all(r["reason"] and r["tested_commit"] and r["started_at"].endswith("Z") for r in records))
         self.assertEqual(len(runner.read_attempts(self.results)), 24)
-        self.assertIn("| fixture_contract | fixture_contract | 24 | 24 |", report.render(ROOT, self.results))
+        # Report v2 columns: lane, lane version, enabled, provider, tools, scheduled, attempts.
+        self.assertIn("| fixture_contract | 1 | yes | controlled/none | any | 24 | 24 |", report.render(ROOT, self.results))
 
     def test_attempts_are_append_only_and_numbered(self):
         self.run_lane("fixture_contract", NoSubject(), ["C01-A"])
