@@ -304,7 +304,7 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
     details(root, 'Exact inputs this plan was created with', s.reviewed_context, 'technical')
     const controls = element('div', '', 'actions'); root.append(controls)
     button(controls, 'Refresh saved state', () => controller.refresh(), false, 'secondary')
-    if (!['completed', 'failed', 'cancelled'].includes(s.state)) button(controls, 'Stop this research plan', () => controller.cancel(), Boolean(state.pending), 'danger')
+    if (!['completed', 'failed', 'cancelled'].includes(s.state)) button(controls, 'Stop this research plan', async () => { if (confirm('Stop this research plan and any work it owns? Evidence already recorded is kept, but the plan cannot be resumed.')) await controller.cancel() }, Boolean(state.pending), 'danger')
     root.append(element('p', 'This plan is saved on the server. Signing in again with the same identity reopens it; expired or revoked access cannot resume it, and moving it to another identity is not supported.', 'fine'))
     if (ACTIVE.has(s.state) && !state.busy && !state.pending) timer = setTimeout(() => action(() => controller.refresh()), 1500)
   }

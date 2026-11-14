@@ -89,7 +89,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   }
   function renderReview() {
     const review = byId('backend-review'); review.replaceChildren(node('h2', 'Save, approve and start the check'))
-    if (!api) review.append(para('Connect to a Dr. Bean server at the top of this page first. Until then you can still prepare and download your draft.', 'note wait'))
+    if (!api) review.append(para('Investigation planning is unavailable until you connect. Connect to a Dr. Bean server at the top of this page; meanwhile you can still prepare and download your draft.', 'note wait'))
     else if (!workspace) review.append(para('Choose or create a workspace in the connection panel at the top of this page.', 'note wait'))
     else if (!available()) review.append(para(`You can save and approve a plan, but this server cannot run the check right now: ${capabilities?.science?.reason || 'the configured runtime does not offer baseline discovery'}.`, 'note wait'))
     review.append(node('h3', '1. Freeze these inputs'), para('Saves the measurements and claim on the server exactly as shown above and prepares a plan for one check. Nothing runs yet. No language model is used.'))

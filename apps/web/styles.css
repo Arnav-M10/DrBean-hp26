@@ -8,7 +8,7 @@
   --surface: #ffffff;
   --sunken: #e8edf0;
   --rule: #d3dbe1;
-  --rule-strong: #9aa8b3;
+  --rule-strong: #7f8d99; /* ≥3:1 on white for control borders */
   --ink: #15202a;
   --ink-2: #3f4c58;
   --ink-3: #5b6874;
@@ -42,7 +42,8 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; line-height: 1.55; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+html { scroll-padding-top: 5rem; -webkit-tap-highlight-color: transparent; }
+body { touch-action: manipulation; margin: 0; line-height: 1.55; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 h1, h2, h3, h4, p, figure { margin: 0; }
 p, dd, li, td, th, code, summary, label { overflow-wrap: anywhere; }
 a { color: var(--act); text-underline-offset: .2em; text-decoration-thickness: 1px; }
@@ -52,6 +53,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--sunken); pad
 pre { font-family: var(--mono); font-size: var(--t-xs); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; overflow-x: auto; background: var(--sunken); padding: var(--s3); border-radius: var(--r-ctl); margin: var(--s2) 0 0; max-height: 28rem; }
 sup { line-height: 0; }
 
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
 h1 { font-family: var(--serif); font-weight: 600; font-size: var(--t-2xl); line-height: 1.15; letter-spacing: -.005em; }
 h2 { font-size: var(--t-lg); line-height: 1.3; font-weight: 680; }
 h3 { font-size: var(--t-md); line-height: 1.35; font-weight: 680; }
@@ -157,7 +160,7 @@ label { font-weight: 600; }
 input[type='text'], input[type='password'], input:not([type]), textarea, select { display: block; width: 100%; min-height: 2.75rem; padding: .5rem .65rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-strong); border-radius: var(--r-ctl); }
 input[type='file'] { display: block; margin-top: var(--s1); font: inherit; max-width: 100%; }
 textarea { resize: vertical; min-height: 4rem; }
-input::placeholder, textarea::placeholder { color: #7a8691; }
+input::placeholder, textarea::placeholder { color: #66727d; }
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 0; border-color: var(--focus); }
 input[type='checkbox'] { accent-color: var(--act); width: 1.2rem; height: 1.2rem; margin: .15rem 0 0; flex: none; }
 .check { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s3); background: var(--sunken); border-radius: var(--r-ctl); font-weight: 600; margin-top: var(--s3); }

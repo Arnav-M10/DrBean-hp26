@@ -113,6 +113,7 @@ export function concentrationChart({ rows, curves = [], markTime = null, height 
   const curveFns = curves.map(curve => ({ ...curve, f: t => curve.A * (Math.exp(-curve.ke * t) - Math.exp(-curve.ka * t)) }))
   const samples = curveFns.map(curve => Array.from({ length: 121 }, (_, i) => { const t = tMax * i / 120; return [t, curve.f(t)] }))
   const cMax = Math.max(...included.map(r => r.c + (r.e || 0)), ...samples.flat().map(([, c]) => c)) * 1.08
+  if (!(tMax > 0) || !(cMax > 0) || !Number.isFinite(tMax) || !Number.isFinite(cMax)) return null
   const x = t => pad.l + t / tMax * (width - pad.l - pad.r)
   const y = c => height - pad.b - Math.max(0, c) / cMax * (height - pad.t - pad.b)
   const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-labelledby': 'conc-title conc-desc' })

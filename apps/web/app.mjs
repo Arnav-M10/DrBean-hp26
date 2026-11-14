@@ -1,9 +1,9 @@
-import { parseMeasurementsCsv, validateMeasurements } from './exact.mjs'
+import { parseMeasurementsCsv, validateMeasurements, parseExact } from './exact.mjs'
 import { validateQuestion } from './question.mjs'
 import { setupWorkflow } from './workflow.mjs'
 import { setupGeneralWorkspace } from './general-workspace.mjs'
 import { setupResearch } from './research.mjs'
-import { concentrationChart, readable } from './result-view.mjs'
+import { concentrationChart, readable, toNumber } from './result-view.mjs'
 
 const byId = id => document.getElementById(id)
 const sections = ['start', 'inputs', 'question', 'review', 'investigations', 'result', 'next']
@@ -271,7 +271,9 @@ function route(focusHeading = true) {
     else main.removeAttribute('aria-current')
   }
   document.title = `${pageTitles[page]} · Dr. Bean`
-  document.querySelector('#step-list > li[data-current] > a')?.scrollIntoView({ block: 'nearest', inline: 'center' })
+  // Keep the current step visible in the narrow-screen strip without moving focus.
+  const strip = document.querySelector('.steps'), currentLink = document.querySelector('#step-list > li[data-current] > a')
+  if (strip && currentLink && strip.scrollWidth > strip.clientWidth) strip.scrollLeft = currentLink.offsetLeft - 16
   if (page === 'review') renderReview()
   if (requested === 'research') byId('files-path').open = true
   renderWorkflow?.()
@@ -369,7 +371,8 @@ function placeSourcePanel(page) {
 
 function renderInputPlot() {
   const figure = byId('input-plot')
-  const points = rows.map(row => ({ t: Number(row.time), c: Number(row.concentration), e: Number(row.epsilon) || 0, included: row.included }))
+  const exactNumber = value => { try { return toNumber(parseExact(value)) } catch { return NaN } }
+  const points = rows.map(row => ({ t: exactNumber(row.time), c: exactNumber(row.concentration), e: exactNumber(row.epsilon) || 0, included: row.included }))
     .filter(row => row.included && row.time !== '' && Number.isFinite(row.t) && Number.isFinite(row.c) && row.t >= 0)
   figure.querySelector('svg')?.remove()
   figure.hidden = points.length < 2
@@ -521,3 +524,8 @@ renderRows()
 route(false)
 updateChrome()
 addEventListener('hashchange', () => route())
+// The draft lives only in this tab until it is saved, so warn before it is lost.
+addEventListener('beforeunload', event => {
+  const typed = rows.some(row => row.time || row.concentration) || byId('targetMin').value.trim()
+  if (typed && !renderWorkflow?.status?.().planCurrent) { event.preventDefault(); event.returnValue = '' }
+})
