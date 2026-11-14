@@ -242,6 +242,7 @@ try {
 
   // Real retained-file producer, actual citation validation and ordinary UI.
   // Only the model response is an explicitly labelled local controlled preview.
+  await pageA.evaluate(() => { location.hash = 'research' })
   await pageA.locator('#research-files').setInputFiles(join(root, 'tests/integration/fixtures/general/penguins-excerpt.csv'))
   await pageA.locator('#general-assets article').first().waitFor()
   const admitted = await browserRequest(pageA, `/workspaces/${sessionA.workspace_id}/research-assets`)

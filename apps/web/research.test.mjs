@@ -85,3 +85,33 @@ test('general sources retain an untrusted question without forced model inputs o
   assert.equal(body.objective, c.getSourceQuestion()); assert.equal(body.problem_id, undefined); assert.equal(body.accepted, undefined)
   assert.deepEqual(body.source_ids, ['research_asset_table']); assert.equal(calls.filter(call => call.body).length, 1)
 })
+
+test('live session saving neither consents nor grants provider allocation', async () => {
+  const calls = [], api = { json: async (path, body) => { calls.push({ path, body }); return body ? snapshot({ mode: 'live' }) : { items: [] } } }
+  const { controller: c, connection, draft } = setup(api)
+  connection.capabilities = { deepagents: { execution_mode: 'live', dispatch_enabled: true }, gemini: { model: 'gemini-2.5-flash-lite' } }
+  await c.connect(connection); c.state.dataAccepted = true; c.state.acceptedDraft = JSON.stringify(draft)
+  await c.create()
+  assert.equal(calls.at(-1).body.mode, 'live')
+  assert.equal(calls.filter(call => call.body).length, 1)
+  assert.equal(calls.some(call => /consent|allocation|advance/.test(call.path)), false)
+})
+
+test('explicit live consent freezes the exact disclosure and never advances or allocates', async () => {
+  const calls = [], scope = 'c'.repeat(64), current = snapshot({ mode: 'live', provider_disclosure: { context_digest: scope } })
+  const api = { json: async (path, body) => {
+    calls.push({ path, body })
+    if (body) return { id: 'consent_test', kind: 'research_provider_consent', workspace_id: 'ws_test', body: { research_session_id: current.id, context_digest: scope, model: body.model, accepted: true } }
+    return path.endsWith('/research-sessions') ? { items: [] } : current
+  } }
+  const { controller: c, connection } = setup(api)
+  connection.capabilities = { deepagents: { execution_mode: 'live' }, gemini: { model: 'gemini-2.5-flash-lite' } }
+  await c.connect(connection); c.state.snapshot = current
+  await assert.rejects(() => c.consent(), /disclosure/)
+  c.state.providerAccepted = true; await c.consent()
+  const mutation = calls.filter(call => call.body)
+  assert.equal(mutation.length, 1)
+  assert.equal(mutation[0].path, `/research-sessions/${current.id}/provider-consents`)
+  assert.deepEqual(mutation[0].body, { model: 'gemini-2.5-flash-lite', expected_context_digest: scope, accepted: true })
+  assert.equal(c.state.pending, null)
+})

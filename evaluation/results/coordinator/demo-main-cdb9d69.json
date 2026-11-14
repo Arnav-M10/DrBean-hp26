@@ -1,0 +1,201 @@
+{
+  "schema_version": "coordinator-demo-observation.v1",
+  "profile": "langchain-narrow-demo.v1",
+  "profile_canonical_sha256": "aeec4fefdffde49dc166d2b545da840e87f205ad4454ecff25f4d5fad38f5453",
+  "release_qualification": false,
+  "statement": "Narrow demo observation only. Not a coordinator release qualification; deferred predicates are unqualified.",
+  "environment": {
+    "os": "macOS 26.7 arm64",
+    "backend": "CPython 3.13.18 (isolated venv from the unchanged lock)",
+    "engine": "CPython 3.11.17, Counterdex 0.3.0",
+    "browser": "Playwright 1.63.0 Chromium (headless), isolated API, worker and web server on ephemeral ports"
+  },
+  "lanes": {
+    "controlled_science": "controlled model decisions, actual backend and Counterdex",
+    "live_gemini": "not_run"
+  },
+  "claims": [
+    {
+      "id": "DEMO-01",
+      "status": "passed",
+      "basis": "The actual compiled create_deep_agent graph ran through the ordinary worker. write_todos produced research-plan.v1 revisions (plan_updated events), and every event is labelled controlled. The compiled inventory probe passes 4/4.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_01_graph_and_planning_execute",
+        "tests/integration/test_research_graph_inventory.py"
+      ]
+    },
+    {
+      "id": "DEMO-02",
+      "status": "passed",
+      "basis": "No child exists before the canonical decision. The research_decision binds the exact review id and digest, and the approval it created is the one the dispatched child used (child plan_id equals the review id). The browser shows the exact review, keeps approve disabled until the exact checkbox is ticked, and dispatches exactly that plan. Forged, raw-command and actor-selection decisions are refused.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_02_approval_binds_the_dispatched_operation",
+        "evaluation/results/previews/demo-main-cdb9d69/browser.json",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "DEMO-03",
+      "status": "passed",
+      "basis": "The approved child is an actual Counterdex job (certified_counterexample, verification valid, native artifact). An evidence_observed event references that evidence id.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_03_counterdex_evidence_reaches_the_agent"
+      ]
+    },
+    {
+      "id": "DEMO-04",
+      "status": "passed",
+      "basis": "Sessions differing only in the reviewed claim produce different next steps in the maintained plan. A certified counterexample yields a separately approved pair-design review step; no counterexample yields a step to review assumptions and the bounded search scope, with no pair design. These are controlled decisions over actual tool results, not live reasoning.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_04_changed_evidence_changes_the_next_action"
+      ]
+    },
+    {
+      "id": "DEMO-05",
+      "status": "passed",
+      "basis": "The no-counterexample report states that a bounded search finding no counterexample does not prove the claim, with no overclaiming wording. A session without design constraints proposes no design. A session without a reviewed problem creates no child and pauses at an honest research_clarification review.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_05_inconclusive_results_are_reported_honestly"
+      ]
+    },
+    {
+      "id": "DEMO-06",
+      "status": "passed",
+      "basis": "The report snapshot keeps the exact question and binds the actual evidence ids, and the report download works. Native bytes match the recorded SHA-256 and size; the authenticated anchor binds the run; fresh replay with the matching source passes and keeps the outcome. The browser downloads (native, anchor, report) match the same records.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_06_report_and_native_downloads_replay",
+        "evaluation/results/previews/demo-main-cdb9d69/browser.json"
+      ]
+    },
+    {
+      "id": "DEMO-07",
+      "status": "passed",
+      "basis": "Replaying the same decision returns the same session with no new child. The same decision under a new key is refused (409), and so is a stale advance. Children, usage and revision are unchanged: one approved review produced one child.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_07_duplicate_decisions_do_not_duplicate_science"
+      ]
+    },
+    {
+      "id": "DEMO-08",
+      "status": "passed",
+      "basis": "Another identity gets 404 on the session, events, report, evidence and native artifact, through HTTP and through a second browser identity. No key, dummy marker or thread id appears in the visible research records. There are no external browser requests, and the private-session probes pass.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_08_research_and_credentials_stay_private",
+        "evaluation/results/previews/demo-main-cdb9d69/browser.json",
+        "tests/integration/test_private_sessions_independent.py"
+      ]
+    },
+    {
+      "id": "DEMO-09",
+      "status": "passed",
+      "basis": "Using the ordinary in-process Worker, a ProviderFailure after the completed child (as the metered gateway reports one) leaves the session failed with provider_request_failed_unknown_outcome and publishes no report. The evidence, native bytes and replay are intact, with no physical call. On the final merge an unexpected exception type is also contained: the session fails with research_runtime_failure and the evidence is kept (F-RESEARCH-WORKER-UNGUARDED, closed by retest).",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_09_model_failure_preserves_completed_evidence",
+        "tests/integration/test_post_science_failure_independent.py"
+      ]
+    },
+    {
+      "id": "DEMO-10",
+      "status": "not_run",
+      "basis": "Controlled runs are labelled controlled everywhere (mode, events) and record zero physical calls and no Gemini attempt; the browser shows the local controlled policy. No live-labelled demonstration has been run: there is no coordinated live sample within the $0 allocation, and C makes no provider call. The live clause is therefore unqualified.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_10_controlled_runs_are_labelled_controlled",
+        "tests/integration/test_research_gateway_independent.py"
+      ]
+    }
+  ],
+  "candidate": {
+    "main": "cdb9d696e8d9f4ab490b45d73cfea5251bb0d935",
+    "is_final_merge": true,
+    "contains": [
+      "B's PR #43 (merged as cdb9d69)",
+      "A's controlled factory (PR #44 0491939)",
+      "C demo checks e1a69db",
+      "B's 9b7ee31 containing unexpected research failures"
+    ]
+  },
+  "harness": {
+    "commit": "7eaf257ddff182398fa8c88a37f6aa5308f1e747",
+    "note": "C branch merge of main cdb9d69; the C test files are byte-identical to e1a69db"
+  },
+  "observed_at": "2026-11-14T15:39:21Z",
+  "results": {
+    "http": "34 passed, 1 skipped (the honest-refusal probe does not apply once dispatch is enabled)",
+    "browser": "10/10 (langchain_demo_browser.mjs through the ordinary research panel)",
+    "worker_unexpected_exception_retest": "session failed with research_runtime_failure, child completed, tick did not raise",
+    "provider_failure_retest": "session failed with provider_request_failed_unknown_outcome, child completed",
+    "previously": "the same 9 passed and 1 not_run on PR #43 c2e0743 and on A's PR #44 0491939"
+  },
+  "open_findings": [
+    {
+      "id": "F-TEST-VAR-LEAK",
+      "severity": "P2",
+      "owner": "B (backend tests; was Owner 2)",
+      "status": "open"
+    },
+    {
+      "id": "F-SIBLING-FORKS",
+      "severity": "P2",
+      "owner": "B (worker/process supervision; was Owner 2)",
+      "status": "open"
+    },
+    {
+      "id": "F-PAPER-CITATION-SUBSTRING",
+      "severity": "P1",
+      "owner": "A (PR #35 paper proposal validator; was Owner 3)",
+      "status": "open"
+    },
+    {
+      "id": "F-PAPER-QUOTE-NORMALIZATION",
+      "severity": "P2",
+      "owner": "A (PR #35 validator) with B (file services; was Owners 3 and 4)",
+      "status": "open"
+    },
+    {
+      "id": "F-PAPER-HARD-BOUND-CONTEXT",
+      "severity": "P2",
+      "owner": "A (PR #35 validator; was Owner 3)",
+      "status": "open"
+    },
+    {
+      "id": "F-PAPER-EXPONENT-FLATTENING",
+      "severity": "P2",
+      "owner": "A (PR #35 validator) with B (parser; was Owners 3 and 4)",
+      "status": "open"
+    },
+    {
+      "id": "F-PAPER-RENDER-MEMORY",
+      "severity": "P1",
+      "owner": "B (PR #36 papers worker and resource policy; was Owners 4 and 2)",
+      "status": "open"
+    },
+    {
+      "id": "F-PAPER-IDENTITY-CONTRACTS",
+      "severity": "P2",
+      "owner": "B (canonical contracts; was Owner 2) with A",
+      "status": "open"
+    },
+    {
+      "id": "F-UPLOAD-LIMIT-MESSAGE",
+      "severity": "P3",
+      "owner": "B (upload boundary and general-file admission)",
+      "status": "open"
+    },
+    {
+      "id": "F-RESEARCH-PLAN-PROGRESS-PENDING",
+      "severity": "P3",
+      "owner": "B (plan projection) with A (planning tool output)",
+      "status": "open"
+    }
+  ],
+  "blockers": {
+    "open_p0": [],
+    "demo_reachable_open_p1": [],
+    "visible_risks": [
+      "F-RESEARCH-PLAN-PROGRESS-PENDING (P3, B/A): finished steps still display as pending on the final merge",
+      "general-file workspace and paper features are exposed in the same app but are deferred (unqualified) under this profile",
+      "live Gemini is not demonstrated (DEMO-10 not_run)"
+    ]
+  },
+  "final_merge_retest": "done on main cdb9d69"
+}

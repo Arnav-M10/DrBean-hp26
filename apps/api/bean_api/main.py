@@ -335,6 +335,10 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None,
         result = workflow.get(actor, record_id)
         return sources.public_record(result) if result["kind"] == "source_asset" else artifacts.public_record(result) if result["kind"] == "native_artifact" else result
 
+    @app.get(PREFIX + "/approvals/{approval_id}")
+    def read_approval(approval_id: str, actor: Actor):
+        return workflow.get_approval(actor, approval_id)
+
     @app.get(PREFIX + "/workspaces/{workspace_id}/provider-attempts")
     def provider_attempts(workspace_id: str, actor: Actor):
         workflow.authorize(actor, workspace_id)

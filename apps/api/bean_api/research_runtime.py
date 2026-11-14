@@ -34,6 +34,9 @@ def research_capabilities(settings, provider_config=None):
         "contract_version": "DB-RESEARCH-1", "graph_version": "research-graph.v1",
         "checkpoint_version": "research-checkpoint.v1", "persistence": "application_sqlite",
         "review_resume": True, "unavailable_reason": reason,
+        "supported_operations": ["investigation", "checked_pair_design"] if controlled or live else [],
+        "deferred_operations": ["observation", "design_amendment", "restart_continuation"],
+        "restart_qualification": "not_run",
         "session_allocation_required": True, "default_live_allocation": 0,
         "session_limits_policy": "research-session-limits.v2", "session_limits": {"logical_turns": 16, "tool_calls": 24, "child_count": 4},
         "live_qualification": "not_run", "live_unavailable_reason": "No live qualification requests were made; each live session needs current consent and an explicit operator allocation.",
@@ -113,8 +116,11 @@ class ResearchRunner:
                 self.service.release(context, "waiting_observation" if reading else "waiting_review")
             else:
                 self.service.release(context, "completed")
-        except (DomainError, CoordinatorFailure, ProviderFailure, LedgerBudgetExceeded, asyncio.TimeoutError, ValueError, ImportError) as error:
-            code = getattr(error, "code", "research_timeout" if isinstance(error, asyncio.TimeoutError) else "research_runtime_failure")
+        except Exception as error:
+            # One unexpected SDK/model exception must not terminate the shared
+            # scientific worker. Never retry the action or refund its ledger.
+            known = isinstance(error, (DomainError, CoordinatorFailure, ProviderFailure, LedgerBudgetExceeded))
+            code = getattr(error, "code", "research_runtime_failure") if known else "research_timeout" if isinstance(error, asyncio.TimeoutError) else "research_permission_failure" if isinstance(error, PermissionError) else "research_runtime_failure"
             try:
                 self.service.release(context, "needs_reconciliation" if "reconcil" in code else "failed", error_code=code)
             except DomainError:
@@ -130,13 +136,14 @@ class ResearchRunner:
         for row in rows:
             try:
                 asyncio.run(self.execute(row))
-            except DomainError as error:
+            except Exception as error:
                 # Input/lease/version refusal before acquisition must not crash
                 # the scientific worker or repeatedly retry a stale action.
                 with self.service.store.transaction() as conn:
                     action = self.service._action(conn, row["actor_id"], row["id"])
                     if action["state"] == "queued" and not action["lease_owner"]:
                         from .store import utc_now
-                        conn.execute("UPDATE research_actions SET state='failed',error_code=?,updated_at=? WHERE id=?", (error.code, utc_now(), action["id"]))
+                        code = error.code if isinstance(error, DomainError) else "research_runtime_failure"
+                        conn.execute("UPDATE research_actions SET state='failed',error_code=?,updated_at=? WHERE id=?", (code, utc_now(), action["id"]))
                         conn.execute("UPDATE research_sessions SET state='failed',revision=revision+1,updated_at=? WHERE active_action_id=? AND state='queued'", (utc_now(), action["id"]))
         return len(rows)

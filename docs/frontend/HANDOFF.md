@@ -1,6 +1,6 @@
 # Frontend handoff: five-step study experience
 
-Branch `claude/frontend-polish`, based on main `070b697`. Owner of this work: frontend (visual design, page composition, copy, responsive and accessible presentation). B remains the owner of controllers, API contracts, research state and approval behaviour.
+Branch `claude/frontend-polish`, based on main `070b697`, merged with main `db6cea6` (PR #43/#45). Owner of this work: frontend (visual design, page composition, copy, responsive and accessible presentation). B remains the owner of controllers, API contracts, research state and approval behaviour.
 
 ## What changed for a person using it
 
@@ -10,7 +10,7 @@ The single long page is now five route-backed steps sharing one shell, one token
 |---|---|---|
 | 1 Start | `#start` (default; `#research` opens the file-question path) | What Dr. Bean does, start with the example or enter data, the four terms, saved work, the separate file-question path |
 | 2 Check inputs | `#inputs`, `#question`, `#review` | Measurements with an allowance plot, claim kept apart from search limits, a plain review of every assumption, then save → approve → start as three numbered actions |
-| 3 Investigate | `#investigations` | The approved check's real state and timeline, reopen by run identifier, and the research-assistant plan (honest unavailable state today) |
+| 3 Investigate | `#investigations` | The approved check's real state and timeline, reopen by run identifier, and the Deep Agents research plan with its approvals |
 | 4 Result | `#result` (no secrets or research content in the URL) | Plain conclusion, `ke` number line against the claim, concentration chart with allowance bars and candidate curves, support / assumptions / uncertainty, one next action, evidence downloads, technical states behind a disclosure |
 | 5 Next measurement | `#next`, `#report` | Pair comparison with chart and suggested time, follow-up reading, readable report summary and report export |
 
@@ -31,7 +31,7 @@ Narrow patches in files that mix presentation and behaviour. **B, please review 
    - `refreshRun()` additionally performs three **read-only** GETs (`/records/{plan_id}`, its problem, its dataset) once per run to draw the chart; failure only hides the chart.
    - `setupWorkflow(..., { onRender })` new optional callback; the returned `render` has a read-only `render.status()` used by the step rail.
    - Errors no longer force the connection panel open unless disconnected.
-2. `apps/web/research.mjs` – `ResearchController` is **untouched**. Only `setupResearch()`'s render was rewritten (new optional `onChange`). Labels changed: "Advance research plan" → "Continue research plan", "Approve exact operation and continue" → "Approve this operation", "Save reviewed inputs and research question" → "Create research plan", research anchors download → "Download research replay anchors". "Stop this research plan" now asks for confirmation. Kept: "Save selected files and research question" and the objective in `#durable-research h4`.
+2. `apps/web/research.mjs` – `ResearchController` is **untouched** (main's live-consent and configured-mode changes merged as-is). Only `setupResearch()`'s render was rewritten (new optional `onChange`). Main's PR #43 render behaviour is carried over: live provider disclosure and consent, approve disabled until the box is ticked, "Plan next step for separate review", observation input only when `supported_operations` includes it. Every control label, checkbox label and heading used by `check-research.mjs` is kept exactly. "Cancel research and owned work" now asks for confirmation.
 3. `apps/web/design-workflow.mjs`, `apps/web/followup-workflow.mjs` – copy, checkbox placement, readable values and a comparison chart. Request construction unchanged.
 4. `apps/web/serve.mjs` – registers `/result-view.mjs` in the static allowlist. **If the share gateway or any other proxy keeps its own module allowlist, add `result-view.mjs` there too.**
 
@@ -39,17 +39,20 @@ Tests changed (navigation and display only; no scientific, approval or binding a
 
 - `apps/web/check-backend.mjs`: navigates by hash to `#result` / `#next` before clicking controls that now live there; reads `Outcome:` from `#backend-results`; the design grid shows readable times (`8`, `6`), with the exact plan still asserted as `['8/1', '6/1']`; the disconnected message regex.
 - `tests/integration/general_workspace_smoke.mjs`: opens `#research` directly, since the measurement study is now the primary entry.
-- `tests/integration/shared-session-browser.mjs`: one added hash navigation to `#investigations` before `Save selected files and research question`. **Not run here** (needs the HTTPS sharing gateway); please run it on the assembled stack.
+- `tests/integration/shared-session-browser.mjs`: hash navigation to `#research` before adding a file (the file path is a disclosure on Start) and to `#investigations` before `Save selected files and research question`.
+- `apps/web/check-research.mjs`: opens `#investigations` instead of `#research`, where the research panel now lives.
 
 ## Integration notes for the coordinator
 
-The Investigate page reads only `capabilities.deepagents` and the existing `DB-RESEARCH-1` snapshot/events. With `execution_mode: 'controlled'` and `dispatch_enabled: true` the "Continue research plan" action becomes available; plan steps map their real `status` to Suggested / Running / Needs your approval / Needs a reading / Done / Failed / Unresolved / Skipped; events map to plain labels with the raw list behind "All recorded events (technical)". On current main `bean_api.research_controlled` is absent, so the page shows the server's `unavailable_reason` and keeps the approved manual check usable. No fixture events are shown.
+The Investigate page reads only `capabilities.deepagents` and the existing `DB-RESEARCH-1` snapshot/events. With `dispatch_enabled: true` the "Advance research plan" action becomes available; plan steps map their real `status` to Suggested / Running / Needs your approval / Needs a reading / Done / Failed / Unresolved / Skipped; events map to plain labels with the raw list behind "All recorded events (technical)". When dispatch is disabled the page shows the server's `unavailable_reason` and keeps the approved manual check usable. No fixture events are shown.
 
 ## Verification run on this branch (macOS, Node 25.3, backend Python 3.13, engine CPython 3.11.17 / Counterdex 0.3.0, Playwright 1.63 Chromium)
 
 | Command | Result |
 |---|---|
-| `node --test` in `apps/web` | 79 passed, 0 failed |
+| `node --test` in `apps/web` | 81 passed, 0 failed |
+| `node apps/web/check-research.mjs` | Passed: real Deep Agents plan, approved investigation, separately approved pair design, native + anchor replay, zero provider attempts |
+| `node tests/integration/shared-session-browser.mjs` | Passed |
 | `node apps/web/check-backend.mjs` | Passed: real discovery on two inputs, checked-separation and no-separation designs, hypothetical follow-up, native + anchor downloads replayed by the installed engine, zero provider attempts, 390 px no horizontal scroll |
 | same with `BEAN_TEST_FOLLOWUP_ORIGIN=actual` | Passed |
 | `node tests/integration/web_manual_smoke.mjs` | 18/18 |
@@ -72,7 +75,7 @@ Manual browser rehearsal (isolated API/worker/web on 8811/4811): first visit, ex
 
 ## Known limitations
 
-- Research-assistant coordination is unavailable on current main; its view is built against the real contract but has only been exercised in the unavailable and empty states here.
+- Observation ingestion and live-provider coordination are not qualified on main; their views follow the contract but were not exercised.
 - The investigation question generated by `manual.mjs` uses exact rationals (`[1/10, 17/100] 1/h`); it is frozen into the plan, so the UI shows it verbatim.
 - Charts are drawn with decimal approximations and labelled as such; exact values stay in the technical disclosures.
 - Draft persistence is unchanged: in-memory only, with download and leave-warning.

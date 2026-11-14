@@ -255,7 +255,14 @@ class ResearchService:
                     raise DomainError("research_provider_consent_required", "Consent to the exact current research context before live coordination.", 403)
                 if current["physical_allocation"] <= current["physical_calls"]:
                     raise DomainError("research_provider_allocation_exhausted", "No explicit remaining research provider allocation is available.", 409)
-            if current["state"] not in {"ready", "paused"}:
+            if current["state"] == "completed":
+                report = conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind='report' ORDER BY rowid DESC LIMIT 1", (session_id,)).fetchone()
+                action = self._action(conn, actor, current["active_action_id"])
+                if report is None or action["state"] != "completed":
+                    raise DomainError("research_not_advanceable", "A completed canonical report is required before planning a next step.", 409)
+                if conn.execute("SELECT 1 FROM research_effects e JOIN jobs j ON j.id=e.job_id WHERE e.session_id=? AND j.kind='design_job'", (session_id,)).fetchone():
+                    raise DomainError("research_next_step_unavailable", "This milestone ends after the checked pair-design report. Observation ingestion and design amendments are unavailable.", 409)
+            elif current["state"] not in {"ready", "paused"}:
                 raise DomainError("research_not_advanceable", "Use the pending review, observation or reconciliation action.", 409)
             self._queue(conn, current, request["budget"], resume_required=current["state"] == "paused")
             return self._public(conn, self._session(conn, actor, session_id))
