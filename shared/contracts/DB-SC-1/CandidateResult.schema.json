@@ -1,0 +1,79 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "verification": {
+      "enum": [
+        "not_checked",
+        "valid",
+        "invalid",
+        "inconclusive",
+        "unsupported",
+        "failed"
+      ],
+      "title": "Verification",
+      "type": "string"
+    },
+    "reason_code": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason Code"
+    },
+    "violating_observation_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 128,
+      "title": "Violating Observation Ids",
+      "type": "array"
+    },
+    "unresolved_observation_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 128,
+      "title": "Unresolved Observation Ids",
+      "type": "array"
+    },
+    "outside_closed_claim": {
+      "title": "Outside Closed Claim",
+      "type": "boolean"
+    },
+    "is_counterexample": {
+      "title": "Is Counterexample",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "verification",
+    "outside_closed_claim",
+    "is_counterexample"
+  ],
+  "title": "CandidateResult",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:CandidateResult"
+}

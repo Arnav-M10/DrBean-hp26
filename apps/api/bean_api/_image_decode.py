@@ -1,14 +1,17 @@
 """Private fixed-path image decoder process, intentionally without application imports."""
 import io
 import json
-import resource
 import sys
 import warnings
 
+try:
+    from .resource_policy import ResourceSetupError, apply_limits
+except ImportError:  # The parent invokes this fixed file directly, with a minimal environment.
+    from resource_policy import ResourceSetupError, apply_limits
+
 
 def main():
-    resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
-    resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
+    apply_limits(cpu_seconds=3, memory_bytes=512 * 1024 * 1024)
     from PIL import Image
     max_pixels = 12_000_000
     max_source_bytes = 5 * 1024 * 1024
@@ -46,6 +49,6 @@ if __name__ == "__main__":
     except Exception as exc:
         # Only known fixed codes leave this parser; no decoder input or raw traceback.
         known = {"pixel_limit", "decoded_memory_limit", "animated_image_unsupported", "orientation_unsupported", "image_mode_unsupported"}
-        code = str(exc) if isinstance(exc, ValueError) and str(exc) in known else "malformed_image"
+        code = "decoder_setup_failed" if isinstance(exc, ResourceSetupError) else str(exc) if isinstance(exc, ValueError) and str(exc) in known else "malformed_image"
         print(code, file=sys.stderr)
         raise SystemExit(1) from None

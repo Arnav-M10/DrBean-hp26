@@ -7,9 +7,9 @@ Scientific validation/verification belongs to the separately qualified adapter.
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
-from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import AfterValidator, BeforeValidator, BaseModel, ConfigDict, Field, StringConstraints, model_serializer, model_validator
 
 from .canonical import validate_rational
 
@@ -39,6 +39,17 @@ ExplicitTrue = Annotated[Literal[True], BeforeValidator(_explicit_true)]
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, validate_default=True)
+    legacy_optional_fields: ClassVar[tuple[str, ...]] = ()
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_absence(self, handler):
+        # New optional profile metadata must not change old identity/operation
+        # bytes merely because a later application version knows these fields.
+        body = handler(self)
+        for field in self.legacy_optional_fields:
+            if body.get(field) is None or body.get(field) == [] or body.get(field) == {}:
+                body.pop(field, None)
+        return body
 
 
 class FieldDiagnostic(StrictModel):
@@ -163,15 +174,56 @@ class ProblemBody(StrictModel):
     target: TargetInterval
 
 
+class MaterializedProblemInputs(StrictModel):
+    model: Literal["two_rate_concentration"] = "two_rate_concentration"
+    domain: ParameterDomain
+    initial_concentration: Literal["0/1"] = "0/1"
+    observable: Literal["concentration"] = "concentration"
+    time_unit: Literal["h"] = "h"
+    concentration_unit: Literal["mg/L"] = "mg/L"
+    rate_unit: Literal["1/h"] = "1/h"
+    target: TargetInterval
+
+
+class MaterializeIntakeRequest(StrictModel):
+    expected_review_digest: Digest
+    dataset: DatasetBody
+    problem: MaterializedProblemInputs
+    human_assumptions: dict[str, Annotated[str, StringConstraints(min_length=1, max_length=2000)]] = Field(default_factory=dict, max_length=50)
+
+    @model_validator(mode="after")
+    def bounded_assumptions(self) -> "MaterializeIntakeRequest":
+        if any(not key or len(key) > 256 for key in self.human_assumptions):
+            raise ValueError("Assumption field paths must be nonempty and bounded")
+        return self
+
+
 ToolName = Literal["read_scoped_evidence", "execute_approved_scenario", "record_allowed_skip", "prepare_design_proposal", "execute_approved_design", "return_grounded_explanation"]
 
 
 class Scenario(StrictModel):
+    legacy_optional_fields = ("purpose", "eligible_baseline_outcomes")
     id: Identifier
     problem_id: Identifier
     problem_digest: Digest
     kind: Literal["baseline", "optional"]
     label: Annotated[str, StringConstraints(min_length=1, max_length=128)]
+    purpose: Annotated[str, StringConstraints(min_length=1, max_length=1000)] | None = None
+    eligible_baseline_outcomes: list[Literal["certified_counterexample", "numerical_candidate", "no_counterexample_found", "inconclusive", "unsupported", "failed"]] | None = Field(default=None, min_length=1, max_length=6)
+
+    @model_validator(mode="after")
+    def conditional_scope(self) -> "Scenario":
+        if self.kind == "baseline" and self.eligible_baseline_outcomes is not None:
+            raise ValueError("The mandatory baseline is not conditional")
+        if self.eligible_baseline_outcomes and len(set(self.eligible_baseline_outcomes)) != len(self.eligible_baseline_outcomes):
+            raise ValueError("Eligibility outcome classes must be unique")
+        return self
+
+
+class ResearchObjective(StrictModel):
+    version: Literal["research-objective.v1"] = "research-objective.v1"
+    question: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+    success_criterion: Annotated[str, StringConstraints(min_length=1, max_length=1000)]
 
 
 class InvestigationBudget(StrictModel):
@@ -214,6 +266,7 @@ class AgentProviderConsent(StrictModel):
 
 
 class PlanBody(StrictModel):
+    legacy_optional_fields = ("scientific_profile", "objective")
     schema_version: Literal["DB-SC-1"] = CONTRACT_VERSION
     problem_id: Identifier
     problem_digest: Digest
@@ -223,6 +276,8 @@ class PlanBody(StrictModel):
     budget: InvestigationBudget = Field(default_factory=InvestigationBudget)
     provider_disclosure: ProviderDisclosure = Field(default_factory=ProviderDisclosure)
     parent_plan_id: Identifier | None = None
+    scientific_profile: Literal["counterdex.v1"] | None = None
+    objective: ResearchObjective | None = None
 
     @model_validator(mode="after")
     def bounded_scenarios(self) -> "PlanBody":
@@ -239,6 +294,11 @@ class PlanBody(StrictModel):
             raise ValueError("Design execution requires a separate DesignPlanRevision")
         if len(set(self.permitted_tools)) != len(self.permitted_tools):
             raise ValueError("Permitted tools must be unique")
+        if self.scientific_profile == "counterdex.v1":
+            if self.objective is None:
+                raise ValueError("The Counterdex profile requires an explicit reviewed research objective")
+            if any(s.kind == "optional" and (not s.purpose or not s.eligible_baseline_outcomes) for s in self.scenarios):
+                raise ValueError("Every optional scientific scenario needs a reviewed purpose and baseline-outcome condition")
         return self
 
 
@@ -277,7 +337,13 @@ class CandidateVector(StrictModel):
         return self
 
 
+class AllowanceOrigin(StrictModel):
+    kind: Literal["hypothetical", "reviewed_hard_bound"]
+    description: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+
+
 class DesignRequestBody(StrictModel):
+    legacy_optional_fields = ("scientific_profile", "requested_tier", "allowance_origin", "maximum_horizon", "source_artifact_ids")
     schema_version: Literal["DB-SC-1"] = CONTRACT_VERSION
     historical_run_id: Identifier
     scenario_id: Identifier
@@ -291,6 +357,11 @@ class DesignRequestBody(StrictModel):
     allow_construction: bool = False
     allow_continuation: bool = False
     budget: DesignBudget = Field(default_factory=DesignBudget)
+    scientific_profile: Literal["counterdex.v1"] | None = None
+    requested_tier: Literal["numerical_guidance", "checked_pair_separation"] | None = None
+    allowance_origin: AllowanceOrigin | None = None
+    maximum_horizon: Rational | None = None
+    source_artifact_ids: list[Identifier] = Field(default_factory=list, max_length=2)
 
     @model_validator(mode="after")
     def reviewed_pair(self) -> "DesignRequestBody":
@@ -302,6 +373,17 @@ class DesignRequestBody(StrictModel):
             raise ValueError("Future elapsed times must be positive")
         if len(set(self.feasible_times)) != len(self.feasible_times):
             raise ValueError("Reviewed feasible times must be unique")
+        if len(set(self.source_artifact_ids)) != len(self.source_artifact_ids):
+            raise ValueError("Source artifact references must be unique")
+        if self.allow_continuation and not self.allow_construction:
+            raise ValueError("Continuation requires separately approved construction permission")
+        if self.maximum_horizon is not None and Fraction(self.maximum_horizon) <= 0:
+            raise ValueError("The reviewed maximum horizon must be positive")
+        if self.scientific_profile == "counterdex.v1":
+            if self.requested_tier is None or self.allowance_origin is None or self.maximum_horizon is None:
+                raise ValueError("The scientific design profile requires an explicit tier, allowance origin and maximum horizon")
+            if any(Fraction(t) > Fraction(self.maximum_horizon) for t in self.feasible_times):
+                raise ValueError("Every reviewed future time must fit the approved maximum horizon")
         return self
 
 
@@ -528,6 +610,7 @@ class CandidateReference(StrictModel):
 
 
 class VerificationRecord(StrictModel):
+    legacy_optional_fields = ("expected_scientific_problem_digest", "observed_scientific_problem_digest")
     checker_name: Identifier
     checker_version: Annotated[str, StringConstraints(min_length=1, max_length=128)]
     artifact_id: Identifier
@@ -537,6 +620,8 @@ class VerificationRecord(StrictModel):
     expected_binding: BindingState
     expected_problem_digest: Digest
     observed_problem_digest: Digest | None = None
+    expected_scientific_problem_digest: Digest | None = None
+    observed_scientific_problem_digest: Digest | None = None
 
     @model_validator(mode="after")
     def binding_is_consistent(self) -> "VerificationRecord":
@@ -544,10 +629,31 @@ class VerificationRecord(StrictModel):
             raise ValueError("A matching binding requires equal observed and externally expected identities")
         if self.expected_binding == "mismatch" and (self.observed_problem_digest is None or self.observed_problem_digest == self.expected_problem_digest):
             raise ValueError("A mismatch requires a distinct observed problem identity")
+        if self.expected_binding == "matches" and self.expected_scientific_problem_digest is not None and self.observed_scientific_problem_digest != self.expected_scientific_problem_digest:
+            raise ValueError("Matching scientific projection evidence requires its independently supplied scientific digest")
+        return self
+
+
+class CandidateResult(StrictModel):
+    candidate_id: Identifier
+    verification: VerificationState
+    reason_code: Identifier | None = None
+    violating_observation_ids: list[Identifier] = Field(default_factory=list, max_length=128)
+    unresolved_observation_ids: list[Identifier] = Field(default_factory=list, max_length=128)
+    outside_closed_claim: bool
+    is_counterexample: bool
+
+    @model_validator(mode="after")
+    def candidate_conclusion(self) -> "CandidateResult":
+        if self.is_counterexample and not (self.verification == "valid" and self.outside_closed_claim):
+            raise ValueError("A candidate counterexample requires its individual compatibility and strict outside position")
+        if self.violating_observation_ids and self.verification != "invalid":
+            raise ValueError("Checked excluded observations cannot receive a compatible candidate status")
         return self
 
 
 class ScientificResult(StrictModel):
+    legacy_optional_fields = ("projection_version", "scientific_problem_digest", "scientific_design_digest", "native_suggestion_digest", "candidate_results", "native_replay")
     scientific_outcome: ScientificOutcome
     verification: VerificationState
     expected_binding: BindingState
@@ -558,6 +664,12 @@ class ScientificResult(StrictModel):
     candidates: list[CandidateReference] = Field(default_factory=list, max_length=16)
     artifacts: list[ArtifactReference] = Field(default_factory=list, max_length=16)
     verification_record: VerificationRecord | None = None
+    projection_version: Literal["bean-to-counterdex.v1"] | None = None
+    scientific_problem_digest: Digest | None = None
+    scientific_design_digest: Digest | None = None
+    native_suggestion_digest: Digest | None = None
+    candidate_results: list[CandidateResult] = Field(default_factory=list, max_length=16)
+    native_replay: dict = Field(default_factory=dict, max_length=64)
 
     @model_validator(mode="after")
     def evidence_axes(self) -> "ScientificResult":
@@ -575,6 +687,8 @@ class ScientificResult(StrictModel):
             raise ValueError("A certified counterexample requires matched valid evidence and a named candidate")
         if any(candidate.problem_id != self.problem_id or (self.problem_digest is not None and candidate.problem_digest != self.problem_digest) for candidate in self.candidates):
             raise ValueError("Candidate references must belong to the same reviewed problem")
+        if record and record.expected_scientific_problem_digest is not None and record.expected_scientific_problem_digest != self.scientific_problem_digest:
+            raise ValueError("The named verification must bind the separately retained scientific projection")
         return self
 
 
@@ -586,6 +700,7 @@ class DesignOption(StrictModel):
 
 
 class DesignResult(StrictModel):
+    legacy_optional_fields = ("projection_version", "scientific_problem_digest", "scientific_design_digest", "native_suggestion_digest", "candidate_results", "native_replay")
     design_tier: Literal["numerical_guidance", "checked_pair_separation", "no_separation_established", "unavailable"]
     verification: VerificationState
     replay: ReplayState
@@ -597,6 +712,12 @@ class DesignResult(StrictModel):
     future_hard_allowance: Rational | None = None
     artifacts: list[ArtifactReference] = Field(default_factory=list, max_length=16)
     verification_record: VerificationRecord | None = None
+    projection_version: Literal["bean-to-counterdex.v1"] | None = None
+    scientific_problem_digest: Digest | None = None
+    scientific_design_digest: Digest | None = None
+    native_suggestion_digest: Digest | None = None
+    candidate_results: list[CandidateResult] = Field(default_factory=list, max_length=16)
+    native_replay: dict = Field(default_factory=dict, max_length=64)
 
     @model_validator(mode="after")
     def checked_scope(self) -> "DesignResult":
@@ -607,6 +728,8 @@ class DesignResult(StrictModel):
             raise ValueError("Only an actually evaluated option may be selected")
         if self.verification == "valid" and self.verification_record is None:
             raise ValueError("A valid suggestion requires a named verification record")
+        if self.verification_record and self.verification_record.expected_scientific_problem_digest is not None and self.verification_record.expected_scientific_problem_digest != self.scientific_problem_digest:
+            raise ValueError("Suggestion verification must bind the retained scientific projection")
         if self.design_tier == "checked_pair_separation":
             record = self.verification_record
             if (self.verification != "valid" or self.replay != "passed" or record is None
@@ -624,7 +747,8 @@ PUBLIC_SCHEMAS = {
     cls.__name__: cls
     for cls in (
         ApiError, WorkspaceCreateRequest, CancelRequest, DecimalInputRequest, ReportRequest,
-        DatasetBody, ProblemBody, PlanBody, CreatePlanRequest, ApprovalRequest, AgentProviderConsent,
+        DatasetBody, ProblemBody, MaterializedProblemInputs, MaterializeIntakeRequest, ResearchObjective,
+        CandidateResult, AllowanceOrigin, PlanBody, CreatePlanRequest, ApprovalRequest, AgentProviderConsent,
         StartRunRequest, DesignRequestBody, DesignPlanBody, ObservationProposalBody,
         ObservationReviewRequest, SourceAssetMetadata, IntakeProposalBody, IntakeProposalRecordBody, IntakeRequest,
         IntakeReviewRequest, AssistantTurnRequest, GroundedExplanation, ScientificResult,

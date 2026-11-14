@@ -5,10 +5,8 @@ import sys
 from .analytical import (DYADIC_BITS, EXP_POLICY, MAX_ARGUMENT_BITS,
                          MAX_REDUCTIONS, TAYLOR_EVEN_DEGREE)
 from .exact import CANONICALIZATION_PROFILE
+from .identity import VERSION
 from .models import CHECKED_POLICY, DESIGN_PROFILE, MODEL, NUMERICAL_POLICY, PROBLEM_PROFILE
-
-VERSION = "0.1.0"
-
 
 def capabilities() -> dict:
     """Return fresh metadata; availability is never a verdict on supplied data."""
@@ -19,12 +17,21 @@ def capabilities() -> dict:
         "adapter": {"name": "counterdex", "version": VERSION, "runtime_dependencies": []},
         "canonicalization_profile": CANONICALIZATION_PROFILE,
         "scientific_profiles": {"problem": PROBLEM_PROFILE, "design": DESIGN_PROFILE,
-                                "pair": "groundwork.analytic-pair.v1"},
+                                "pair": "groundwork.analytic-pair.v1",
+                                "historical": "groundwork.historical-candidates.v1",
+                                "baseline": "groundwork.baseline-bundle.v1",
+                                "application": "counterdex.application-bundle.v1"},
         "model": {"id": MODEL, "revision": 1, "observable": "c",
                   "units": {"time": "h", "concentration": "mg/L", "rate": "1/h"}},
         "runtime": {"implementation": sys.implementation.name, "version": platform.python_version(),
                     "qualified": qualified_runtime, "qualified_versions": ["CPython 3.11"]},
         "capabilities": {
+            "bounded_candidate_discovery": {"supported": qualified_runtime, "reason_code": native_reason,
+                "policy": "rate-grid-amplitude-midpoint-12sig.v1",
+                "scope": "Finite two-rate search with amplitude screening; exact frozen proposals checked independently; no completeness."},
+            "native_historical_replay": {"supported": qualified_runtime, "reason_code": native_reason,
+                "proof_rule": EXP_POLICY,
+                "scope": "Fresh exact compatibility and strict outside-claim checks for one or two fixed vectors, without prospective approval."},
             "numerical_fixed_pair_guidance": {"supported": qualified_runtime, "reason_code": native_reason,
                 "policy": NUMERICAL_POLICY, "scope": "Two fixed vectors on the supplied finite feasible grid; no compatibility proof."},
             "checked_fixed_pair_separation": {"supported": qualified_runtime, "reason_code": native_reason,
@@ -40,6 +47,7 @@ def capabilities() -> dict:
                 "scope": "No browser runtime, worker, assets or protocol has been qualified."},
         },
         "hard_caps": {"fixed_candidates": 2, "observables": 1, "historical_rows": 128,
+                      "search_rate_pairs": 16384, "search_candidate_checks": 32,
                       "unique_times": 64, "wall_seconds": 120, "construction_attempts": 2,
                       "pair_verification_passes": 2, "certificate_bytes": 2 * 1024 * 1024,
                       "bundle_bytes": 4 * 1024 * 1024},
