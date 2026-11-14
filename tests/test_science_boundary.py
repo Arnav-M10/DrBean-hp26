@@ -27,8 +27,13 @@ class DescendantAdapter:
 def process_running(pid):
     # A dead process awaiting its OS reaper is no longer executing computation.
     stat = Path(f"/proc/{pid}/stat")
-    if stat.exists() and stat.read_text().split()[2] == "Z":
-        return False
+    try:
+        if stat.read_text().split()[2] == "Z":
+            return False
+    except FileNotFoundError:
+        # The OS can reap the process while this observer reads its state.
+        # Fall through to the portable liveness check (also used off Linux).
+        pass
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -41,6 +46,16 @@ def assert_descendant_terminated(pid):
     while process_running(pid) and time.monotonic() < deadline:
         time.sleep(0.02)
     assert not process_running(pid), "The owned descendant remained running after parent acknowledgement"
+
+
+def test_process_observer_handles_reaping_during_stat_read(monkeypatch):
+    def disappeared(*args, **kwargs):
+        raise FileNotFoundError
+    def reaped(*args):
+        raise ProcessLookupError
+    monkeypatch.setattr(Path, "read_text", disappeared)
+    monkeypatch.setattr(os, "kill", reaped)
+    assert not process_running(12345)
 
 
 def test_unconfigured_science_has_no_checked_capability():

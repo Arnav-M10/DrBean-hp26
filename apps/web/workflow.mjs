@@ -1,5 +1,7 @@
 import { BeanApi, baselineAvailable, baselineExplanation } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
+import { setupDesignWorkflow } from './design-workflow.mjs'
+import { designAvailable } from './design.mjs'
 const byId = id => document.getElementById(id)
 function node(tag, text) { const n = document.createElement(tag); n.textContent = text; return n }
 function exactRecord(title, record) {
@@ -15,7 +17,8 @@ export function setupWorkflow(getDraft) {
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
   const available = () => baselineAvailable(capabilities)
-  function reset() { clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined }
+  const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save })
+  function reset() { clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
   function button(parent, label, action, disabled = false) {
     const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy
     b.addEventListener('click', () => perform(action)); parent.append(b); return b
@@ -126,7 +129,8 @@ export function setupWorkflow(getDraft) {
         }
       }
     }
-    investigations.append(node('p', 'Next-measurement design and follow-up controls are not part of this baseline screen. They require their own reviewed inputs and approval.'))
+    designs.render(investigations)
+    investigations.append(node('p', 'Adding and checking a follow-up observation is a separate workflow. A design approval does not authorize a new observation or investigation.'))
     const reports = byId('backend-report'); reports.replaceChildren(node('h3', 'Reviewer snapshot'))
     reports.append(node('p', 'A report freezes the selected run, inputs and evidence inventory at creation. Download native scientific evidence and its separate replay anchors from Investigations. A report JSON byte hash is not scientific replay. Public reviewer sharing is unavailable.'))
     button(reports, 'Create report for selected run', async () => { report = await api.json(`/runs/${run.id}/reports`, {}) }, !api || !run)
@@ -138,9 +142,13 @@ export function setupWorkflow(getDraft) {
       })
     }
     clearTimeout(pollTimer)
-    if (api && run && ['queued', 'running', 'cancel_requested'].includes(run.state) && !busy) {
-      const id = run.id
-      pollTimer = setTimeout(() => perform(() => refreshRun(id)), 1000)
+    const pendingRun = run && ['queued', 'running', 'cancel_requested'].includes(run.state)
+    if (api && (pendingRun || designs.pending()) && !busy) {
+      const id = run?.id
+      pollTimer = setTimeout(() => perform(async () => {
+        if (pendingRun) await refreshRun(id)
+        if (designs.pending()) await designs.refresh()
+      }), 1000)
     }
   }
   byId('connect-form').addEventListener('submit', event => {
