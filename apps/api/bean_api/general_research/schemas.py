@@ -97,7 +97,7 @@ class ModelTable(Strict):
     source: SourceLabel
     page_index: Annotated[int, Field(ge=0, le=L.MAX_PDF_PAGES - 1)]
     columns: list[ModelColumn] = Field(min_length=1, max_length=24)
-    rows: list[list[Annotated[str, Field(max_length=120)] | None]] = Field(
+    rows: list[Annotated[list[Annotated[str, Field(max_length=120)] | None], Field(max_length=24)]] = Field(
         max_length=40, description="Cells exactly as printed; null for an empty cell")
     citation_ids: list[Annotated[str, Field(max_length=8)]] = Field(max_length=6)
     notes: Annotated[str, Field(max_length=500)] | None
