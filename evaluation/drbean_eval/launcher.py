@@ -236,7 +236,21 @@ class LocalStack:
         self.events.append({"event": "spawned", "name": name, "pid": process.pid, "at": time.time()})
         return process
 
+    def _archive(self, suffix: str, source: str | None = None) -> None:
+        """Lane accounting: when DRBEAN_STACK_GUARD_ARCHIVE names a directory, mark this stack as started and, at
+        cleanup, keep a copy of its egress-guard log there so a lane report can count every stack's events."""
+        archive = os.environ.get("DRBEAN_STACK_GUARD_ARCHIVE")
+        if not archive or not os.path.isdir(archive):
+            return
+        target = os.path.join(archive, f"{os.path.basename(self.workdir)}.{suffix}")
+        if source is None:
+            with open(target, "w", encoding="utf-8") as handle:
+                handle.write(json.dumps({"started_at": time.time(), "pid": os.getpid()}) + "\n")
+        elif os.path.exists(source):
+            shutil.copyfile(source, target)
+
     def start(self) -> "LocalStack":
+        self._archive("started")
         os.makedirs(os.path.dirname(self.database), exist_ok=True, mode=0o700)
         self._spawn("api", [self.python, "-m", "uvicorn", "bean_api.main:create_app", "--factory",
                             "--host", "127.0.0.1", "--port", str(self.port), "--log-level", "warning",
@@ -414,6 +428,7 @@ class LocalStack:
         return report
 
     def cleanup(self) -> None:
+        self._archive("guard.jsonl", self.guard_log)
         if self._own_workdir:
             shutil.rmtree(self.workdir, ignore_errors=True)
 

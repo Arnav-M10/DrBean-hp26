@@ -19,7 +19,7 @@ import pytest
 from drbean_support import REPO, launcher, load_packet, other_actor, reviewer
 from drbean_eval import kinetics, native, science_flow as sf
 
-pytestmark = [pytest.mark.real_stack]
+pytestmark = [pytest.mark.real_stack, pytest.mark.real_science]
 
 HERO = load_packet("hero-v2")
 MANIFEST = REPO / "scripts" / "ai" / "fixtures" / "source-previews.v1.json"

@@ -15,7 +15,7 @@ import json
 import os
 import subprocess
 
-from . import engine_controls, history, manifest as manifest_mod
+from . import engine_controls, history, lanes, manifest as manifest_mod
 from .runner import read_attempts
 
 REQUIRED_SCIENCE = ("RS-HERO-FULL",)
@@ -34,8 +34,7 @@ REQUIRED_CONTROLS = ("fixed_pair:grid-6-8-allowance-0.2", "fixed_pair:grid-6-all
 
 # Changes here cannot alter the application or the harness's behaviour: recorded evidence and its written
 # summaries. Evidence recorded at an ancestor counts for the tested commit only if every later change is here.
-EVIDENCE_ONLY_PATHS = ("evaluation/results/", "evaluation/FINDINGS.md", "evaluation/findings.json",
-                       "evaluation/README.md", "docs/evaluation-protocol.md", "docs/workstreams/05-validation.md")
+EVIDENCE_ONLY_PATHS = lanes.EVIDENCE_ONLY_PATHS
 
 
 def equivalent_commits(repo: str, head: str, candidates: set[str]) -> set[str]:
@@ -181,6 +180,7 @@ def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path
                   "failed" if "failed" in (source, worker) else "blocked",
                   "observed": {"source_image_admitted": source, "baseline_completed_with_evidence": worker,
                                "runtime": (platform_entry or {}).get("runtime")}})
+    gates.append(lanes.lanes_gate(results_dir, repo or os.path.dirname(os.path.abspath(root))))
     findings = []
     if findings_path and os.path.exists(findings_path):
         with open(findings_path, encoding="utf-8") as handle:
@@ -189,8 +189,9 @@ def compute(root: str, results_dir: str, commit: str, dirty: bool, findings_path
     gates.append({"gate": "no_unresolved_p0", "status": "passed" if not open_p0 else "failed",
                   "description": "evaluation/findings.json lists no open P0", "open_p0": open_p0})
     gates.append({"gate": "live_gemini_qualification", "status": "not_run", "required": False,
-                  "description": "NOT a current acceptance gate. Live lanes are disabled; activation needs a new "
-                                 "explicit user instruction. Placeholder runs are not Gemini evidence."})
+                  "description": "NOT a current acceptance gate. Live requests need the user to enable provider "
+                                 "consent and one bounded shared qualification budget; none exists. Controlled "
+                                 "placeholder runs are never Gemini evidence."})
     required = [g for g in gates if g.get("required", True)]
     overall = ("passed" if all(g["status"] == "passed" for g in required) and not dirty else
                "failed" if any(g["status"] == "failed" for g in required) else "blocked")

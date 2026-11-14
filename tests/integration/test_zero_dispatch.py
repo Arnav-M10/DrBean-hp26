@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from drbean_support import REPO, load_packet, reviewer, session_guard_events
+from drbean_support import REPO, announce_guard_probe, load_packet, reviewer, session_guard_events
 
 pytestmark = [pytest.mark.zero_dispatch]
 DUMMY_KEY = "DRBEAN-DUMMY-KEY-0001"
@@ -26,6 +26,7 @@ LEGACY_LIVE_SWITCH = {"GEMINI_API_KEY": DUMMY_KEY, "GEMINI_MODEL": DUMMY_MODEL, 
 
 
 def test_pytest_process_itself_is_egress_guarded():
+    announce_guard_probe("egress_blocked", "test_pytest_process_itself_is_egress_guarded")
     before = len(session_guard_events())
     with pytest.raises(OSError):
         socket.create_connection(("generativelanguage.googleapis.com", 443), timeout=1)
@@ -170,6 +171,7 @@ def test_guard_spies_refuse_client_construction_but_allow_sdk_types():
     from google.genai import types  # local SDK types and schemas stay allowed
     assert types.GenerateContentConfig.__name__
     from google import genai
+    announce_guard_probe("provider_client_blocked", "test_guard_spies_refuse_client_construction_but_allow_sdk_types")
     before = len(session_guard_events())
     with pytest.raises(RuntimeError, match="egress guard"):
         genai.Client(api_key=DUMMY_KEY)
