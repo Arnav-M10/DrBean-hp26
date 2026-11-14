@@ -3,7 +3,7 @@
 Completed: browser baseline, pushed and merged in PR #6 (`1f75bdc`).
 Completed: separately approved next-measurement design from the actual baseline
 pair, with browser review and independently replayable native design evidence.
-Current task: push final design fixes in PR #9; merge is held for release CI.
+Current task: release CI handoff for pushed PR #9; merge is held for failing checks.
 
 Branch: `backend/browser-design`; integrated `main` at `9cc90e0` (PRs #7–8).
 Verified on Linux, backend Python 3.12.14, scientific CPython 3.11.18.
