@@ -57,6 +57,22 @@ class OwnedProcesses(unittest.TestCase):
             bystander.kill()
             bystander.wait()
 
+    def test_missing_start_time_cannot_establish_ownership(self):
+        with open(launcher.pidfile("worker"), "w", encoding="utf-8") as handle:
+            json.dump({"pid": os.getpid(), "started_at": None}, handle)
+        with mock.patch.object(launcher, "started_at", return_value=None):
+            self.assertIsNone(launcher.owned("worker"))
+
+    def test_partial_spawn_failure_stops_services(self):
+        with mock.patch.object(launcher, "static_facts", return_value={}), \
+                mock.patch.object(launcher, "summarize", return_value=([], True)), \
+                mock.patch.object(launcher, "owned", return_value=None), \
+                mock.patch.object(launcher, "port_in_use", return_value=False), \
+                mock.patch.object(launcher, "spawn", side_effect=[{}, OSError("launch failed")]), \
+                mock.patch.object(launcher, "stop_one") as stop:
+            self.assertEqual(launcher.cmd_start(None), 1)
+        self.assertEqual(stop.call_args_list, [mock.call(name) for name in reversed(launcher.SERVICES)])
+
     def test_a_reused_or_foreign_pid_is_never_treated_as_ours(self):
         with open(launcher.pidfile("worker"), "w", encoding="utf-8") as handle:
             json.dump({"name": "worker", "pid": os.getpid(), "started_at": "Thu Jan  1 00:00:00 1970"}, handle)  # this test's own pid, wrong start time
