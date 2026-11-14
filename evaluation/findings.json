@@ -1,7 +1,7 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T04:10:00Z",
+  "updated_at": "2026-11-14T04:40:00Z",
   "application_code_commit": "adac9452 (origin/main, merged into claude/adversarial-validation as 1862ebf)",
   "observed_at_harness_commit": "d2d3c53",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
@@ -87,6 +87,13 @@
           "evidence": {
             "backend_test": "tests/test_scientific_http.py::test_ordinary_http_baseline_is_honestly_blocked_without_a_producer"
           }
+        },
+        {
+          "at_commit": "preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance)",
+          "result": "Fixed on that branch: ordinary HTTP baseline returns certified_counterexample with two exact candidates in the admitted domain, the outside one freshly valid (ke = 101/1016, strictly below 0.10), both compatible per the independent 80-digit oracle; the counterdex.application-bundle.v1 baseline packet downloads and passes fresh replay-native with the authenticated anchor. Close after it merges to main and passes on the Mac without diagnostics.",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc"
+          }
         }
       ]
     },
@@ -110,6 +117,13 @@
           "result": "Implemented on main: GET /artifacts/{id} returns native bytes with X-Artifact-SHA256 and GET /artifacts/{id}/anchor returns scientific_problem_digest / native_suggestion_digest. Not yet exercised through HTTP here: no run produces artifacts (discovery unavailable; F-MAC-NPROC on this Mac). Harness updated to use the anchor route.",
           "evidence": {
             "code": "apps/api/bean_api/main.py artifact(), artifact_anchor()"
+          }
+        },
+        {
+          "at_commit": "preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance)",
+          "result": "Native bytes, X-Artifact-SHA256, length, media type and the separate anchor route all verified over HTTP for baseline and design packets; altered bytes and wrong anchors rejected. Pending a non-diagnostic run on main.",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc"
           }
         }
       ]
@@ -138,6 +152,13 @@
             "attempts": [
               "att_86aae8c45eb24619"
             ]
+          }
+        },
+        {
+          "at_commit": "preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance)",
+          "result": "Lineage now verified for all three what-if branches (new hypothetical dataset, parent link, old approval refused, new approval required); candidate-specific outcomes for the prior pair still have no route. Independent oracle expectations are recorded per branch for the eventual route.",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-FOLLOWUP)"
           }
         }
       ]
@@ -347,7 +368,16 @@
           "test_scientific_http.py::test_explicit_seed_pair_real_design_download_and_independent_replay"
         ],
         "suggested_seam": "treat RLIMIT_NPROC on Darwin like RLIMIT_AS (report unavailable) or set it to current user process count + a small margin; keep the owned-session kill and wall clock"
-      }
+      },
+      "retests": [
+        {
+          "at_commit": "backend/browser-baseline cc779bf (preview, no diagnostic)",
+          "result": "Also present on Owner 2's newer branch: the plain preview's hero baseline fails the same way.",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/plain"
+          }
+        }
+      ]
     },
     {
       "id": "F-COORDINATOR-OPTIONAL-STATUS",
@@ -385,6 +415,35 @@
       "observed": "an empty var/artifacts appeared in the working tree (removed)",
       "evidence": {
         "note": "Workstream 5's own fixture had the same omission and now sets artifact_dir"
+      }
+    },
+    {
+      "id": "F-DESIGN-SOURCE-ARTIFACTS",
+      "severity": "P1",
+      "owner": "2 (projection) and 1 (engine reuse format)",
+      "status": "open",
+      "title": "A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation",
+      "minimal_input": "hero-v2 on backend/browser-baseline cc779bf: discovered pair, grid [6,8] h, allowance 1/5, horizon 8, construction+continuation, source_artifact_ids=[baseline native artifact]",
+      "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <worktree of backend/browser-baseline> --diagnostic relax_nproc --results evaluation/results/previews/x --only RS-HERO-FULL",
+      "expected": "the walkthrough's documented design scope (with source artifact ids) yields checked_pair_separation for a checkable pair",
+      "observed": "design_tier numerical_guidance, reason invalid_input; engine report.checked.error invalid_input at field ['pair']: 'Missing or unknown fields in this version' - candidates get source_artifact_digest = the baseline application packet, which the engine tries to reuse as a pair certificate. The same pair without source_artifact_ids, separately approved: checked_pair_separation, verification valid, fresh replay passed, selected 8 h with a positive exact margin",
+      "evidence": {
+        "results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-HERO-FULL isolation checks)",
+        "suggested_seam": "do not project the baseline application packet as a pair-reuse source_artifact_digest (pass it as historical context), or teach the engine to accept baseline certificates; and return a specific reason code instead of a silent numerical fallback"
+      }
+    },
+    {
+      "id": "F-SIBLING-FORKS",
+      "severity": "P2",
+      "owner": "2",
+      "status": "open",
+      "title": "Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer)",
+      "minimal_input": "two hypothetical observation proposals against the same parent dataset in one workspace",
+      "command": "review the second proposal after accepting the first",
+      "expected": "comparing several hypothetical readings from the same history is a natural planning task; either allow sibling forks or document 'one fork per workspace'",
+      "observed": "409 stale_revision for the second fork (the first moved the current dataset); the harness now uses one workspace per branch",
+      "evidence": {
+        "note": "correct immutability behaviour; product/UX gap, not a safety defect"
       }
     },
     {
@@ -451,6 +510,26 @@
         ],
         "affected_records": "records at 31a73b1 and 5bcc917 carry worktree_dirty=true although only evaluation/results changed; the 34 pre-merge records are unaffected"
       }
+    },
+    {
+      "id": "H-HERO-CONTINUATION",
+      "severity": "P1",
+      "owner": "5",
+      "status": "retested",
+      "title": "hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h)",
+      "fixed_in": "d6c7f1f (hero-v2, manifest v3)",
+      "evidence": {
+        "note": "found by previewing real discovery; hero-v1 kept for its attempts"
+      }
+    },
+    {
+      "id": "H-PREVIEW-HARNESS",
+      "severity": "P1",
+      "owner": "5",
+      "status": "retested",
+      "title": "Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace",
+      "fixed_in": "d6c7f1f, de1aca5",
+      "evidence": {}
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14."

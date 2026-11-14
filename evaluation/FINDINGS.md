@@ -20,11 +20,15 @@ Application code commit `adac9452 (or`, observed with harness `d2d3c53` on macOS
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | open | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | open | Coordinator attempt metadata names provider gemini for controlled-model turns |
 | F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
+| F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | open | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
+| F-SIBLING-FORKS | P2 | 2 | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
 | H-ORACLE-BOUNDARIES | P1 | 5 | retested | Harness contract oracle accepted inputs the API rejects (trailing newline, -0, depth 64, digit caps) |
 | H-BUDGET-USAGE | P1 | 5 | retested | Harness JSONL budget accepted negative usage and counted one request per reservation |
 | H-COMPLETED-QUALIFIES | P0 | 5 | retested | Merged harness passed a case-less full-stack entry on state == completed alone |
 | H-VACUOUS-ORPHAN | P1 | 5 | retested | First lane run passed orphan/restart checks vacuously (child died at setup); attempt retained |
 | H-DIRTY-FLAG | P1 | 5 | retested | git_state stripped porcelain output and marked every record dirty (since harness 0.1.0) |
+| H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
+| H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
 
 ## F-PLATFORM-RLIMIT (P0, owner 2, retested)
 
@@ -52,6 +56,7 @@ Application code commit `adac9452 (or`, observed with harness `d2d3c53` on macOS
 - **Observed:** public API exposes normalize/create_suggestion/replay_bundle for a supplied fixed pair only
 - **Evidence:** {"note": "engine-level fixed-pair controls pass (controls.jsonl); discovery is the missing join, not the checker"}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** Still open on main: CounterdexAdapter.investigate returns unsupported/baseline_producer_unavailable by design (Owner 2 BACKEND_INTEGRATION.md). Counterdex baseline.py/search.py are merged but not wired; the unmerged branch backend/browser-baseline (cc779bf) appears to wire computed baseline evidence and is next to preview. (evidence: {"backend_test": "tests/test_scientific_http.py::test_ordinary_http_baseline_is_honestly_blocked_without_a_producer"})
+- **Retest at preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance):** Fixed on that branch: ordinary HTTP baseline returns certified_counterexample with two exact candidates in the admitted domain, the outside one freshly valid (ke = 101/1016, strictly below 0.10), both compatible per the independent 80-digit oracle; the counterdex.application-bundle.v1 baseline packet downloads and passes fresh replay-native with the authenticated anchor. Close after it merges to main and passes on the Mac without diagnostics. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc"})
 
 ## F-NATIVE-BYTES (P0, owner 2 (bytes, anchor record) and 1 (complete packet), fixed_pending_retest)
 
@@ -61,6 +66,7 @@ Application code commit `adac9452 (or`, observed with harness `d2d3c53` on macOS
 - **Observed:** not yet reachable through HTTP at this commit because F-PLATFORM-RLIMIT/F-ADAPTER-SELECTION stop the run first; code inspection: main.py artifact() returns canonical_bytes(record) for evidence/suggestion/report kinds only
 - **Evidence:** {"anchor_field_names_accepted": "evaluation/drbean_eval/native.py ANCHOR_KEYS (agree final names with Owner 2)", "harness": "evaluation/drbean_eval/science_flow.py Flow.download tries /artifacts/{id} and /artifacts/{id}/content and classifies envelopes"}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** Implemented on main: GET /artifacts/{id} returns native bytes with X-Artifact-SHA256 and GET /artifacts/{id}/anchor returns scientific_problem_digest / native_suggestion_digest. Not yet exercised through HTTP here: no run produces artifacts (discovery unavailable; F-MAC-NPROC on this Mac). Harness updated to use the anchor route. (evidence: {"code": "apps/api/bean_api/main.py artifact(), artifact_anchor()"})
+- **Retest at preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance):** Native bytes, X-Artifact-SHA256, length, media type and the separate anchor route all verified over HTTP for baseline and design packets; altered bytes and wrong anchors rejected. Pending a non-diagnostic run on main. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc"})
 
 ## F-FOLLOWUP-FEEDBACK (P0, owner 1 and 2, open)
 
@@ -70,6 +76,7 @@ Application code commit `adac9452 (or`, observed with harness `d2d3c53` on macOS
 - **Observed:** lineage, origin labelling and new-approval requirement work over HTTP; per-candidate feedback has no route (harness accepts prior_candidate_results / candidate_results); blocked behind the hero run
 - **Evidence:** {"attempts": ["att_003a52ad356c4088"], "engine_controls": "followup:3.4/4.57/4.0 pass at engine level"}
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** ScientificResult now carries candidate_results; Owner 1's unmerged codex/science-next adds original-candidate observation rechecks. No integrated HTTP route yet exercised here (blocked behind the hero run). (evidence: {"attempts": ["att_86aae8c45eb24619"]})
+- **Retest at preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance):** Lineage now verified for all three what-if branches (new hypothetical dataset, parent link, old approval refused, new approval required); candidate-specific outcomes for the prior pair still have no route. Independent oracle expectations are recorded per branch for the eventual route. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-FOLLOWUP)"})
 
 ## F-PLACEHOLDER-AUTO (P0, owner 3, retested)
 
@@ -141,6 +148,7 @@ Application code commit `adac9452 (or`, observed with harness `d2d3c53` on macOS
 - **Expected:** the supervised child launches the prepared CPython 3.11 runtime on the team's Mac; process-tree containment comes from the owned session/process group
 - **Observed:** spawn fails with EAGAIN at caps 32 and 64 (passes at 4000); runs end failed with scientific_runtime_unavailable / scientific_worker_failed; 4 backend tests fail on the Mac only (Linux run passed)
 - **Evidence:** {"attempts": ["att_87537746fa40470d", "att_adf816f75f9b4d1a"], "backend_tests": ["test_science_boundary.py::test_cancellation_terminates_descendants", "test_science_boundary.py::test_descendant_cannot_escape_by_outliving_adapter", "test_scientific_http.py::test_ordinary_http_baseline_is_honestly_blocked_without_a_producer", "test_scientific_http.py::test_explicit_seed_pair_real_design_download_and_independent_replay"], "suggested_seam": "treat RLIMIT_NPROC on Darwin like RLIMIT_AS (report unavailable) or set it to current user process count + a small margin; keep the owned-session kill and wall clock"}
+- **Retest at backend/browser-baseline cc779bf (preview, no diagnostic):** Also present on Owner 2's newer branch: the plain preview's hero baseline fails the same way. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/plain"})
 
 ## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, open)
 
@@ -165,3 +173,19 @@ Application code commit `adac9452 (or`, observed with harness `d2d3c53` on macOS
 - **Expected:** test runs write only to tmp_path
 - **Observed:** an empty var/artifacts appeared in the working tree (removed)
 - **Evidence:** {"note": "Workstream 5's own fixture had the same omission and now sets artifact_dir"}
+
+## F-DESIGN-SOURCE-ARTIFACTS (P1, owner 2 (projection) and 1 (engine reuse format), open)
+
+- **Input:** hero-v2 on backend/browser-baseline cc779bf: discovered pair, grid [6,8] h, allowance 1/5, horizon 8, construction+continuation, source_artifact_ids=[baseline native artifact]
+- **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <worktree of backend/browser-baseline> --diagnostic relax_nproc --results evaluation/results/previews/x --only RS-HERO-FULL`
+- **Expected:** the walkthrough's documented design scope (with source artifact ids) yields checked_pair_separation for a checkable pair
+- **Observed:** design_tier numerical_guidance, reason invalid_input; engine report.checked.error invalid_input at field ['pair']: 'Missing or unknown fields in this version' - candidates get source_artifact_digest = the baseline application packet, which the engine tries to reuse as a pair certificate. The same pair without source_artifact_ids, separately approved: checked_pair_separation, verification valid, fresh replay passed, selected 8 h with a positive exact margin
+- **Evidence:** {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-HERO-FULL isolation checks)", "suggested_seam": "do not project the baseline application packet as a pair-reuse source_artifact_digest (pass it as historical context), or teach the engine to accept baseline certificates; and return a specific reason code instead of a silent numerical fallback"}
+
+## F-SIBLING-FORKS (P2, owner 2, open)
+
+- **Input:** two hypothetical observation proposals against the same parent dataset in one workspace
+- **Command:** `review the second proposal after accepting the first`
+- **Expected:** comparing several hypothetical readings from the same history is a natural planning task; either allow sibling forks or document 'one fork per workspace'
+- **Observed:** 409 stale_revision for the second fork (the first moved the current dataset); the harness now uses one workspace per branch
+- **Evidence:** {"note": "correct immutability behaviour; product/UX gap, not a safety defect"}

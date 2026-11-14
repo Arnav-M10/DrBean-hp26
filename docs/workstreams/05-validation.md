@@ -11,7 +11,7 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 | Last recorded lane run | harness `d2d3c53` against application `adac945` (`evaluation/results/lane-runs.jsonl`, last line) |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 |
 | AI mode | zero external model dispatch, verified by the egress guard in API, worker and pytest; live Gemini `NOT_RUN` |
-| Findings | `evaluation/findings.json` → `evaluation/FINDINGS.md` (4 open P0 at this point) |
+| Findings | `evaluation/findings.json` → `evaluation/FINDINGS.md` (open P0: F-MAC-NPROC, F-BASELINE-DISCOVERY on main, F-NATIVE-BYTES pending retest, F-FOLLOWUP-FEEDBACK) |
 | Release gate | `python3.11 evaluation/cli.py gate --require release` → failed (exit 3) |
 
 ## Gate evidence (current)
@@ -19,8 +19,8 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 | Gate | Status | Evidence |
 |---|---|---|
 | G0 baseline | done | backend suite on this Mac: 265 passed / 4 failed at `adac945` (was 136/17/11 at `586fb9b`); engine 257 OK; harness 82 unit tests, manifest v2 verified, selftest 24/62 |
-| G1 real manual investigation (HTTP) | **blocked** | `RS-HERO-FULL` fails: on the Mac `scientific_runtime_unavailable` (F-MAC-NPROC); on any host the baseline producer is unavailable on `main` (F-BASELINE-DISCOVERY). Image admission now passes. |
-| G2 decision loop | blocked behind G1 | engine-level controls pass 12/12 (fixed pair 8 h / 6 h / no-separation, three defenses, endpoint, touching bands, follow-ups 3.4 / 4.57 / 4.0) |
+| G1 real manual investigation (HTTP) | **blocked on `main`** | `RS-HERO-FULL` fails: on the Mac `scientific_runtime_unavailable` (F-MAC-NPROC); on any host the baseline producer is unavailable on `main` (F-BASELINE-DISCOVERY). Image admission passes. **Preview of Owner 2's `backend/browser-baseline` cc779bf (diagnostic relax_nproc):** real discovery, certified counterexample, baseline packet download + fresh `replay-native` all pass. |
+| G2 decision loop | blocked | engine-level controls 12/12. Preview: changed input, design authority, three hypothetical lineages pass; checked design blocked by F-DESIGN-SOURCE-ARTIFACTS (without source ids the same pair separates at 8 h and replays fresh); per-candidate follow-up feedback has no route (F-FOLLOWUP-FEEDBACK). |
 | G3 AI-ready offline | mostly evidenced | zero-dispatch tests 7/7 incl. legacy live switch; controlled boundary 28 passed + 2 strict xfail (P2 residuals); real Worker + deepagents graph contrast and vanished-scenario refusal pass |
 | G4 usable release | not started here | Owner 4 |
 
@@ -58,10 +58,18 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 2. `docs/issue-ledger.md`: I-001/I-002/I-005 are superseded by the merged backend and engine; current statuses are in `evaluation/FINDINGS.md`.
 3. CI: run the commands above; treat `gate --require release` exit 3 as a failing release, exit 0 from `inventory` as informational only. `scripts/release/checklist.py:25` has an unused import (F-LINT-CHECKLIST).
 
+## Previews of unmerged branches (never acceptance)
+
+`--app-repo <worktree>` runs this branch's harness against a teammate checkout; `--diagnostic relax_nproc` lifts only the per-user process cap that blocks the Mac (F-MAC-NPROC). Both write to `evaluation/results/previews/` and never count toward gates.
+
+| Branch | Commit | Result |
+|---|---|---|
+| `backend/browser-baseline` | `cc779bf` | plain: hero fails (F-MAC-NPROC). diagnostic: discovery + baseline replay pass; changed input, concurrency, design authority, zero dispatch pass; hero blocked by F-DESIGN-SOURCE-ARTIFACTS; follow-up per-candidate blocked (F-FOLLOWUP-FEEDBACK); cancel/restart unobservable (computation < 1 s). |
+
 ## Next exact actions
 
-1. Preview Owner 2's `backend/browser-baseline` (computed baseline evidence) in a separate worktree with this harness; feed back the first real discovery → design → download → replay observation before it merges.
-2. Preview Owner 3's `codex/gemini-offline-integration` against the zero-dispatch and controlled-boundary tests.
+1. Preview Owner 3's `codex/gemini-offline-integration` against the zero-dispatch and controlled-boundary tests.
+2. Make cancellation observable: a heavier admitted input (more rows / 64-time design grid) or an Owner 2 deterministic barrier; until then F-RESTART-UNOBSERVABLE stays open.
 3. Remaining master-brief gaps in my lane: stale-approval-after-revision HTTP check, extended native negative controls (truncation, missing dependency, wrong profile, duplicate member, oversized, another run's packet), endpoint-level admission goldens from `shared/contracts/DB-SC-1/fixtures/admission-golden.json`, guard coverage for the CLI process and credential-read detection, ledger corruption handling, metamorphic engine controls, and grading C08/C09 from the real graph at the controlled tier.
 4. Retest F-MAC-NPROC, F-BASELINE-DISCOVERY, F-NATIVE-BYTES and F-FOLLOWUP-FEEDBACK whenever `main` moves.
 

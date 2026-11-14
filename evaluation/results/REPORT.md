@@ -2,7 +2,7 @@
 
 Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0). Feasibility evidence from a small portfolio, not a statistical benchmark. No live model request was permitted or made: live lanes are disabled (NOT_RUN) and any AI in the current lanes is absent or a labelled controlled placeholder. Fresh native replay re-runs the project's own checker; it is not an independent proof.
 
-- Manifest version 2 (ancestry: v1), contract GF-2 / DB-SC-1
+- Manifest version 3 (ancestry: v1, v2), contract GF-2 / DB-SC-1
 - Holdouts: prepared and sealed by digest; not used for prompt tuning; ungraded
 - Attempts recorded: 69; history verification: OK
 - Live activation: disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared accounted allocation, Owner 3's operator path and independent grading of predeclared cases. The CLI has no switch for it.
@@ -96,16 +96,16 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | followup:4.57 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "compatible", "reference": "excluded"}, "per_candidate": {"outside": "compatible", "refe |
 | followup:4.0 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "excluded"}, "per_candidate": {"outside": "excluded", "referenc |
 
-## Release gates at d2d3c5393a (overall: failed)
+## Release gates at de1aca516c (overall: failed)
 
 | Gate | Status |
 |---|---|
 | harness_integrity | passed |
-| real_science_http | failed |
-| essential_negative_controls_http | failed |
-| zero_external_model_dispatch | passed |
-| native_engine_controls | passed |
-| supported_machine_subprocesses | failed |
+| real_science_http | blocked |
+| essential_negative_controls_http | blocked |
+| zero_external_model_dispatch | blocked |
+| native_engine_controls | blocked |
+| supported_machine_subprocesses | blocked |
 | no_unresolved_p0 | failed |
 | live_gemini_qualification | not_run |
 
@@ -129,11 +129,15 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | open | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | open | Coordinator attempt metadata names provider gemini for controlled-model turns |
 | F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
+| F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | open | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
+| F-SIBLING-FORKS | P2 | 2 | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
 | H-ORACLE-BOUNDARIES | P1 | 5 | retested | Harness contract oracle accepted inputs the API rejects (trailing newline, -0, depth 64, digit caps) |
 | H-BUDGET-USAGE | P1 | 5 | retested | Harness JSONL budget accepted negative usage and counted one request per reservation |
 | H-COMPLETED-QUALIFIES | P0 | 5 | retested | Merged harness passed a case-less full-stack entry on state == completed alone |
 | H-VACUOUS-ORPHAN | P1 | 5 | retested | First lane run passed orphan/restart checks vacuously (child died at setup); attempt retained |
 | H-DIRTY-FLAG | P1 | 5 | retested | git_state stripped porcelain output and marked every record dirty (since harness 0.1.0) |
+| H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
+| H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
 
 ## Every attempt
 
