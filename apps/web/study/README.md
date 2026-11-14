@@ -33,6 +33,9 @@ The study id is kept in `localStorage`, so a reload reopens the study.
 - Scanned images and photos need the AI reader, which is off here; the page says so.
 - Excel files are not read. Save them as CSV.
 - Live model runs were not part of testing.
+- Browsers share cookies across ports, so two copies of the app on 127.0.0.1 (say ports 4173 and
+  28170) clear each other's private session. Open the second copy in a private window. One copy
+  serving both `/` and `/study/` shares a single session and has no such problem.
 
 ## Files
 
