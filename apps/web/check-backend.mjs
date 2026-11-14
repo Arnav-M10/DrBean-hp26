@@ -43,7 +43,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#workspace-select').value !== '')
   await page.click('#example'); await page.getByRole('button', { name: 'Use these rows', exact: true }).click()
   await page.click('#measurements button[type=submit]')
-  const fields = { 'experiment-id': 'browser_test', 'time-origin': 'Elapsed hours after synthetic dose', aMin: '1', aMax: '12', keMin: '0.1', keMax: '0.3', kaMin: '0.5', kaMax: '2', targetMin: '0.10', targetMax: '17/100', allowanceOrigin: 'Team-chosen synthetic hard bound' }
+  const fields = { 'experiment-id': 'browser_test', 'time-origin': 'Elapsed hours after synthetic dose', aMin: '0.001', aMax: '30', keMin: '0.015', keMax: '0.35', kaMin: '0.4', kaMax: '8', targetMin: '0.10', targetMax: '0.17', allowanceOrigin: 'Team-chosen synthetic hard bound' }
   for (const [id, value] of Object.entries(fields)) await page.fill(`#${id}`, value)
   await page.selectOption('#dataset-origin', 'synthetic'); await page.click('#question-form button[type=submit]')
   await page.getByRole('button', { name: 'Save inputs and prepare plan' }).click()

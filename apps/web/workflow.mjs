@@ -1,4 +1,4 @@
-import { BeanApi, qualifiedScience } from './api.mjs'
+import { BeanApi, qualifiedScience, scienceReadiness } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 const byId = id => document.getElementById(id)
 function node(tag, text) { const n = document.createElement(tag); n.textContent = text; return n }
@@ -44,7 +44,7 @@ export function setupWorkflow(getDraft) {
     byId('workspace-controls').hidden = !api
     for (const id of ['connect-form', 'new-workspace']) for (const el of byId(id).elements) el.disabled = busy
     byId('workspace-select').disabled = busy
-    review.append(node('p', !api ? 'Investigation planning is unavailable. Connect to the local backend above.' : !workspace ? 'Choose a workspace above.' : qualified() ? 'Save reviewed inputs to prepare a provider-free baseline plan.' : 'Plan review is available. Scientific execution is unavailable: Owner 02 must connect and qualify Owner 01’s Counterdex adapter in the API and worker.'))
+    review.append(node('p', !api ? 'Investigation planning is unavailable. Connect to the local backend above.' : !workspace ? 'Choose a workspace above.' : qualified() ? 'Save reviewed inputs to prepare a provider-free baseline plan.' : scienceReadiness(capabilities).reason))
     button(review, 'Save inputs and prepare plan', async () => {
       const draft = getDraft(), snapshot = fingerprint()
       const datasetPayload = datasetBody(draft, draft.context)

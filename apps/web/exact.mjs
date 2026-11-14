@@ -133,12 +133,32 @@ export function parseMeasurementsCsv(text) {
   });
 }
 
+// Limits of the server's dataset contract (apps/api/bean_api/contracts.py), checked here so a
+// draft is refused before review instead of after it. The server remains the authority.
+export const MAX_ROWS = 500;
+export const MAX_SPELLING_LENGTH = 256;
+
+export function isBlankRow(row) {
+  return measurementFields.every((field) => !String(row[field] ?? "").trim());
+}
+
 export function validateMeasurements(rows) {
   const errors = [];
   const includedTimes = new Set();
+  if (rows.length > MAX_ROWS) {
+    errors.push({ index: -1, field: "rows", message: `Use at most ${MAX_ROWS} rows. This draft has ${rows.length}.` });
+  }
   rows.forEach((row, index) => {
+    if (isBlankRow(row)) {
+      // An empty row is never silently dropped or guessed at. It is reported once, with the repair.
+      errors.push({ index, field: "time", message: "This row is empty. Fill it in or remove it." });
+      return;
+    }
     for (const field of measurementFields) {
       try {
+        if (String(row[field] ?? "").length > MAX_SPELLING_LENGTH) {
+          throw new Error(`Use at most ${MAX_SPELLING_LENGTH} characters.`);
+        }
         const value = parseExact(row[field]);
         if (field === "time") {
           if (compareExact(value, "0/1") < 0) {

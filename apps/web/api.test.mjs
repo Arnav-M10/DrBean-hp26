@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { BeanApi, qualifiedScience } from './api.mjs'
+import { ApiError, BeanApi, MAX_JSON_BYTES, qualifiedScience, scienceReadiness } from './api.mjs'
 import { datasetBody, problemBody, planRequest, researchObjective } from './manual.mjs'
 
 test('uncertain mutation retry retains its operation key and token never enters body or URL', async () => {
@@ -50,4 +50,37 @@ test('plans carry the Counterdex profile and an explicit objective even when the
   assert.ok(stated.question.startsWith('Is the literature range justified?'))
   assert.ok(stated.question.includes('[1/10, 17/100]'))
   assert.ok(researchObjective(problem, 'x'.repeat(5000)).question.length <= 2000)
+})
+
+test('a lost mutation response is reported as uncertain, a lost read as unreachable, a refusal as rejected', async () => {
+  const lost = new BeanApi('t', async () => { throw new Error('socket closed') })
+  await assert.rejects(lost.json('/plans/p/approvals', { accepted: true }), e => e instanceof ApiError && e.kind === 'uncertain' && /cannot create a second one/.test(e.message))
+  await assert.rejects(lost.json('/runs/r'), e => e.kind === 'unreachable' && /Nothing was changed/.test(e.message))
+  const refused = new BeanApi('t', async () => new Response(JSON.stringify({ code: 'stale_revision', message: 'Review again.', field_paths: ['plan.problem_id'], current_revision_id: 'p2', request_id: 'req' }), { status: 409 }))
+  await assert.rejects(refused.json('/x', {}), e => e.kind === 'rejected' && e.code === 'stale_revision' && e.status === 409 && e.fieldPaths[0] === 'plan.problem_id' && e.currentRevisionId === 'p2')
+})
+test('a different request body gets a different operation key', async () => {
+  const keys = []
+  const api = new BeanApi('t', async (url, options) => { keys.push(options.headers['Idempotency-Key']); return new Response('{}') })
+  await api.json('/plans/p/runs', { approval_id: 'a' }); await api.json('/plans/p/runs', { approval_id: 'b' }); await api.json('/plans/p/runs', { approval_id: 'a' })
+  assert.notEqual(keys[0], keys[1]); assert.equal(keys[0], keys[2])
+})
+test('oversized and malformed responses are refused, not parsed', async () => {
+  const declared = new BeanApi('t', async () => new Response('{}', { headers: { 'Content-Length': String(MAX_JSON_BYTES + 1) } }))
+  await assert.rejects(declared.json('/x'), e => e.kind === 'too_large')
+  const streamed = new BeanApi('t', async () => new Response(new Uint8Array(MAX_JSON_BYTES + 5)))
+  await assert.rejects(streamed.json('/x'), e => e.kind === 'too_large')
+  const garbage = new BeanApi('t', async () => new Response('<html>'))
+  await assert.rejects(garbage.json('/x'), e => e.kind === 'malformed')
+})
+test('queueing follows what the server says it can do and explains why not', () => {
+  const base = { contract_version: 'DB-SC-1', policy_version: 'GF-2', model_templates: [{ id: 'two_rate_concentration', scientific_adapter_qualified: false }] }
+  const installedOnly = scienceReadiness({ ...base, science: { available: true, baseline_discovery: false, reason: 'baseline_producer_unavailable', verified_in_environment: false } })
+  assert.equal(installedOnly.canQueueBaseline, false)
+  assert.match(installedOnly.reason, /cannot yet search for candidates \(baseline_producer_unavailable\)/)
+  assert.equal(scienceReadiness({ ...base, science: { available: true, baseline_discovery: true } }).canQueueBaseline, true)
+  assert.match(scienceReadiness({ ...base, science: { available: false, reason: 'groundwork_adapter_not_installed' } }).reason, /No scientific engine/)
+  assert.equal(scienceReadiness({ ...base, policy_version: 'other', science: { available: true, baseline_discovery: true } }).canQueueBaseline, false)
+  assert.equal(scienceReadiness({ ...base, model_templates: [], science: { available: true, baseline_discovery: true } }).canQueueBaseline, false)
+  assert.equal(qualifiedScience(undefined), false)
 })

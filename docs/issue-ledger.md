@@ -23,6 +23,7 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 | I-015 | 2, 4 | open, target platform | `resource_policy.py` now omits `RLIMIT_AS` on macOS; still unverified on the Mac |
 | I-016 | 5 | open, blocks strict gate | HTTP/invariant suite and offline real-science lane not delivered |
 | I-017 | 4 | open, waits for G1 | Browser controls for source review, design and follow-up not built |
+| I-019 | 2, 4 | open, question | Which capability field should enable the browser's queue button |
 | I-018 | 2 | **open, launch blocker for every ordinary user** | Scientific child's process-count limit counts all of the user's processes, so real jobs fail for anyone who is not root |
 
 ## I-011: float refusal does not name the field (Owner 2)
@@ -43,6 +44,12 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 - **Not acceptable:** removing every guard, or requiring the stack to run as root.
 - **Acceptance:** `python3 scripts/release/user_conditions_check.py` exits 0; the CI `backend` and `stack` jobs go green.
 - **Why earlier evidence missed it:** all local runs by Workstream 4 were as root. Earlier statements that the launch path "passed (Linux)" were true only for root and are corrected in the status documents.
+
+## I-019: which capability enables queueing (Owner 2 to confirm)
+
+- **Current behaviour:** capabilities report `science.verified_in_environment: false` permanently, with the note that each result needs its own check and replay. The browser used to enable **Queue approved manual run** only when that flag and `model_templates[].scientific_adapter_qualified` were true, so the button could never enable, even once discovery works.
+- **Change made in the web client (Workstream 4):** `scienceReadiness` in `apps/web/api.mjs` enables queueing when `science.available === true` and `science.baseline_discovery === true` (the older flags are still honoured), fails closed on anything unknown, and shows the server's own reason otherwise. Today that keeps the button disabled, with the text "the scientific engine is installed, but this server cannot yet search for candidates (baseline_producer_unavailable)".
+- **Needed from Owner 2:** confirm those two fields are the intended gate, or name the right one. The server stays the authority either way: it refuses a run it cannot perform.
 
 ## I-012: provider must be disabled by default in code (Owner 3)
 
