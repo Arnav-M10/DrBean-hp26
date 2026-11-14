@@ -101,7 +101,9 @@ jobs:
       # Passes when the launch path works. It reports gate G1 separately and does not
       # claim real science until the engine bridge is integrated.
       - run: python3 scripts/release/stack_smoke.py
+        if: always()   # still show the launch and science result when the boundary check above fails
       - name: Owner 5 HTTP/invariant suite, when delivered
+        if: always()
         run: |
           if ls tests/integration/test_*.py >/dev/null 2>&1; then
             .venv/bin/python -m pytest -q tests/integration

@@ -24,7 +24,7 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 | I-016 | 5 | open, blocks strict gate | HTTP/invariant suite and offline real-science lane not delivered |
 | I-017 | 4 | **open, now unblocked** | Browser controls for source review, design and follow-up not built |
 | I-019 | 2, 4 | **closed** | PR #6 gates queueing on `science.available` and `baseline_discovery` (`baselineAvailable`), the same fields proposed |
-| I-018 | 2 | **closed on `main` at `1f75bdc`** (pending CI confirmation on the runner) | `user_conditions_check.py` now passes locally: 5 of 5 as an unprivileged user owning 64 processes |
+| I-018 | 2 | **partly fixed on `main` at `1f75bdc`; one test still fails on GitHub's runner** | Locally 5 of 5 as an unprivileged user owning 64 processes. On the runner (uid 1001, run 43554490810) 4 of 5: `test_descendant_cannot_escape_by_outliving_adapter` still fails. Whether an approved run completes there is shown by the stack smoke step in the same job. |
 
 ## I-011: float refusal does not name the field (Owner 2)
 
