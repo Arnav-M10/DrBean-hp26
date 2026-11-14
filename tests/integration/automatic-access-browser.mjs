@@ -118,7 +118,7 @@ async function readyPage(page, allowedOrigin) {
   await page.waitForFunction(() => Boolean(document.querySelector('#workspace-select')?.value), null, { timeout: 30000 })
   assert.equal(await page.locator('#connect-form').isVisible(), false)
   assert.equal(await page.locator('#bearer').isVisible(), false)
-  const session = await ownApi(page, '/shared-session')
+  const session = await ownApi(page, '/shared-session/current')
   assert.equal(session.mode, 'browser_session'); assert.equal(session.credentials, 'server_managed')
   assert.equal(await page.locator('#workspace-select').inputValue(), session.workspace_id)
   return session
@@ -183,7 +183,7 @@ async function scientificLoop(page, otherPage, workspace) {
     goal: 'Does this reviewed target range survive these corrected measurements, and what checked pair measurement distinguishes the computed candidates?' })) await page.fill(`#${id}`, value)
   await page.selectOption('#dataset-origin', 'synthetic')
   await page.click('#question-form button[type=submit]')
-  await page.evaluate(() => { location.hash = 'investigations' })
+  await page.getByRole('link', { name: 'Research with the assistant', exact: true }).click()
   await panel.getByText('Feasible next-measurement constraints (optional until design)', { exact: true }).click()
   for (const [name, value] of Object.entries({ times: '8, 6', allowance: '0.2', horizon: '8',
     allowanceReason: 'Explicit synthetic prospective hard bound; not a claim about an instrument' })) await panel.locator(`[name="${name}"]`).fill(value)
@@ -233,25 +233,37 @@ async function scientificLoop(page, otherPage, workspace) {
   assert.equal(session.reports.length, 2)
   for (const child of session.children) assert.equal((await browserRequest(otherPage, `/approvals/${child.approval_id}`)).status, 404)
   check('cookie-authorized-real-baseline-and-separately-approved-pair-design')
-  const [download] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'Download research report snapshot', exact: true }).last().click()])
+  const navigate = async name => {
+    const link = page.locator('.steps').getByRole('link', { name })
+    const hash = await link.getAttribute('href'), previous = await page.evaluate(() => location.hash)
+    await link.click()
+    await page.waitForFunction(({ hash, changed }) => location.hash === hash
+      && !document.getElementById(hash.slice(1)).hidden
+      && (!changed || document.activeElement?.id === `${hash.slice(1)}-title`), { hash, changed: previous !== hash })
+  }
+  await navigate(/^Next measurement/)
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#research-report').getByRole('button', { name: 'Download research report snapshot', exact: true }).last().click()])
   await download.saveAs(join(output, 'report.json'))
   const downloaded = JSON.parse(await readFile(join(output, 'report.json'), 'utf8')), report = downloaded.body
   assert.equal(report.report_profile, 'research-report.v2'); assert.equal(report.evidence.length, 2); assert.equal(report.native_evidence.length, 2)
   assert.equal((await browserRequest(otherPage, `/records/${downloaded.id}`)).status, 404)
   assert.equal((await browserRequest(otherPage, `/reports/${downloaded.id}/download`)).status, 404)
-  const nativeButtons = panel.getByRole('button', { name: 'Download native evidence', exact: true })
-  const anchorButtons = panel.getByRole('button', { name: 'Download independent replay anchors', exact: true })
   for (let index = 0; index < report.native_evidence.length; index++) {
     const entry = report.native_evidence[index]
+    const evidence = report.evidence.find(item => item.id === entry.evidence_id)
+    await navigate(evidence.kind === 'suggestion' ? /^Next measurement/ : /^Result/)
+    const destination = page.locator(evidence.kind === 'suggestion' ? '#research-next' : '#research-results')
+    const card = destination.locator('section.callout').filter({ hasText: entry.artifact.id })
+    assert.equal(await card.count(), 1, `One visible evidence card must bind artifact ${entry.artifact.id}`)
     for (const path of [`/artifacts/${entry.artifact.id}`, `/artifacts/${entry.artifact.id}/anchor`]) assert.equal((await browserRequest(otherPage, path)).status, 404)
-    const [native] = await Promise.all([page.waitForEvent('download'), nativeButtons.nth(index).click()])
-    const [anchor] = await Promise.all([page.waitForEvent('download'), anchorButtons.nth(index).click()])
+    const [native] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Download native evidence', exact: true }).click()])
+    const [anchor] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Download independent replay anchors', exact: true }).click()])
     const nativePath = join(output, entry.native_filename), anchorPath = join(output, entry.anchor_filename)
     await native.saveAs(nativePath); await anchor.saveAs(anchorPath)
     assert.equal(createHash('sha256').update(await readFile(nativePath)).digest('hex'), entry.artifact.sha256)
     const replay = JSON.parse(await command(engine, ['-I', '-m', 'counterdex', 'replay-native', nativePath, '--anchors', anchorPath]))
     assert.equal(replay.integrity, 'passed'); assert.equal(replay.expected_binding, 'matches')
-    const evidence = report.evidence.find(item => item.id === entry.evidence_id), result = evidence.body.result || evidence.body
+    const result = evidence.body.result || evidence.body
     assert.equal(replay.replay, result.replay)
     if (evidence.kind === 'suggestion') {
       assert.equal(result.design_tier, 'checked_pair_separation')
@@ -289,6 +301,22 @@ print(json.dumps({'python':sys.version.split()[0],'counterdex':version,'source_m
   assert.ok(Object.values(scientificCounters(untouched)).every(value => value === 0))
   const localBrowser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox', '--disable-background-networking'] })
   browsers.push(localBrowser)
+  // Inspect the server's first paint with application JavaScript disabled: even
+  // opening the native disclosure before bootstrap must never expose token entry.
+  const firstPaintContext = await localBrowser.newContext({ javaScriptEnabled: false })
+  const firstPaint = await trackedPage(firstPaintContext, base)
+  await firstPaint.goto(base, { waitUntil: 'networkidle' })
+  const connectionPanel = firstPaint.locator('#connection-panel')
+  if (await connectionPanel.count() && await connectionPanel.getAttribute('open') === null) {
+    await connectionPanel.locator('summary').click()
+  }
+  assert.equal(await firstPaint.locator('#connect-form').isVisible(), false)
+  assert.equal(await firstPaint.locator('#bearer').isVisible(), false)
+  if (await connectionPanel.count()) assert.doesNotMatch(await connectionPanel.innerText(), /Paste the researcher access token/)
+  assert.deepEqual(counters(), untouched)
+  await firstPaint.screenshot({ path: join(output, 'first-paint-no-token-entry.png'), fullPage: true })
+  await firstPaint.close(); await firstPaintContext.close()
+  check('server-first-paint-never-exposes-token-entry-before-application-javascript')
   const localContext = await localBrowser.newContext({ acceptDownloads: true })
   const local = await trackedPage(localContext, base), localSecond = await trackedPage(localContext, base)
   const [localSession, simultaneousLocalSession] = await Promise.all([readyPage(local, base), readyPage(localSecond, base)])
@@ -360,9 +388,14 @@ print(json.dumps({'python':sys.version.split()[0],'counterdex':version,'source_m
 
   // Real server stop/start, scoped to the test's own launcher metadata and ports.
   await command(python, ['scripts/dev/launcher.py', 'stop']); launched = false
+  assert.equal((await browserRequest(pageA, '/shared-session/current')).status, 503,
+    'Stopping the actual launcher must invalidate its published shared origin')
   await command(python, ['scripts/dev/launcher.py', 'start']); launched = true
+  // The launcher deliberately removes its publication on stop. Re-establish
+  // only this harness's existing loopback TLS mapping, never a public tunnel.
+  await writeFile(join(scratch, 'share-origin.json'), JSON.stringify({ origin }), { mode: 0o600 })
   for (const [page, session] of [[local, localSession], [pageA, sessionA], [pageB, sessionB]]) {
-    assert.equal((await ownApi(page, '/shared-session')).workspace_id, session.workspace_id)
+    assert.equal((await ownApi(page, '/shared-session/current')).workspace_id, session.workspace_id)
   }
   assert.deepEqual(counters(), beforeRecovery)
   assert.deepEqual(await ownApi(pageA, `/workspaces/${sessionA.workspace_id}/provider-budget`), budgetBefore)
@@ -449,6 +482,16 @@ print(json.dumps({'python':sys.version.split()[0],'counterdex':version,'source_m
     change_reason: 'Retained private input; saving does not authorize a scientific operation', origin: 'synthetic' } })
   assert.equal(bobSavedInput.status, 201)
   assert.equal((await browserRequest(pageA, `/records/${bobSavedInput.body.id}`)).status, 404)
+  const bobObjective = 'Retain this private question without authorizing any operation.'
+  const bobResearch = await browserRequest(pageB, `/workspaces/${sessionB.workspace_id}/research-sessions`, {
+    body: { objective: bobObjective, mode: 'controlled' } })
+  assert.equal(bobResearch.status, 200)
+  assert.equal(bobResearch.body.action, null); assert.equal(bobResearch.body.children.length, 0)
+  assert.equal((await browserRequest(pageA, `/research-sessions/${bobResearch.body.id}`)).status, 404)
+  await pageB.reload({ waitUntil: 'networkidle' })
+  await pageB.locator('.steps').getByRole('link', { name: /^Investigate/ }).click()
+  await pageB.locator('#durable-research').getByRole('button', { name: `Reopen: ${bobObjective}`, exact: true }).click()
+  await pageB.locator('#durable-research').getByRole('button', { name: 'Refresh saved state', exact: true }).waitFor()
   await pageA.evaluate(() => { location.hash = 'research' })
   await pageA.locator('#research-files').setInputFiles(join(root, 'tests/integration/fixtures/general/penguins-excerpt.csv'))
   await pageA.locator('#general-assets article').first().waitFor()
@@ -476,9 +519,19 @@ print(json.dumps({'python':sys.version.split()[0],'counterdex':version,'source_m
   assert.equal((await ownApi(pageA, '/shared-session')).workspace_id, sessionA.workspace_id)
   check('valid-rotation-preserves-identity-and-revoked-cookie-cannot-reopen-history')
   currentPage = pageB
-  store(`import json,sqlite3,sys
-c=sqlite3.connect(sys.argv[1]); c.execute('UPDATE browser_sessions SET expires_at=0 WHERE workspace_id=?',(sys.argv[2],)); c.commit(); print(json.dumps(True))`, [sessionB.workspace_id])
+  store(`import json,sqlite3,sys,time
+c=sqlite3.connect(sys.argv[1]); c.execute('UPDATE browser_sessions SET expires_at=created_at+1 WHERE workspace_id=?',(sys.argv[2],)); c.commit()
+assert c.execute('SELECT max(expires_at) FROM browser_sessions WHERE workspace_id=?',(sys.argv[2],)).fetchone()[0] < time.time()
+print(json.dumps(True))`, [sessionB.workspace_id])
   const beforeExpired = counters()
+  // An already-open child controller must notify the shared connection UI on
+  // expiry; its failed read must not dispatch science or replace the identity.
+  await pageB.locator('#durable-research').getByRole('button', { name: 'Refresh saved state', exact: true }).click()
+  await pageB.waitForFunction(() => document.querySelector('#connection-pill')?.textContent === 'Connection needs attention')
+  await pageB.locator('#connection-retry').waitFor({ state: 'visible' })
+  assert.doesNotMatch(await pageB.locator('#connection-status').innerText(), /^Ready/)
+  assert.deepEqual(counters(), beforeExpired)
+  check('in-tab-expired-child-controller-read-revokes-ready-status-without-retry-or-new-identity')
   await pageB.reload({ waitUntil: 'networkidle' })
   await pageB.locator('#connection-start-new').waitFor({ state: 'visible', timeout: 15000 })
   assert.equal((await browserRequest(pageB, `/workspaces/${sessionB.workspace_id}`)).status, 401)
@@ -491,8 +544,8 @@ print(json.dumps({'workspace':c.execute('SELECT id,name,created_at FROM workspac
  'membership':c.execute('SELECT workspace_id,actor_id FROM memberships WHERE workspace_id=? ORDER BY actor_id',(sys.argv[2],)).fetchall(),
  'entities':c.execute('SELECT id,digest,body FROM entities WHERE workspace_id=? ORDER BY id',(sys.argv[2],)).fetchall()}))`, [sessionB.workspace_id])
   assert.ok(retainedOldWorkspace.workspace)
-  assert.equal(retainedOldWorkspace.entities.length, 1)
-  assert.equal(retainedOldWorkspace.entities[0][0], bobSavedInput.body.id)
+  assert.ok(retainedOldWorkspace.entities.some(([id]) => id === bobSavedInput.body.id))
+  assert.ok(retainedOldWorkspace.entities.some(([id]) => id === bobResearch.body.id))
   await pageB.locator('#connection-start-new').click()
   await pageB.waitForFunction(oldWorkspace => {
     const value = document.querySelector('#workspace-select')?.value
@@ -508,6 +561,7 @@ print(json.dumps({'workspace':c.execute('SELECT id,name,created_at FROM workspac
   assert.deepEqual((await ownApi(pageB, '/workspaces')).map(workspace => workspace.id), [replacement.workspace_id])
   assert.equal((await browserRequest(pageB, `/workspaces/${sessionB.workspace_id}`)).status, 404)
   assert.equal((await browserRequest(pageB, `/records/${bobSavedInput.body.id}`)).status, 404)
+  assert.equal((await browserRequest(pageB, `/research-sessions/${bobResearch.body.id}`)).status, 404)
   assert.equal((await browserRequest(pageB, `/workspaces/${sessionA.workspace_id}`)).status, 404)
   assert.deepEqual(store(`import json,sqlite3,sys
 c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True)
@@ -530,7 +584,8 @@ print(json.dumps({'workspace':c.execute('SELECT id,name,created_at FROM workspac
 } catch (error) {
   await currentPage?.evaluate(() => scrollTo(0, 0)).catch(() => {})
   await currentPage?.screenshot({ path: join(output, 'failure.png'), fullPage: true }).catch(() => {})
-  const failure = { status: 'failed', checks, error: redact(error.stack || error), output }
+  const renderedErrors = await currentPage?.locator('.errors').allTextContents().catch(() => [])
+  const failure = { status: 'failed', checks, error: redact(error.stack || error), renderedErrors, output }
   await writeFile(join(output, 'failure.json'), JSON.stringify(failure, null, 2)); console.error(JSON.stringify(failure, null, 2)); process.exitCode = 1
 } finally {
   await writeFile(join(output, 'browser-console.json'), JSON.stringify({ pageErrors, messages: browserConsole }, null, 2)).catch(() => {})
