@@ -5,9 +5,11 @@ from __future__ import annotations
 import hashlib
 import secrets
 from fastapi import Depends, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
+from .sessions import COOKIE, cookie_lane
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="BearerToken")
+cookie_scheme = APIKeyCookie(name=COOKIE, auto_error=False, scheme_name="BrowserSession")
 
 
 class AuthenticationError(Exception):
@@ -15,7 +17,10 @@ class AuthenticationError(Exception):
         self.code, self.message, self.status = code, message, status
 
 
-async def principal(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)) -> str:
+async def principal(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+                    browser_cookie: str | None = Depends(cookie_scheme)) -> str:
+    if cookie_lane(request):
+        return request.app.state.sessions.authenticate(request)
     settings = request.app.state.settings
     origin = request.headers.get("origin")
     if origin and origin not in settings.allowed_origins:
