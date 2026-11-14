@@ -1,0 +1,116 @@
+................................................F....................... [ 38%]
+........................................................................ [ 77%]
+..........................................                               [100%]
+=================================== FAILURES ===================================
+_ test_reviewed_controlled_source_correction_reaches_actual_science_and_unknown_sources_preserve_it _
+
+controlled_intake_science_client = <starlette.testclient.TestClient object at 0x7fabb1c23290>
+replay_python = '/tmp/drbean-counterdex-runtime/bin/python'
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-61/test_reviewed_controlled_sourc0')
+
+    def test_reviewed_controlled_source_correction_reaches_actual_science_and_unknown_sources_preserve_it(
+            controlled_intake_science_client, replay_python, tmp_path):
+        """Simulated human review, actual API/worker/checker and fresh native replay.
+
+        The deliberate correction is synthetic test input, not evidence that the
+        authored fixture misread the image or that a live model understood it.
+        """
+        from fractions import Fraction
+        from io import BytesIO
+        from PIL import Image, PngImagePlugin
+        from bean_api.contracts import DatasetBody, MaterializedProblemInputs, PlanBody
+        from bean_api.main import PREFIX
+        from bean_api.source_materialization import reviewed_input_values
+        from bean_api.worker import Worker
+        from test_scientific_http import post
+
+        client = controlled_intake_science_client
+        root = Path(__file__).resolve().parents[1]
+        raw = (root / "fixtures/intake/clean.png").read_bytes()
+        workspace = post(client, "/workspaces", {"name": "Reviewed controlled source with actual science"}, "source-workspace")["id"]
+
+        def upload(content, key):
+            response = client.post(PREFIX + f"/workspaces/{workspace}/source-assets?origin=synthetic&retention=retain",
+                content=content, headers={"Content-Type": "image/png", "Idempotency-Key": key})
+            assert response.status_code == 201, response.text
+            return response.json()
+
+        source = upload(raw, "clean-source")
+        assert source["body"]["sha256"] == hashlib.sha256(raw).hexdigest()
+        assert client.get(PREFIX + f"/source-assets/{source['id']}/content").content == raw
+        request_body = {"execution_mode": "controlled", "source_id": source["id"],
+                        "expected_source_digest": source["body"]["sha256"], "notes": "", "existing_values": {}}
+        proposal = post(client, f"/workspaces/{workspace}/intake-proposals", request_body, "controlled-source")
+        body = proposal["body"]
+        assert body["execution_mode"] == "controlled" and body["authorship"] == "controlled_fixture"
+        assert body["status"] == "controlled_example" and body["review_state"] == "unaccepted"
+        assert body["next_action"] == "review_controlled_preview"
+        assert body["diagnostics"] == [] and "provider_attempt_id" not in body
+        assert all(field["method"] == "controlled_fixture" and field["source_asset_id"] == source["id"] for field in body["fields"])
+        assert body["provenance"]["fixture_id"] == "clean"
+        local_attempt = client.get(PREFIX + f"/records/{body['provenance']['local_attempt_id']}")
+        assert local_attempt.status_code == 200, local_attempt.text
+        assert local_attempt.json()["workspace_id"] == workspace
+        assert local_attempt.json()["body"]["external_provider_calls"] == 0
+        local_attempts = client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json()
+        assert post(client, f"/workspaces/{workspace}/intake-proposals", request_body, "controlled-source")["id"] == proposal["id"]
+        assert client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json() == local_attempts
+        assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
+
+        reviewed_fields = []
+        for field in body["fields"]:
+            changed = field["field_path"] == "rows[0].concentration"
+            reviewed_fields.append({"field_path": field["field_path"],
+                "value": "97/20" if changed else field["candidate_exact"],
+                "origin": "corrected_transcription" if changed else "confirmed_transcription",
+                **({"correction_reason": "Deliberate synthetic review correction to verify exact input materialization."} if changed else {})})
+        review = post(client, f"/workspaces/{workspace}/intake-proposals/{proposal['id']}/review", {
+            "expected_proposal_digest": proposal["digest"], "reviewed_fields": reviewed_fields}, "review-controlled-source")
+        accepted = {field["field_path"]: field["normalized_value"] for field in review["body"]["reviewed_fields"]}
+        dataset_body = DatasetBody(experiment_id="controlled_source_experiment", time_origin="Elapsed hours from the declared synthetic start",
+            origin="synthetic", change_reason="Explicitly reviewed correction of a controlled source proposal", rows=[
+                {"id": f"source_row_{index}", "time": accepted[f"rows[{index}].time"],
+                 "concentration": accepted[f"rows[{index}].concentration"], "hard_allowance": accepted[f"rows[{index}].hard_allowance"],
+                 "included": True} for index in range(5)]).model_dump(mode="json")
+        problem_inputs = MaterializedProblemInputs(domain={"A": {"lower": "1/1000", "upper": "30/1"},
+            "ke": {"lower": "3/200", "upper": "7/20"}, "ka": {"lower": "2/5", "upper": "8/1"}},
+            target={"lower": accepted["target.lower"], "upper": accepted["target.upper"]}).model_dump(mode="json")
+        assumptions = {path: "Explicitly reviewed synthetic model or experiment assumption; not machine-extracted."
+            for path in reviewed_input_values(dataset_body, problem_inputs) if path not in accepted and not path.endswith(".notes")}
+        materialized = post(client, f"/workspaces/{workspace}/intake-reviews/{review['id']}/materialize", {
+            "expected_review_digest": review["digest"], "dataset": dataset_body, "problem": problem_inputs,
+            "human_assumptions": assumptions}, "materialize-controlled-source")
+        dataset, problem = materialized["dataset"], materialized["problem"]
+        assert dataset["body"]["origin"] == "synthetic"
+        assert dataset["body"]["rows"][0]["concentration"] == "97/20"
+        assert dataset["body"]["rows"][0]["original_values"]["concentration"] == "4.80"
+        assert all(row["source_asset_id"] == source["id"] for row in dataset["body"]["rows"])
+        assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
+
+        plan_body = PlanBody(problem_id=problem["id"], problem_digest=problem["digest"], dataset_id=dataset["id"],
+            scientific_profile="counterdex.v1", objective={"question": "Does the reviewed synthetic correction admit an outside assignment?",
+                "success_criterion": "Retain actual checked scientific evidence bound to accepted source-review values."},
+            scenarios=[{"id": "baseline", "kind": "baseline", "label": "Reviewed source correction", "problem_id": problem["id"],
+                        "problem_digest": problem["digest"]}]).model_dump(mode="json")
+        plan = post(client, f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"], "plan": plan_body}, "source-plan")
+        approval = post(client, f"/plans/{plan['id']}/approvals", {"expected_current_revision_id": problem["id"],
+            "expected_plan_digest": plan["digest"], "accepted": True}, "source-approval")
+        run = post(client, f"/plans/{plan['id']}/runs", {"approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "source-run")
+        result, content, anchors, native = native_baseline.execute_and_download(client, run)
+        assert native["problem"]["observations"][0]["value"] == "97/20"
+        assert result["problem_id"] == problem["id"] and result["problem_digest"] == problem["digest"]
+        assert result["scientific_outcome"] == "certified_counterexample" and result["verification"] == "valid"
+        lower, upper = Fraction(problem["body"]["target"]["lower"]), Fraction(problem["body"]["target"]["upper"])
+        assert any(candidate["verification"] == "valid" and not lower <= Fraction(candidate["parameter_vector"]["ke"]) <= upper
+                   for candidate in result["candidates"])
+        assert json.loads(content)["binding"]["dataset"]["body"] == dataset["body"]
+        process, fresh = native_baseline.replay_cli(replay_python, tmp_path, content, anchors)
+>       assert process.returncode == 0, fresh
+E       AssertionError: {'error': {'code': 'source_version_mismatch', 'field_paths': [], 'message': 'Use the prepared installed source version for these evidence bytes.', 'retryable': False}}
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/tmp/drbean-counterdex-runtime/bin/python', '-I', '-m', 'counterdex', 'replay-native', '/tmp/p...field_paths":[],"message":"Use the prepared installed source version for these evidence bytes.","retryable":false}}\n').returncode
+
+tests/test_provider.py:584: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_provider.py::test_reviewed_controlled_source_correction_reaches_actual_science_and_unknown_sources_preserve_it
+1 failed, 185 passed in 30.19s
