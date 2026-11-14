@@ -1,0 +1,36 @@
+........................................................................ [  8%]
+........................................................................ [ 16%]
+........................................................................ [ 25%]
+..........F............................................................. [ 33%]
+........................................................................ [ 42%]
+........................................................................ [ 50%]
+........................................................................ [ 59%]
+........................................................................ [ 67%]
+........................................................................ [ 75%]
+........................................................................ [ 84%]
+........................................................................ [ 92%]
+..............................................................           [100%]
+=================================== FAILURES ===================================
+_ test_numeric_policy_uses_ranges_parameter_vectors_selected_options_and_search_counters _
+
+    def test_numeric_policy_uses_ranges_parameter_vectors_selected_options_and_search_counters():
+        from bean_api.ai_prompts import commentary_rejection
+    
+        facts = [{"target": {"lower": "1/10", "upper": "17/100"},
+                  "candidates": [{"id": "candidate-999", "parameter_vector": {"ke": "3/25"}}],
+                  "selected_option": {"time": "8/1", "exact_margin": "1/5"},
+                  "baseline_search": {"evaluated_count": 3, "settings": {"ka_points": 7}, "reason": "999"}}]
+        assert commentary_rejection("The interval is [0.10, 0.17]; the candidate rate is 0.12.", facts) is None
+        assert commentary_rejection("At elapsed time 8h, the margin is 0.2mg/L.", facts) is None
+        assert commentary_rejection("The search evaluated 3 assignments using 7 rate grid points.", facts) is None
+        assert commentary_rejection("The margin is 999mg/L.", facts) == "unsupported_numeric_claim"
+        assert commentary_rejection("The selected time is 999h.", facts) == "unsupported_numeric_claim"
+        assert commentary_rejection("The selected time is 999.", facts) == "unsupported_numeric_claim"
+>       assert commentary_rejection("Opaque evidence a123b and candidate-999 retain their original IDs.", facts) is None
+E       AssertionError: assert 'unsupported_claim' is None
+E        +  where 'unsupported_claim' = <function commentary_rejection at 0x7f33380ad4e0>('Opaque evidence a123b and candidate-999 retain their original IDs.', [{'baseline_search': {'evaluated_count': 3, 'reason': '999', 'settings': {'ka_points': 7}}, 'candidates': [{'id': 'can... '3/25'}}], 'selected_option': {'exact_margin': '1/5', 'time': '8/1'}, 'target': {'lower': '1/10', 'upper': '17/100'}}])
+
+tests/test_coordinator.py:356: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_coordinator.py::test_numeric_policy_uses_ranges_parameter_vectors_selected_options_and_search_counters
+1 failed, 853 passed in 142.40s (0:02:22)
