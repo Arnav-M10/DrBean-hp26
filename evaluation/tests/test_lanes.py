@@ -198,6 +198,24 @@ class AccountingTests(unittest.TestCase):
         self.assertEqual(lanes.live_not_run_statement()["status"], "not_run")
 
 
+class EnginePreconditionTests(unittest.TestCase):
+    def test_precondition_follows_the_applications_import_not_the_installed_copy(self):
+        app = os.path.dirname(ROOT)
+        source = lanes.engine_controls.engine_source_identity(os.path.join(app, "packages", "groundwork_adapter"))
+        repository = {"imported_from": "repository", "version": "x", "source_sha256": source["source_sha256"]}
+        for installed in ({"installed": False}, {"installed": True, "matches_repository": False,
+                                                 "differing_files": ["core.py"]}):
+            with self.subTest(installed=installed):
+                result = lanes.engine_precondition({"versions": {"engine_repository": repository,
+                                                                 "engine_installed": installed}}, app)
+                self.assertTrue(result["passed"], result["detail"])
+        for imported in ({**repository, "imported_from": "elsewhere"}, {**repository, "source_sha256": "0" * 64}, {}):
+            with self.subTest(imported=imported):
+                result = lanes.engine_precondition({"versions": {"engine_repository": imported,
+                                                                 "engine_installed": {"installed": False}}}, app)
+                self.assertFalse(result["passed"])
+
+
 class JunitAndReplayTests(unittest.TestCase):
     def test_junit_outcomes(self):
         xml = ('<?xml version="1.0"?><testsuites><testsuite name="pytest">'

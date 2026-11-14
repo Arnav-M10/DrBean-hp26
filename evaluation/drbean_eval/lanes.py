@@ -389,13 +389,7 @@ def run_pytest_lane(lane: str, repo: str, results_dir: str, *, app_repo: str | N
         results = parse_junit(junit)
         accounting = dispatch_accounting(session_log, archive)
         report = _base_report(lane, repo, app, app_repo, backend, science, before)
-        engine = report["versions"]["engine_installed"] or {}
-        preconditions = [{"id": "engine_runtime_matches_repository_source",
-                          "passed": engine.get("matches_repository") is True,
-                          "detail": f"installed Counterdex {engine.get('version')} differs in "
-                                    f"{engine.get('differing_files')}" if not engine.get("matches_repository")
-                          else "installed engine copy is identical to the repository source"},
-                         _unchanged(before, repo)]
+        preconditions = [engine_precondition(report, app), _unchanged(before, repo)]
         counts = results.get("counts") or {}
         ok = (exit_code == 0 and counts and not counts.get("failed") and all(p["passed"] for p in preconditions)
               and accounting["external_model_requests"]["status"] == "verified_zero")
@@ -419,6 +413,30 @@ def _write_json(directory: str, name: str, value) -> str:
         json.dump(value, handle, indent=1, sort_keys=True)
         handle.write("\n")
     return path
+
+
+def engine_precondition(report: dict, app: str) -> dict:
+    """The engine the application runs is its checkout's repository source.
+
+    The application's scientific child (bean_api/counterdex_child.py) puts ``packages/groundwork_adapter`` first on
+    sys.path, so an installed copy in the engine interpreter is shadowed. The check therefore mirrors that import
+    (engine_controls.engine_identity) and compares its digest with the tested source. The installed copy is recorded
+    as information only (H-LANE-ENGINE-PRECONDITION: the first version checked the installed copy and wrongly failed
+    checkouts that have none)."""
+    versions_ = report.get("versions") or {}
+    imported = versions_.get("engine_repository") or {}
+    expected = engine_controls.engine_source_identity(os.path.join(app, "packages", "groundwork_adapter"))
+    ok = imported.get("imported_from") == "repository" and bool(expected["source_sha256"]) and \
+        imported.get("source_sha256") == expected["source_sha256"]
+    installed = versions_.get("engine_installed") or {}
+    note = ("no installed copy in the engine interpreter" if not installed.get("installed") else
+            "installed copy identical to the source (shadowed)" if installed.get("matches_repository") else
+            f"installed copy differs in {installed.get('differing_files')} (shadowed by the repository source)")
+    return {"id": "engine_runtime_matches_repository_source", "passed": ok,
+            "detail": (f"the application's import path resolves Counterdex {imported.get('version')} to the "
+                       f"repository source; {note}") if ok else
+            f"engine import resolved {imported.get('imported_from')!r} with digest "
+            f"{str(imported.get('source_sha256'))[:12]}, expected {str(expected['source_sha256'])[:12]}; {note}"}
 
 
 def _unchanged(before: dict, repo: str) -> dict:

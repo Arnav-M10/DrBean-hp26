@@ -50,6 +50,7 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 | F-PAPER-QUOTE-NORMALIZATION | P2 | 3 (with 4: parser text normalization) | open | An authentic quote that crosses a text-layer line break, or uses an NFKC-equivalent character (µ U+00B5 vs μ U+03BC), discards the whole paper proposal |
 | F-PAPER-HARD-BOUND-CONTEXT | P2 | 3 | open | A stated hard bound is refused, and the whole proposal discarded, when an unrelated SD or CI appears anywhere on the same page |
 | F-PAPER-EXPONENT-FLATTENING | P2 | 3 (with 4: parser) | open | A superscript exponent flattened by the PDF text layer ('1.1 × 10' + superscript '1' read as '1.1 × 101') is accepted as the exact value 101 with no visual-review flag |
+| H-LANE-ENGINE-PRECONDITION | P2 | 5 (harness) | fixed_pending_retest | Lane reports judged the engine precondition by the engine interpreter's installed copy, so checkouts without one (preview worktrees) were reported failed although the application ran the repository source |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -457,6 +458,14 @@ Application code commit `b8c5952`, observed with harness `c51bbae` on macOS 26.7
 - **Expected:** a number adjacent to a multiplication sign and '10' (or any glyph raised off the baseline, reported by the parser) is refused as exact or carries a blocking visual-review diagnostic
 - **Observed:** accepted with no diagnostic; the text layer cannot represent the superscript, so the citation looks authentic
 - **Evidence:** {"preview": "preview f413922 = candidate c51bbae + PR #35 codex/gemini-metered-adapter c952c35 (local merge, never pushed; labelled preview, not acceptance)", "tests": "tests/integration/test_paper_proposal_validation.py (strict xfail)"}
+
+## H-LANE-ENGINE-PRECONDITION (P2, owner 5 (harness), fixed_pending_retest)
+
+- **Input:** python3.11 evaluation/cli.py lanes run --lane controlled_callbacks --app-repo <worktree without .venv-engine> --results evaluation/results/previews/pr35-3a7816e
+- **Command:** `same; then inspect preconditions in evaluation/results/previews/pr35-3a7816e/lanes/reports.jsonl`
+- **Expected:** the precondition follows the import the application's scientific child performs (bean_api/counterdex_child.py puts packages/groundwork_adapter first on sys.path) and passes when that resolves to the tested source
+- **Observed:** precondition FAILED ('installed Counterdex None differs in None'); 111 passed / 10 xfailed and 17 passed / 7 NOT_AVAILABLE were recorded as failed lane reports
+- **Evidence:** {"failed_reports": ["lane_3022c056c95f4f23", "lane_95503c92ead24a0d"], "regression": "evaluation/tests/test_lanes.py::EnginePreconditionTests"}
 
 ## Check-level finding ids (raised only when the check fails)
 
