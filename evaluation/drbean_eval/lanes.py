@@ -324,9 +324,10 @@ def _split_probes(logs: dict[str, list[dict]]) -> tuple[list[dict], list[dict]]:
 # -- pytest lanes ----------------------------------------------------------------------------------------------
 
 def parse_junit(path: str) -> dict:
-    """Outcome per test from pytest's JUnit XML (xunit2). xfail is reported by pytest as a skip of type pytest.xfail;
-    a NOT_AVAILABLE reason marks a capability absent from this candidate (not run, never passed)."""
-    counts = {"passed": 0, "failed": 0, "xfailed": 0, "skipped": 0, "not_available": 0}
+    """Outcome per test from pytest's JUnit XML (xunit2). xfail is reported by pytest as a skip of type pytest.xfail.
+    A NOT_AVAILABLE reason marks a capability absent from this candidate (not run, never passed); HARNESS_PENDING
+    marks an advertised capability whose attack the harness has not written yet (a harness gap, not a pass)."""
+    counts = {"passed": 0, "failed": 0, "xfailed": 0, "skipped": 0, "not_available": 0, "harness_pending": 0}
     notable = []
     try:
         root = ET.parse(path).getroot()
@@ -342,6 +343,8 @@ def parse_junit(path: str) -> dict:
             reason = (skipped.get("message") or "")[:300]
             if "NOT_AVAILABLE" in reason:
                 outcome = "not_available"
+            elif "HARNESS_PENDING" in reason:
+                outcome = "harness_pending"
             elif skipped.get("type") == "pytest.xfail":
                 outcome = "xfailed"
             else:

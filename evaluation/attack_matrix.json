@@ -1,0 +1,132 @@
+{
+ "schema": "drbean-attack-matrix/v1",
+ "rule": "each category lists tests that observe the actual outcome through application interfaces; 'covered_on_current_candidate' means for the current image-source and controlled workflow only; the paper/Gemini/Deep Agents extension stays NOT_AVAILABLE until the capability is advertised, then HARNESS_PENDING until written",
+ "categories": [
+  {
+   "id": 1,
+   "name": "citation and value corruption",
+   "owner": "Owner 4 (papers), Owner 3 (extraction)",
+   "current": [
+    "tests/integration/test_ai_boundaries.py::test_ambiguous_decimal_blocks_until_explicitly_resolved_with_a_reason",
+    "tests/integration/test_ai_boundaries.py::test_missing_unit_and_sd_are_never_inferred_into_scientific_values"
+   ],
+   "pending": [
+    "tests/integration/test_paper_trust_boundaries.py::test_page_citations_must_point_at_real_page_content"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "statistical interval, SD/SEM, pooled means, time origin, graph estimates",
+   "owner": "Owner 1 (eligibility), Owner 3",
+   "current": [
+    "tests/integration/test_ai_boundaries.py::test_missing_unit_and_sd_are_never_inferred_into_scientific_values"
+   ],
+   "pending": [
+    "tests/integration/test_paper_trust_boundaries.py::test_statistical_summaries_never_become_hard_scientific_inputs"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "embedded instructions, fake tool output, fake ids, hidden text, forged consent",
+   "owner": "Owners 2 and 3",
+   "current": [
+    "tests/integration/test_ai_boundaries.py::test_source_content_cannot_grant_authority_or_change_scope",
+    "tests/integration/test_ai_boundaries.py::test_forbidden_tool_request_fails_without_any_side_effect"
+   ],
+   "pending": [
+    "tests/integration/test_paper_trust_boundaries.py::test_paper_text_cannot_grant_tools_approval_or_consent"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "cross-workspace ids, changed hash, changed input after consent, stale response, key reuse",
+   "owner": "Owner 2",
+   "current": [
+    "tests/integration/test_http_lifecycle_and_science.py::test_cross_workspace_records_are_invisible_and_unusable",
+    "tests/integration/test_ai_boundaries.py::test_wrong_workspace_source_is_refused_before_any_provider_call",
+    "tests/integration/test_ai_boundaries.py::test_reference_to_another_workspace_is_refused_before_the_provider",
+    "tests/integration/test_paper_trust_boundaries.py::test_reused_operation_key_with_different_source_bytes_is_a_conflict",
+    "lane offline_real_science RS-CHANGED-INPUT"
+   ],
+   "pending": [
+    "tests/integration/test_paper_trust_boundaries.py::test_paper_identity_disclosure_and_review_binding"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "invalid/wrong output, refusal, timeout, 429, interruption, unavailable model, incomplete usage, exhausted budget",
+   "owner": "Owner 3",
+   "current": [
+    "tests/integration/test_ai_boundaries.py::test_provider_failures_preserve_accepted_inputs",
+    "tests/integration/test_ai_boundaries.py::test_invalid_controlled_output_falls_back_without_authority",
+    "tests/integration/test_ai_boundaries.py::test_exaggerated_final_explanation_is_rejected_but_evidence_is_preserved"
+   ],
+   "pending": [
+    "tests/integration/test_paper_trust_boundaries.py::test_metered_chat_model_failures_and_accounting"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "hidden calls (children, retries, summarization, token counting, tracing), shared budget, concurrency, uncertain refunds",
+   "owner": "Owners 2 and 3",
+   "current": [
+    "tests/integration/test_ledger_attacks.py (8 tests)",
+    "tests/integration/test_ai_boundaries.py::test_controlled_turns_never_masquerade_as_live_provider_attempts",
+    "tests/integration/test_ai_boundaries.py::test_worker_records_controlled_turns_outside_the_provider_ledger"
+   ],
+   "pending": [
+    "tests/integration/test_paper_trust_boundaries.py::test_metered_chat_model_failures_and_accounting"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "duplicate science from resume, refresh, retry, double click, restart, crash; phase separation",
+   "owner": "Owner 2",
+   "current": [
+    "tests/integration/test_http_lifecycle_and_science.py::test_concurrent_and_retried_starts_create_exactly_one_run",
+    "tests/integration/test_http_lifecycle_and_science.py::test_queued_cancel_restart_recovery_and_no_orphans",
+    "tests/integration/test_http_lifecycle_and_science.py::test_design_authority_is_separate_and_bound",
+    "lane offline_real_science RS-RETRY-CONCURRENT, RS-CANCEL-RESTART, RS-DESIGN-AUTHORITY"
+   ],
+   "pending": [
+    "tests/integration/test_paper_trust_boundaries.py::test_agent_resume_never_duplicates_science_or_crosses_phases"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "hostile PDF resources, MIME spoofing, path traversal",
+   "owner": "Owner 4",
+   "current": [
+    "tests/integration/test_paper_trust_boundaries.py::test_hostile_pdf_bytes_never_enter_through_image_admission"
+   ],
+   "pending": [
+    "tests/integration/test_paper_trust_boundaries.py::test_paper_route_bounds_hostile_resources"
+   ],
+   "assets": "evaluation/drbean_eval/hostile_pdfs.py (19 assets + 10 hostile filenames, generated at test time)"
+  },
+  {
+   "id": 9,
+   "name": "ungrounded narrative (proves/true/optimal, invented quantities, hedge-word, concatenated-unit and range attacks) while authentic explanations survive",
+   "owner": "Owner 3",
+   "current": [
+    "tests/integration/test_explanation_guard.py (9 tests, 33 cases; 27 gap cases xfail on main, fixed in PR #28)",
+    "tests/integration/test_ai_boundaries.py::test_exaggerated_controlled_explanation_is_suppressed_and_records_unchanged"
+   ],
+   "pending": [
+    "re-run against the metered Gemini narration once Owner 3 lands it"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "offline mode with provider variables present: zero dispatch including graph helpers and specialists",
+   "owner": "Owners 2 and 3",
+   "current": [
+    "tests/integration/test_zero_dispatch.py (8 tests)",
+    "every lane report: guard-verified external_model_requests"
+   ],
+   "pending": [
+    "extend to specialists and the metered adapter when advertised (test_metered_chat_model_failures_and_accounting)"
+   ]
+  }
+ ]
+}

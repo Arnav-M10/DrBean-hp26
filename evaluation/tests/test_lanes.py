@@ -208,6 +208,8 @@ class JunitAndReplayTests(unittest.TestCase):
                '<testcase classname="m" name="absent"><skipped type="pytest.xfail" '
                'message="NOT_AVAILABLE: papers capability absent"/></testcase>'
                '<testcase classname="m" name="skip"><skipped type="pytest.skip" message="why"/></testcase>'
+               '<testcase classname="m" name="todo"><skipped type="pytest.xfail" '
+               'message="HARNESS_PENDING: papers advertised"/></testcase>'
                '</testsuite></testsuites>')
         with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as handle:
             handle.write(xml)
@@ -215,7 +217,8 @@ class JunitAndReplayTests(unittest.TestCase):
             result = lanes.parse_junit(handle.name)
         finally:
             os.unlink(handle.name)
-        self.assertEqual(result["counts"], {"passed": 1, "failed": 2, "xfailed": 1, "skipped": 1, "not_available": 1})
+        self.assertEqual(result["counts"], {"passed": 1, "failed": 2, "xfailed": 1, "skipped": 1, "not_available": 1,
+                                            "harness_pending": 1})
         self.assertEqual({t["id"]: t["outcome"] for t in result["tests"]}["m::absent"], "not_available")
         self.assertIsNone(lanes.parse_junit("/nonexistent/junit.xml")["counts"])
 
