@@ -1,0 +1,89 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "checker_name": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Checker Name",
+      "type": "string"
+    },
+    "checker_version": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Checker Version",
+      "type": "string"
+    },
+    "artifact_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Artifact Sha256",
+      "type": "string"
+    },
+    "proposition": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Proposition",
+      "type": "string"
+    },
+    "verification": {
+      "enum": [
+        "not_checked",
+        "valid",
+        "invalid",
+        "inconclusive",
+        "unsupported",
+        "failed"
+      ],
+      "title": "Verification",
+      "type": "string"
+    },
+    "expected_binding": {
+      "enum": [
+        "matches",
+        "mismatch",
+        "not_supplied"
+      ],
+      "title": "Expected Binding",
+      "type": "string"
+    },
+    "expected_problem_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Expected Problem Digest",
+      "type": "string"
+    },
+    "observed_problem_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Observed Problem Digest"
+    }
+  },
+  "required": [
+    "checker_name",
+    "checker_version",
+    "artifact_id",
+    "artifact_sha256",
+    "proposition",
+    "verification",
+    "expected_binding",
+    "expected_problem_digest"
+  ],
+  "title": "VerificationRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:VerificationRecord"
+}

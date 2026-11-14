@@ -1,0 +1,349 @@
+{
+  "$defs": {
+    "DesignDraft": {
+      "additionalProperties": false,
+      "description": "An incomplete interpretation; separate exact DesignRequest review is required.",
+      "properties": {
+        "experiment_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Experiment Id"
+        },
+        "elapsed_time_confirmed": {
+          "default": false,
+          "title": "Elapsed Time Confirmed",
+          "type": "boolean"
+        },
+        "feasible_times": {
+          "items": {
+            "maxLength": 514,
+            "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Feasible Times",
+          "type": "array"
+        },
+        "future_hard_allowance": {
+          "anyOf": [
+            {
+              "maxLength": 514,
+              "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Future Hard Allowance"
+        },
+        "allowance_unit": {
+          "anyOf": [
+            {
+              "const": "mg/L",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowance Unit"
+        },
+        "hard_bound_confirmed": {
+          "default": false,
+          "title": "Hard Bound Confirmed",
+          "type": "boolean"
+        },
+        "availability_confirmed": {
+          "default": false,
+          "title": "Availability Confirmed",
+          "type": "boolean"
+        },
+        "candidate_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 2,
+          "title": "Candidate Ids",
+          "type": "array"
+        }
+      },
+      "title": "DesignDraft",
+      "type": "object"
+    },
+    "FieldDiagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Code",
+          "type": "string"
+        },
+        "field_path": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2000,
+          "title": "Message",
+          "type": "string"
+        },
+        "blocking": {
+          "default": true,
+          "title": "Blocking",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "field_path",
+        "message"
+      ],
+      "title": "FieldDiagnostic",
+      "type": "object"
+    },
+    "GroundedExplanation": {
+      "additionalProperties": false,
+      "properties": {
+        "fact_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Fact Ids",
+          "type": "array"
+        },
+        "text": {
+          "maxLength": 2000,
+          "title": "Text",
+          "type": "string"
+        },
+        "next_action": {
+          "enum": [
+            "stop",
+            "clarify",
+            "review_design",
+            "review_observation",
+            "review_plan"
+          ],
+          "title": "Next Action",
+          "type": "string"
+        },
+        "clarification_fields": {
+          "items": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Clarification Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fact_ids",
+        "text",
+        "next_action"
+      ],
+      "title": "GroundedExplanation",
+      "type": "object"
+    },
+    "ObservationDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "experiment_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Experiment Id"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "enum": [
+                "actual",
+                "transcription",
+                "hypothetical"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Origin"
+        },
+        "elapsed_time": {
+          "anyOf": [
+            {
+              "maxLength": 514,
+              "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Time"
+        },
+        "concentration": {
+          "anyOf": [
+            {
+              "maxLength": 514,
+              "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Concentration"
+        },
+        "hard_allowance": {
+          "anyOf": [
+            {
+              "maxLength": 514,
+              "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hard Allowance"
+        },
+        "time_unit": {
+          "anyOf": [
+            {
+              "const": "h",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Time Unit"
+        },
+        "concentration_unit": {
+          "anyOf": [
+            {
+              "const": "mg/L",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Concentration Unit"
+        },
+        "source_description": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Description"
+        },
+        "generating_choices": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 16,
+          "title": "Generating Choices",
+          "type": "object"
+        },
+        "same_experiment_confirmed": {
+          "default": false,
+          "title": "Same Experiment Confirmed",
+          "type": "boolean"
+        }
+      },
+      "title": "ObservationDraft",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "explanation": {
+      "$ref": "#/$defs/GroundedExplanation"
+    },
+    "clarifications": {
+      "items": {
+        "$ref": "#/$defs/FieldDiagnostic"
+      },
+      "maxItems": 16,
+      "title": "Clarifications",
+      "type": "array"
+    },
+    "design_draft": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DesignDraft"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "observation_draft": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ObservationDraft"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "explanation"
+  ],
+  "title": "AssistantOutput",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:AssistantOutput"
+}

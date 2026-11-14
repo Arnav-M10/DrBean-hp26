@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "approval_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Approval Id",
+      "type": "string"
+    },
+    "expected_plan_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Expected Plan Digest",
+      "type": "string"
+    }
+  },
+  "required": [
+    "approval_id",
+    "expected_plan_digest"
+  ],
+  "title": "StartRunRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:StartRunRequest"
+}

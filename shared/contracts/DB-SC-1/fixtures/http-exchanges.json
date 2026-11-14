@@ -1,0 +1,95 @@
+{
+  "synthetic": true,
+  "success": {
+    "request": {
+      "method": "POST",
+      "path": "/api/bean/v1/plans/synthetic_plan/runs",
+      "headers": {
+        "Idempotency-Key": "synthetic_operation_key"
+      },
+      "body": {
+        "approval_id": "synthetic_approval",
+        "expected_plan_digest": "18dc961b1ae9a2883e4d3377f5d3ed57d072b7ddbeaf45fe135c05e2a496f45c"
+      }
+    },
+    "response": {
+      "status": 202,
+      "body": {
+        "id": "synthetic_run",
+        "status": "queued",
+        "request_id": "synthetic_request"
+      }
+    },
+    "retry_behavior": "An identical accepted request returns the same run; a changed body under this key conflicts. Fresh keys cannot rerun an already reserved plan."
+  },
+  "errors": [
+    {
+      "status": 401,
+      "body": {
+        "code": "unauthorized",
+        "message": "Authentication is required",
+        "field_paths": [],
+        "retryable": false,
+        "current_revision_id": null,
+        "request_id": "synthetic_request"
+      }
+    },
+    {
+      "status": 422,
+      "body": {
+        "code": "invalid_fields",
+        "message": "Scientific values must be canonical rational strings",
+        "field_paths": [
+          "/rows/0/time"
+        ],
+        "retryable": false,
+        "current_revision_id": null,
+        "request_id": "synthetic_request"
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "code": "stale_revision",
+        "message": "The reviewed revision changed; inspect the current revision",
+        "field_paths": [],
+        "retryable": false,
+        "current_revision_id": "synthetic_new_revision",
+        "request_id": "synthetic_request"
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "code": "idempotency_conflict",
+        "message": "This operation key is already bound to a different request",
+        "field_paths": [],
+        "retryable": false,
+        "current_revision_id": null,
+        "request_id": "synthetic_request"
+      }
+    },
+    {
+      "status": 503,
+      "body": {
+        "code": "capability_unavailable",
+        "message": "The requested engine capability is not qualified in this environment",
+        "field_paths": [],
+        "retryable": false,
+        "current_revision_id": null,
+        "request_id": "synthetic_request"
+      }
+    },
+    {
+      "status": 503,
+      "body": {
+        "code": "provider_timeout",
+        "message": "The provider outcome is unknown; existing reviewed data are unchanged",
+        "field_paths": [],
+        "retryable": true,
+        "current_revision_id": null,
+        "request_id": "synthetic_request"
+      }
+    }
+  ]
+}

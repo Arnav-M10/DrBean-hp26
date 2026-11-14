@@ -1,0 +1,59 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "provider": {
+      "const": "gemini",
+      "default": "gemini",
+      "title": "Provider",
+      "type": "string"
+    },
+    "model": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "source_asset_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 1,
+      "title": "Source Asset Ids",
+      "type": "array"
+    },
+    "context_fields": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Context Fields",
+      "type": "array"
+    },
+    "problem_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Problem Id",
+      "type": "string"
+    },
+    "accepted": {
+      "const": true,
+      "title": "Accepted",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "model",
+    "problem_id",
+    "accepted"
+  ],
+  "title": "AgentProviderConsent",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:AgentProviderConsent"
+}

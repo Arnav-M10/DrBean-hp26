@@ -1,0 +1,88 @@
+{
+  "additionalProperties": false,
+  "description": "An incomplete interpretation; separate exact DesignRequest review is required.",
+  "properties": {
+    "experiment_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Experiment Id"
+    },
+    "elapsed_time_confirmed": {
+      "default": false,
+      "title": "Elapsed Time Confirmed",
+      "type": "boolean"
+    },
+    "feasible_times": {
+      "items": {
+        "maxLength": 514,
+        "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "title": "Feasible Times",
+      "type": "array"
+    },
+    "future_hard_allowance": {
+      "anyOf": [
+        {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Future Hard Allowance"
+    },
+    "allowance_unit": {
+      "anyOf": [
+        {
+          "const": "mg/L",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Allowance Unit"
+    },
+    "hard_bound_confirmed": {
+      "default": false,
+      "title": "Hard Bound Confirmed",
+      "type": "boolean"
+    },
+    "availability_confirmed": {
+      "default": false,
+      "title": "Availability Confirmed",
+      "type": "boolean"
+    },
+    "candidate_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "maxItems": 2,
+      "title": "Candidate Ids",
+      "type": "array"
+    }
+  },
+  "title": "DesignDraft",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:DesignDraft"
+}

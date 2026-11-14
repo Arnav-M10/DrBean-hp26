@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "proposal_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Proposal Digest",
+      "type": "string"
+    },
+    "parent_dataset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Parent Dataset Id",
+      "type": "string"
+    },
+    "accepted": {
+      "const": true,
+      "title": "Accepted",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "proposal_digest",
+    "parent_dataset_id",
+    "accepted"
+  ],
+  "title": "ObservationReviewRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ObservationReviewRequest"
+}

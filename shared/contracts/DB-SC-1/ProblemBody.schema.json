@@ -1,0 +1,162 @@
+{
+  "$defs": {
+    "ParameterBounds": {
+      "additionalProperties": false,
+      "properties": {
+        "lower": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Lower",
+          "type": "string"
+        },
+        "upper": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Upper",
+          "type": "string"
+        }
+      },
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "title": "ParameterBounds",
+      "type": "object"
+    },
+    "ParameterDomain": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "$ref": "#/$defs/ParameterBounds"
+        },
+        "ke": {
+          "$ref": "#/$defs/ParameterBounds"
+        },
+        "ka": {
+          "$ref": "#/$defs/ParameterBounds"
+        },
+        "rate_order": {
+          "const": "ke_lt_ka",
+          "default": "ke_lt_ka",
+          "title": "Rate Order",
+          "type": "string"
+        }
+      },
+      "required": [
+        "A",
+        "ke",
+        "ka"
+      ],
+      "title": "ParameterDomain",
+      "type": "object"
+    },
+    "TargetInterval": {
+      "additionalProperties": false,
+      "properties": {
+        "parameter": {
+          "const": "ke",
+          "default": "ke",
+          "title": "Parameter",
+          "type": "string"
+        },
+        "lower": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Lower",
+          "type": "string"
+        },
+        "upper": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Upper",
+          "type": "string"
+        },
+        "closed": {
+          "const": true,
+          "default": true,
+          "title": "Closed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "title": "TargetInterval",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "DB-SC-1",
+      "default": "DB-SC-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "dataset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Dataset Id",
+      "type": "string"
+    },
+    "dataset_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dataset Digest",
+      "type": "string"
+    },
+    "model": {
+      "const": "two_rate_concentration",
+      "default": "two_rate_concentration",
+      "title": "Model",
+      "type": "string"
+    },
+    "domain": {
+      "$ref": "#/$defs/ParameterDomain"
+    },
+    "initial_concentration": {
+      "const": "0/1",
+      "default": "0/1",
+      "title": "Initial Concentration",
+      "type": "string"
+    },
+    "observable": {
+      "const": "concentration",
+      "default": "concentration",
+      "title": "Observable",
+      "type": "string"
+    },
+    "time_unit": {
+      "const": "h",
+      "default": "h",
+      "title": "Time Unit",
+      "type": "string"
+    },
+    "concentration_unit": {
+      "const": "mg/L",
+      "default": "mg/L",
+      "title": "Concentration Unit",
+      "type": "string"
+    },
+    "rate_unit": {
+      "const": "1/h",
+      "default": "1/h",
+      "title": "Rate Unit",
+      "type": "string"
+    },
+    "target": {
+      "$ref": "#/$defs/TargetInterval"
+    }
+  },
+  "required": [
+    "dataset_id",
+    "dataset_digest",
+    "domain",
+    "target"
+  ],
+  "title": "ProblemBody",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:ProblemBody"
+}

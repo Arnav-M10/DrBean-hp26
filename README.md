@@ -1,80 +1,65 @@
-# Dr. Bean
+# Dr. Bean backend
 
-Dr. Bean is a research evidence assistant, powered by the Groundwork engine. It is meant to help a researcher turn an ambiguous result into a defensible next measurement: read one lab sheet, review every extracted value, run a bounded check of a narrow claim, and choose a useful next observation.
+An authenticated research-workflow API implementing the **GF-2 operational policy** and **DB-SC-1 application contracts** from the backend work order. It preserves exact reviewed inputs, immutable research history, separate provider permission and scientific approval, durable reservations, and honest evidence states.
 
-This README describes what the repository actually contains at the tested commit. Planned features are listed separately and are not claimed.
+This repository combines Owner02's backend with the researcher draft workspace under `apps/web`. The web workspace currently runs independently and is not yet connected to the backend approval/run routes. The Groundwork scientific engine is not included. The API runs without Gemini credentials. Its default scientific adapter returns `unsupported`; it cannot issue a scientific certificate. Gemini and real deepagents adapters are implemented and tested with explicitly controlled transports/models, but no live Gemini request has been made or qualified here.
 
-## What works today
+## Start locally
 
-| Area | State | Evidence |
-|---|---|---|
-| Local web workspace (`apps/web`): CSV or manual measurements, exact rational validation, model bounds and target interval, review, draft download | Works with no install, no key and no network | `node --test` in `apps/web`; `tests/integration/web_manual_smoke.mjs` (14 browser checks) |
-| Evaluation harness (`evaluation/`): 12 cases × 2 variants with frozen expected assertions, grader, four evidence lanes, append-only attempt ledger, shared provider-budget ledger, trace sanitizer | Works; the harness's own tests pass | `python3 -m unittest discover -s evaluation/tests` |
-| Frozen synthetic sources: 12 lab-sheet images plus 2 sealed holdouts, with expected transcriptions and pixel regions | Frozen by SHA-256 in `evaluation/manifest.json` | `python3 evaluation/cli.py verify` |
-| Release checks: clean-clone run, secret scan, twelve-boundary checklist | Runs; reports the build as not release-ready | `scripts/release/clean_checkout.sh` |
+Requires Python 3.12 or 3.13 and [uv](https://docs.astral.sh/uv/).
 
-## What does not exist yet
-
-There is no backend, no `/api/bean/v1`, no Gemini integration, no deepagents runtime, no Groundwork scientific adapter, no approvals, runs, design jobs, reports or replay. Consequently:
-
-- No Gemini request has been made by this project. Zero provider requests, zero tokens, zero cost.
-- No scientific computation or check has run. No certificate, counterexample or measurement suggestion exists.
-- All 24 scheduled fixture traces and all 10 scheduled live invocations are recorded as **unrun**, with the reason. See `evaluation/results/REPORT.md`.
-- 10 of the 12 cross-owner release boundaries are unrun, 2 are partial. See `evaluation/results/release-checklist.json`.
-
-The harness's self-test exemplars prove the grader works. They are not product evidence and never enter the attempt ledger.
-
-## Run it
-
-Requirements: Node 22 and Python 3.11 or newer. The browser smoke also needs Playwright (`npm install` in `tests/integration`); without it that check reports unrun.
-
-```bash
-node apps/web/serve.mjs
+```sh
+uv sync --locked
+uv run python -m bean_api.bootstrap
+uv run uvicorn bean_api.main:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:4173`. Stop with Ctrl-C. Nothing is stored outside the browser tab.
+In another terminal, start the durable worker:
 
-```bash
+```sh
+uv run python -m bean_api.worker
+```
+
+The API documentation is at `http://127.0.0.1:8000/docs`; capabilities are at `/api/bean/v1/capabilities`. The bootstrap creates a private, ignored `var/auth.json`. Read its local researcher bearer token locally and use the documentation's **Authorize** control or an `Authorization: Bearer …` header. Tokens never belong in URLs, examples, source control, or browser bundles. There is no unauthenticated mutation mode. Auth uses bearer headers; the API does not issue cookies and does not enable cross-origin browser access. Keep this local lane on loopback.
+
+To run the separate researcher draft preview, use `node apps/web/serve.mjs` and open `http://127.0.0.1:4173`. See [the web workspace instructions](apps/web/README.md) for its current scope. Run its tests with `npm --prefix apps/web test`.
+
+`uv` cache location can be set to a writable directory if needed, for example `UV_CACHE_DIR=/workspace/.uv-cache uv sync --locked`. Environment examples are in `.env.example`; export the variables in the server shell. The app does not automatically load `.env`.
+
+## Implemented path
+
+1. Create an authenticated workspace and enter exact manual data, or upload one retained synthetic/public PNG or JPEG. Upload alone never contacts Gemini.
+2. An explicitly disclosed, consented intake operation can request unaccepted Gemini transcriptions. Review every field, resolve ambiguity, and retain corrections and source locations. The manual route remains available.
+3. Create an immutable dataset, problem, and exact plan. Approve the plan's digest and current problem revision through the dedicated approval route. Queueing a run atomically consumes its one durable reservation.
+4. A manual worker calls only its frozen baseline. A consented Gemini plan invokes the actual deepagents framework with a checked tool inventory and bounded callbacks. Source text and chat cannot approve work.
+5. A design request binds an existing scenario and two exact candidate vectors; it has its own plan, approval, and job. An observation is separately reviewed into a new immutable dataset, preserving actual/hypothetical ancestry.
+6. Reopen persisted conversation and records, download authenticated JSON report snapshots with byte hashes, and inspect activity and provider-attempt ledgers.
+
+The initial source path supports one PNG/JPEG, at most 5 MiB and 12 megapixels; it rejects PDFs, animation, malformed files, unsupported orientation and non-retention. A bounded parser process enforces decode resources. All scientific values are reduced rational strings; `/exact/decimal` converts finite decimal strings exactly. Source grounding and checked scientific evidence remain distinct.
+
+## Validate
+
+```sh
+uv run pytest -q
+uv run ruff check apps tests scripts
+uv run python scripts/export_contracts.py
+uv run python scripts/evaluate.py
+```
+
+Tests cover actual concurrent reservation races, stale approval, cancellation and process termination, restart reconciliation, exact canonical bytes, malformed media, source ambiguity, cross-workspace rejection, real framework tool inventory, controlled evidence-dependent choices, HTTP integration, and backup/restore. They do not substitute for live provider, engine, replay, or hosted-database qualification.
+
+The shared schemas and synthetic exchanges are in [shared/contracts](shared/contracts/README.md). See [the handoff](docs/HANDOFF.md) for exact limits, qualification gates, migration/recovery and owner integration, and [evaluation notes](docs/EVALUATION.md) for the source corpus and separate evidence lanes.
+
+The completed validation run passed **164 tests**, lint, schema export and wheel packaging. The [validation record](docs/VALIDATION.md) distinguishes these controls from the still-unrun live acceptance portfolio.
+
+## Integration, evaluation and release (Owner 04)
+
+The cross-owner evaluation harness, frozen twelve-case portfolio, shared provider-budget ledger, browser smoke and release checks live in `evaluation/`, `tests/integration/` and `scripts/release/`. They use the Python standard library and Node only.
+
+```sh
 python3 scripts/release/checklist.py
-```
-
-Runs every automated check and prints the twelve-boundary table for the current commit.
-
-```bash
 scripts/release/clean_checkout.sh
-```
-
-Repeats the checks from a clean clone, so nothing depends on untracked files.
-
-```bash
 python3 evaluation/cli.py run --lane fixture_contract
 ```
 
-Runs the 24 scheduled fixture entries against the configured subject (none by default) and appends one record per entry.
-
-More commands: [docs/release-runbook.md](docs/release-runbook.md).
-
-## Chosen scope
-
-- **Source modality:** one PNG image. PDF is not selected and its admission cases are unrun by decision.
-- **Model:** `C(t) = A*(exp(-ke*t) - exp(-ka*t))`, concentration in mg/L, time in hours.
-- **Advertised design tier:** numerical guidance only. Checked pair separation is unshipped until Owner 01 delivers replayable evidence.
-- **Store:** local SQLite lane proposed. Tiger Data, MongoDB, Solana, Vultr and Photon are omitted.
-
-## What a result would and would not mean
-
-A checked assignment outside a claimed interval shows that the reviewed measurements and model do not force the parameter inside that interval. It does not establish the true parameter, validate the physical model or support a clinical decision. A next-measurement suggestion compares two named candidates at reviewed feasible times under a stated future hard allowance. A later reading can reject either candidate or both. It never proves the interval. Gemini proposes and explains; it does not approve assumptions or decide validity.
-
-## Documents
-
-- [Ownership and layout](docs/ownership-and-layout.md)
-- [Provenance, eligibility and event contributions](docs/provenance-and-eligibility.md)
-- [Evaluation protocol](docs/evaluation-protocol.md) and [observation schema](evaluation/README.md)
-- [Cross-owner issue ledger](docs/issue-ledger.md)
-- [Release runbook](docs/release-runbook.md)
-- [120-second demo script](docs/demo/demo-script.md)
-- [Human task protocol](docs/human-task/task-protocol.md)
-- [Submission draft](docs/submission-draft.md)
-- [Owner 04 handoff](docs/handoff-owner04.md)
-
-All test sources are synthetic and labelled as such. No real laboratory data, personal data or credentials are in this repository.
+See the [evaluation protocol](docs/evaluation-protocol.md), [release runbook](docs/release-runbook.md), [cross-owner issue ledger](docs/issue-ledger.md), [provenance and eligibility](docs/provenance-and-eligibility.md), [demo script](docs/demo/demo-script.md), [submission draft](docs/submission-draft.md) and [Owner 04 handoff](docs/handoff-owner04.md). The recorded results in `evaluation/results/` were taken before the backend and science package were merged and say so; they are retained, not rewritten.

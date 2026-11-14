@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "ReviewedField": {
+      "additionalProperties": false,
+      "properties": {
+        "field_path": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        },
+        "correction_reason": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Correction Reason"
+        },
+        "origin": {
+          "enum": [
+            "confirmed_transcription",
+            "corrected_transcription",
+            "human_assumption"
+          ],
+          "title": "Origin",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_path",
+        "value",
+        "origin"
+      ],
+      "title": "ReviewedField",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "expected_proposal_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Expected Proposal Digest",
+      "type": "string"
+    },
+    "reviewed_fields": {
+      "items": {
+        "$ref": "#/$defs/ReviewedField"
+      },
+      "maxItems": 50,
+      "minItems": 1,
+      "title": "Reviewed Fields",
+      "type": "array"
+    },
+    "resolved_diagnostics": {
+      "items": {
+        "maxLength": 384,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 50,
+      "title": "Resolved Diagnostics",
+      "type": "array"
+    }
+  },
+  "required": [
+    "expected_proposal_digest",
+    "reviewed_fields"
+  ],
+  "title": "IntakeReviewRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:IntakeReviewRequest"
+}

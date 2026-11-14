@@ -1,0 +1,284 @@
+{
+  "$defs": {
+    "CandidateVector": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "A",
+          "type": "string"
+        },
+        "ke": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Ke",
+          "type": "string"
+        },
+        "ka": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Ka",
+          "type": "string"
+        }
+      },
+      "required": [
+        "A",
+        "ke",
+        "ka"
+      ],
+      "title": "CandidateVector",
+      "type": "object"
+    },
+    "DesignBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "wall_seconds": {
+          "default": 120,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Wall Seconds",
+          "type": "integer"
+        },
+        "fixed_vector_constructions": {
+          "default": 2,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Fixed Vector Constructions",
+          "type": "integer"
+        },
+        "pair_verifications": {
+          "default": 2,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Pair Verifications",
+          "type": "integer"
+        },
+        "bundle_bytes": {
+          "default": 4194304,
+          "maximum": 4194304,
+          "minimum": 1,
+          "title": "Bundle Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "DesignBudget",
+      "type": "object"
+    },
+    "DesignRequestBody": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "DB-SC-1",
+          "default": "DB-SC-1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "historical_run_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Historical Run Id",
+          "type": "string"
+        },
+        "scenario_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "problem_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "problem_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Problem Digest",
+          "type": "string"
+        },
+        "candidate_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Candidate Ids",
+          "type": "array"
+        },
+        "candidate_vectors": {
+          "items": {
+            "$ref": "#/$defs/CandidateVector"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Candidate Vectors",
+          "type": "array"
+        },
+        "observable": {
+          "const": "concentration",
+          "default": "concentration",
+          "title": "Observable",
+          "type": "string"
+        },
+        "feasible_times": {
+          "items": {
+            "maxLength": 514,
+            "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Feasible Times",
+          "type": "array"
+        },
+        "future_hard_allowance": {
+          "maxLength": 514,
+          "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)/[1-9][0-9]*$",
+          "title": "Future Hard Allowance",
+          "type": "string"
+        },
+        "allow_construction": {
+          "default": false,
+          "title": "Allow Construction",
+          "type": "boolean"
+        },
+        "allow_continuation": {
+          "default": false,
+          "title": "Allow Continuation",
+          "type": "boolean"
+        },
+        "budget": {
+          "$ref": "#/$defs/DesignBudget"
+        }
+      },
+      "required": [
+        "historical_run_id",
+        "scenario_id",
+        "problem_id",
+        "problem_digest",
+        "candidate_ids",
+        "candidate_vectors",
+        "feasible_times",
+        "future_hard_allowance"
+      ],
+      "title": "DesignRequestBody",
+      "type": "object"
+    },
+    "ProviderDisclosure": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "default": "none",
+          "enum": [
+            "gemini",
+            "none"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "source_asset_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 1,
+          "title": "Source Asset Ids",
+          "type": "array"
+        },
+        "context_fields": {
+          "items": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Context Fields",
+          "type": "array"
+        },
+        "permission_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permission Id"
+        }
+      },
+      "title": "ProviderDisclosure",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "DB-SC-1",
+      "default": "DB-SC-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "request": {
+      "$ref": "#/$defs/DesignRequestBody"
+    },
+    "request_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Request Digest",
+      "type": "string"
+    },
+    "provider_disclosure": {
+      "$ref": "#/$defs/ProviderDisclosure"
+    },
+    "permitted_tools": {
+      "items": {
+        "enum": [
+          "read_scoped_evidence",
+          "execute_approved_scenario",
+          "record_allowed_skip",
+          "prepare_design_proposal",
+          "execute_approved_design",
+          "return_grounded_explanation"
+        ],
+        "type": "string"
+      },
+      "maxItems": 3,
+      "title": "Permitted Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "request",
+    "request_digest"
+  ],
+  "title": "DesignPlanBody",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:DesignPlanBody"
+}

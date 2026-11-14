@@ -1,0 +1,82 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    },
+    "declared_media_type": {
+      "enum": [
+        "image/png",
+        "image/jpeg"
+      ],
+      "title": "Declared Media Type",
+      "type": "string"
+    },
+    "observed_media_type": {
+      "enum": [
+        "image/png",
+        "image/jpeg"
+      ],
+      "title": "Observed Media Type",
+      "type": "string"
+    },
+    "byte_size": {
+      "maximum": 5242880,
+      "minimum": 1,
+      "title": "Byte Size",
+      "type": "integer"
+    },
+    "width": {
+      "maximum": 12000000,
+      "minimum": 1,
+      "title": "Width",
+      "type": "integer"
+    },
+    "height": {
+      "maximum": 12000000,
+      "minimum": 1,
+      "title": "Height",
+      "type": "integer"
+    },
+    "origin": {
+      "enum": [
+        "synthetic",
+        "public"
+      ],
+      "title": "Origin",
+      "type": "string"
+    },
+    "retention": {
+      "enum": [
+        "retain",
+        "digest_only"
+      ],
+      "title": "Retention",
+      "type": "string"
+    },
+    "upload_actor_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+      "title": "Upload Actor Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sha256",
+    "declared_media_type",
+    "observed_media_type",
+    "byte_size",
+    "width",
+    "height",
+    "origin",
+    "retention",
+    "upload_actor_id"
+  ],
+  "title": "SourceAssetMetadata",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:DB-SC-1:SourceAssetMetadata"
+}
