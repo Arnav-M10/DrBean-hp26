@@ -1,6 +1,6 @@
 # Prepared scientific runtime and native-byte seam
 
-Counterdex 0.2.0 keeps exact mathematics on **CPython 3.11**. The API remains
+Counterdex 0.3.0 keeps exact mathematics on **CPython 3.11**. The API remains
 on its supported 3.12/3.13 runtime. Use one server-configured prepared executable
 for `-I -m counterdex.bridge`; never take an executable, module, path, URL or
 environment from a request, model decision or evidence packet. No provider is
@@ -23,6 +23,13 @@ the parent. The included parent example's `PreparedBridge.capabilities()` sets
 `configured: true` only for an explicitly configured absolute executable; a
 failed launch is available false, and a 3.12/3.13 scientific child is unqualified.
 Configuration alone never grants a result a checked label.
+
+The handshake advertises `observation_revision_recheck` with binding profile
+`counterdex.followup-binding.v1`, alongside bounded discovery, historical
+replay and fixed-pair design. Its scientific profiles also identify the explicit
+design mapping `DB-SC-1-design-to-groundwork-v2`. These capabilities describe the
+qualified package; they do not establish backend dispatch, persisted evidence
+or a successful application run.
 
 The reusable **parent-side**, stdlib-only example
 `scripts/supervise_bridge.py` runs on 3.12/3.13. It launches a private POSIX
@@ -66,6 +73,7 @@ transport cap separately covers base64 and result diagnostics. Owner 2's old
 | `investigate` | those records, `run_id`, `scenario_id`, `workflow`, `limits`, `search_settings` (null for defaults) |
 | `design` | those records, `run_id`, `workflow`, normalized application `request`, independent `expected_request_digest`, actual `historical_evidence`, `historical_artifact` |
 | `review` | revised records, `run_id`, `scenario_id`, `workflow`, `limits`, original design `historical_artifact` |
+| `recheck` | revised records, `run_id`, `scenario_id`, `workflow`, `limits`, original baseline or design `historical_artifact`, full `observation_proposal` record |
 | `replay` | `native_artifact_base64`, independent `expected` anchors |
 
 `workflow` has `plan_id`, `approval_id`, `operation_id`, `execution_id`.
@@ -84,6 +92,14 @@ identities. The historical application evidence body remains
 by the existing workflow. The bridge matches its artifact reference and selected
 candidate IDs/vectors to freshly replayed native history. It does not fetch URLs.
 
+New explicit `counterdex.v1` design requests preserve `requested_tier`, full
+`allowance_origin`, and `maximum_horizon` through the v2 design mapping. The
+horizon must cover included history and all reviewed times. Nonempty
+`source_artifact_ids` are rejected as unsupported prospective certificate reuse;
+mandatory baseline lineage still travels in `historical_artifact`. Legacy
+requests retain their v1 mapping. See [APPLICATION_MAPPING.md](APPLICATION_MAPPING.md)
+for the exact admission rules and distinct digest namespaces.
+
 Success responses contain `protocol`, `ok:true`, authoritative DTO-shaped
 `result`, `native_artifacts`, `anchors`, and `details`. Each native artifact is
 `{id,sha256,byte_size,media_type,bytes_base64}`. The result has only existing
@@ -91,6 +107,80 @@ Success responses contain `protocol`, `ok:true`, authoritative DTO-shaped
 bytes are outside that DTO. Admission, handshake and replay have their smaller
 operation-specific responses. Failure is `ok:false,error:{code,message,
 field_paths,retryable}` with fixed safe messages and nonzero process exit.
+
+In 0.3.0, scientific results include `scientific_problem_digest`, concise
+`candidate_results` and complete `native_replay`; design results additionally
+include `scientific_design_digest` and `native_suggestion_digest`. Verification
+records include expected/observed scientific problem digests separately from
+the application problem digests. Each candidate result retains its ID,
+verification, reason, violating/unresolved row IDs and exact outside-claim
+classification. The optional application `projection_version` is omitted:
+its current `bean-to-counterdex.v1` literal is a different mapping and must not
+label this package's projection. Full native bytes and independent anchors
+remain in the envelope. See [RESULT_SEMANTICS.md](RESULT_SEMANTICS.md) for the
+separate evidence, compatibility and execution meanings.
+
+## Admitted observation recheck
+
+`recheck` uses `counterdex.followup-binding.v1` inside the existing
+`counterdex.application-bundle.v1` packet. Its binding contains the complete
+new `application` binding, the original `observation_proposal` record, and
+derived `parent` metadata naming operation, run, scenario, dataset, problem
+and projection identities. Complete parent native bytes and separately stored
+anchors are retained in `history`; metadata alone cannot replace them.
+
+`observation_proposal` is `{id,digest,body}` from the existing backend
+`ObservationProposalBody`. Its full normalized body contains:
+
+```text
+dataset_id, experiment_id, observable, origin, row,
+source_description, change_reason, generating_choices,
+time_unit, concentration_unit
+```
+
+The proposal digest is SHA-256 of its canonical body bytes, matching the
+backend's observation record hash. It has no DB-SC-1 semantic-kind prefix.
+The row retains every normalized `ObservationRow` field, including original
+value spellings and notes. Required units are `h` and `mg/L`; the observable is
+`concentration`. Proposal origin is `actual`, `transcription` or `hypothetical`.
+Hypothetical rows require nonempty `generating_choices`; other origins forbid
+them. Full source descriptions and generating choices remain in the binding.
+This operation rejects a non-null `row.source_asset_id`, matching the existing
+proposal/review workflow: source-derived observations require a separate exact
+intake-review lineage that this seam does not yet admit.
+
+The new dataset must append exactly that one included row, preserving all
+earlier row bodies/order, experiment and elapsed-time origin. Its parent ID
+must name the original dataset. Dataset and problem IDs must be new; model,
+domain, claim and all other problem fields remain unchanged. The dataset's
+`change_reason` must equal the proposal's. A hypothetical proposal or ancestor
+keeps the revised dataset hypothetical; otherwise the ancestor's aggregate
+origin is retained, including synthetic ancestry. The separately retained
+proposal origin distinguishes the new reading even when the conservative
+scientific projection describes the aggregate dataset as hypothetical.
+
+The row is checked at its exact supplied time and its own reviewed historical
+allowance. For example, `79/10` hours stays `79/10` when a design recommended
+`8/1`; the design's prospective allowance does not replace the new row's
+allowance. A freshly replayed baseline parent supplies one or two original
+compatible vectors; a freshly replayed design supplies its original pair.
+Candidate IDs and exact parameters are preserved, with only the scientific
+problem binding updated. No search or replacement vector is allowed. A new
+approved child run may have a different scenario ID; its external anchors bind
+that new scope while parent metadata and history preserve the original scope.
+
+The server retrieves the proposal through its accepted `observation_review`
+linkage, checks workspace/revision ownership, and approves the new execution.
+The bridge retains provenance and checks scientific bindings; it neither
+authenticates a review nor grants permission. Its `admission` operation checks
+the new dataset/problem projection only. Full proposal and parent-lineage
+validation also occurs before `recheck` computes a new certificate.
+
+The existing `review` operation is unchanged: it requires one hypothetical row
+at a checked design's selected time and prospective allowance. Use `recheck`
+for actual or differently timed/allowed observations. Neither operation accepts
+a prior `review` or `recheck` as its parent. A separately approved `investigate`
+on revised data can discover new vectors and has its own evidence identity.
 
 ## Required Owner 2 integration changes
 
@@ -109,11 +199,13 @@ field_paths,retryable}` with fixed safe messages and nonzero process exit.
 4. Keep cancellation wired to the owned scientific process group. Reject late
    results after revoked approval/cancellation. Use the existing ledger and
    approval machinery; this package supplies neither a new ledger nor approval.
-5. Follow-up appends one separately labeled hypothetical row in a new dataset
-   and problem revision, with preserved lineage, selected elapsed time and
-   reviewed allowance. `review` checks exactly the original vectors; it does
-   not replace their history with a new search. A new separate investigation of
-   the revised data may discover other vectors when separately approved.
+5. Dispatch admitted observation revisions as `recheck` with the accepted full
+   proposal and original baseline/design packet. Preserve the exact new time,
+   allowance and origin, plus immutable ancestor records. Keep `review` only
+   for its narrower existing hypothetical selected-time behavior. Both check
+   original vectors; separate new discovery requires `investigate` and its
+   own approved execution. See the concrete handoff in
+   [OWNER2_BRIDGE_ADOPTION.md](OWNER2_BRIDGE_ADOPTION.md).
 
 ## Offline replay and trust boundaries
 
@@ -125,9 +217,10 @@ field_paths,retryable}` with fixed safe messages and nonzero process exit.
 
 Application anchors independently name raw artifact SHA-256, dataset digest,
 application problem digest, scientific projection digest, run and scenario,
-plus application request and native design digests (null before design).
-Design packets retain baseline bytes; follow-up packets retain design plus
-baseline. Maximum lineage depth is two. Replay reconstructs mappings, verifies
+plus application request and native design digests (non-null only for design).
+Design packets retain baseline bytes. Follow-up packets retain either their
+original baseline or design plus baseline. Maximum lineage depth is two.
+Replay reconstructs mappings, verifies
 source/runtime identity, and recomputes exact bounds. It never reruns numerical
 discovery or treats stored `valid` flags as proof. A valid historical certificate
 can correctly show an excluded candidate; that is successful evidence checking,
@@ -142,6 +235,11 @@ a deliberately changed test anchor. Fresh checking still fails
 The corresponding tests are in `test_baseline.py`. A changed anchor authenticates
 nothing. Source digests prevent replay under accidentally different local code;
 they are not signatures or independent formal certification.
+
+Source identity includes every installed scientific module. Keep archived
+packets with their matching prepared package/runtime; upgrading to 0.3.0 does
+not rewrite their source manifests or make changed code equivalent. The new
+follow-up profile leaves earlier operation semantics intact.
 
 ## Owner 5 acceptance request and current boundary
 

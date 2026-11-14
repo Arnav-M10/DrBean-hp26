@@ -1,7 +1,10 @@
 # DB-SC-1 application projection
 
 `counterdex.application` implements mapping policy
-`DB-SC-1-to-groundwork-v1`. Application schema authority remains
+`DB-SC-1-to-groundwork-v1` for application records and legacy design requests.
+Design requests declaring `scientific_profile: "counterdex.v1"` use
+`DB-SC-1-design-to-groundwork-v2` while retaining the same application-record
+mapping. Application schema authority remains
 `apps/api/bean_api/contracts.py`; the package defines scientific projections,
 not replacement application DTOs. The API supplies complete normalized
 `model_dump(mode="json")` bodies. Its authorization checks still apply.
@@ -88,11 +91,25 @@ as the native result is not replay.
 | `candidate_ids`, `candidate_vectors` | Preserve IDs/order/exact vectors; require two distinct vectors; scientific candidate problem binding uses the projection digest |
 | `historical_run_id`, `scenario_id`, `problem_id`, `problem_digest` | Match original application evidence scope; the native wrapper additionally checks historical packet run/scenario anchors |
 | `feasible_times` | Every exact time becomes a feasible grid row; no omitted options; preserve approved order in binding |
-| `future_hard_allowance` | Same positive exact value, `reviewed_hard_bound`, with originating request digest in its description |
+| `future_hard_allowance` | Same positive exact value |
+| `scientific_profile` | `counterdex.v1` selects the explicit v2 design mapping; unknown profiles fail |
+| `requested_tier` | Explicit profile preserves `numerical_guidance` or `checked_pair_separation`; checked requests need two pair-verification passes for initial checking and fresh replay |
+| `allowance_origin` | Explicit profile preserves the reviewed kind and complete description, bounded to 1–2000 characters |
 | `allow_construction` | Copy explicitly; no automatic construction authority |
 | `allow_continuation` | Map to extension authority; reject extension without construction |
-| Maximum horizon | Maximum of included historical times and reviewed feasible times; never extends beyond this mapped bound |
+| `maximum_horizon` | Explicit profile preserves the exact reviewed positive horizon; it must cover included history and every approved time, including numerical requests |
+| `source_artifact_ids` | A list of at most two unique application IDs; nonempty lists fail with `unsupported_artifact_reuse` because prospective certificate reuse is not yet supported by this bridge |
 | Budget | Copy wall seconds, construction count, verification count, and bundle bytes; `max_times=len(grid)`; certificate cap is the smaller of 2 MiB and bundle cap |
+
+The explicit profile requires tier, allowance origin and maximum horizon.
+Missing or null choices fail instead of supplying approval defaults. Non-null
+extended choices without the explicit profile also fail. Legacy requests with
+no such choices keep v1 semantics and byte-identical fixture mappings: checked
+requested tier, a reviewed-hard-bound origin description containing the request
+digest, and maximum horizon equal to the largest included historical or reviewed
+future time. Absent/null optional choices and an empty source list do not select
+v2. Replay accepts either policy only if it exactly matches recomputation from
+the retained request; changing the policy label does not upgrade a packet.
 
 The finite scientific grid is sorted by the existing package normalizer.
 `restore_approved_grid(options, approved_grid_order)` restores the application's
@@ -102,8 +119,9 @@ It rejects missing, additional or duplicate options.
 Baseline historical certificates are not prospective analytic-pair
 certificates. This mapping supplies `source_artifact_digest=null`; any new pair
 construction requires the reviewed construction flag and available budget.
-The requested tier asks the existing checker for checked separation, but only
-its actual result controls the returned tier. Lack of construction authority,
+Mandatory baseline packet history remains separate from prospective reuse IDs;
+an empty `source_artifact_ids` list does not authorize omission of historical
+native bytes. Only the actual result controls the returned tier. Lack of construction authority,
 an incompatible candidate, an inconclusive bound, or no positive margin does
 not become checked separation. Bounded exact arithmetic limits continue to
 apply; an admitted numerical candidate is not guaranteed an exact enclosure.

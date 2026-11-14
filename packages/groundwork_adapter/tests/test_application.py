@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import unittest
 
-from counterdex.application import (project_application, project_design, restore_approved_grid,
+from counterdex.application import (DESIGN_MAPPING_POLICY, MAPPING_POLICY, project_application, project_design, restore_approved_grid,
                                    verify_application_binding, verify_design_binding)
 from counterdex.errors import AdapterError
 from counterdex.exact import artifact_digest, canonical_bytes, rational_text, semantic_digest, strict_json_loads
@@ -236,6 +236,148 @@ class ApplicationDesignProjectionTests(unittest.TestCase):
     def project(self, digest=None):
         return project_design(self.request, expected_request_digest=digest or semantic_digest("design-request", self.request),
                               projection=self.projection, historical_evidence=self.evidence, native_candidate_results=self.native)
+
+    def explicit_profile(self, tier="numerical_guidance"):
+        self.request.update(scientific_profile="counterdex.v1", requested_tier=tier,
+                            allowance_origin={"kind": "hypothetical", "description": "Reviewed hypothetical measurement bound"},
+                            maximum_horizon="10/1", source_artifact_ids=[])
+
+    def test_explicit_reviewed_choices_are_preserved_and_reproducible(self):
+        self.explicit_profile()
+        self.request["budget"]["pair_verifications"] = 0
+        output = self.project()
+        self.assertEqual(DESIGN_MAPPING_POLICY, output["binding"]["mapping_policy"])
+        self.assertEqual(MAPPING_POLICY, output["binding"]["application"]["mapping_policy"])
+        self.assertEqual("numerical_guidance", output["design"]["requested_tier"])
+        self.assertEqual(self.request["allowance_origin"], output["design"]["allowance_origin"])
+        self.assertEqual("10/1", output["design"]["horizon_policy"]["maximum_horizon"])
+        self.assertEqual(0, output["design"]["limits"]["max_pair_verifications"])
+        self.assertEqual(self.request, output["binding"]["request"])
+        self.assertEqual(output, verify_design_binding(output["binding"], native_candidate_results=self.native))
+
+    def test_changed_explicit_choices_require_new_request_and_design_identity(self):
+        for field, value in (("requested_tier", "checked_pair_separation"),
+                             ("maximum_horizon", "12/1"),
+                             ("allowance_origin", {"kind": "reviewed_hard_bound", "description": "Separate reviewed choice"})):
+            self.setUp()
+            self.explicit_profile()
+            original = self.project()
+            self.request[field] = value
+            with self.subTest(field=field):
+                with self.assertRaises(AdapterError) as caught:
+                    self.project(original["binding"]["request_digest"])
+                self.assertEqual("wrong_specification_binding", caught.exception.code)
+                changed = self.project()
+                self.assertNotEqual(original["design_digest"], changed["design_digest"])
+                self.assertNotEqual(original["binding"]["request_digest"], changed["binding"]["request_digest"])
+
+    def test_explicit_profile_requires_each_reviewed_field(self):
+        for field in ("requested_tier", "allowance_origin", "maximum_horizon"):
+            for absent in (True, False):
+                self.setUp()
+                self.explicit_profile()
+                if absent:
+                    self.request.pop(field)
+                else:
+                    self.request[field] = None
+                with self.subTest(field=field, absent=absent), self.assertRaises(AdapterError) as caught:
+                    self.project()
+                self.assertEqual(("request/" + field,), caught.exception.field_paths)
+
+    def test_partial_extended_fields_cannot_fall_back_to_legacy_mapping(self):
+        values = {"requested_tier": "numerical_guidance", "maximum_horizon": "10/1",
+                  "allowance_origin": {"kind": "hypothetical", "description": "Reviewed"},
+                  "source_artifact_ids": ["native_history"]}
+        for field, value in values.items():
+            self.setUp()
+            self.request[field] = value
+            with self.subTest(field=field), self.assertRaises(AdapterError) as caught:
+                self.project()
+            self.assertEqual(("request/scientific_profile",), caught.exception.field_paths)
+        self.setUp()
+        self.explicit_profile()
+        self.request["scientific_profile"] = "counterdex.v2"
+        with self.assertRaises(AdapterError) as caught:
+            self.project()
+        self.assertEqual("unsupported_model", caught.exception.code)
+
+    def test_explicit_horizon_covers_history_and_every_time_for_both_tiers(self):
+        for tier in ("numerical_guidance", "checked_pair_separation"):
+            for horizon, times in (("7/1", ["8/1", "6/1"]), ("3/1", ["2/1", "3/1"])):
+                self.setUp()
+                self.explicit_profile(tier)
+                self.request.update(maximum_horizon=horizon, feasible_times=times)
+                with self.subTest(tier=tier, horizon=horizon), self.assertRaises(AdapterError) as caught:
+                    self.project()
+                self.assertEqual("unavailable_horizon", caught.exception.code)
+                self.assertEqual(("request/maximum_horizon",), caught.exception.field_paths)
+        self.setUp()
+        self.explicit_profile()
+        self.request["maximum_horizon"] = "8/1"
+        self.assertEqual("8/1", self.project()["design"]["horizon_policy"]["maximum_horizon"])
+
+    def test_explicit_checked_budget_covers_initial_check_and_fresh_replay(self):
+        self.explicit_profile("checked_pair_separation")
+        for passes in (0, 1):
+            self.request["budget"]["pair_verifications"] = passes
+            with self.subTest(passes=passes), self.assertRaises(AdapterError) as caught:
+                self.project()
+            self.assertEqual(("request/budget/pair_verifications",), caught.exception.field_paths)
+        self.request["budget"]["pair_verifications"] = 2
+        self.assertEqual("checked_pair_separation", self.project()["design"]["requested_tier"])
+
+    def test_explicit_artifact_reuse_is_rejected_without_silent_construction(self):
+        self.explicit_profile()
+        for sources in (["native_history"], ["native_left", "native_right"]):
+            self.request["source_artifact_ids"] = sources
+            with self.subTest(sources=sources), self.assertRaises(AdapterError) as caught:
+                self.project()
+            self.assertEqual("unsupported_artifact_reuse", caught.exception.code)
+            self.assertEqual(("request/source_artifact_ids",), caught.exception.field_paths)
+
+    def test_source_artifact_reference_shape_is_validated(self):
+        self.explicit_profile()
+        for sources in (None, "native_history", [None], ["bad\nlabel"], ["same", "same"], ["a", "b", "c"]):
+            self.request["source_artifact_ids"] = sources
+            with self.subTest(sources=sources), self.assertRaises(AdapterError) as caught:
+                self.project()
+            self.assertEqual("invalid_input", caught.exception.code)
+            self.assertTrue(caught.exception.field_paths[0].startswith("request/source_artifact_ids"))
+
+    def test_explicit_allowance_origin_is_a_complete_bounded_reviewed_choice(self):
+        self.explicit_profile()
+        for origin in ({}, {"kind": "hypothetical"}, {"kind": "standard_deviation", "description": "Reviewed"},
+                       {"kind": "hypothetical", "description": ""}, {"kind": "hypothetical", "description": "x" * 2001},
+                       {"kind": "hypothetical", "description": "Reviewed", "extra": True}):
+            self.request["allowance_origin"] = origin
+            with self.subTest(origin=origin), self.assertRaises(AdapterError) as caught:
+                self.project()
+            self.assertEqual("invalid_input", caught.exception.code)
+
+    def test_binding_policy_cannot_be_relabelled(self):
+        self.explicit_profile()
+        binding = self.project()["binding"]
+        binding["mapping_policy"] = MAPPING_POLICY
+        with self.assertRaises(AdapterError) as caught:
+            verify_design_binding(binding, native_candidate_results=self.native)
+        self.assertEqual("wrong_specification_binding", caught.exception.code)
+        self.setUp()
+        binding = self.project()["binding"]
+        binding["mapping_policy"] = DESIGN_MAPPING_POLICY
+        with self.assertRaises(AdapterError):
+            verify_design_binding(binding, native_candidate_results=self.native)
+
+    def test_existing_legacy_fixture_mapping_is_unchanged(self):
+        fixture_dir = Path(__file__).resolve().parents[1] / "fixtures" / "archive" / "0.2.0-bridge"
+        packet = strict_json_loads((fixture_dir / "hero-design.native.json").read_bytes())
+        baseline = strict_json_loads((fixture_dir / "hero-baseline.response.json").read_bytes())
+        binding = packet["binding"]
+        output = verify_design_binding(binding, native_candidate_results=baseline["details"]["fresh_replay"]["candidate_results"])
+        self.assertEqual(MAPPING_POLICY, output["binding"]["mapping_policy"])
+        self.assertEqual(binding, output["binding"])
+        self.request.update(scientific_profile=None, requested_tier=None, allowance_origin=None,
+                            maximum_horizon=None, source_artifact_ids=[])
+        self.assertEqual(MAPPING_POLICY, self.project()["binding"]["mapping_policy"])
 
     def test_selected_vectors_grid_allowance_horizon_and_caps(self):
         output = self.project()
