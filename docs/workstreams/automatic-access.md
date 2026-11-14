@@ -51,10 +51,31 @@ with its already generated dummy fixture; no credential or scanner rule changed.
 The initially reused backend runtime lacked the locked PDF decoder dependency.
 It was left untouched; a fresh locked backend runtime was prepared separately.
 The initial full run had 1,233 passes and 23 PDF-dependent failures/errors;
-a full rerun in the matching environment is in progress. Schema export produces
+the full rerun in the matching environment passed all 1,256 tests with no skips. Schema export produces
 identical schema definitions but existing PDF example boxes vary by about 0.0003
 on macOS. Generator changes were not retained; frozen examples were not edited.
 
 Claude’s independent `tests/integration/langchain_demo_browser.mjs` still targets
 old bearer onboarding and is not registered in ordinary CI. It was left unchanged
 for its owner to update; the retained production-path `check-research.mjs` passes.
+
+## Failure-injection review
+
+A separate read-only implementation review found two integration defects.
+Interrupted HTTP 200 response bodies now keep the pending-session marker, so
+an explicit retry first checks identity and never silently issues again.
+A 408 response is also treated as uncertain. Real failing-stream regressions
+and an independent reproduction each confirm one issuance across retries.
+
+Public sharing children now strip the local gateway configuration added by
+the launcher. A regression uses the real launcher environment with a temporary
+fixture directory and mocked process creation; no tunnel is opened. The
+launcher/sharing suite now passes 50 tests. Reviewer found no further session
+authorization defect; this does not substitute for the outstanding UI recovery
+and final combined-browser acceptance.
+
+Backend full-run evidence: 1,256 passed, no skips, Ruff passed, zero
+egress/provider-client attempts and no inherited credentials. One existing
+opt-in test read its own synthetic fixture, not an owner credential.
+`1649820e70fd8169ce2ac20a5a432e10ef6a88b1` identifies the reviewed backend;
+backend files were unchanged throughout that run.

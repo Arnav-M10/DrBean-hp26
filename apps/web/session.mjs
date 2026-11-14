@@ -72,11 +72,14 @@ export function bootstrapSharedSession(fetcher = defaultFetch, {
     remember('pending', true)
     let issued
     try { issued = metadata(await api.json('/shared-session')) } catch (error) {
-      if (error.kind === 'unreachable' || error.kind === 'malformed' || error.kind === 'too_large' || error.status >= 500) {
-        throw recovery('The connection response did not arrive intact. A workspace may already exist. Retry connection to check the browser session before starting a new workspace.', 'session_uncertain')
+      // A body stream may fail after HTTP 200 and after issuance commits.
+      // Unknown/read errors are uncertain too; only a definite HTTP refusal can
+      // safely restore the pre-issuance marker. A timeout is never such proof.
+      if (error.kind === 'rejected' && error.status >= 400 && error.status < 500 && error.status !== 408) {
+        remember(previous)
+        throw error
       }
-      remember(previous)
-      throw error
+      throw recovery('The connection response did not arrive intact. A workspace may already exist. Retry connection to check the browser session before starting a new workspace.', 'session_uncertain')
     }
     remember(issued.workspace_id)
     let confirmed

@@ -152,3 +152,26 @@ test('a retained valid cookie still reopens when site storage is unavailable', a
   const { session } = await bootstrapSharedSession(async () => reply(metadata), config)
   assert.equal(session.workspace_id, metadata.workspace_id)
 })
+
+test('a failed HTTP200 response stream retains uncertain issuance and cannot flood actors', async () => {
+  const config = options(); let issued = 0
+  const fetcher = async url => {
+    if (url.endsWith('/current')) return missing()
+    issued++
+    return new Response(new ReadableStream({ start(controller) { controller.error(new TypeError('terminated response body')) } }), { status: 200 })
+  }
+  await assert.rejects(bootstrapSharedSession(fetcher, config), e => e.code === 'session_uncertain')
+  await assert.rejects(bootstrapSharedSession(fetcher, config), e => e.code === 'session_lost')
+  assert.equal(issued, 1)
+})
+
+test('an issuance timeout cannot erase continuity and trigger automatic replacement', async () => {
+  const config = options(); let issued = 0
+  const fetcher = async url => {
+    if (url.endsWith('/current')) return missing()
+    issued++; return reply({}, 408)
+  }
+  await assert.rejects(bootstrapSharedSession(fetcher, config), e => e.code === 'session_uncertain')
+  await assert.rejects(bootstrapSharedSession(fetcher, config), e => e.code === 'session_lost')
+  assert.equal(issued, 1)
+})
