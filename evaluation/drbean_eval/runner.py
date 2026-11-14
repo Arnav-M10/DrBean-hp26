@@ -67,11 +67,27 @@ def git_state(repo: str) -> dict:
 
 
 def read_attempts(results_dir: str) -> list[dict]:
+    """All attempt records. A malformed line is kept on disk and surfaced as an explicit error record."""
     path = os.path.join(results_dir, "attempts.jsonl")
     if not os.path.exists(path):
         return []
-    with open(path, encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+    records = []
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        for number, line in enumerate(handle, 1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+                if not isinstance(record, dict):
+                    raise ValueError("not an object")
+            except ValueError:
+                record = {"attempt_id": f"malformed-line-{number}", "entry_id": f"<malformed line {number}>",
+                          "lane": "unknown", "status": "error", "attempt_number": 0, "tested_commit": None,
+                          "worktree_dirty": None, "duration_ms": None, "provider_requests": None,
+                          "reason": "history line is not valid JSON; preserved unchanged, needs explicit recovery",
+                          "malformed_line": number}
+            records.append(record)
+    return records
 
 
 def lane_rules(manifest: dict, lane: str) -> dict:
@@ -279,8 +295,8 @@ def _run_entry(entry, lane, rules, subject, root, results_dir, manifest, manifes
             trusted = False
             record.update(status="error", reason="attestation rejected: " + problem)
         elif not case_id:
-            evidence_class = ("executed_acceptance" if getattr(subject, "executes_acceptance", False)
-                              and evidence_dir else "imported_claim")
+            evidence_class = (getattr(subject, "evidence_class", "executed_acceptance")
+                              if getattr(subject, "executes_acceptance", False) and evidence_dir else "imported_claim")
             outcome = qualify.qualify(observation, evidence_dir=evidence_dir, evidence_class=evidence_class,
                                       science_python=getattr(subject, "science_python", None),
                                       package_dir=getattr(subject, "package_dir", None))
@@ -332,7 +348,8 @@ def _run_entry(entry, lane, rules, subject, root, results_dir, manifest, manifes
             record["external_model_requests"] = {"value": 0 if verified else None,
                                                  "basis": "verified by egress guard" if verified else "unknown"}
             record["external_dispatch"] = sanitize.sanitize(dispatch)
-        for key in ("records", "placeholder_identity", "job_ids", "input_digest"):
+        for key in ("records", "placeholder_identity", "job_ids", "input_digest", "app_under_test",
+                    "diagnostic_overrides"):
             if key in observation:
                 record[key] = sanitize.sanitize(observation[key])
         trace = {"attempt_id": attempt_id, "entry_id": entry["entry_id"], "lane": lane,

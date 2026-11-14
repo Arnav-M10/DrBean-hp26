@@ -2,9 +2,9 @@
 
 Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0). Feasibility evidence from a small portfolio, not a statistical benchmark. No live model request was permitted or made: live lanes are disabled (NOT_RUN) and any AI in the current lanes is absent or a labelled controlled placeholder. Fresh native replay re-runs the project's own checker; it is not an independent proof.
 
-- Manifest version 2 (ancestry: v1), contract GF-2 / DB-SC-1
+- Manifest version 3 (ancestry: v1, v2), contract GF-2 / DB-SC-1
 - Holdouts: prepared and sealed by digest; not used for prompt tuning; ungraded
-- Attempts recorded: 69; history verification: OK
+- Attempts recorded: 98; history verification: OK
 - Live activation: disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared accounted allocation, Owner 3's operator path and independent grading of predeclared cases. The CLI has no switch for it.
 
 ## Lanes
@@ -15,13 +15,13 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 | live_intake | 1 | NOT_RUN (disabled) | live | any | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | live_agent_controlled_tools | 1 | NOT_RUN (disabled) | live | controlled | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | actual_full_stack | 1 | NOT_RUN (disabled) | live | real | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
-| offline_real_science | 1 | yes | none/controlled | real | 7 | 35 | 11 | 13 | 11 | 0 | 0 | 0 | 0 | 0 |
+| offline_real_science | 1 | yes | none/controlled | real | 7 | 64 | 20 | 21 | 23 | 0 | 0 | 0 | 0 | 0 |
 
 Records with manifest_version 1 / harness 0.1.0 are the pre-merge inventory: 34 entries recorded before the backend and science package were merged, all `unrun` with a stale reason. They are kept byte-for-byte and interpreted as written, never relabelled as current results.
 
 Evidence classes: `executed_acceptance` (the runner executed the subject against a stack it launched and re-verified the evidence), `imported_claim` (recorded observations; never qualification).
 
-Evidence class counts (harness >= 0.2.0): executed_acceptance: 35.
+Evidence class counts (harness >= 0.2.0): executed_acceptance: 64.
 
 ## Latest attempt per scheduled entry
 
@@ -61,25 +61,25 @@ Evidence class counts (harness >= 0.2.0): executed_acceptance: 35.
 | live_intake | C01-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live1 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
-| offline_real_science | RS-CANCEL-RESTART | unrun | d2d3c5393a | False | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for example; no_orphan_after_worker_kill (prerequisite): the ru |
-| offline_real_science | RS-CHANGED-INPUT | failed | d2d3c5393a | False | failed: baseline_completed_with_evidence |
-| offline_real_science | RS-DESIGN-AUTHORITY | unrun | d2d3c5393a | False | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
-| offline_real_science | RS-FOLLOWUP | unrun | d2d3c5393a | False | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
-| offline_real_science | RS-HERO-FULL | failed | d2d3c5393a | False | failed: baseline_completed_with_evidence |
-| offline_real_science | RS-RETRY-CONCURRENT | passed | d2d3c5393a | False |  |
-| offline_real_science | RS-ZERO-DISPATCH | passed | d2d3c5393a | False |  |
+| offline_real_science | RS-CANCEL-RESTART | unrun | 0085414dd2 | False | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for example; no_orphan_after_worker_kill (prerequisite): the ru |
+| offline_real_science | RS-CHANGED-INPUT | failed | 0085414dd2 | False | failed: baseline_completed_with_evidence |
+| offline_real_science | RS-DESIGN-AUTHORITY | unrun | 0085414dd2 | False | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
+| offline_real_science | RS-FOLLOWUP | unrun | 0085414dd2 | False | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
+| offline_real_science | RS-HERO-FULL | failed | 0085414dd2 | False | failed: baseline_completed_with_evidence |
+| offline_real_science | RS-RETRY-CONCURRENT | passed | 0085414dd2 | False |  |
+| offline_real_science | RS-ZERO-DISPATCH | passed | 0085414dd2 | False |  |
 
 ## Scientific jobs and external model requests (separate counts)
 
-- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 26. These are actual local computations attempted by the real worker; at this commit they fail before scientific computation (see findings).
-- External model requests: verified zero by the egress guard in 35 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
+- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 55. These are actual local computations attempted by the real worker; at this commit they fail before scientific computation (see findings).
+- External model requests: verified zero by the egress guard in 64 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
 - Synthetic budget-ledger reservations in unit tests use temporary stores and are not provider charges.
 - Durations are harness wall time on loopback; they are not provider latency.
 - Harness budget ledger: no cohort opened; none may be opened now.
 
 ## Engine-level native controls (latest run; engine public operations, not HTTP)
 
-Commit d2d3c5393a, interpreter CPython 3.11.17.
+Commit 0085414dd2, interpreter CPython 3.11.17.
 
 | Control | Result | Observed |
 |---|---|---|
@@ -91,12 +91,22 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | defense:mutation_rejected_by_original_anchor | passed | "integrity_failure" |
 | defense:mutation_rejected_by_fresh_mathematics | passed | {"class": "mathematical_failure", "field_paths": ["pair/candidates/0/samples/5"]} |
 | semantics:touching_bands_do_not_separate | passed | {"error": null, "margin": "-6167420579173/21267647932558653966460912964485513216000000000000", "selected_time": null, "tier": "no_separation_established"} |
+| defense:truncated_packet | passed | {"class": "unsupported_format", "code": "invalid_input"} |
+| defense:oversized_packet | passed | {"class": "exhausted", "code": "resource_exhaustion"} |
+| defense:another_runs_valid_packet | passed | {"class": "integrity_failure", "code": "artifact_mismatch"} |
+| defense:drop_artifacts | passed | {"code": "incomplete_export", "diagnostic_anchor": "incomplete_evidence", "original_anchor": "integrity_failure", "reason": null} |
+| defense:duplicate_artifact | passed | {"code": "invalid_input", "diagnostic_anchor": "unsupported_format", "original_anchor": "integrity_failure", "reason": null} |
+| defense:unknown_profile | passed | {"code": "unsupported_model", "diagnostic_anchor": "unsupported_format", "original_anchor": "unsupported_format", "reason": null} |
+| metamorphic:tightened_row_allowance | passed | {"baseline": {"outside": "compatible", "reference": "compatible"}, "engine": {"outside": "excluded", "reference": "excluded"}} |
+| metamorphic:widened_allowances_keep_compatibility | passed | {"baseline": {"outside": "compatible", "reference": "compatible"}, "widened": {"outside": "compatible", "reference": "compatible"}} |
+| metamorphic:excluded_row_is_not_a_constraint | passed | {"digest_changed": true, "verdicts": {"outside": "compatible", "reference": "compatible"}} |
+| metamorphic:swapped_pair_order | passed | {"margins_equal": true, "selected": ["8/1", "8/1"], "verdicts": {"outside": "compatible", "reference": "compatible"}} |
 | semantics:closed_endpoint_is_inside | passed | {"is_counterexample": false, "outside_closed_claim": false, "verification": "invalid"} |
 | followup:3.4 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "compatible"}, "per_candidate": {"outside": "excluded", "refere |
 | followup:4.57 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "compatible", "reference": "excluded"}, "per_candidate": {"outside": "compatible", "refe |
 | followup:4.0 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "excluded"}, "per_candidate": {"outside": "excluded", "referenc |
 
-## Release gates at d2d3c5393a (overall: failed)
+## Release gates at 0085414dd2 (overall: failed)
 
 | Gate | Status |
 |---|---|
@@ -113,27 +123,37 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
+| F-ORPHAN-WORKER-KILL | P0 | 2 | open | A scientific child survives its worker's death and keeps computing after the job is marked interrupted |
+| F-AI-INTEGRATION-SEAM | P1 | 2 and 3 | fixed_pending_retest | Merging Owner 3's placeholder-mode branch onto main breaks the worker's controlled agent lane |
 | F-PLATFORM-RLIMIT | P0 | 2 | retested | Valid PNG refused and every scientific worker fails on the team's Mac (RLIMIT_AS rejected) |
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
-| F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | open | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
-| F-NATIVE-BYTES | P0 | 2 (bytes, anchor record) and 1 (complete packet) | fixed_pending_retest | No authenticated route returns native packet bytes; /artifacts/{id} serves the entity envelope; records expose no scientific anchors |
-| F-FOLLOWUP-FEEDBACK | P0 | 1 and 2 | open | No application route reports candidate-specific outcomes for the prior pair after a hypothetical reading |
+| F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | retested | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
+| F-NATIVE-BYTES | P0 | 2 (bytes, anchor record) and 1 (complete packet) | retested | No authenticated route returns native packet bytes; /artifacts/{id} serves the entity envelope; records expose no scientific anchors |
+| F-FOLLOWUP-FEEDBACK | P0 | 2 (design-bound follow-up, PR #11) and 1 (wider native admission) | retested | No application route reports candidate-specific outcomes for the prior pair after a hypothetical reading |
 | F-PLACEHOLDER-AUTO | P0 | 3 | retested | The legacy documented live switch (dummy values only) constructs google.genai.Client and attempts dispatch |
 | F-PLACEHOLDER-MODE | P1 | 3 | retested | Capabilities declare no explicit placeholder/disabled provider mode |
 | F-OPTIONAL-VANISHES | P1 | 3 (graph) and 2 (callbacks) | retested | The actual deepagents graph completes while a reviewed optional scenario is neither executed nor skipped |
 | F-CONTROLLED-PROVENANCE | P1 | 3 | retested | Controlled-model turns are reserved as provider 'gemini' attempts with no placeholder marker |
 | F-REVIEW-MATERIALIZATION | P1 | 2 | fixed_pending_retest | An accepted intake review creates no dataset association (source values never reach execution) |
-| F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | open | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
+| F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
 | F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
 | F-MAC-NPROC | P0 | 2 | open | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
-| F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | open | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
-| F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | open | Coordinator attempt metadata names provider gemini for controlled-model turns |
+| F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | fixed_pending_retest | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
+| F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | fixed_pending_retest | Coordinator attempt metadata names provider gemini for controlled-model turns |
 | F-TEST-VAR-LEAK | P2 | 2 | open | Backend test fixtures build Settings without artifact_dir, creating the repo-relative var/artifacts |
+| F-DESIGN-SOURCE-ARTIFACTS | P1 | 2 (projection) and 1 (engine reuse format) | retested | A design request that cites the baseline packet in source_artifact_ids cannot reach checked separation |
+| F-SIBLING-FORKS | P2 | 2 | open | Sibling what-if forks from one parent cannot coexist in a workspace (one current dataset pointer) |
 | H-ORACLE-BOUNDARIES | P1 | 5 | retested | Harness contract oracle accepted inputs the API rejects (trailing newline, -0, depth 64, digit caps) |
 | H-BUDGET-USAGE | P1 | 5 | retested | Harness JSONL budget accepted negative usage and counted one request per reservation |
 | H-COMPLETED-QUALIFIES | P0 | 5 | retested | Merged harness passed a case-less full-stack entry on state == completed alone |
 | H-VACUOUS-ORPHAN | P1 | 5 | retested | First lane run passed orphan/restart checks vacuously (child died at setup); attempt retained |
 | H-DIRTY-FLAG | P1 | 5 | retested | git_state stripped porcelain output and marked every record dirty (since harness 0.1.0) |
+| H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
+| H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
+| H-CI-ENGINE | P1 | 5 | fixed_pending_retest | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
+| F-LAUNCHER-HIDDEN-PTH | P1 | 4 | open | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
+| F-LAUNCHER-ENV-READ | P2 | 4 | open | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
+| H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
 
 ## Every attempt
 
@@ -208,3 +228,32 @@ Commit d2d3c5393a, interpreter CPython 3.11.17.
 | 67 | RS-FOLLOWUP | offline_real_science | 5 | unrun | executed_acceptance | d2d3c5393a | False | 0.539 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
 | 68 | RS-CANCEL-RESTART | offline_real_science | 5 | unrun | executed_acceptance | d2d3c5393a | False | 3003.027 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
 | 69 | RS-ZERO-DISPATCH | offline_real_science | 5 | passed | executed_acceptance | d2d3c5393a | False | 71.907 |  |
+| 70 | RS-HERO-FULL | offline_real_science | 6 | failed | executed_acceptance | 8bb1fbeb13 | False | 562.364 | failed: baseline_completed_with_evidence |
+| 71 | RS-CHANGED-INPUT | offline_real_science | 6 | failed | executed_acceptance | 8bb1fbeb13 | False | 1744.731 | failed: baseline_completed_with_evidence |
+| 72 | RS-RETRY-CONCURRENT | offline_real_science | 6 | passed | executed_acceptance | 8bb1fbeb13 | False | 516.079 |  |
+| 73 | RS-DESIGN-AUTHORITY | offline_real_science | 6 | unrun | executed_acceptance | 8bb1fbeb13 | False | 4.289 | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
+| 74 | RS-FOLLOWUP | offline_real_science | 6 | unrun | executed_acceptance | 8bb1fbeb13 | False | 0.476 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
+| 75 | RS-CANCEL-RESTART | offline_real_science | 6 | unrun | executed_acceptance | 8bb1fbeb13 | False | 3047.256 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
+| 76 | RS-ZERO-DISPATCH | offline_real_science | 6 | passed | executed_acceptance | 8bb1fbeb13 | False | 73.821 |  |
+| 77 | RS-RETRY-CONCURRENT | offline_real_science | 7 | passed | executed_acceptance | f8cf08a60a | False | 998.018 |  |
+| 78 | RS-HERO-FULL | offline_real_science | 7 | failed | executed_acceptance | 3b55843a76 | False | 606.504 | failed: baseline_completed_with_evidence |
+| 79 | RS-CHANGED-INPUT | offline_real_science | 7 | failed | executed_acceptance | 3b55843a76 | False | 1351.38 | failed: baseline_completed_with_evidence |
+| 80 | RS-RETRY-CONCURRENT | offline_real_science | 8 | passed | executed_acceptance | 3b55843a76 | False | 987.13 |  |
+| 81 | RS-DESIGN-AUTHORITY | offline_real_science | 7 | unrun | executed_acceptance | 3b55843a76 | False | 2.513 | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
+| 82 | RS-FOLLOWUP | offline_real_science | 7 | unrun | executed_acceptance | 3b55843a76 | False | 0.327 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
+| 83 | RS-CANCEL-RESTART | offline_real_science | 7 | unrun | executed_acceptance | 3b55843a76 | False | 2493.865 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
+| 84 | RS-ZERO-DISPATCH | offline_real_science | 7 | passed | executed_acceptance | 3b55843a76 | False | 85.088 |  |
+| 85 | RS-HERO-FULL | offline_real_science | 8 | failed | executed_acceptance | b827c61ade | False | 574.081 | failed: baseline_completed_with_evidence |
+| 86 | RS-CHANGED-INPUT | offline_real_science | 8 | failed | executed_acceptance | b827c61ade | False | 1748.364 | failed: baseline_completed_with_evidence |
+| 87 | RS-RETRY-CONCURRENT | offline_real_science | 9 | passed | executed_acceptance | b827c61ade | False | 554.692 |  |
+| 88 | RS-DESIGN-AUTHORITY | offline_real_science | 8 | unrun | executed_acceptance | b827c61ade | False | 2.468 | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
+| 89 | RS-FOLLOWUP | offline_real_science | 8 | unrun | executed_acceptance | b827c61ade | False | 0.263 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
+| 90 | RS-CANCEL-RESTART | offline_real_science | 8 | unrun | executed_acceptance | b827c61ade | False | 3071.019 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
+| 91 | RS-ZERO-DISPATCH | offline_real_science | 8 | passed | executed_acceptance | b827c61ade | False | 75.932 |  |
+| 92 | RS-HERO-FULL | offline_real_science | 9 | failed | executed_acceptance | 0085414dd2 | False | 589.191 | failed: baseline_completed_with_evidence |
+| 93 | RS-CHANGED-INPUT | offline_real_science | 9 | failed | executed_acceptance | 0085414dd2 | False | 1322.486 | failed: baseline_completed_with_evidence |
+| 94 | RS-RETRY-CONCURRENT | offline_real_science | 10 | passed | executed_acceptance | 0085414dd2 | False | 952.428 |  |
+| 95 | RS-DESIGN-AUTHORITY | offline_real_science | 9 | unrun | executed_acceptance | 0085414dd2 | False | 2.29 | blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry) |
+| 96 | RS-FOLLOWUP | offline_real_science | 9 | unrun | executed_acceptance | 0085414dd2 | False | 0.251 | blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run |
+| 97 | RS-CANCEL-RESTART | offline_real_science | 9 | unrun | executed_acceptance | 0085414dd2 | False | 3022.985 | blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for |
+| 98 | RS-ZERO-DISPATCH | offline_real_science | 9 | passed | executed_acceptance | 0085414dd2 | False | 79.219 |  |

@@ -1,0 +1,117 @@
+{
+  "evidence_commits": [
+    "0085414dd22c21c2264a7eb9b42b17ea6b931262"
+  ],
+  "evidence_only_paths": [
+    "evaluation/results/",
+    "evaluation/FINDINGS.md",
+    "evaluation/findings.json",
+    "evaluation/README.md",
+    "docs/evaluation-protocol.md",
+    "docs/workstreams/05-validation.md"
+  ],
+  "gates": [
+    {
+      "description": "frozen manifest and append-only history verify",
+      "gate": "harness_integrity",
+      "problems": [],
+      "status": "passed"
+    },
+    {
+      "description": "actual HTTP -> science -> separate design -> raw download -> fresh native replay",
+      "entries": {
+        "RS-HERO-FULL": {
+          "attempt_id": "att_c2ad0599996a4dda",
+          "reason": "failed: baseline_completed_with_evidence",
+          "status": "failed"
+        }
+      },
+      "gate": "real_science_http",
+      "status": "failed"
+    },
+    {
+      "description": "duplicate starts, design authority, cancellation/restart, changed input, follow-up",
+      "entries": {
+        "RS-CANCEL-RESTART": {
+          "attempt_id": "att_310404f514344fc9",
+          "reason": "blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for example; no_orphan_after_worker_kill (prerequisite): the run reached failed before the worker was killed, so there was no in-flight work to interrupt; interrupted_not_redispatched (prerequisite): the run reached failed before the worker wa",
+          "status": "blocked"
+        },
+        "RS-CHANGED-INPUT": {
+          "attempt_id": "att_f301afa4f3d147a7",
+          "reason": "failed: baseline_completed_with_evidence",
+          "status": "failed"
+        },
+        "RS-DESIGN-AUTHORITY": {
+          "attempt_id": "att_0b508346e61a4830",
+          "reason": "blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry)",
+          "status": "blocked"
+        },
+        "RS-FOLLOWUP": {
+          "attempt_id": "att_c29cac5f6fcd495e",
+          "reason": "blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run",
+          "status": "blocked"
+        },
+        "RS-RETRY-CONCURRENT": {
+          "attempt_id": "att_b7239579bd2f45ff",
+          "reason": "",
+          "status": "passed"
+        }
+      },
+      "gate": "essential_negative_controls_http",
+      "status": "failed"
+    },
+    {
+      "description": "guard active in API and worker; zero external model attempts in the lane",
+      "entries": {
+        "RS-ZERO-DISPATCH": {
+          "attempt_id": "att_c3416712499040ea",
+          "reason": "",
+          "status": "passed"
+        }
+      },
+      "gate": "zero_external_model_dispatch",
+      "status": "passed"
+    },
+    {
+      "description": "fixed-pair constraint controls, three distinct defenses, endpoint/touching-band semantics, candidate-specific follow-ups (engine, not HTTP)",
+      "failed": [],
+      "gate": "native_engine_controls",
+      "missing": [],
+      "status": "passed"
+    },
+    {
+      "description": "image decoder and scientific worker subprocesses work on this host through the real stack",
+      "gate": "supported_machine_subprocesses",
+      "observed": {
+        "baseline_completed_with_evidence": "failed",
+        "runtime": {
+          "machine": "arm64",
+          "system": "Darwin"
+        },
+        "source_image_admitted": "passed"
+      },
+      "status": "failed"
+    },
+    {
+      "description": "evaluation/findings.json lists no open P0",
+      "gate": "no_unresolved_p0",
+      "open_p0": [
+        "F-ORPHAN-WORKER-KILL",
+        "F-MAC-NPROC"
+      ],
+      "status": "failed"
+    },
+    {
+      "description": "NOT a current acceptance gate. Live lanes are disabled; activation needs a new explicit user instruction. Placeholder runs are not Gemini evidence.",
+      "gate": "live_gemini_qualification",
+      "required": false,
+      "status": "not_run"
+    }
+  ],
+  "overall": "failed",
+  "schema": "drbean-release-gates/v1",
+  "statement": "Gates read recorded evidence only; they dispatch no provider or scientific work.",
+  "tested_commit": "0085414dd22c21c2264a7eb9b42b17ea6b931262",
+  "worktree_dirty": false
+}
