@@ -101,3 +101,7 @@ Next eligible tasks: implement source-review and follow-up browser controls agai
 ## Follow-up result presentation
 
 Added candidate-specific feedback when reopening a native review run through the existing run lookup. Displays recorded observation origin, compatible/excluded/unresolved status, violating observation IDs and reason. Explanation distinguishes a checked pair review from baseline discovery and preserves uncertainty when replay or binding fails. New regression plus existing web tests: 30 pass. JavaScript syntax and diff checks pass. Full browser/API exercise remains pending. Follow-up entry and source-review controls remain unfinished.
+
+## Browser CI checkpoint
+
+Base `4b5f1f5`. Added a dedicated browser job using the existing pinned integration lockfile, Node 22, declared backend/engine setup and Playwright Chromium. Runs both the manual editor smoke and actual browser/API/science/design/native-replay check. No new evaluator or provider integration. Acceptance requires the new job and existing CI jobs to pass on this contribution. Source-review and follow-up entry remain separate pending controls.
