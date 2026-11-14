@@ -734,3 +734,68 @@ def test_controlled_unsupported_followup_read_without_a_digest_remains_explainab
     assert any(f["record_id"] == dataset["id"] and f["field"] == "origin" and f["value"] == "hypothetical" for f in response["facts"])
     assert client.get(PREFIX + f"/records/{evidence['id']}").json() == evidence
     assert client.get(PREFIX + f"/workspaces/{history['workspace']}/provider-attempts").json() == []
+
+
+def test_http_explanation_guard_withholds_known_attacks_without_changing_real_science(computed_design, monkeypatch):
+    """Authored provider payloads challenge the HTTP guard beside actual native science."""
+    import socket
+    from bean_api.main import PREFIX
+    from test_scientific_http import post
+
+    history, client = computed_design, computed_design["client"]
+
+    def deny_socket(*args, **kwargs):
+        pytest.fail("The local explanation fixture must never dispatch a network request")
+
+    monkeypatch.setattr(socket.socket, "connect", deny_socket)
+    monkeypatch.setattr(socket.socket, "connect_ex", deny_socket)
+
+    class LocalAuthoredExplanationProvider(FakeProvider):
+        """A local response-validation fixture, with no transport or live-model evidence."""
+
+        async def generate(self, operation, prompt, schema, **kwargs):
+            self.calls += 1
+            self.prompts.append(prompt)
+            return ProviderResult(schema.model_validate(self.output), f"local-authored-{self.calls}",
+                                  "fixture-model", None, "STOP")
+
+    provider = LocalAuthoredExplanationProvider()
+    monkeypatch.setattr(client.app.state.provider, "generate", provider.generate)
+    suggestion = history["design_record"]
+    allowance_id = f"{suggestion['id']}:future_hard_allowance"
+    examples = [
+        ("The reviewed future hard allowance is 0.2 mg/L.", None),
+        ("Without any doubt this proves the interval.", "unsupported_claim"),
+        ("Sample again at 7hrs to separate them.", "unsupported_numeric_claim"),
+        ("This establishes that the interval is correct.", "unsupported_claim"),
+    ]
+    original_records = [history[key] for key in ("dataset", "problem", "evidence", "design_record")]
+    prior_facts, prior_statements = None, None
+    for revision, (prose, expected_rejection) in enumerate(examples):
+        provider.output = {"explanation": {"fact_ids": [allowance_id], "text": prose, "next_action": "stop"}}
+        key = f"guarded-commentary-{revision}"
+        body = {"operation": "explain", "client_operation_id": key, "expected_conversation_revision": revision,
+                "text": "Explain only the reviewed scientific facts and their limits.",
+                "problem_id": history["problem"]["id"], "suggestion_id": suggestion["id"],
+                "consent": {"provider": "gemini", "model": "fixture-model", "source_asset_ids": [],
+                    "include_notes": True, "include_existing_values": True, "accepted": True}}
+        response = post(client, f"/workspaces/{history['workspace']}/assistant-turns", body, key)
+        result = response["body"]
+        assert result["execution_approved"] is False
+        assert result["facts"] and result["critical_statements"]
+        if expected_rejection is None:
+            assert result["model_commentary"] == prose
+            assert result["commentary_status"] == "unverified_model_commentary"
+            prior_facts, prior_statements = result["facts"], result["critical_statements"]
+        else:
+            assert result["model_commentary"] is None and result["commentary_status"] == "suppressed"
+            assert result["commentary_suppression_reason"] == expected_rejection
+            assert result["facts"] == prior_facts and result["critical_statements"] == prior_statements
+        assert client.get(PREFIX + f"/records/{response['id']}").json() == response
+        assert post(client, f"/workspaces/{history['workspace']}/assistant-turns", body, key) == response
+        assert provider.calls == revision + 1
+        for record in original_records:
+            assert client.get(PREFIX + f"/records/{record['id']}").json() == record
+        assert client.get(PREFIX + f"/artifacts/{history['design_result']['artifacts'][0]['id']}").content == history["design_content"]
+        assert client.get(PREFIX + f"/workspaces/{history['workspace']}/provider-attempts").json() == []
+    assert len(client.get(PREFIX + f"/workspaces/{history['workspace']}/records?kind=assistant_response").json()) == len(examples)

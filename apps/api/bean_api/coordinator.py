@@ -26,7 +26,7 @@ from typing import Any, Callable, Literal
 
 from .contracts import GroundedExplanation
 from .canonical import canonical_bytes
-from .ai_prompts import commentary_rejection
+from .ai_prompts import COMMENTARY_POLICY_VERSION, commentary_rejection
 
 from .providers import (
     AttemptContext, AttemptLedger, ProviderConfig, ProviderFailure, SYSTEM_INSTRUCTION,
@@ -329,6 +329,7 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
                 "operation": "coordinator", "framework": "deepagents",
                 "framework_version": package_version("deepagents"),
                 "prompt_version": "gf2-coordinator-v1", "schema_version": "DB-SC-1",
+                "commentary_policy_version": COMMENTARY_POLICY_VERSION,
                 "started_at": utc_now(), "turn": inv.turns,
                 "simulated_input_token_reservation": reservation,
                 "simulated_output_token_reservation": inv.config.max_output_tokens,
@@ -459,7 +460,9 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
             "Issue exactly one tool per model turn. Finish using return_grounded_explanation referencing actual "
             "returned fact IDs. Do not write an unreferenced final answer. A completed job does not prove a "
             "claim. No counterexample found leaves the interval unproved. Mismatched evidence cannot certify "
-            "this problem. Numerical evidence is not checked. New data/design must await separate review."
+            "this problem. Numerical evidence is not checked. New data/design must await separate review. "
+            "Narration must use complete evidence-bound field statements or the neutral sentence "
+            "'The evidence has a conditional scope.' Unrecognized free-form scientific prose is withheld."
         ), subagents=[], skills=None, memory=None, checkpointer=None, store=None, cache=None, debug=False)
     nodes = agent.get_graph().nodes
     inventories = [set(node.data.tools_by_name) for node in nodes.values() if hasattr(node.data, "tools_by_name")]
@@ -471,6 +474,7 @@ def _make_graph(inv: _Invocation, model: Any) -> tuple[Any, dict[str, Any]]:
                "active_mode": "controlled_offline", "transport_provenance": "trusted_local_model_injection",
                "external_provider_calls": 0, "actual_model_tokens": 0,
                "live_qualification": "not_run", "tool_inventory": sorted(inv.allowed_tools),
+               "commentary_policy_version": COMMENTARY_POLICY_VERSION,
                "filesystem": "disabled_by_middleware_replacement", "backend": "isolated_ephemeral_StateBackend",
                "shell": False, "subagents": False, "memory": False, "summarization": False,
                "tracing": "disabled", "observed_graph_nodes": sorted(nodes), "middleware_policy": "gf2-allowlist-v1", "live_qualified": False}

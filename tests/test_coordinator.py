@@ -353,7 +353,9 @@ def test_numeric_policy_uses_ranges_parameter_vectors_selected_options_and_searc
     assert commentary_rejection("The margin is 999mg/L.", facts) == "unsupported_numeric_claim"
     assert commentary_rejection("The selected time is 999h.", facts) == "unsupported_numeric_claim"
     assert commentary_rejection("The selected time is 999.", facts) == "unsupported_numeric_claim"
-    assert commentary_rejection("Opaque evidence a123b and candidate-999 retain their original IDs.", facts) is None
+    # IDs are still opaque to numeric checking. Arbitrary identity assertions
+    # now fail the complete-statement policy instead of becoming narration.
+    assert commentary_rejection("Opaque evidence a123b and candidate-999 retain their original IDs.", facts) == "unsupported_claim"
 
 
 @pytest.mark.parametrize("facts, reason", [
