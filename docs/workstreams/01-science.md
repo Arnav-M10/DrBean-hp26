@@ -2,7 +2,59 @@
 
 Owner: Person 1 / Counterdex.
 
-## Current review — integrated candidate and browser handoff
+## Current review — final scientific loop and browser integration
+
+Reviewed current main **`2d2993d1a264d0128a0ea4af8f02010b263016ad`** and
+product [PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27), advancing the
+isolated `codex/science-loop-qualification` worktree from `6a3705a` to actual
+candidate **`f71363589ad5370cabbf99bfaf96c8a2d11e57db`**. Preserved all teammate
+history, recovery and ledger fixes. Did not merge obsolete PR #14. Production
+engine/backend/contracts match previously qualified `5d66354`; no new engine
+code, model family, package release or manufactured regression was needed.
+
+Exact clean `f713635` checks: **152 focused backend tests passed**; **292 engine
+tests** (291 passed, one backend-dependency skip separately passed under backend
+Python); **7/7 ordinary HTTP cases**; **22/22 native controls**; and the additional
+actual-origin own-time unresolved HTTP/native-replay case **passed in 2.40 s**.
+The ordinary scientific gate passed with no diagnostic overrides or external
+model requests. Source and installed Counterdex **0.3.0 / CPython 3.11.17** both
+match `90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`;
+backend Python is **3.13.18**. The unresolved candidate remains inconclusive
+despite valid packet verification and successful replay.
+
+The full fresh-clone strict checklist on the same clean `f713635` also passed:
+**5/5 configured gates, 12/12 boundaries, 588 backend, 47 HTTP, 31 web unit tests,
+31/31 stack launch-path checks**, with both hypothetical and declared-actual
+browser modes. Dependencies were installed from locks; the lock/setup selects
+Playwright 1.63 and matching Chromium 153. Its configured release-ready label does not erase the uncovered
+predicates and pending cross-owner integrations below.
+
+[Detailed predicates, exact rational unresolved inputs, native bytes/anchors,
+commands and receipts](../../packages/groundwork_adapter/docs/DECISION_LOOP_QUALIFICATION.md)
+are retained separately from Claude's independent `c8d39b5` acceptance. Claude's
+7/7 and 22/22 passing record is current for that older application tree, not
+independent acceptance of the new product browser.
+
+Owner 4 has exact reproductions in PR #27: retain the custom goal in a
+source-materialized plan; assert actual follow-up survivor IDs/vectors/history
+and download/replay the final follow-up packet; expose checked no-separation
+parents or explicitly record that browser limitation. Actual own-time controls
+and the dataset-origin label are already fixed in `f713635`. Owner 2 has no new
+engine/backend science defect from this review; its separate
+`backend/source-handoff` integration must preserve exact accepted-value
+projection, separate approval, immutable history and external anchors. Its
+normal API controlled-proposal route is not yet part of the tested candidate's
+release-fixture source flow. Owner 3's draft #28 narration guard remains a
+separate qualification item. Claude needs the actual combined candidate and
+positive source join, no-separation parent and unresolved-band acceptance.
+
+The scientific side is ready to support those integration corrections. A full
+combined-release verdict requires testing their actual resulting commit. No
+application model-provider calls, key inspection, public deployment or PyPI
+publication. This owner change contains only review documentation and retained
+evidence; all other owners' implementation and logs remain intact.
+
+## Historical review — backend candidate and browser handoff
 
 Reviewed merged main `37d8f6f6010e2fe8be3e55323bd6cc18f9112760`, PR #19,
 and newer backend, product, AI and Claude branches in separate worktrees.

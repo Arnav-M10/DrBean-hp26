@@ -1,5 +1,10 @@
 # Current scientific integration review
 
+The newer review of main `2d2993d` and product candidate `f713635`, including
+declared actual follow-ups, is [Decision-loop qualification](DECISION_LOOP_QUALIFICATION.md).
+The evidence below is retained as the historical backend-integration review;
+its checks and browser handoffs are not silently relabelled as current results.
+
 Owner 1, November 14, 2026. Counterdex **0.3.0**, prepared CPython **3.11.17**,
 Darwin arm64; backend CPython **3.13.18**. Scientific implementation identity:
 `90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
