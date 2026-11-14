@@ -54,6 +54,59 @@ PROVIDER_ENV_EXACT = {
 PROVIDER_ENV_PREFIXES = ("GOOGLE_GENAI_", "GOOGLE_CLOUD_", "VERTEX", "LANGSMITH_", "ANTHROPIC_", "OPENAI_")
 SERVICES = ("api", "worker", "web")
 
+# Explicit opt-in to live Gemini, read as JSON data (never shell-sourced) from an ignored file.
+# Only these keys are accepted. The values are passed to the API and worker processes only;
+# the web server, the scientific engine (Owner 2 clears its environment) and the PDF/image
+# workers (minimal environments) never receive them. A key on its own changes nothing: "mode"
+# must also be "live", and the server must itself report that live dispatch is enabled.
+LIVE_CONFIG = os.path.join(VAR, "gemini.local.json")
+LIVE_CHECK = os.path.join(VAR, "gemini-live-check.json")  # written only by a completed opted-in live check
+LIVE_KEYS = {"GEMINI_API_KEY", "GEMINI_MODEL", "BEAN_GEMINI_ACCOUNT_GATE", "BEAN_GEMINI_ACCOUNT_DECISION_ID",
+             "BEAN_GEMINI_IMAGE_TOKEN_BOUND", "BEAN_GEMINI_MAX_INPUT_TOKENS", "BEAN_GEMINI_MAX_OUTPUT_TOKENS"}
+
+
+def live_config() -> dict:
+    """{'state', 'detail', 'env'}; 'env' is empty unless mode is live and a key is present. Never prints values."""
+    if not os.path.exists(LIVE_CONFIG):
+        return {"state": "absent", "detail": f"no {os.path.relpath(LIVE_CONFIG, REPO)}: live Gemini is off", "env": {}}
+    try:
+        if os.stat(LIVE_CONFIG).st_size > 16384:
+            raise ValueError("file is larger than 16 KiB")
+        with open(LIVE_CONFIG, encoding="utf-8") as handle:
+            data = json.load(handle)
+        if not isinstance(data, dict):
+            raise ValueError("top level must be a JSON object")
+        unknown = sorted(set(data) - LIVE_KEYS - {"mode"})
+        if unknown:
+            raise ValueError(f"unsupported key(s) {', '.join(unknown)}")
+        if data.get("mode", "disabled") not in {"disabled", "live"}:
+            raise ValueError('"mode" must be "disabled" or "live"')
+        if any(not isinstance(v, str) or len(v) > 4096 or "\n" in v for k, v in data.items()):
+            raise ValueError("every value must be a single-line string")
+    except (OSError, ValueError) as error:
+        return {"state": "invalid", "detail": f"{os.path.relpath(LIVE_CONFIG, REPO)} ignored: {error}", "env": {}}
+    loose = os.stat(LIVE_CONFIG).st_mode & 0o077
+    note = " (warning: readable by other users; chmod 600 it)" if loose else ""
+    key = bool(data.get("GEMINI_API_KEY"))
+    if data.get("mode", "disabled") != "live":
+        return {"state": "disabled", "detail": f"opt-in file present, mode disabled; key {'present' if key else 'missing'}{note}", "env": {}}
+    if not key:
+        return {"state": "missing_key", "detail": f"mode live but GEMINI_API_KEY is missing: live Gemini stays off{note}", "env": {}}
+    env = {k: v for k, v in data.items() if k in LIVE_KEYS}
+    return {"state": "configured", "detail": f"mode live, key present, model {data.get('GEMINI_MODEL') or 'not set'}{note}",
+            "env": {**env, "BEAN_AI_MODE": "live_opt_in"}}
+
+
+def live_check_record() -> str:
+    try:
+        with open(LIVE_CHECK, encoding="utf-8") as handle:
+            record = json.load(handle)
+        if record.get("status") == "completed" and record.get("provider_requests", 0) > 0:
+            return f"completed {record.get('completed_at', '?')} ({record.get('provider_requests')} request(s))"
+    except (OSError, ValueError, AttributeError):
+        pass
+    return "not run"
+
 
 def child_env() -> dict:
     """Environment for product processes: explicit placeholder AI, one store, absolute paths."""
@@ -276,8 +329,13 @@ def summarize(static: dict, service: dict | None) -> tuple[list[tuple[str, str, 
         f"{static.get('store_dir', 'var')} writable, {free} MiB free; database "
         f"{'present' if static.get('database_present') else 'not created yet'}"
         if static.get("store_writable", True) else f"{static.get('store_dir')} is not writable")
-    row(True, "AI mode", "controlled placeholder only. Provider credentials are removed from every launched "
-        "process; no model provider is contacted.")
+    live = live_config()
+    row(True, "AI mode", "controlled placeholder only. Provider credentials from your shell are removed from every "
+        "launched process; no model provider is contacted." if live["state"] != "configured" else
+        "live opt-in: the key from the opt-in file goes to the API and worker only; the web server, "
+        "scientific engine and document workers never receive it.")
+    row(live["state"] != "invalid", "Gemini opt-in file", live["detail"], required=False)
+    row(True, "Gemini live check", live_check_record())
     if service is None:
         return rows, ok
     caps = service["capabilities"] or {}
@@ -301,12 +359,18 @@ def summarize(static: dict, service: dict | None) -> tuple[list[tuple[str, str, 
             "yes" if science.get("baseline_discovery") else f"no ({science.get('reason')})")
         live = bool(gemini.get("configured")) or bool(gemini.get("account_gate_passed")) \
             or bool(gemini.get("dispatch_enabled"))
-        rows.append(("ALERT" if live else "ok", "Gemini live",
-                     "CONFIGURED. This sprint requires placeholder mode: stop, and start with scripts/dev/start.sh"
-                     if live else "disabled, not tested"
-                     + (f" (API reports ai_mode {caps['ai_mode']})" if caps.get("ai_mode") else "")))
-        if live:
+        opted = live_config()["state"] == "configured"
+        if live and not opted:
+            rows.append(("ALERT", "Gemini live", "the API reports a configured provider but no live opt-in was given; "
+                         "stop it and start with scripts/dev/start.sh"))
             ok = False
+        elif opted:
+            rows.append(("ok", "Gemini live", "opted in; API reports dispatch "
+                         f"{'enabled' if gemini.get('dispatch_enabled') else 'still disabled by the server'}; "
+                         f"live check: {live_check_record()}"))
+        else:
+            rows.append(("ok", "Gemini live", "disabled, not tested"
+                         + (f" (API reports ai_mode {caps['ai_mode']})" if caps.get("ai_mode") else "")))
     return rows, ok
 
 
@@ -381,10 +445,11 @@ def cmd_start(_args) -> int:
               "Nothing was started and nothing was killed. Free the port and retry.")
         return 1
     env = child_env()
+    provider_env = {**env, **live_config()["env"]}  # identical to env unless explicitly opted in
     try:
         spawn("api", [BACKEND_PY, "-m", "uvicorn", "bean_api.main:create_app", "--factory", "--host", HOST,
-                      "--port", str(API_PORT), "--no-access-log"], env)
-        spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], env)
+                      "--port", str(API_PORT), "--no-access-log"], provider_env)
+        spawn("worker", [BACKEND_PY, "-m", "bean_api.worker"], provider_env)
         spawn("web", ["node", os.path.join("apps", "web", "serve.mjs"), str(WEB_PORT)], env)
     except (OSError, KeyboardInterrupt) as error:
         for name in reversed(SERVICES):

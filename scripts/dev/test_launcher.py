@@ -184,3 +184,68 @@ class Doctor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LiveOptIn(unittest.TestCase):
+    """The opt-in file is data, its key reaches only the API and worker, and a key alone enables nothing."""
+    CANARY = "CANARY-gemini-key-not-real-0001"
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.patches = [mock.patch.object(launcher, "LIVE_CONFIG", os.path.join(self.dir.name, "gemini.local.json")),
+                        mock.patch.object(launcher, "LIVE_CHECK", os.path.join(self.dir.name, "check.json"))]
+        for patch in self.patches:
+            patch.start()
+
+    def tearDown(self):
+        for patch in self.patches:
+            patch.stop()
+        self.dir.cleanup()
+
+    def write(self, data, raw=None):
+        with open(launcher.LIVE_CONFIG, "w", encoding="utf-8") as handle:
+            handle.write(raw if raw is not None else json.dumps(data))
+        os.chmod(launcher.LIVE_CONFIG, 0o600)
+
+    def test_states_are_distinct_and_never_print_the_key(self):
+        self.assertEqual(launcher.live_config()["state"], "absent")
+        self.write({"GEMINI_API_KEY": self.CANARY})
+        disabled = launcher.live_config()
+        self.assertEqual((disabled["state"], disabled["env"]), ("disabled", {}))  # a saved key alone is not opt-in
+        self.write({"mode": "live"})
+        self.assertEqual(launcher.live_config()["state"], "missing_key")
+        self.write({"mode": "live", "GEMINI_API_KEY": self.CANARY, "GEMINI_MODEL": "model-x"})
+        live = launcher.live_config()
+        self.assertEqual(live["state"], "configured")
+        self.assertEqual(live["env"]["GEMINI_API_KEY"], self.CANARY)
+        for state in (disabled, live):
+            self.assertNotIn(self.CANARY, state["detail"])
+        self.assertEqual(launcher.live_check_record(), "not run")
+
+    def test_file_is_data_not_shell(self):
+        self.write(None, raw="export GEMINI_API_KEY=$(touch /tmp/drbean-should-not-exist)\n")
+        self.assertEqual(launcher.live_config()["state"], "invalid")
+        self.assertFalse(os.path.exists("/tmp/drbean-should-not-exist"))
+        self.write({"mode": "live", "GEMINI_API_KEY": "k", "LD_PRELOAD": "/evil.so"})
+        invalid = launcher.live_config()
+        self.assertEqual((invalid["state"], invalid["env"]), ("invalid", {}))
+        self.assertIn("LD_PRELOAD", invalid["detail"])
+
+    def test_key_reaches_api_and_worker_only(self):
+        self.write({"mode": "live", "GEMINI_API_KEY": self.CANARY})
+        spawned = {}
+        ready = {"uv": "uv", "node": "v22.0.0", "backend": {"python": "3.13.0", "application_importable": True,
+                 "packages": {"dr-bean-backend": "0"}}, "engine": {"python": "3.11.0", "runtime_qualified": True,
+                 "counterdex": "0", "native_replay_supported": True}, "auth_file_present": True,
+                 "os": "x", "os_release": "x", "arch": "x"}
+        with mock.patch.object(launcher, "static_facts", return_value=ready), \
+                mock.patch.object(launcher, "port_in_use", return_value=False), \
+                mock.patch.object(launcher, "owned", return_value=None), \
+                mock.patch.object(launcher, "spawn", side_effect=lambda name, cmd, env: spawned.__setitem__(name, env)), \
+                mock.patch.object(launcher, "service_facts", side_effect=RuntimeError("stop after spawning")):
+            with self.assertRaises(RuntimeError):
+                launcher.cmd_start(None)
+        self.assertEqual(spawned["api"]["GEMINI_API_KEY"], self.CANARY)
+        self.assertEqual(spawned["worker"]["GEMINI_API_KEY"], self.CANARY)
+        self.assertNotIn(self.CANARY, json.dumps(spawned["web"]))
+        self.assertEqual(spawned["api"]["BEAN_AI_MODE"], "live_opt_in")
