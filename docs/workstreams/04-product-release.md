@@ -105,3 +105,7 @@ Added candidate-specific feedback when reopening a native review run through the
 ## Browser CI checkpoint
 
 Base `4b5f1f5`. Added a dedicated browser job using the existing pinned integration lockfile, Node 22, declared backend/engine setup and Playwright Chromium. Runs both the manual editor smoke and actual browser/API/science/design/native-replay check. No new evaluator or provider integration. Acceptance requires the new job and existing CI jobs to pass on this contribution. Source-review and follow-up entry remain separate pending controls.
+
+## Hypothetical follow-up browser checkpoint
+
+Added a browser path from a checked design to an explicitly hypothetical observation, reviewed dataset revision, new fixed-pair plan, separate approval and queued run. Existing run lookup renders candidate feedback and downloads. Extended the real browser CI check through this path and checks preserved design identity. Thirty existing web tests pass locally; full browser qualification is delegated to the existing clean CI job. Actual acquisition and off-design readings remain unsupported by this flow.
