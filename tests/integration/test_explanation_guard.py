@@ -97,6 +97,27 @@ def test_checked_design_statement_needs_every_verification_gate(gates):
     assert rejection_with({**FACTS[0], **gates}, CHECKED_TEXT) == "unsupported_claim"
 
 
+# Legitimate supported narration: correct limiting statements grounded in the cited record must be kept. The
+# declared evidence-bound policy (PR #28 623ae19) withholds all four, including PR #20's own coordinator narration,
+# so the two PRs fail together (tests/test_coordinator.py::test_separately_approved_design_has_one_completed_
+# callback_observation). Strict xfail only under that policy; it passes on the legacy guard.
+OVERSUPPRESSED = pytest.mark.xfail(not LEGACY_GUARD, strict=True, reason="F-NARRATION-OVERSUPPRESSION (P2, Owner 3): "
+                                   "the evidence-bound policy withholds correct limiting statements grounded in the "
+                                   "cited record [declared policy]")
+
+
+@OVERSUPPRESSED
+@pytest.mark.parametrize("fact, text", [
+    ({"design_tier": "numerical_guidance"}, "The returned design remains numerical guidance."),
+    ({"design_tier": "no_separation_established"}, "No separation was established on the reviewed grid."),
+    ({"design_tier": "numerical_guidance", "verification": "not_checked"},
+     "This design is numerical guidance without checked pair separation."),
+    ({"scientific_outcome": "inconclusive"}, "The result is inconclusive."),
+], ids=["numerical_guidance", "no_separation", "not_checked", "inconclusive"])
+def test_correct_limiting_statements_grounded_in_the_cited_record_are_kept(fact, text):
+    assert rejection_with({"id": "design-evidence", "problem_id": "problem", **fact}, text) is None
+
+
 QUALIFIER = gap("F-EXPLANATION-QUALIFIER (P2, Owner 3): any hedge word earlier in "
                               "the clause exempts an overclaim, even when it intensifies rather than hedges")
 
