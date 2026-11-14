@@ -96,6 +96,12 @@ export function baselineAvailable(capabilities) {
 }
 
 export function baselineExplanation(result) {
+  if (['review', 'recheck'].includes(result.native_replay?.operation)) {
+    if (result.verification !== 'valid' || result.expected_binding !== 'matches' || result.replay !== 'passed') {
+      return 'Follow-up checking is incomplete or its evidence does not match. Inspect the recorded candidate states and reason before drawing a conclusion.'
+    }
+    return 'This follow-up rechecked the two previously selected candidates against the revised observations. Review each candidate below. Excluding both leaves other parameter assignments unexamined and does not establish global model inconsistency.'
+  }
   if (result.scientific_outcome === 'certified_counterexample' && result.verification === 'valid'
       && result.expected_binding === 'matches' && result.replay === 'passed') {
     return 'A freshly checked parameter assignment is compatible with the reviewed hard bounds and has ke strictly outside the closed claim. The claim is challenged under these assumptions; this does not identify the true physical model.'

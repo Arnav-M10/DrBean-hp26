@@ -88,3 +88,24 @@ Live Gemini of any kind; hosted deployment; Photon; visual redesign; additional 
 ## Codex launcher recovery contribution
 
 Base `9cc90e0`, branch `codex/product-launch-recovery`, macOS, launcher Python 3.14. Partial service spawn exceptions now trigger cleanup. Missing process start timestamps no longer establish ownership. Six focused environment, doctor and regression checks pass, and `git diff --check` passes. Full launcher suite could not qualify this environment: sandbox denies `ps`, and the repeated socket connection assertion failed. No full-stack or release qualification is claimed. Next actions: run launcher checks in an environment allowing process inspection, qualify ordinary Mac startup, then resume the existing browser integration backlog. Gemini remains disabled.
+
+
+## Release-check maintenance after main `80f95a4`
+
+Merged the current integrated backend/design browser work into the contribution branch. Preserve the separately approved design UI and native download implementation. Corrected checklist Playwright resolution and explicit evaluation science interpreter selection. Editor smoke cleanup now covers Chromium launch failure. Updated integration summary to retire the obsolete claim that the HTTP suite is undelivered.
+
+Fresh checks on macOS with Node 25.9.0: 29 web unit tests pass, smoke JavaScript syntax passes, release environment assertions pass, and diff whitespace checks pass. Full browser and Mac stack execution remain unverified. `uv` is absent from PATH. PR #12 CI previously passed launcher tests, backend lint/tests/schemas, web, engine/replay and harness checks; corrected HTTP runtime selection reached 40 passed, 3 failed, 2 xfailed. Remaining failures concern native evidence/design tier, follow-up results/lineage and interruption observations, plus the separate descendant process-boundary check.
+
+Next eligible tasks: implement source-review and follow-up browser controls against current contracts; qualify installed browser dependencies and target Mac setup; reconcile independent failures and rerun strict offline release. Human consultation and rehearsal remain pending.
+
+## Follow-up result presentation
+
+Added candidate-specific feedback when reopening a native review run through the existing run lookup. Displays recorded observation origin, compatible/excluded/unresolved status, violating observation IDs and reason. Explanation distinguishes a checked pair review from baseline discovery and preserves uncertainty when replay or binding fails. New regression plus existing web tests: 30 pass. JavaScript syntax and diff checks pass. Full browser/API exercise remains pending. Follow-up entry and source-review controls remain unfinished.
+
+## Browser CI checkpoint
+
+Base `4b5f1f5`. Added a dedicated browser job using the existing pinned integration lockfile, Node 22, declared backend/engine setup and Playwright Chromium. Runs both the manual editor smoke and actual browser/API/science/design/native-replay check. No new evaluator or provider integration. Acceptance requires the new job and existing CI jobs to pass on this contribution. Source-review and follow-up entry remain separate pending controls.
+
+## Hypothetical follow-up browser checkpoint
+
+Added a browser path from a checked design to an explicitly hypothetical observation, reviewed dataset revision, new fixed-pair plan, separate approval and queued run. Existing run lookup renders candidate feedback and downloads. Extended the real browser CI check through this path and checks preserved design identity. Thirty existing web tests pass locally; full browser qualification is delegated to the existing clean CI job. Actual acquisition and off-design readings remain unsupported by this flow.

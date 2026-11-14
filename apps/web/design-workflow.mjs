@@ -1,9 +1,11 @@
+import { setupFollowupWorkflow } from './followup-workflow.mjs'
 import { designCandidates, designRequest, designExplanation } from './design.mjs'
 
 export function setupDesignWorkflow({ context, perform, button, node, exactRecord, save }) {
+  const followup = setupFollowupWorkflow({ context, button, node, exactRecord })
   let sourceRun = '', evidenceId = '', draft, plan, approval, frozen, job, jobPlan, suggestion, jobId = ''
   const blank = () => ({ candidateIds: ['', ''], times: '', allowance: '', horizon: '', allowanceOrigin: 'reviewed_hard_bound', allowanceDescription: '', allowConstruction: false, allowContinuation: false })
-  function reset() { sourceRun = evidenceId = jobId = ''; draft = blank(); plan = approval = frozen = job = jobPlan = suggestion = undefined }
+  function reset() { followup.reset(); sourceRun = evidenceId = jobId = ''; draft = blank(); plan = approval = frozen = job = jobPlan = suggestion = undefined }
   reset()
   const fingerprint = () => JSON.stringify({ sourceRun, evidenceId, draft })
   const currentPlan = () => plan && fingerprint() === frozen
@@ -138,6 +140,7 @@ export function setupDesignWorkflow({ context, perform, button, node, exactRecor
         button(section, 'Download design replay anchors', async () => { const file = await api.download(`/artifacts/${encodeURIComponent(reference.id)}/anchor?download=true`); save(file.bytes, `${name}.anchors.json`) })
         section.append(node('p', 'Replay the retained design and baseline history with the matching Counterdex CPython 3.11 package. Native replay checks supported mathematical facts; browser download hashes establish byte integrity only.'), node('pre', `python3.11 -m counterdex replay-native ${name}.native.json --anchors ${name}.anchors.json`))
       }
+      followup.render(section, job, suggestion, jobPlan)
     }
   }
   return { render, reset, pending: () => job && ['queued', 'running', 'cancel_requested'].includes(job.state), refresh: () => refresh(job.id) }
