@@ -11,7 +11,9 @@ Frozen predicates: [coordinator/](coordinator/README.md). Baseline on main `299a
 not_available, 0 failed; the durable coordinator and general-file producer do not exist yet). Revision 2
 ([results/coordinator/baseline-299a356-r2.json](results/coordinator/baseline-299a356-r2.json)) re-observes the same
 tree at harness `f278de6` and corrects SCI-06's missing parts; revision 3 (`-r3`, harness `644ad8c`) adds
-the SCI-05/06/07 cases: 14 passed, 5 not_run, 35 not_available. Previews of unmerged A/B branches live under
+the SCI-05/06/07 cases: 14 passed, 5 not_run, 35 not_available. Main then moved to `4a0c616` (A's PR #42):
+[results/integration/baseline-4a0c616.md](results/integration/baseline-4a0c616.md), same statuses; A's factory inventory
+passes on main, but no route or worker uses it yet. Previews of unmerged A/B branches live under
 `results/previews/` (for example `pr42-051b4d6/`) and are never acceptance.
 
 ## Integrated acceptance checkpoint

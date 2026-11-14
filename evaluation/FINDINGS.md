@@ -1,6 +1,6 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `299a356`, observed with harness `644ad8c` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `4a0c616`, observed with harness `8a21323` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
@@ -44,7 +44,7 @@ Application code commit `299a356`, observed with harness `644ad8c` on macOS 26.7
 | F-LEDGER-MALFORMED | P2 | 2 | retested | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
 | F-EXPLANATION-CHECKED-GATES | P2 | 3 | retested | 'Checked design' narration is kept when its cited record lacks or contradicts the verification, replay, binding or tier gates |
 | H-GATE-CONTROLS-DIRTY | P1 | 5 | retested | native_engine_controls gate admitted dirty (and otherwise unqualified) control records |
-| F-NARRATION-OVERSUPPRESSION | P2 | A (narration guard in conversation/coordinator; was Owner 3) | fixed_pending_retest | The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record |
+| F-NARRATION-OVERSUPPRESSION | P2 | A (narration guard in conversation/coordinator; was Owner 3) | retested | The evidence-bound explanation guard withholds correct limiting statements grounded in the cited record |
 | H-SOURCE-RETRY-KEY | P2 | 5 | retested | Harness source-review test treated a new idempotency key as a retry |
 | F-PAPER-CITATION-SUBSTRING | P1 | A (PR #35 paper proposal validator; was Owner 3) | open | A paper citation that is only a fragment of a longer printed number is accepted as the exact cited value (4.6 for 4.62; 538 ng/mL for 5380 ng/mL) |
 | F-PAPER-QUOTE-NORMALIZATION | P2 | A (PR #35 validator) with B (file services; was Owners 3 and 4) | open | An authentic quote that crosses a text-layer line break, or uses an NFKC-equivalent character (µ U+00B5 vs μ U+03BC), discards the whole paper proposal |
@@ -424,7 +424,7 @@ Application code commit `299a356`, observed with harness `644ad8c` on macOS 26.7
 - **Retest at candidate e791e91 (application code = main 2d2993d, Counterdex 0.3.0, CPython 3.11.17 engine / 3.13.18 backend, macOS 26.7 arm64, no diagnostics unless named):** The candidate's control record is clean, executed acceptance, CPython 3.11.17, engine 0.3.0 imported from the repository with a matching source digest; the fixed gate admits it (22/22). (evidence: {"controls": "evaluation/results/controls.jsonl (tested_commit e791e91)"})
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Still holds: harness path 7/7, Owner 4's unmodified launcher 6/7, barrier diagnostic passed, 22/22 qualified controls. (evidence: {"attempts": ["att_b6fc5431663f4693", "att_f66513d7ec274c82", "att_917faf93b8a14f96", "att_17ae63064bb84863"]})
 
-## F-NARRATION-OVERSUPPRESSION (P2, owner A (narration guard in conversation/coordinator; was Owner 3), fixed_pending_retest)
+## F-NARRATION-OVERSUPPRESSION (P2, owner A (narration guard in conversation/coordinator; was Owner 3), retested)
 
 - **Input:** commentary_rejection('The returned design remains numerical guidance.', [{'id': 'design-evidence', 'problem_id': 'problem', 'design_tier': 'numerical_guidance'}]) and three similar limiting statements
 - **Command:** `local merge of PR #20 f3d424f + PR #28 623ae19: .venv/bin/python -m pytest tests/test_coordinator.py::test_separately_approved_design_has_one_completed_callback_observation`
@@ -434,6 +434,7 @@ Application code commit `299a356`, observed with harness `644ad8c` on macOS 26.7
 - **Retest at candidate 1bc3604 (application code = main 22c9a24 incl. PR #27's controlled source review; Counterdex 0.3.0; macOS 26.7 arm64; no diagnostics unless named):** Main 22c9a24 has PR #27's source review but neither PR #20's coordinator change nor PR #28; the conflict between those two open PRs is unchanged. (evidence: {})
 - **Retest at candidate c51bbae (application code = main b8c5952 incl. PR #32 = PRs #20 + #28 + fixes; Counterdex 0.3.0; CPython 3.11.17 engine / 3.13.18 backend; macOS 26.7 arm64; no diagnostics):** Still present on main b8c5952: the evidence-bound guard withholds all four correct limiting statements (4 strict xfails hold). The cross-PR coordinator failure is resolved: PR #32 changed the coordinator fixture to neutral narration (eaa9d809), and the backend suite passes (704). The finding is narrowed to useful narration being suppressed; nothing is overclaimed. (evidence: {"backend": "704 passed", "pytest": "tests/integration/test_explanation_guard.py::test_correct_limiting_statements_grounded_in_the_cited_record_are_kept: 4 xfailed (strict)"})
 - **Retest at A's PR #42 head 051b4d6 (component branch on main 299a356; not merged), as local overlay fbc08ee = 051b4d6 + C harness f278de6, not pushed; isolated uv-locked .venv CPython 3.13.18; macOS 26.7 arm64; controlled, no provider:** Fix reproduced on the component branch. Policy evidence-bound-statements.v3 keeps all four correct limiting statements: the strict xfails turn into XPASS(strict), and with --runxfail 37/37 pass. C's 14 new converse cases are all withheld under v3 and under main's v2: wrong or absent status, split or conflicting records, context-only support, appended overclaims and a replay upgrade. The suite gives 51 passed on the overlay and 47 passed plus 4 strict xfails on main. Still present on main 299a356 (v2). This finding closes only after a retest on B's integrated candidate once the fix is merged. (evidence: {"preview": "evaluation/results/previews/pr42-051b4d6/README.md", "tests": "tests/integration/test_explanation_guard.py at f278de6 (marker scoped to v1/v2; converse cases test_limiting_statements_without_matching_cited_support_are_withheld)"})
+- **Retest at 8a21323 (C branch merge of main 4a0c616 = A's PR #42; clean; macOS 26.7 arm64):** Fixed on main 4a0c616 (evidence-bound-statements.v3). The four correct limiting statements are kept as ordinary assertions: the v1/v2-scoped marker no longer applies. All 14 converse cases are withheld. Closed by retest on main. (evidence: {"lane": "controlled_callbacks lane_91d63d5f861a4ae7: 110 passed, 1 xfail (F-SESSION-CAPACITY-EXHAUSTION)", "tests": "tests/integration/test_explanation_guard.py: 51 passed"})
 
 ## F-PAPER-CITATION-SUBSTRING (P1, owner A (PR #35 paper proposal validator; was Owner 3), open)
 
