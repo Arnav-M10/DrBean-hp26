@@ -32,6 +32,7 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 
 See `evaluation/FINDINGS.md` for input, command, expected, observed and retests.
 
+- **Owner 2 (urgent, before PR #14 merges):** F-RESTART-EPERM (P0): on macOS `run_bounded`'s owned-session cleanup raises PermissionError (Darwin EPERM for killpg on an exited, unreaped leader), so every normally finishing job fails and a cancelled job's guard can survive. One-line cause, standalone repro and a local-patch confirmation in `evaluation/results/previews/backend-restart-recovery-c231be4/`. Its lifeline guard does fix F-ORPHAN-WORKER-KILL.
 - **Owner 2:** F-MAC-NPROC (P0, new: RLIMIT_NPROC per user on macOS blocks spawning CPython 3.11), F-BASELINE-DISCOVERY (P0, adapter wiring with Owner 1), F-NATIVE-BYTES (fixed pending HTTP retest), F-REVIEW-MATERIALIZATION (fixed pending retest), F-RESTART-UNOBSERVABLE, F-TEST-VAR-LEAK (P2).
 - **Owner 1:** F-BASELINE-DISCOVERY producer side, F-FOLLOWUP-FEEDBACK (with Owner 2).
 - **Owner 3:** F-EXPLANATION-QUALIFIER, F-EXPLANATION-NUMBER-FORMS, F-EXPLANATION-PARAPHRASE (P2, explanation guard gaps found by `tests/integration/test_explanation_guard.py`; P1 before any live model writes user-visible prose). F-COORDINATOR-OPTIONAL-STATUS and F-COORDINATOR-PROVIDER-LABEL closed by retest on `main` `55403ab`.
@@ -72,6 +73,8 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
+| `backend/restart-recovery` (PR #14) | `c231be4` | with barrier: **worker-kill orphan fixed**; without: hero/changed input **fail** and a cancelled child survives (F-RESTART-EPERM, Darwin-only); local one-line patch -> 6/7 + cancel/restart pass. |
+| `backend/controlled-acceptance` (PR #13) | `731afdc` | local merge with this harness: integration suite unchanged (39 passed; failures F-MAC-NPROC/orphan; no regressions). |
 | merged `main` (`55403ab`, after PR #10) in this checkout | harness `1ae19ff` | diagnostic relax_nproc: **6/7 pass** again (hero, changed input, retry, design authority, follow-up, zero dispatch); plain acceptance on both launch paths: F-MAC-NPROC; gate exit 3. |
 | merged `main` (`80f95a4`) in this checkout | harness `b827c61`/`f992b48` | diagnostic relax_nproc: **6/7 pass** (hero, changed input, retry, design authority, follow-up, zero dispatch); with science_barrier the worker-kill orphan reproduces (F-ORPHAN-WORKER-KILL) and is now terminated before the barrier is released. Plain acceptance on both launch paths: F-MAC-NPROC. |
 | `backend/followup` (PR #11, stacked on PR #9; now merged) | `8525cab` | diagnostic relax_nproc: **6/7 entries pass incl. RS-FOLLOWUP** (design-bound `PlanBody.followup`: application, fresh replay and decimal oracle agree per candidate on all three readings; tampered/substituted/foreign scopes refused; qualifier 125/125); RS-CANCEL-RESTART unrun without the barrier. With relax_nproc + science_barrier: running cancel passes, **worker SIGKILL still orphans the child** (F-ORPHAN-WORKER-KILL). |

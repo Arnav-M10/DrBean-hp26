@@ -38,6 +38,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 | F-EXPLANATION-QUALIFIER | P2 | 3 | open | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
 | F-EXPLANATION-NUMBER-FORMS | P2 | 3 | open | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
 | F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
+| F-RESTART-EPERM | P0 | 2 | open | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
 
@@ -50,6 +51,7 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Retest at merged main 80f95a4 via harness b827c61 and f992b48 (diagnostics relax_nproc + science_barrier):** Still reproduces on main, twice: the scientific child survives the worker SIGKILL and `worker --recover` (the run is correctly marked interrupted and not redispatched). Running cancellation still kills its child. Since f992b48 the harness terminates the orphan before releasing the barrier (H-ORPHAN-TEARDOWN). (evidence: {"attempts": ["att_d0b306605a744db4", "att_593e67a5ca214685"], "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier"})
 - **Retest at merged main 80f95a4, harness a1b28ae, tests/integration (science_barrier only; no product guard relaxed):** Reproduces without relax_nproc: the deterministic pytest test fails no_orphan_after_worker_kill (1 live scientific child after the worker SIGKILL). The barrier holds the child after setsid and the product's limits, so this is the product's own kill/recovery path. (evidence: {"pytest": "evaluation/results/integration/pytest-merged-main-a1b28ae.md"})
 - **Retest at main 61edad7, Linux CI (ubuntu runner, no diagnostics except the harness barrier):** Reproduces on Linux too: no_orphan_after_worker_kill, 1 live scientific child after the worker SIGKILL. Not a Mac-only effect. (evidence: {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43560507025", "commit": "main 61edad7 (PR #16)", "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite"})
+- **Retest at preview of backend/restart-recovery c231be4 (PR #14; diagnostics relax_nproc + science_barrier):** Fixed by the PR's lifeline guard: the held child is stopped when the worker is SIGKILLed; nothing for the harness to terminate. Close after PR #14 merges with F-RESTART-EPERM resolved (otherwise normal completion fails on macOS). (evidence: {"attempts": ["att_2712c19d978049cb"], "results": "evaluation/results/previews/backend-restart-recovery-c231be4/relax_nproc+science_barrier"})
 
 ## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, retested)
 
@@ -301,6 +303,14 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Expected:** unsupported_claim (master brief 2.17: proof of the interval, elimination of outside models, physical truth, global optimality)
 - **Observed:** accepted (None)
 - **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+
+## F-RESTART-EPERM (P0, owner 2, open)
+
+- **Input:** any baseline on backend/restart-recovery c231be4 on Darwin 25.6.0; or killpg-eperm-repro.py (standard library)
+- **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <PR #14 checkout> --diagnostic relax_nproc --results <dir>`
+- **Expected:** baselines complete; cancellation leaves no live scientific or guard process
+- **Observed:** hero and changed-input baselines fail with worker_failed / scientific_attempt_failed; run_bounded with a trivial adapter raises PermissionError at science.py:180 (`os.killpg(process.pid, SIGKILL)` in finally, which catches only ProcessLookupError); cancellation without the barrier leaves 1 live child. Darwin returns EPERM for killpg on a group whose only member is an exited, unreaped leader (standalone repro, CPython 3.11.17 and 3.13.18); Linux returns ESRCH, so Linux validation passed. The exception also skips the rest of the cleanup, including closing the parent lifeline, which is why the guard survives a cancellation. A one-line local diagnostic patch catching PermissionError makes the same lane pass 6/7 (as on main) and cancel/restart with the barrier pass.
+- **Evidence:** {"readme": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md", "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/killpg-eperm-repro.py", "results": "evaluation/results/previews/backend-restart-recovery-c231be4"}
 
 ## Check-level finding ids (raised only when the check fails)
 

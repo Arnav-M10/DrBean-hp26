@@ -59,6 +59,16 @@
             "job": "provider-free actual-stack smoke / Owner 5 HTTP/invariant suite",
             "commit": "main 61edad7 (PR #16)"
           }
+        },
+        {
+          "at_commit": "preview of backend/restart-recovery c231be4 (PR #14; diagnostics relax_nproc + science_barrier)",
+          "result": "Fixed by the PR's lifeline guard: the held child is stopped when the worker is SIGKILLed; nothing for the harness to terminate. Close after PR #14 merges with F-RESTART-EPERM resolved (otherwise normal completion fails on macOS).",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-restart-recovery-c231be4/relax_nproc+science_barrier",
+            "attempts": [
+              "att_2712c19d978049cb"
+            ]
+          }
         }
       ]
     },
@@ -956,6 +966,25 @@
       "evidence": {
         "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
         "end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes"
+      },
+      "retests": []
+    },
+    {
+      "id": "F-RESTART-EPERM",
+      "severity": "P0",
+      "owner": "2",
+      "status": "open",
+      "title": "PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it",
+      "minimal_input": "any baseline on backend/restart-recovery c231be4 on Darwin 25.6.0; or killpg-eperm-repro.py (standard library)",
+      "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --app-repo <PR #14 checkout> --diagnostic relax_nproc --results <dir>",
+      "expected": "baselines complete; cancellation leaves no live scientific or guard process",
+      "observed": "hero and changed-input baselines fail with worker_failed / scientific_attempt_failed; run_bounded with a trivial adapter raises PermissionError at science.py:180 (`os.killpg(process.pid, SIGKILL)` in finally, which catches only ProcessLookupError); cancellation without the barrier leaves 1 live child. Darwin returns EPERM for killpg on a group whose only member is an exited, unreaped leader (standalone repro, CPython 3.11.17 and 3.13.18); Linux returns ESRCH, so Linux validation passed. The exception also skips the rest of the cleanup, including closing the parent lifeline, which is why the guard survives a cancellation. A one-line local diagnostic patch catching PermissionError makes the same lane pass 6/7 (as on main) and cancel/restart with the barrier pass.",
+      "impact": "merged as is, it would fail all real science on the release Mac once F-MAC-NPROC is fixed (today F-MAC-NPROC masks it) and can leave a process behind after cancellation; Linux CI cannot see it",
+      "suggested_fix": "treat PermissionError like ProcessLookupError for killpg of the owned session (all such calls), keep join/close of receiver and lifeline in their own finally so one failed signal never skips them, and add a Darwin regression from killpg-eperm-repro.py",
+      "evidence": {
+        "results": "evaluation/results/previews/backend-restart-recovery-c231be4",
+        "readme": "evaluation/results/previews/backend-restart-recovery-c231be4/README.md",
+        "repro": "evaluation/results/previews/backend-restart-recovery-c231be4/killpg-eperm-repro.py"
       },
       "retests": []
     }
