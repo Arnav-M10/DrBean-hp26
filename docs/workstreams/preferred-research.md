@@ -31,3 +31,8 @@ Observation ingestion, broad restart and arbitrary-file/model registration stay 
 PR61 plus the published `codex/preferred-combined-qualification` candidate for review.
 Exact launch commands, researcher steps, receipts/screenshots and scope:
 [frontend handoff](../frontend/preferred-research/README.md).
+
+Merge follow-up: latest main `f6809b8` added PR58’s `/study/` page during the
+merge request. Resolved the one `serve.mjs` conflict by retaining both study and
+research routes. All 144 web/study/preview unit tests passed on that integration.
+The real preferred-browser flow and final-head CI are being rechecked before merge.

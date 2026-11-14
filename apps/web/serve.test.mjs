@@ -155,3 +155,31 @@ test('missing private configuration fails closed without forwarding bearer crede
   assert.equal(calls.length, 0)
   assert.equal(result.headers['set-cookie'], undefined)
 })
+
+test('the study page serves only its own files, by type, and nothing outside its folder', async t => {
+  const { calls, send } = await fixture(t)
+  const redirect = await send('/study')
+  assert.equal(redirect.status, 308)
+  assert.equal(redirect.headers.location, '/study/')
+  const page = await send('/study/')
+  assert.equal(page.status, 200)
+  assert.match(page.headers['content-type'], /^text\/html/)
+  assert.equal(page.headers['x-content-type-options'], 'nosniff')
+  assert.match(page.text, /<title>/)
+  for (const [path, type] of [['/study/app.mjs', /^text\/javascript/], ['/study/styles.css', /^text\/css/],
+    ['/study/vendor/katex/katex.min.js', /^text\/javascript/], ['/study/fonts/atkinson-next-latin.woff2', /^font\/woff2$/]]) {
+    const response = await send(path)
+    assert.equal(response.status, 200, path)
+    assert.match(response.headers['content-type'], type, path)
+  }
+  const head = await send('/study/index.html', {}, 'HEAD')
+  assert.equal(head.status, 200)
+  assert.equal(head.text, '')
+  for (const path of ['/study/../serve.mjs', '/study/..%2fserve.mjs', '/study/%2e%2e/serve.mjs', '/study/vendor/../../serve.mjs',
+    '/study/.hidden.mjs', '/study/fonts/.x.woff2', '/study/fixtures/provenance.json', '/study/fixtures/x.html', '/study/study.test.mjs',
+    '/study/vendor/katex/LICENSE', '/study/fonts/SOURCE.txt', '/study/nothing-here.mjs', '/study/app.mjs/', '/study//app.mjs', '/study/a\\b.mjs']) {
+    assert.equal((await send(path)).status, 404, path)
+  }
+  assert.equal((await send('/study/app.mjs', {}, 'POST')).status, 405)
+  assert.equal(calls.length, 0)
+})

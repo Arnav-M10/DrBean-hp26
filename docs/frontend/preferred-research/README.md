@@ -16,7 +16,9 @@ The combined branch is **`codex/preferred-combined-qualification`**. It contains
 frontend `c78a009` and backend **`a2f568b91f493e796496d02a0e700741baf9206a`**;
 the backend application implementation is `114aae410062d6abe05fb96db9bfb846ae0de8bd`
 (the later backend commit changes its progress document only). No evaluator code
-is merged into this candidate. Subsequent frontend commits retain evidence/docs only.
+is merged into this candidate. Frontend head `4eddae7` retains evidence/docs only after the tested application.
+A later integration merges main `f6809b8` (PR58) and preserves both `/study/`
+and research routes; its final SHA and checks are recorded in PR61.
 These are author checks, not Claude's independent acceptance or release approval.
 
 The normal lane starts the actual launcher, trusted private-session proxy, API,

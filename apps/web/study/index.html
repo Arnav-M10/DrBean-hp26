@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#121315">
+<meta name="description" content="Bring your readings, get a checked answer, and plan the next measurement that would settle the question.">
+<title>Your data: Dr. Bean</title>
+<link rel="preload" href="fonts/atkinson-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="styles.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<script type="module" src="app.mjs"></script>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" class="symbols" aria-hidden="true">
+<symbol id="professor-bean" viewBox="0 0 240 240">
+  <g stroke="#423b30" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path fill="#eeeae1" d="M69 116 27 104 42 89 17 82 42 69 24 54 54 53 44 34 77 45 78 25 101 46 131 41 155 28 162 48 190 36 187 56 215 54 200 72 223 82 202 97 213 113 178 123Z"/>
+    <path fill="#c6ccc0" stroke="none" d="m31 82 29-6-6 13 19 4-4 23-42-12 15-15Zm170-9-18 14 10 10-18 13 3 13 35-10-11-16 21-15Z"/>
+    <path fill="#c68c5a" d="M141 48C106 40 79 58 70 88c-8 27 4 43-2 64-5 20 2 43 24 54 34 18 79 2 92-35 13-36-5-56-5-76 0-24-13-41-38-47Z"/>
+    <path fill="#ddb385" stroke="none" d="M135 55c-31-4-52 12-58 36-6 25 6 41-1 65-5 19 4 35 23 44 17 8 35 6 48-1-38 2-38-34-31-53 11-29 20-31 24-53 3-19 0-30-5-38Z"/>
+    <path fill="none" stroke="#9c6c42" d="M137 58c18 27-3 48-17 72-11 20-14 42-1 54"/>
+    <path fill="none" d="m83 103 15-4m43-2 16 6"/>
+    <ellipse fill="#423b30" stroke="none" cx="94" cy="115" rx="3.8" ry="5.4"/><ellipse fill="#423b30" stroke="none" cx="146" cy="115" rx="3.8" ry="5.4"/>
+    <path fill="#e3b78c" stroke="#9c6c42" stroke-width="2" d="M117 117c-5 6-7 13-3 15 5 3 12 0 12-3"/>
+    <path fill="#f6f3ea" d="M119 136c-17-15-28-5-33 6-3 6-9 10-14 10 12 11 36 12 47-4 9 16 32 17 47 6-8-1-13-6-16-12-7-12-18-17-31-6Z"/>
+    <path fill="none" stroke-width="2" d="m88 149 11-6m43 1 9 7m-39 19q10 6 19-1"/>
+    <path fill="none" stroke="#7a8072" stroke-width="2" d="m46 62 17 9m-25 9 22 3m118-17 17-8m-11 26 17-1"/>
+  </g></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 20h14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24"><path d="M9 4h6v3H9zM9 5H6v15h12V5h-3"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6v18h12V7zM14 3v4h4"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to the study</a>
+
+<header class="top">
+  <a class="brand" href="#data"><svg aria-hidden="true"><use href="#professor-bean"/></svg><span>Dr. Bean</span></a>
+  <p id="study-name" class="study"></p>
+  <div class="top-links">
+    <span id="connection" class="meta" role="status">Connecting…</span>
+    <button type="button" class="quiet-button" data-action="new-study">New study</button>
+  </div>
+</header>
+
+<nav class="steps" aria-label="Study steps">
+  <ol>
+    <li><a href="#data" data-step="data"><span class="num" aria-hidden="true"><b>1</b><svg><use href="#i-check"/></svg></span><span class="label">Data</span></a></li>
+    <li><a href="#check" data-step="check"><span class="num" aria-hidden="true"><b>2</b><svg><use href="#i-check"/></svg></span><span class="label">Approval</span></a></li>
+    <li><a href="#result" data-step="result"><span class="num" aria-hidden="true"><b>3</b><svg><use href="#i-check"/></svg></span><span class="label">Answer</span></a></li>
+    <li><a href="#next" data-step="next"><span class="num" aria-hidden="true"><b>4</b><svg><use href="#i-check"/></svg></span><span class="label">Next step</span></a></li>
+  </ol>
+</nav>
+
+<main id="main" tabindex="-1">
+  <div id="connection-problem" class="notice" role="alert" hidden>
+    <p id="connection-message"></p>
+    <div class="notice-actions">
+      <button type="button" class="secondary small" data-action="retry-connection">Retry connection</button>
+      <button type="button" id="start-new-workspace" class="primary small" data-action="start-new-workspace" hidden>Start a new private workspace</button>
+    </div>
+  </div>
+  <section id="data" aria-labelledby="data-title">
+    <div id="start" class="start">
+      <h1 id="data-title">Bring your files and your question</h1>
+      <p class="lead">Any field, any file. The assistant reads your files and answers with quotes from them. When a table fits a model Dr. Bean can check, it checks the answer too.</p>
+      <label class="field question-field">Your question<textarea id="question" data-question rows="2" maxlength="2000" spellcheck="true" placeholder="For example: does this drug clear faster than 0.17 per hour? What changed between the two runs?"></textarea></label>
+      <label id="drop" class="drop">
+        <input id="file" type="file" multiple accept=".csv,.tsv,.tab,.txt,.json,.md,.pdf,.png,.jpg,.jpeg,text/csv,text/tab-separated-values,application/json,text/plain,text/markdown,application/pdf,image/png,image/jpeg">
+        <svg aria-hidden="true"><use href="#i-upload"/></svg>
+        <span class="drop-title">Drop files or choose them</span>
+        <span class="meta">Up to 5 files: CSV, TSV, JSON, text, Markdown, PDF of up to 10 pages, PNG or JPEG. Up to 5 MB each.</span>
+      </label>
+      <div class="start-actions">
+        <button type="button" class="secondary" data-action="paste"><svg aria-hidden="true"><use href="#i-paste"/></svg>Paste or type a table</button>
+        <p class="meta examples">Or try an example with <button type="button" class="link" data-action="sample-concentration">drug levels after a dose</button> or <button type="button" class="link" data-action="sample-currents">electron currents at a collector</button>.</p>
+      </div>
+      <p id="start-problem" class="problem" hidden></p>
+      <p id="start-status" class="status" role="status" hidden></p>
+    </div>
+
+    <div id="overview" hidden>
+      <h1>What Dr. Bean found</h1>
+      <label class="field question-field">Your question<textarea id="overview-question" data-question rows="2" maxlength="2000" spellcheck="true" placeholder="What do you want to know from these files?"></textarea></label>
+      <ul id="source-list" class="files sources"></ul>
+      <div class="table-actions">
+        <label class="secondary small file-add"><input id="file-more" type="file" multiple accept=".csv,.tsv,.tab,.txt,.json,.md,.pdf,.png,.jpg,.jpeg,text/csv,text/tab-separated-values,application/json,text/plain,text/markdown,application/pdf,image/png,image/jpeg"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add files</label>
+        <p id="overview-status" class="status left" role="status" hidden></p>
+      </div>
+      <h2 class="sub">What it can do with them</h2>
+      <ul id="can-do" class="can-do"></ul>
+      <details id="manual-check" class="technical" hidden>
+        <summary>Use a table for a check anyway</summary>
+        <div class="manual-body">
+          <label class="field">Table<select id="manual-table"></select></label>
+          <div class="file-actions"><button type="button" class="secondary small" data-action="manual" data-kind="concentration">Check as drug concentration over time</button><button type="button" class="secondary small" data-action="manual" data-kind="currents">Compare as electron currents</button></div>
+        </div>
+      </details>
+    </div>
+
+    <div id="editor" hidden>
+      <h1 class="claim" id="claim-title">Is <span class="m-ke"></span> between
+        <input class="claim-input" id="claim-low" data-field="low" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Lowest claimed elimination rate, per hour" placeholder="low">
+        and <input class="claim-input" id="claim-high" data-field="high" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Highest claimed elimination rate, per hour" placeholder="high"> per hour?</h1>
+      <p id="source-line" class="lead"></p>
+      <p id="problems-claim" class="problem" hidden></p>
+      <div id="mapping" class="mapping" hidden></div>
+      <fieldset class="about-data">
+        <legend class="sr-only">About these readings</legend>
+        <div class="field"><span id="origin-label">These readings are</span>
+          <div class="choice" role="radiogroup" aria-labelledby="origin-label">
+            <label><input type="radio" name="origin" value="actual" data-field="origin">Measured</label>
+            <label><input type="radio" name="origin" value="synthetic" data-field="origin">Made up</label>
+          </div>
+        </div>
+        <label class="field">Time 0 is<input id="time-origin" data-field="timeOrigin" autocomplete="off"></label>
+        <label class="field">Where the allowances come from<input id="allowance-source" data-field="source" autocomplete="off" placeholder="For example, the assay's acceptance limit"></label>
+      </fieldset>
+      <p id="problems-about" class="problem" hidden></p>
+      <div class="work">
+        <div class="table-area">
+          <table class="readings">
+            <thead><tr><th scope="col"><span class="sr-only">Use</span></th><th scope="col">Hours</th><th scope="col">Concentration <span class="unit">mg/L</span></th><th scope="col">Allowance <span class="unit">± mg/L</span></th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="table-actions">
+            <button type="button" class="secondary small" data-action="add"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add a reading</button>
+            <span id="used-count" class="meta"></span>
+          </div>
+          <p id="problems-rows" class="problem" hidden></p>
+          <p id="allowance-hint" class="hint">Allowance is the largest gap you accept between a curve and a reading. It is not a standard deviation.</p>
+        </div>
+        <div class="chart-col">
+          <figure class="chart-area"><div id="data-chart"></div></figure>
+          <details id="limits">
+            <summary>Model and search limits</summary>
+            <div class="limits-body">
+              <div class="equation" id="model-equation"></div>
+              <table class="limits">
+                <thead><tr><th scope="col">Value</th><th scope="col">Lowest</th><th scope="col">Highest</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row"><span class="m-A"></span> <span class="unit">mg/L</span></th><td><input data-limit="aLow" inputmode="decimal" aria-label="Lowest A to search"></td><td><input data-limit="aHigh" inputmode="decimal" aria-label="Highest A to search"></td></tr>
+                  <tr><th scope="row"><span class="m-ke"></span> <span class="unit">per hour</span></th><td><input data-limit="keLow" inputmode="decimal" aria-label="Lowest elimination rate to search"></td><td><input data-limit="keHigh" inputmode="decimal" aria-label="Highest elimination rate to search"></td></tr>
+                  <tr><th scope="row"><span class="m-ka"></span> <span class="unit">per hour</span></th><td><input data-limit="kaLow" inputmode="decimal" aria-label="Lowest absorption rate to search"></td><td><input data-limit="kaHigh" inputmode="decimal" aria-label="Highest absorption rate to search"></td></tr>
+                </tbody>
+              </table>
+              <p id="problems-limits" class="problem" hidden></p>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="quiet-button" data-action="start-over">Use different data</button>
+        <div class="go">
+          <p id="prepare-status" class="status" role="status" hidden></p>
+          <button id="prepare" type="button" class="primary" data-action="prepare">Prepare the check</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="cmp-editor" hidden>
+      <h1 class="claim">Which electron distribution fits these currents?</h1>
+      <p id="cmp-source" class="lead"></p>
+      <div id="cmp-mapping" class="mapping" hidden></div>
+      <fieldset class="about-data cmp-about">
+        <legend class="sr-only">About these currents</legend>
+        <div class="field"><span>These currents are</span><label class="check-line"><input type="checkbox" id="cmp-synthetic" data-cfield="synthetic">Made up, not measured</label></div>
+        <label class="field">How they were made<input id="cmp-description" data-cfield="description" maxlength="500" autocomplete="off" placeholder="For example, forward currents from a chosen distribution"></label>
+        <label class="field">Collector area (m²)<input id="cmp-area" data-cfield="area" inputmode="decimal" autocomplete="off" spellcheck="false"></label>
+        <label class="field">Efficiency<input id="cmp-efficiency" data-cfield="efficiency" inputmode="decimal" autocomplete="off" spellcheck="false"></label>
+      </fieldset>
+      <p id="cmp-problems-about" class="problem" hidden></p>
+      <div class="work cmp-work">
+        <div class="table-area">
+          <table class="readings">
+            <thead><tr><th scope="col"><span class="sr-only">Use</span></th><th scope="col">Angle <span class="unit">degrees</span></th><th scope="col">From <span class="unit">eV</span></th><th scope="col">To <span class="unit">eV</span></th><th scope="col">Current <span class="unit">µA</span></th><th scope="col">σ <span class="unit">µA</span></th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+            <tbody id="cmp-rows"></tbody>
+          </table>
+          <div class="table-actions">
+            <button type="button" class="secondary small" data-action="cmp-add"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add a current</button>
+            <span id="cmp-used" class="meta"></span>
+          </div>
+          <p id="cmp-problems-rows" class="problem" hidden></p>
+          <p class="hint">σ is the standard deviation of each current's noise. An empty "To" means no upper limit.</p>
+        </div>
+        <div class="chart-col">
+          <figure class="chart-area">
+            <div id="cmp-data-chart"></div>
+          </figure>
+          <details id="cmp-settings">
+            <summary>Fit, noise and next settings</summary>
+            <div class="limits-body">
+              <div class="equation" id="cmp-equation"></div>
+              <div class="settings-grid">
+                <label class="field">Lowest density <span class="unit">m⁻³</span><input data-cfield="densityMin" inputmode="decimal" spellcheck="false"></label>
+                <label class="field">Highest density <span class="unit">m⁻³</span><input data-cfield="densityMax" inputmode="decimal" spellcheck="false"></label>
+                <label class="field wide">Temperatures to try <span class="unit">eV, separated by commas</span><input data-cfield="temperatures" spellcheck="false"></label>
+                <label class="field">A fit passes when <span class="m-chi"></span> is at most<input data-cfield="maxChi" inputmode="decimal" spellcheck="false"></label>
+                <label class="field">Fit evaluations allowed<input data-cfield="maxEvaluations" inputmode="numeric" spellcheck="false"></label>
+                <label class="field wide">Noise levels to test <span class="unit">σ in µA, separated by commas</span><input data-cfield="noise" spellcheck="false"></label>
+                <label class="field">Band width <span class="unit">± this many σ</span><input data-cfield="z" spellcheck="false"></label>
+                <label class="field">Simulated readings<input data-cfield="samples" inputmode="numeric" spellcheck="false"></label>
+                <label class="field">Seed<input data-cfield="seed" inputmode="numeric" spellcheck="false"></label>
+              </div>
+              <table class="readings settings-table">
+                <caption>Settings you could measure next</caption>
+                <thead><tr><th scope="col">Angle <span class="unit">degrees</span></th><th scope="col">From <span class="unit">eV</span></th><th scope="col">To <span class="unit">eV</span></th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+                <tbody id="cmp-next-rows"></tbody>
+              </table>
+              <div class="table-actions"><button type="button" class="secondary small" data-action="cmp-add-setting"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add a setting</button></div>
+              <p id="cmp-problems-settings" class="problem" hidden></p>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="quiet-button" data-action="start-over">Use different data</button>
+        <div class="go">
+          <p id="cmp-prepare-status" class="status" role="status" hidden></p>
+          <button id="cmp-prepare" type="button" class="primary" data-action="cmp-prepare">Review the comparison</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="check" aria-labelledby="check-title" hidden>
+   <div id="pk-check" class="pane">
+    <h1 id="check-title">Approve the check</h1>
+    <p class="lead">The assistant prepared exactly one check. Nothing runs until you approve it.</p>
+    <table class="facts"><tbody id="check-facts"></tbody></table>
+    <details class="technical"><summary>Exact plan the server froze</summary><pre id="check-exact" class="command"></pre></details>
+    <p id="check-problem" class="problem" hidden></p>
+    <div class="actions">
+      <a href="#data" class="back">Change data or claim</a>
+      <div class="go">
+        <p id="check-status" class="status" role="status" hidden></p>
+        <button id="approve-check" type="button" class="primary" data-action="approve-check">Approve and run the check</button>
+      </div>
+    </div>
+   </div>
+   <div id="ai-check" class="pane" hidden>
+    <h1>Approve the reading</h1>
+    <p id="ai-check-lead" class="lead"></p>
+    <table class="facts"><tbody id="ai-check-facts"></tbody></table>
+    <label class="check-line consent"><input type="checkbox" id="ai-consent"><span id="ai-consent-text"></span></label>
+    <p id="ai-check-problem" class="problem" hidden></p>
+    <div class="actions">
+      <a href="#data" class="back">Change the files or question</a>
+      <div class="go">
+        <p id="ai-check-status" class="status" role="status" hidden></p>
+        <button id="ai-send" type="button" class="primary" data-action="ai-send">Send to the assistant</button>
+      </div>
+    </div>
+   </div>
+   <div id="cmp-check" class="pane" hidden>
+    <h1>Approve the comparison</h1>
+    <p class="lead">Nothing runs until you approve it. This is a numerical fit, not an exact Counterdex proof.</p>
+    <table class="facts"><tbody id="cmp-check-facts"></tbody></table>
+    <details class="technical"><summary>Exact request, sent when you approve</summary><pre id="cmp-check-exact" class="command"></pre></details>
+    <p id="cmp-check-problem" class="problem" hidden></p>
+    <div class="actions">
+      <a href="#data" class="back">Change the currents</a>
+      <div class="go">
+        <p id="cmp-check-status" class="status" role="status" hidden></p>
+        <button id="cmp-approve" type="button" class="primary" data-action="cmp-approve">Approve and run the comparison</button>
+      </div>
+    </div>
+   </div>
+  </section>
+
+  <section id="result" aria-labelledby="result-title" hidden>
+   <div id="pk-result" class="pane">
+    <div class="result-head">
+      <p id="result-note" class="meta"></p>
+      <nav class="views" aria-label="Result views"><a href="#result" data-view>Answer</a><a href="#result-readings" data-view>Reading by reading</a><a href="#result-files" data-view>Files</a></nav>
+    </div>
+    <div id="result-answer">
+      <h1 id="result-title"></h1>
+      <p id="result-lead" class="lead"></p>
+      <div class="work result-work">
+        <figure class="chart-area">
+          <div id="result-chart"></div>
+          <figcaption class="key"><span class="k-inside">Curve inside the claim</span><span class="k-outside">Curve outside the claim</span><span class="k-reading">Reading with its allowance</span></figcaption>
+        </figure>
+        <div class="curves">
+          <table class="data">
+            <caption class="sr-only">The curves the checker found</caption>
+            <thead><tr><th scope="col">Curve</th><th scope="col"><span class="m-ke"></span> <span class="unit">per hour</span></th><th scope="col"><span class="m-ka"></span> <span class="unit">per hour</span></th><th scope="col"><span class="m-A"></span> <span class="unit">mg/L</span></th></tr></thead>
+            <tbody id="candidates"></tbody>
+          </table>
+          <p class="hint">Exact values from the checker sit under each rounded number.</p>
+          <p id="result-limit" class="hint"></p>
+        </div>
+      </div>
+    </div>
+    <div id="result-readings" hidden>
+      <h1>Reading by reading</h1>
+      <p id="result-search" class="lead"></p>
+      <div id="result-readings-table"></div>
+    </div>
+    <div id="result-files" hidden>
+      <h1>Files from this study</h1>
+      <p class="lead">The app saves exact JSON files. The readable report puts all of them on one page you can open, print or send.</p>
+      <button type="button" class="secondary" data-action="report"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download the readable report</span></button>
+      <ul id="file-list" class="files"></ul>
+      <p class="hint">Each proof's page shows the command that replays it on your own computer.</p>
+    </div>
+    <div class="actions">
+      <a href="#data" class="back">Change data or claim</a>
+      <div class="go"><p id="next-unavailable" class="meta" hidden></p><button id="to-next" type="button" class="primary" data-action="go-next">Plan the next measurement</button></div>
+    </div>
+   </div>
+   <div id="ai-result" class="pane" hidden>
+    <div class="result-head">
+      <p id="ai-note" class="meta"></p>
+      <nav class="views" aria-label="Answer views"><a href="#result" data-view>Answer</a><a href="#result-readings" data-view>Sources</a><a href="#result-files" data-view>Files</a></nav>
+    </div>
+    <div id="ai-answer">
+      <h1 id="ai-title"></h1>
+      <p id="ai-summary" class="lead"></p>
+      <p id="ai-label" class="notice-line"></p>
+      <div class="answer-grid">
+        <div>
+          <h2 class="sub">Claims and the words they rest on</h2>
+          <div id="ai-claims"></div>
+        </div>
+        <div>
+          <div id="ai-checkable"></div>
+          <div id="ai-questions-wrap"><h2 class="sub">Questions for you</h2><div id="ai-questions"></div></div>
+          <h2 class="sub">What this reading does not show</h2>
+          <ul id="ai-limits" class="limit-list"></ul>
+        </div>
+      </div>
+      <div id="ai-tables"></div>
+    </div>
+    <div id="ai-sources" hidden>
+      <h1>Sources</h1>
+      <p class="lead">Every quote in the answer, by file and page. The server compares each quote with the file's own text.</p>
+      <div id="ai-source-list"></div>
+    </div>
+    <div id="ai-files" hidden>
+      <h1>Files</h1>
+      <p class="lead">The files the assistant read, kept in your private workspace with their fingerprints.</p>
+      <ul id="ai-file-list" class="files"></ul>
+      <button type="button" class="secondary small" data-action="ai-view">View the saved answer as JSON</button>
+    </div>
+    <div class="actions">
+      <a href="#data" class="back">Change the files or question</a>
+      <div class="go"><button id="ai-to-next" type="button" class="primary" data-action="ai-go-next">See the next steps</button></div>
+    </div>
+   </div>
+   <div id="cmp-result" class="pane" hidden>
+    <div class="result-head">
+      <p id="cmp-result-note" class="meta"></p>
+      <nav class="views" aria-label="Result views"><a href="#result" data-view>Answer</a><a href="#result-readings" data-view>Current by current</a><a href="#result-files" data-view>Files</a></nav>
+    </div>
+    <p id="cmp-stale" class="notice-line" hidden></p>
+    <div id="cmp-answer">
+      <h1 id="cmp-title"></h1>
+      <p id="cmp-lead" class="lead"></p>
+      <div class="work result-work">
+        <figure class="chart-area">
+          <div id="cmp-result-chart"></div>
+          <figcaption class="key"><span class="k-iso">Isotropic Maxwellian</span><span class="k-bi">Bi-Maxwellian</span><span class="k-reading">Current with ±σ</span></figcaption>
+        </figure>
+        <div class="curves">
+          <table class="data">
+            <caption class="sr-only">The two fits</caption>
+            <thead><tr><th scope="col">Model</th><th scope="col">Fitted values</th><th scope="col"><span class="m-chi"></span></th><th scope="col">Passes</th></tr></thead>
+            <tbody id="cmp-fits"></tbody>
+          </table>
+          <p id="cmp-limit" class="hint"></p>
+          <p class="hint">Numerical fits on your temperature grid. Nothing here is an exact proof.</p>
+        </div>
+      </div>
+    </div>
+    <div id="cmp-readings" hidden>
+      <h1>Current by current</h1>
+      <p class="lead">Each current next to both fitted predictions. Below each prediction: how many σ it is from the current.</p>
+      <div id="cmp-readings-table"></div>
+    </div>
+    <div id="cmp-files" hidden>
+      <h1>Files from this comparison</h1>
+      <p class="lead">The server keeps this comparison as one record. Its export holds the exact request, both fits, the noise sweep and the limits below.</p>
+      <ul class="files">
+        <li><div><h3>Numerical export</h3><p id="cmp-file-about"></p></div>
+          <div class="file-actions"><button type="button" class="secondary small" data-action="cmp-view">View</button><button type="button" class="secondary small" data-action="cmp-download" data-status="cmp-file-status">Download</button></div></li>
+      </ul>
+      <p id="cmp-file-status" class="status left" role="status" hidden></p>
+      <h2 class="sub">What this result does not show</h2>
+      <ul id="cmp-limitations" class="limit-list"></ul>
+    </div>
+    <div class="actions">
+      <a href="#data" class="back">Change the currents</a>
+      <div class="go"><p id="cmp-next-unavailable" class="meta" hidden></p><button id="cmp-to-next" type="button" class="primary" data-action="cmp-go-next">See the next measurement</button></div>
+    </div>
+   </div>
+  </section>
+
+  <section id="next" aria-labelledby="next-heading" hidden>
+   <div id="pk-next" class="pane">
+    <div id="next-settings">
+      <h1 id="next-heading">When could you take one more reading?</h1>
+      <p class="lead">Dr. Bean compares the two curves at those times and tells you which one reading can decide between them.</p>
+      <div class="work">
+        <form class="next-form" onsubmit="return false">
+          <label class="field">Possible times <span class="unit">hours after time 0, separated by commas</span><input id="next-times" data-next="times" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="6, 8"></label>
+          <label class="field">Allowance for the new reading <span class="unit">± mg/L</span><input id="next-allowance" data-next="allowance" inputmode="decimal" autocomplete="off" placeholder="0.20"></label>
+          <label class="field">Latest possible time <span class="unit">hours</span><input id="next-horizon" data-next="horizon" inputmode="decimal" autocomplete="off" placeholder="8"></label>
+          <label class="field">Where this allowance comes from<input id="next-source" data-next="source" autocomplete="off"></label>
+          <p id="next-problems" class="problem" hidden></p>
+        </form>
+        <figure class="chart-area">
+          <div id="next-chart"></div>
+          <figcaption class="key"><span class="k-inside">Range the inside curve allows</span><span class="k-outside">Range the outside curve allows</span></figcaption>
+        </figure>
+      </div>
+      <div class="actions">
+        <a href="#result" class="back">Back to the result</a>
+        <div class="go">
+          <p id="next-status" class="status" role="status" hidden></p>
+          <button id="prepare-next" type="button" class="primary" data-action="prepare-next">Prepare the comparison</button>
+        </div>
+      </div>
+    </div>
+    <div id="next-review" hidden>
+      <h1>Approve the comparison</h1>
+      <p class="lead">This is a separate approval. Approving the check did not approve it.</p>
+      <table class="facts"><tbody id="next-facts"></tbody></table>
+      <div class="actions">
+        <a href="#next" class="back" data-action="edit-next">Change the settings</a>
+        <div class="go">
+          <p id="next-run-status" class="status" role="status" hidden></p>
+          <button id="approve-next" type="button" class="primary" data-action="approve-next">Approve and run the comparison</button>
+        </div>
+      </div>
+    </div>
+    <div id="next-answer" hidden>
+      <h1 id="next-title"></h1>
+      <p id="next-lead" class="lead"></p>
+      <div class="work result-work">
+        <figure class="chart-area">
+          <div id="next-result-chart"></div>
+          <figcaption class="key"><span class="k-inside">Range the inside curve allows</span><span class="k-outside">Range the outside curve allows</span></figcaption>
+        </figure>
+        <div id="next-table" class="curves"></div>
+      </div>
+      <div class="actions">
+        <a href="#result-files" class="back">See the files</a>
+        <button type="button" class="primary" data-action="report"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download the readable report</span></button>
+      </div>
+    </div>
+   </div>
+   <div id="ai-next" class="pane" hidden>
+    <h1>Next steps</h1>
+    <p id="ai-next-lead" class="lead"></p>
+    <div id="ai-next-checks"></div>
+    <h2 class="sub">What the assistant suggests</h2>
+    <div id="ai-steps"></div>
+    <div class="actions">
+      <a href="#result" class="back">Back to the answer</a>
+    </div>
+   </div>
+   <div id="cmp-next" class="pane" hidden>
+    <div class="result-head">
+      <p class="meta">Noise level</p>
+      <div id="cmp-cases" class="views" role="group" aria-label="Noise level"></div>
+    </div>
+    <h1 id="cmp-next-title"></h1>
+    <p id="cmp-next-lead" class="lead"></p>
+    <div class="work result-work">
+      <figure class="chart-area">
+        <div id="cmp-next-chart"></div>
+        <figcaption class="key"><span class="k-iso">Isotropic band</span><span class="k-bi">Bi-Maxwellian band</span></figcaption>
+      </figure>
+      <div id="cmp-next-table" class="curves"></div>
+    </div>
+    <div id="cmp-simulation"></div>
+    <div class="actions">
+      <a href="#result" class="back">Back to the result</a>
+      <div class="go">
+        <p id="cmp-next-status" class="status" role="status" hidden></p>
+        <button type="button" class="primary" data-action="cmp-download" data-status="cmp-next-status"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download the numerical export</span></button>
+      </div>
+    </div>
+   </div>
+  </section>
+</main>
+
+<dialog id="paste-dialog" aria-labelledby="paste-title">
+  <h2 id="paste-title">Paste or type a table</h2>
+  <p>Copy rows from a spreadsheet, a paper or a text file. Columns can be separated by tabs, commas or spaces. A header line helps Dr. Bean name the columns.</p>
+  <label class="field">Rows<textarea id="paste-text" rows="8" spellcheck="false"></textarea></label>
+  <p id="paste-problem" class="problem" hidden></p>
+  <div class="dialog-actions"><button type="button" class="quiet-button" data-action="close">Cancel</button><button type="button" class="primary" data-action="use-paste">Use this table</button></div>
+</dialog>
+
+<dialog id="file-dialog" aria-labelledby="file-title" class="wide">
+  <div class="dialog-head"><h2 id="file-title"></h2><button type="button" class="icon" data-action="close" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+  <div id="file-body" class="file-body"></div>
+  <div class="dialog-actions"><button type="button" class="secondary" data-action="save-file"><svg aria-hidden="true"><use href="#i-download"/></svg>Download this JSON file</button><button type="button" class="primary" data-action="close">Done</button></div>
+</dialog>
+
+<dialog id="ai-dialog" aria-labelledby="ai-dialog-title" class="wide">
+  <div class="dialog-head"><h2 id="ai-dialog-title">The saved answer</h2><button type="button" class="icon" data-action="close" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+  <div class="file-body"><pre id="ai-dialog-body" class="raw-json"></pre></div>
+  <div class="dialog-actions"><button type="button" class="primary" data-action="close">Done</button></div>
+</dialog>
+
+<dialog id="cmp-dialog" aria-labelledby="cmp-dialog-title" class="wide">
+  <div class="dialog-head"><h2 id="cmp-dialog-title">Numerical export</h2><button type="button" class="icon" data-action="close" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+  <div class="file-body"><pre id="cmp-dialog-body" class="raw-json"></pre></div>
+  <p id="cmp-dialog-status" class="status left" role="status" hidden></p>
+  <div class="dialog-actions"><button type="button" class="secondary" data-action="cmp-download" data-status="cmp-dialog-status"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download this JSON file</span></button><button type="button" class="primary" data-action="close">Done</button></div>
+</dialog>
+
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+</body>
+</html>
