@@ -249,3 +249,47 @@ design follows this checkpoint. Report commentary is retained in graph messages
 as a guarded annotation, not misrepresented as B's canonical report body.
 These are A author integration checks; B integrates and C qualifies the resulting
 candidate/browser. Live coordination remains `not_run`.
+
+## Same-graph metered baseline and next-action boundary
+
+The factory checkpoint is pushed at `39930b846f46c7475ed39228d10ada1739b38715`
+in [PR44](https://github.com/Arnav-M10/DrBean-hp26/pull/44); B received the exact
+command on PR41. Main advanced to `070b697` (its tree equals B's tested0cabe92).
+
+The complete baseline now also passes through the ordinary live-shaped model
+factory with the actual Gemini chat adapter/gateway and SQLite consent/session/
+shared ledger. An explicitly controlled SDK responder runs the offline policy
+on the actual serialized messages/tool results; no hosted request or credential
+test occurs. Six requested calls create exactly six reserved-before-dispatch
+attempts, totaling **63,802 reserved input tokens**, within the unchanged64,000
+ceiling. Missing consent/allocation and exhausted capacity still refuse. This
+narrow input fits; larger inputs may correctly exhaust the conservative limit.
+It establishes adapter/accounting integration, not Gemini understanding or live
+free-tier qualification.
+
+To fit that existing limit, `research-prompt.v3` uses compact instructions for
+the actual SDK TodoListMiddleware and tool descriptions. Model context retains
+all scientific record bodies, rows (including excluded rows), allowances,
+assumptions, provenance, IDs and digests. It omits only storage timestamps,
+actor/workspace metadata and aliases an identical current-problem envelope.
+Scientific bodies are copied intact, including any nested source metadata.
+Authority/checkpoint binding still uses the original full context; incompatible
+old prompt checkpoints are refused. No provider estimator or budget changed.
+
+The offline policyv2 preserves completed todos across explicit actions, rereads
+the baseline and checks its current problem identity/digest before proposing
+design, requires positive checked margin for a reading recommendation, and
+includes baseline+design evidence in canonical order in the next report.
+Component controls cover zero margin, numerical guidance, changed assumptions
+and no separation. **Ordinary pair-design continuation is not yet available:**
+B's `ResearchService.advance` accepts ready/paused but refuses completed reports
+with409 `research_not_advanceable`. Two concrete application regressions report
+that exact dependency as xfail; they do not pass or bypass B's state machine.
+B owns admitting an explicit bounded next action/UI affordance and the trusted
+pending-tool caller adoption. No B implementation or C test was edited.
+
+Final local regression: **240 passed, 2 explicitly unavailable pair-flow cases**
+across the first checkpoint suites plus Gemini chat model/gateway controls.
+Ruff/diff checks pass; the guard logged only installations (no provider/network/
+credential events). These results remain author checks. C should challenge the
+eventual integrated commit, and B remains sole application integrator.

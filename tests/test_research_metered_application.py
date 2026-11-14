@@ -6,11 +6,16 @@ leases, logical admission, checkpoints and physical ledger are real. This does
 not qualify credentials, free-tier availability or Gemini understanding.
 """
 from dataclasses import replace
+import json
+import os
+from pathlib import Path
+import shutil
 import socket
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 from google.genai import types
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 import pytest
 
 from bean_api.config import Settings
@@ -36,6 +41,8 @@ class OfflineSDK:
     def __init__(self):
         self.requests, self.constructions, self.closed = [], [], 0
         self.before_request = lambda: None
+        self.research_policy = False
+        self.policy_calls = []
 
     def factory(self, **kwargs):
         assert kwargs["api_key"] == "DRBEAN-DUMMY-OFFLINE-RESEARCH"
@@ -48,6 +55,34 @@ class OfflineSDK:
         self.requests.append(kwargs)
         declared = {item.name for tool in kwargs["config"].tools for item in tool.function_declarations}
         assert declared == TOOLS
+        if self.research_policy:
+            # Offline wire bridge only. Decisions come from the shipped fixture
+            # after decoding the actual model input, including real tool outputs.
+            # No fabricated candidates, native bytes or scientific responses.
+            from bean_api.research_controlled import build_controlled_research_model
+            messages = []
+            for content in kwargs["contents"]:
+                if content.role == "model":
+                    calls = [{"name": part.function_call.name, "args": part.function_call.args,
+                              "id": part.function_call.id, "type": "tool_call"}
+                             for part in content.parts if part.function_call is not None]
+                    messages.append(AIMessage(content="".join(part.text or "" for part in content.parts), tool_calls=calls))
+                    continue
+                for part in content.parts:
+                    if part.function_response is not None:
+                        value = part.function_response.response
+                        assert set(value) == {"output"}, value
+                        output = value["output"]
+                        messages.append(ToolMessage(content=output if isinstance(output, str) else json.dumps(output),
+                            name=part.function_response.name, tool_call_id=part.function_response.id))
+                    else:
+                        messages.append(HumanMessage(content=part.text))
+            result = build_controlled_research_model()._generate(messages).generations[0].message
+            assert len(result.tool_calls) == 1
+            selected = result.tool_calls[0]
+            name, args = selected["name"], selected["args"]
+            self.policy_calls.append(selected)
+            return self.response(name, args, selected["id"])
         results = [part.function_response for content in kwargs["contents"] for part in content.parts
                    if part.function_response is not None]
         if not results:
@@ -74,7 +109,7 @@ class OfflineSDK:
 
 
 @pytest.fixture
-def metered_app(tmp_path, monkeypatch):
+def metered_app(tmp_path, monkeypatch, request):
     def denied(*args, **kwargs):
         raise AssertionError("Hosted network and real SDK construction are forbidden")
     monkeypatch.setattr(socket.socket, "connect", denied)
@@ -85,9 +120,14 @@ def metered_app(tmp_path, monkeypatch):
     config = OfflineReadyConfig(mode="live", model=LIVE_MODEL, api_key="DRBEAN-DUMMY-OFFLINE-RESEARCH",
         account_gate_passed=True, account_decision_id="explicit-offline-readiness-fixture",
         free_tier_user_asserted=True, max_input_tokens=24_000, max_output_tokens=512)
+    native = getattr(request, "param", None) == "native"
+    python = os.getenv("BEAN_COUNTERDEX_PYTHON") or shutil.which("python3.11")
+    if native and python is None:
+        pytest.skip("Qualified CPython 3.11 is required for actual Counterdex execution")
     settings = Settings(database_path=str(tmp_path / "offline-metered.sqlite3"),
         blob_dir=str(tmp_path / "blobs"), artifact_dir=str(tmp_path / "artifacts"),
-        auth_tokens={"alice": "DRBEAN-DUMMY-AUTH-" + "a" * 40}, science_adapter="unavailable", research_mode="live")
+        auth_tokens={"alice": "DRBEAN-DUMMY-AUTH-" + "a" * 40},
+        science_adapter="counterdex" if native else "unavailable", counterdex_python=python or "python3.11", research_mode="live")
     # Explicit provider avoids all environment/credential lookup during startup.
     app = create_app(settings, provider=SimpleNamespace(config=config))
     with TestClient(app) as client:
@@ -196,3 +236,95 @@ def test_real_configuration_keeps_free_tier_and_account_gate_checks():
         replace(config, account_gate_passed=False).check_ready()
     with pytest.raises(ProviderFailure, match="provider_key_format_invalid"):
         config.check_ready()
+
+
+@pytest.mark.parametrize("metered_app", ["native"], indirect=True)
+def test_actual_baseline_approval_evidence_and_report_through_metered_model(metered_app, tmp_path):
+    """Six admitted offline SDK turns through ordinary production application wiring."""
+    from test_research_controlled_application import replay_current_source, saved_messages
+    client, service, worker, wire = metered_app
+    wire.research_policy = True
+    root = Path(__file__).resolve().parents[1]
+    fixture = json.loads((root / "packages/groundwork_adapter/fixtures/decision/hero-baseline.request.json").read_text())
+
+    def accepted(path, body, key):
+        response = post(client, path, body, key)
+        assert response.status_code in {200, 201, 202}, response.text
+        return response.json()
+
+    workspace = accepted("/workspaces", {"name": "Offline metered actual science"}, "workspace")["id"]
+    dataset = accepted(f"/workspaces/{workspace}/datasets", {
+        "experiment_id": "explicit-offline-metered-test", "time_origin": fixture["dataset"]["body"]["time_origin"],
+        "origin": "hypothetical", "change_reason": "Synthetic reviewed measurements, no fixed candidate outputs",
+        "rows": fixture["dataset"]["body"]["rows"]}, "dataset")
+    problem = accepted(f"/workspaces/{workspace}/problems", {
+        "dataset_id": dataset["id"], "dataset_digest": dataset["digest"],
+        "domain": fixture["problem"]["body"]["domain"], "target": fixture["problem"]["body"]["target"]}, "problem")
+    session = accepted(f"/workspaces/{workspace}/research-sessions", {
+        "objective": "Do the reviewed measurements challenge this range, and what should I do next?", "mode": "live",
+        "problem_id": problem["id"], "expected_problem_digest": problem["digest"]}, "session")
+    consent_record = consent(client, session)
+    service.allocate_provider("alice", session["id"], {"physical_requests": 6,
+        "input_tokens": 64_000, "output_tokens": 3072, "accepted": True}, "offline-operator-allocation")
+
+    def reserved_before_sdk():
+        attempts = client.app.state.ledger.list_attempts("alice", workspace)
+        assert len(attempts) == len(wire.requests) + 1
+        assert attempts[-1]["state"] == "reserved"
+        assert attempts[-1]["metadata"]["context"]["consent_id"] == consent_record["id"]
+    wire.before_request = reserved_before_sdk
+    assert advance(client, session).status_code == 200
+    assert worker.research.model_factory is None
+    assert worker.tick() == 1
+    waiting = service.get("alice", session["id"])
+    assert waiting["state"] == "waiting_review", waiting
+    assert waiting["pending_review"]["kind"] == "plan" and not waiting["children"]
+    assert len(wire.requests) == 3
+    decision = {"expected_revision": waiting["revision"], "pending_review_id": waiting["pending_review"]["id"],
+        "expected_review_digest": waiting["pending_review_digest"], "decision": "approve", "accepted": True}
+    path = f"/research-sessions/{session['id']}/decisions"
+    accepted(path, decision, "approve-baseline")
+    accepted(path, decision, "approve-baseline")
+    for _ in range(4):
+        # The same ordinary runtime reconstructs both the model and disk-backed
+        # graph; no in-memory fixture progress is required across worker objects.
+        worker = Worker(service.workflow, settings=client.app.state.settings,
+            provider_config=worker.config, ledger=client.app.state.ledger)
+        worker.tick()
+        final = service.get("alice", session["id"])
+        if final["state"] != "waiting_child":
+            break
+    assert final["state"] == "completed", final
+    assert len(final["children"]) == len(final["reports"]) == 1
+    child = final["children"][0]
+    assert child["state"] == "completed" and child["scientific_reservations"] == 1
+    evidence_id = child["scenarios"][0]["result_id"]
+    evidence = client.get(PREFIX + "/records/" + evidence_id).json()
+    result = evidence["body"]["result"]
+    assert result["scientific_outcome"] == "certified_counterexample"
+    assert result["baseline_search"]["attempted_count"] > 0
+    assert result["problem_digest"] == problem["digest"]
+    assert any(call["name"] == "read_research_evidence" and call["args"]["evidence_id"] == evidence_id
+               for call in wire.policy_calls)
+    report_call = wire.policy_calls[-1]
+    assert report_call["name"] == "publish_research_report"
+    assert report_call["args"]["evidence_ids"] == [evidence_id]
+    assert report_call["args"]["next_action"] == "review_design"
+    messages = saved_messages(client, session["id"])
+    acknowledged = next(json.loads(message.content) for message in messages if isinstance(message, ToolMessage)
+                        and message.tool_call_id == report_call["id"])
+    assert acknowledged["id"] in final["reports"]
+    assert acknowledged["agent_commentary"]["next_action"] == "review_design"
+    assert acknowledged["agent_commentary"]["scientific_authority"] is False
+    report = client.get(PREFIX + "/reports/" + final["reports"][0]).json()
+    assert report["body"]["evidence"] == [evidence]
+    assert report["body"]["root_inputs"]["dataset"] == dataset
+    attempts = client.app.state.ledger.list_attempts("alice", workspace)
+    assert len(wire.requests) == len(wire.constructions) == wire.closed == len(attempts) == 6
+    assert final["usage"]["physical_calls"] == final["usage"]["logical_turns"] == 6
+    assert all(item["state"] == "completed" for item in attempts)
+    assert final["provider_allocation"]["physical_requests"] == 6
+    fresh = replay_current_source(client, result, tmp_path)
+    assert fresh["verification"] == "valid" and fresh["replay"] == "passed"
+    assert worker.tick() == 0
+    assert len(wire.requests) == 6

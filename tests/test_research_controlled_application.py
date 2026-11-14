@@ -6,6 +6,7 @@ results. Each worker instance reopens the application's SQLite checkpoints.
 These are author integration checks, not live-model or browser qualification.
 """
 from copy import deepcopy
+from fractions import Fraction
 import hashlib
 import json
 import os
@@ -66,7 +67,7 @@ def assert_limits_and_zero_provider(client, session):
         assert action["child_count"] <= budget["scientific_reservations"] <= 2
 
 
-def create_session(client, *, incompatible=False, missing=False):
+def create_session(client, *, incompatible=False, missing=False, future_allowance="1/5"):
     workspace = post(client, "/workspaces", {"name": "Same offline investigation"}, "workspace")["id"]
     body = {"objective": QUESTION, "mode": "controlled"}
     dataset = problem = None
@@ -84,7 +85,7 @@ def create_session(client, *, incompatible=False, missing=False):
             "dataset_id": dataset["id"], "dataset_digest": dataset["digest"],
             "domain": control["problem"]["body"]["domain"], "target": control["problem"]["body"]["target"]}, "problem")
         body.update(problem_id=problem["id"], expected_problem_digest=problem["digest"], design_constraints={
-            "feasible_times": ["6/1", "8/1"], "future_hard_allowance": "1/5", "maximum_horizon": "8/1",
+            "feasible_times": ["6/1", "8/1"], "future_hard_allowance": future_allowance, "maximum_horizon": "8/1",
             "allowance_origin": {"kind": "hypothetical", "description": "Explicit prospective control bound"},
             "requested_tier": "checked_pair_separation", "allow_construction": True, "allow_continuation": True})
     session = post(client, f"/workspaces/{workspace}/research-sessions", body, "research")
@@ -116,7 +117,10 @@ def replay_current_source(client, result, tmp_path):
     assert process.returncode == 0, process.stderr or process.stdout
     fresh = json.loads(process.stdout)
     assert fresh["integrity"] == "passed" and fresh["expected_binding"] == "matches"
-    assert fresh["outcome"]["scientific_outcome"] == result["scientific_outcome"]
+    if "scientific_outcome" in result:
+        assert fresh["outcome"]["scientific_outcome"] == result["scientific_outcome"]
+    else:
+        assert fresh["fresh_checked"]["tier"] == result["design_tier"]
     assert fresh["replay"] == result["replay"]
     return fresh
 
@@ -207,3 +211,78 @@ def test_default_factory_missing_reviewed_assumptions_requests_input_without_sci
     assert calls[-1]["name"] == "request_clarification"
     assert not any(call["name"] == "run_scientific_operation" for call in calls)
     assert_limits_and_zero_provider(client, waiting)
+
+
+def approve_and_finish(client, waiting, key):
+    decision = {"expected_revision": waiting["revision"], "pending_review_id": waiting["pending_review"]["id"],
+        "expected_review_digest": waiting["pending_review_digest"], "decision": "approve", "accepted": True}
+    post(client, f"/research-sessions/{waiting['id']}/decisions", decision, key)
+    for _ in range(4):
+        tick(client)
+        current = snapshot(client, waiting["id"])
+        if current["state"] != "waiting_child":
+            break
+    assert current["state"] == "completed", current["action"]
+    return current
+
+
+@pytest.mark.parametrize("allowance,tier,next_action", [
+    ("1/5", "checked_pair_separation", "review_observation"),
+    ("100/1", "no_separation_established", "clarify"),
+])
+def test_explicit_advance_requires_separate_pair_design_review_and_retains_baseline(
+    scientific_client, tmp_path, allowance, tier, next_action,
+):
+    client = scientific_client
+    session, _, _ = create_session(client, future_allowance=allowance)
+    tick(client)
+    first = approve_and_finish(client, snapshot(client, session["id"]), "approve-baseline")
+    assert len(first["children"]) == len(first["reports"]) == 1
+    original_report = client.get(PREFIX + "/reports/" + first["reports"][0]).json()
+    baseline_job = first["children"][0]
+    baseline_id = baseline_job["scenarios"][0]["result_id"]
+    baseline = client.get(PREFIX + "/records/" + baseline_id).json()
+    vectors = {c["id"]: c["parameter_vector"] for c in baseline["body"]["result"]["candidates"]}
+    assert len(vectors) == 2
+    assert tick(client) == 0  # report/next-step proposal did not authorize design
+    advance = client.post(PREFIX + f"/research-sessions/{session['id']}/advance",
+        json={"expected_revision": first["revision"]}, headers={"Idempotency-Key": "advance-design"})
+    if advance.status_code == 409 and advance.json().get("code") == "research_not_advanceable":
+        pytest.xfail("B dependency: completed report cannot start an explicit next action (PR41 research.py:258); pair flow not available")
+    assert advance.status_code in {200, 201, 202}, advance.text
+    tick(client)
+    waiting = snapshot(client, session["id"])
+    assert waiting["state"] == "waiting_review", waiting["action"]
+    assert waiting["pending_review"]["kind"] == "design_plan"
+    assert len(waiting["children"]) == waiting["usage"]["child_count"] == 1
+    request = waiting["pending_review"]["body"]["request"]
+    assert dict(zip(request["candidate_ids"], request["candidate_vectors"], strict=True)) == vectors
+    assert request["historical_run_id"] == baseline_job["id"]
+    assert request["future_hard_allowance"] == allowance
+    assert set(request["feasible_times"]) == {"6/1", "8/1"}
+    assert tick(client) == 0
+    final = approve_and_finish(client, waiting, "approve-design")
+    assert len(final["reports"]) == len(final["children"]) == final["usage"]["child_count"] == 2
+    design_job = next(child for child in final["children"] if child["kind"] == "design_job")
+    design = client.get(PREFIX + "/records/" + design_job["result_id"]).json()
+    result = design["body"]
+    assert result["design_tier"] == tier and result["candidate_ids"] == request["candidate_ids"]
+    if tier == "checked_pair_separation":
+        option = next(option for option in result["options"] if option["time"] == result["selected_time"])
+        assert Fraction(option["exact_margin"]) > 0
+    else:
+        assert result["selected_time"] is None
+        assert all(Fraction(option["exact_margin"]) <= 0 for option in result["options"] if option["state"] == "evaluated")
+    assert client.get(PREFIX + "/reports/" + first["reports"][0]).json() == original_report
+    assert client.get(PREFIX + "/records/" + baseline_id).json() == baseline
+    current_report = client.get(PREFIX + "/reports/" + final["reports"][-1]).json()
+    assert [record["id"] for record in current_report["body"]["evidence"]] == [baseline_id, design["id"]]
+    messages = saved_messages(client, session["id"])
+    calls = [call for message in messages if isinstance(message, AIMessage) for call in message.tool_calls]
+    latest = next(call for call in reversed(calls) if call["name"] == "publish_research_report")
+    assert latest["args"]["evidence_ids"] == [baseline_id, design["id"]]
+    assert latest["args"]["next_action"] == next_action
+    fresh = replay_current_source(client, result, tmp_path)
+    assert fresh["replay"] == "passed" and fresh["fresh_checked"]["tier"] == tier
+    assert_limits_and_zero_provider(client, final)
+    assert tick(client) == 0

@@ -7,7 +7,8 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 import pytest
 
 from bean_api.coordinator import CoordinatorFailure
-from bean_api.research_controlled import build_controlled_research_model
+from bean_api.research_controlled import _next_step, build_controlled_research_model
+from bean_api.research_coordinator import _model_context
 
 
 @pytest.fixture(autouse=True)
@@ -102,3 +103,64 @@ def test_error_response_is_not_treated_as_science():
     messages[-1].status = "error"
     with pytest.raises(CoordinatorFailure, match="controlled_research_observation_invalid"):
         build_controlled_research_model().invoke(messages)
+
+
+def test_model_context_preserves_complete_scientific_bodies_and_changed_problem():
+    body = {"rows": [{"time": "3/7", "hard_allowance": "1/19", "included": False}],
+        "time_origin": "reviewed origin", "target": {"lower": "1/10", "upper": "17/100"},
+        "source": {"id": "source", "digest": "text", "kind": "raw", "body": {},
+                   "created_by": "user-supplied source meaning must remain"}}
+    record = {"id": "problem", "digest": "digest", "kind": "problem", "body": body,
+        "parent_id": "parent", "created_at": "timestamp", "created_by": "actor", "workspace_id": "workspace"}
+    context = {"problem": record, "current_problem": copy.deepcopy(record), "dataset": copy.deepcopy(record)}
+    before = copy.deepcopy(context)
+    projected = _model_context(context)
+    assert context == before
+    assert projected["problem"]["body"] == projected["dataset"]["body"] == body
+    assert projected["problem"]["parent_id"] == "parent"
+    assert projected["current_problem"] == {"id": "problem", "digest": "digest", "same_as": "problem"}
+    assert "created_by" not in projected["problem"]
+    context["current_problem"]["digest"] = "changed"
+    context["current_problem"]["body"]["rows"][0]["hard_allowance"] = "1/23"
+    projected = _model_context(context)
+    assert projected["current_problem"]["body"]["rows"][0]["hard_allowance"] == "1/23"
+    assert projected["problem"]["body"]["rows"][0]["hard_allowance"] == "1/19"
+
+
+@pytest.mark.parametrize("margin,tier,verification,next_action", [
+    ("1/20", "checked_pair_separation", "valid", "review_observation"),
+    ("0/1", "checked_pair_separation", "valid", "clarify"),
+    ("-1/20", "no_separation_established", "valid", "clarify"),
+    ("1/20", "numerical_guidance", "not_checked", "clarify"),
+])
+def test_design_next_action_requires_a_strictly_positive_checked_margin(margin, tier, verification, next_action):
+    fact = {"design_tier": tier, "verification": verification, "expected_binding": "matches", "replay": "passed",
+        "selected_time": "8/1", "selected_option": {"time": "8/1", "exact_margin": margin}}
+    assert _next_step(fact)[0] == next_action
+    fact["selected_option"]["time"] = "6/1"
+    assert _next_step(fact)[0] == "clarify"
+
+
+def test_advance_uses_reread_current_baseline_preserves_todos_and_reports_both_records():
+    model = build_controlled_research_model()
+    fact = {**checked_fact(), "problem_id": "problem", "problem_digest": "digest"}
+    todos = [{"content": "Investigate", "status": "completed"}, {"content": "Review design", "status": "pending"}]
+    prior = [("write_todos", {"todos": todos}, None), ("publish_research_report", {},
+        {"id": "report", "evidence_ids": ["fact"], "agent_commentary": {"next_action": "review_design"}})]
+    context = {"problem": {"id": "problem", "digest": "digest"}, "design_constraints": {"reviewed": True}}
+    assert model._choose(context, [], prior) == ("read_research_evidence", {"evidence_id": "fact"})
+    observed = [("read_research_evidence", {"evidence_id": "fact"}, fact)]
+    assert model._choose(context, observed, prior) == (
+        "prepare_scientific_proposal", {"kind": "design", "reference_ids": ["fact"]})
+    design = {"id": "design", "design_tier": "no_separation_established"}
+    observed += [("run_scientific_operation", {}, {"state": "completed", "evidence_ids": ["design"]}),
+                 ("read_research_evidence", {"evidence_id": "design"}, design)]
+    tool, update = model._choose(context, observed, prior)
+    assert tool == "write_todos" and todos[0] in update["todos"]
+    observed.append((tool, update, None))
+    tool, report = model._choose(context, observed, prior)
+    assert tool == "publish_research_report" and report["evidence_ids"] == ["fact", "design"]
+    assert report["next_action"] == "clarify"
+    context["problem"]["digest"] = "changed-assumptions"
+    assert model._choose(context, observed[:1], prior)[0] == "request_clarification"
+    assert model._choose({"problem": context["problem"]}, [], prior)[0] == "request_clarification"

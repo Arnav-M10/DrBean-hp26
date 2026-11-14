@@ -8,6 +8,7 @@ instances derive progress from checkpointed messages, not process-local turns.
 from __future__ import annotations
 
 import json
+from fractions import Fraction
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -16,7 +17,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 from .coordinator import CoordinatorFailure
 
-CONTROLLED_POLICY_VERSION = "research-controlled.v1"
+CONTROLLED_POLICY_VERSION = "research-controlled.v2"
 
 
 def _object(content: Any) -> dict[str, Any]:
@@ -47,6 +48,26 @@ def _observations(messages: list) -> list[tuple[str, dict, Any]]:
 
 
 def _next_step(fact: dict) -> tuple[str, str, str]:
+    tier = fact.get("design_tier")
+    if tier is not None:
+        selected = fact.get("selected_option") or {}
+        try:
+            positive = Fraction(selected.get("exact_margin", "0/1")) > 0
+        except (ValueError, TypeError, ZeroDivisionError):
+            positive = False
+        if (tier == "checked_pair_separation" and positive and fact.get("selected_time") is not None
+                and selected.get("time") == fact["selected_time"] and fact.get("verification") == "valid"
+                and fact.get("expected_binding") == "matches" and fact.get("replay") == "passed"):
+            return ("review_observation", "Review a new reading at its declared time and allowance",
+                    "The evidence has a conditional scope. No claim that all alternatives are eliminated is supported.")
+        if tier == "no_separation_established":
+            return ("clarify", "Review feasible times and allowance because this grid did not separate the pair",
+                    "No separation was established on the reviewed grid.")
+        if tier == "numerical_guidance":
+            return ("clarify", "Review numerical guidance before proposing a checked design",
+                    "The returned design remains numerical guidance.")
+        return ("clarify", "Review the incomplete design result before acquiring a new reading",
+                "The evidence has a conditional scope.")
     candidates = fact.get("candidates") or []
     checked_pair = (len(candidates) == 2 and all(
         isinstance(c, dict) and c.get("verification") == "valid" and c.get("parameter_vector")
@@ -92,7 +113,8 @@ class ControlledResearchModel(BaseChatModel):
         if not isinstance(context, dict):
             raise CoordinatorFailure("controlled_research_context_missing")
         observed = _observations(current)
-        name, args = self._choose(context, observed)
+        prior = _observations(messages[:starts[-1]])
+        name, args = self._choose(context, observed, prior)
         # Unique across the retained thread, including new admitted actions.
         sequence = sum(len(m.tool_calls) for m in messages if isinstance(m, AIMessage))
         message = AIMessage(content="", tool_calls=[{"name": name, "args": args,
@@ -102,16 +124,30 @@ class ControlledResearchModel(BaseChatModel):
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
         return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
-    def _choose(self, context: dict, observed: list[tuple[str, dict, Any]]) -> tuple[str, dict]:
+    def _choose(self, context: dict, observed: list[tuple[str, dict, Any]],
+                prior: list[tuple[str, dict, Any]]) -> tuple[str, dict]:
         problem = context.get("current_problem") or context.get("problem")
         if not isinstance(problem, dict) or not problem.get("id"):
             return "request_clarification", {"fields": ["reviewed_problem"], "question":
                 "Review the supported model, measurements, time origin, hard allowances, parameter domain "
                 "and closed claim interval before scientific execution. Uploaded prose alone is insufficient."}
         if not observed:
+            if prior:
+                report = next((body for name, _, body in reversed(prior) if name == "publish_research_report"), None)
+                action = (report or {}).get("agent_commentary", {}).get("next_action")
+                if action == "review_design" and len(report.get("evidence_ids", [])) == 1:
+                    if not context.get("design_constraints"):
+                        return "request_clarification", {"fields": ["design_constraints"], "question":
+                            "Review feasible times, future hard allowance and horizon before pair design."}
+                    return "read_research_evidence", {"evidence_id": report["evidence_ids"][0]}
+                if action == "review_observation":
+                    return "request_clarification", {"fields": ["new_observation"], "question":
+                        "Separately review the new reading with its own time, hard allowance and actual or hypothetical origin."}
+                return "request_clarification", {"fields": ["scientific_scope"], "question":
+                    "Review unresolved assumptions or a new scientific scope before further execution."}
             return "write_todos", {"todos": [
-                {"content": "Investigate the reviewed measurements after canonical approval", "status": "in_progress"},
-                {"content": "Read actual scientific evidence and choose a useful next step", "status": "pending"}]}
+                {"content": "Investigate reviewed data after approval", "status": "in_progress"},
+                {"content": "Read evidence; choose next action", "status": "pending"}]}
         name, args, body = observed[-1]
         if name == "write_todos":
             facts = [value for tool, _, value in observed if tool == "read_research_evidence"]
@@ -136,13 +172,22 @@ class ControlledResearchModel(BaseChatModel):
         if name == "read_research_evidence":
             if body.get("id") != args.get("evidence_id"):
                 raise CoordinatorFailure("controlled_research_evidence_invalid")
-            child = next(value for tool, _, value in reversed(observed) if tool == "run_scientific_operation")
+            child = next((value for tool, _, value in reversed(observed) if tool == "run_scientific_operation"), None)
+            if child is None:
+                # History is not current authority: reread the original baseline
+                # and bind it to the current reviewed problem before proposing
+                # a design. Changed assumptions require a newly reviewed scope.
+                if (body.get("problem_id") != problem["id"] or body.get("problem_digest") != problem.get("digest")
+                        or _next_step(body)[0] != "review_design"):
+                    return "request_clarification", {"fields": ["reviewed_problem"], "question":
+                        "The retained baseline does not qualify this current scope for pair design. Review a fresh investigation."}
+                return "prepare_scientific_proposal", {"kind": "design", "reference_ids": [body["id"]]}
             read = {value["id"] for tool, _, value in observed if tool == "read_research_evidence"}
             remaining = [ref for ref in child["evidence_ids"] if ref not in read]
             if remaining:
                 return "read_research_evidence", {"evidence_id": remaining[0]}
             _, title, _ = _next_step(body)
-            previous = next(arguments["todos"] for tool, arguments, _ in reversed(observed) if tool == "write_todos")
+            previous = next(arguments["todos"] for tool, arguments, _ in reversed(prior + observed) if tool == "write_todos")
             return "write_todos", {"todos": [
                 *[{"content": todo["content"], "status": "completed"} for todo in previous],
                 {"content": title, "status": "pending"}]}
