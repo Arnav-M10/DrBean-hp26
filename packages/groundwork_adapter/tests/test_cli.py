@@ -1,14 +1,17 @@
 """Exercise the native CLI from fresh requests using the active installation.
 
-Subprocesses inherit the caller's import environment. The tests do not inject
-a source checkout path, so the same controls can qualify an installed wheel.
+Subprocesses use the active installation with a credential-free environment,
+so the same controls can qualify a source checkout or an installed wheel.
 """
 from pathlib import Path
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+
+import counterdex
 
 from counterdex.__main__ import _write_complete
 from counterdex.exact import canonical_bytes, strict_json_loads
@@ -31,7 +34,8 @@ class CommandLineControls(unittest.TestCase):
 
     def cli(self, *arguments):
         return subprocess.run([sys.executable, "-m", "counterdex", *map(str, arguments)],
-                              capture_output=True, timeout=20, check=False)
+                              capture_output=True, timeout=20, check=False, cwd=self.directory,
+                              env={"PATH": os.defpath, "PYTHONPATH": str(Path(counterdex.__file__).resolve().parent.parent)})
 
     def run_request(self, *extra):
         return self.cli("run", self.request, "--anchors", self.anchors, "--output", self.output, *extra)
@@ -75,6 +79,24 @@ class CommandLineControls(unittest.TestCase):
         replay = self.cli("replay", self.output, "--expected-problem", self.problem.digest,
                           "--expected-suggestion", digest)
         self.assertEqual(replay.returncode, 0, replay.stderr)
+
+    def test_baseline_cli_and_fresh_historical_replay(self):
+        from counterdex.search import SearchSettings
+        self.request.write_bytes(canonical_bytes({"problem": self.problem.to_payload(),
+            "scenario_id": "baseline-cli", "workflow": {key: "fixture-cli" for key in
+                ("plan_id", "approval_id", "operation_id", "execution_id")},
+            "search_settings": SearchSettings(ke_points=8, ka_points=12, max_rate_pairs=96).to_payload()}))
+        self.anchors.write_bytes(canonical_bytes({"problem_digest": self.problem.digest}))
+        result = self.cli("baseline", self.request, "--anchors", self.anchors, "--output", self.output)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = strict_json_loads(result.stdout)
+        self.anchors.write_bytes(canonical_bytes({"problem_digest": self.problem.digest,
+            "baseline_digest": receipt["baseline_digest"], "scenario_id": "baseline-cli"}))
+        replay = self.cli("replay-baseline", self.output, "--anchors", self.anchors)
+        self.assertEqual(replay.returncode, 0, replay.stderr)
+        checked = strict_json_loads(replay.stdout)
+        self.assertEqual(checked["replay"], "passed")
+        self.assertEqual(checked["outcome"]["scientific_outcome"], "certified_counterexample")
 
     def test_existing_destination_is_preserved(self):
         marker = b"existing user content\n"

@@ -1,4 +1,11 @@
-# Counterdex 0.1.0 integration handoff
+# Counterdex scientific integration handoff
+
+The 0.2.0 application/runtime seam is specified in [BRIDGE.md](BRIDGE.md),
+with the exact application projection in [APPLICATION_MAPPING.md](APPLICATION_MAPPING.md).
+It adds bounded baseline discovery, one/two-candidate historical certificates,
+application-bound native bytes and hypothetical follow-up replay. The existing
+fixed-pair scientific contracts below remain supported. See
+[DECISION_EXAMPLE.md](DECISION_EXAMPLE.md) for executed synthetic controls.
 
 This package supplies exact-input numerical guidance and a bounded exact checker
 for `two_rate_kinetics_v1`, revision 1. It has no third-party runtime dependencies.
