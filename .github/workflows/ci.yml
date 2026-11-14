@@ -152,6 +152,10 @@ jobs:
         run: node tests/integration/node_modules/playwright/cli.js install --with-deps chromium
       - name: manual editor browser check
         run: node tests/integration/web_manual_smoke.mjs
+      - name: responsive keyboard, disclosure and reduced-motion checks
+        run: |
+          export NODE_PATH="$PWD/tests/integration/node_modules"
+          node apps/web/check-motion.mjs
       - name: private sessions through actual HTTPS gateway and API
         if: always()
         run: node tests/integration/shared-session-browser.mjs
@@ -176,4 +180,30 @@ jobs:
           name: browser-failure-diagnostics
           path: var/test-evidence/browser-failures
           if-no-files-found: ignore
+          retention-days: 3
+
+  automatic-access:
+    name: automatic private sessions, recovery and scientific replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python3 scripts/dev/launcher.py setup
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: tests/integration
+      - run: node tests/integration/node_modules/playwright/cli.js install --with-deps chromium
+      - name: complete offline automatic-access acceptance
+        env:
+          BEAN_AUTOMATIC_ACCESS_EVIDENCE_DIR: var/test-evidence/automatic-access
+        run: node tests/integration/automatic-access-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: automatic-access-acceptance
+          path: var/test-evidence/automatic-access
+          if-no-files-found: error
           retention-days: 3

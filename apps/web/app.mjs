@@ -364,7 +364,12 @@ function renderResume(status) {
     item.append(text, element('a', status.run.evidence ? 'View result' : 'Follow progress', { href: status.run.evidence ? '#result' : '#investigations', class: 'button secondary' }))
     items.push(item)
   }
-  for (const previous of research?.controller?.state?.history ?? []) {
+  const currentResearch = research?.controller?.state?.snapshot
+  const researchHistory = research?.controller?.state?.history ?? []
+  const savedResearch = currentResearch
+    ? [currentResearch, ...researchHistory.filter(previous => previous.id !== currentResearch.id)]
+    : researchHistory
+  for (const previous of savedResearch) {
     const item = element('div', '', { class: 'resume-item' })
     const text = element('div')
     text.append(element('strong', previous.objective.slice(0, 160)), element('p', `Research plan, ${previous.state.replaceAll('_', ' ')}`))

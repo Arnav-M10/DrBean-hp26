@@ -148,3 +148,56 @@ Teammate review handoffs are posted on PR48 (neutral result wording and connecti
 ownership), PR49 (closed disclosure keyboard focus during animation), and PR50
 (two scientific wording corrections and six UI merge conflicts). Those are
 owner-specific corrections, not duplicated implementations or combined acceptance.
+
+## Final sprint integration (2026-11-14)
+
+The user authorized completing, pushing and merging the current five-owner sprint.
+The older handoff blockers above are historical. PR48's guided journey is already
+in main at `e0e426967cbd690cbe0bebd96e85f0963bacc271`. PR47 now preserves that
+history and integrates PR49 at `6e237e2`, PR50 at `07b0543`, and the agent owner's
+published work at `2acfe97`. No obsolete PR is part of this integration.
+
+Automatic connection and explicit recovery are implemented in the actual entry
+page. No researcher token form exists, even before JavaScript starts. Same-identity
+reconnection retains its API client and pending operation identities. A failure
+in the manual, file or research controller immediately updates connection status;
+Retry only restores access, never repeats a scientific or provider mutation.
+Expired/cleared sessions require the explicit new-workspace action and retain old
+records without transferring access. The launcher, local proxy and HTTPS gateway
+use their separate cookie and trust boundaries.
+
+The merged interface keeps Owner3's assistant-first journey, split result/next/report
+panes, context validation and changed-draft guards. Design download acknowledgement
+fires only after successful bytes arrive; native downloads are bound by actual
+artifact ID. Plain-language copy retains conditional checking/binding/replay
+statements. Agent plan completion cites evidence the thread actually read; it
+never labels unresolved or numerical evidence as checked simply because a todo
+finished or a replay passed. The controlled coordinator remains explicitly an
+offline fixture, not evidence of live model understanding.
+
+Retained component acceptance at `e63608b` exercised all 19 automatic-access gates
+in `/tmp/drbean-automatic-access-combined-pass4/receipt.json`, including actual
+launcher/restart, two HTTPS visitors, cookie refusal/recovery, isolation of
+research/files/approvals/reports/native artifacts, session rotation and expiry,
+real separately approved Counterdex baseline/design, and fresh replay with external
+anchors. The runner verifies CPython3.11 and installed/repository engine-source
+identity before dispatch. No provider, tunnel or real credential was used.
+
+After the sprint merges, the ordinary manual browser path passed for both
+hypothetical and actual follow-up origins. The actual reading retains its own
+7-hour time and 0.3 allowance. The controlled Deep Agents browser path passed
+baseline, separate pair design, accepted reports and both downloaded native replays.
+The offline editor passed 18 checks; web unit tests passed 100. These are integrator
+checks, not a fresh independent Claude acceptance decision. Final combined browser,
+backend and CI results are attached to PR47 at their exact candidate commits.
+
+The automatic-access acceptance is now a separate CI job with retained receipts.
+The ordinary browser CI also exercises responsive layout, keyboard navigation,
+closed-disclosure focus, history, and reduced-motion behavior. Test execution uses
+temporary stores and dynamic ports and does not alter the owner's running server.
+
+Deployment limits: live provider admission/consent/budget qualification is not run,
+with zero application model calls. Prompt v4 deliberately refuses existing v3
+checkpoints; old evidence remains readable, but an old agent thread is not silently
+migrated or resumed. Final main must be retested after merging; earlier branch
+receipts alone are not combined-release qualification.

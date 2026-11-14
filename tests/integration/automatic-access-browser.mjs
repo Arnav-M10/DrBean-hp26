@@ -233,10 +233,11 @@ async function scientificLoop(page, otherPage, workspace) {
   assert.equal(session.reports.length, 2)
   for (const child of session.children) assert.equal((await browserRequest(otherPage, `/approvals/${child.approval_id}`)).status, 404)
   check('cookie-authorized-real-baseline-and-separately-approved-pair-design')
-  const navigate = async name => {
+  const navigate = async (name, keyboard = false) => {
     const link = page.locator('.steps').getByRole('link', { name })
     const hash = await link.getAttribute('href'), previous = await page.evaluate(() => location.hash)
-    await link.click()
+    if (keyboard) { await link.focus(); await page.keyboard.press('Enter') }
+    else await link.click()
     await page.waitForFunction(({ hash, changed }) => location.hash === hash
       && !document.getElementById(hash.slice(1)).hidden
       && (!changed || document.activeElement?.id === `${hash.slice(1)}-title`), { hash, changed: previous !== hash })
@@ -275,6 +276,33 @@ async function scientificLoop(page, otherPage, workspace) {
   await page.evaluate(() => scrollTo(0, 0))
   await page.screenshot({ path: join(output, 'scientific-loop.png'), fullPage: true })
   check('native-browser-downloads-private-anchors-and-fresh-cpython311-replay')
+  const beforeVisualReview = counters(), layouts = []
+  for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: 'phone', width: 390, height: 844 }]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    for (const [name, label] of [['start', /^Start/], ['result', /^Result/], ['next', /^Next measurement/]]) {
+      await navigate(label, true)
+      if (name === 'start') {
+        const resume = page.locator('#resume-list')
+        const saved = resume.locator('.resume-item').filter({ hasText: session.objective.slice(0, 160) })
+        assert.equal(await saved.count(), 1, 'The current research session must appear exactly once in saved work')
+        assert.equal(await saved.locator('strong').innerText(), session.objective.slice(0, 160))
+        assert.equal(await saved.getByText('Research plan, completed', { exact: true }).count(), 1)
+        assert.doesNotMatch(await resume.innerText(), /No saved checks/)
+      }
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await page.evaluate(() => scrollTo(0, 0))
+      const layout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth,
+        focused: document.activeElement?.id, current: document.querySelector('.steps [aria-current="step"]')?.getAttribute('href') }))
+      assert.ok(layout.document <= layout.viewport + 1, `${viewport.name} ${name} must not overflow horizontally: ${JSON.stringify(layout)}`)
+      assert.equal(layout.focused, `${name}-title`)
+      assert.equal(layout.current, `#${name}`)
+      layouts.push({ page: name, device: viewport.name, ...layout })
+      await page.screenshot({ path: join(output, `${name}-${viewport.name}.png`), fullPage: true })
+    }
+  }
+  assert.deepEqual(counters(), beforeVisualReview)
+  await writeFile(join(output, 'layout-review.json'), JSON.stringify(layouts, null, 2))
+  check('desktop-and-phone-keyboard-navigation-preserve-layout-focus-and-operation-ledgers')
 }
 
 try {

@@ -95,6 +95,7 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   check('review-shows-exact-values', review.includes('[1/10, 3/10]') && review.includes('[1/10, 17/100]'),
     'exact normalized bounds are shown in review')
   await page.locator('#manual-path > summary').click()
+  await page.locator('#backend-review').getByText('Investigation planning is unavailable', { exact: false }).waitFor({ state: 'visible' })
   check('planning-honestly-unavailable', (await page.locator('#review').innerText()).includes('Investigation planning is unavailable'),
     'the page does not pretend a backend exists')
 
