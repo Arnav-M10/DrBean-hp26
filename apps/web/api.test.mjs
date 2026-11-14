@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { BeanApi, qualifiedScience } from './api.mjs'
-import { datasetBody, problemBody, planRequest } from './manual.mjs'
+import { datasetBody, problemBody, planRequest, researchObjective } from './manual.mjs'
 
 test('uncertain mutation retry retains its operation key and token never enters body or URL', async () => {
   const seen = []
@@ -38,4 +38,16 @@ test('manual wire mapping preserves excluded duplicates, original spelling and s
   const plan = planRequest({ id: 'server-problem', digest: 'server-problem-digest', body: problem })
   assert.equal(plan.plan.scenarios[0].problem_digest, 'server-problem-digest')
   assert.equal(plan.plan.provider_disclosure.provider, 'none')
+})
+
+test('plans carry the Counterdex profile and an explicit objective even when the goal is blank', () => {
+  const problem = { id: 'p', digest: 'd', body: { dataset_id: 'ds', target: { lower: '1/10', upper: '17/100' } } }
+  const blank = planRequest(problem, '   ').plan
+  assert.equal(blank.scientific_profile, 'counterdex.v1')
+  assert.match(blank.objective.question, /closed interval \[1\/10, 17\/100\]/)
+  assert.ok(blank.objective.success_criterion.includes('Nothing here proves the interval'))
+  const stated = researchObjective(problem, 'Is the literature range justified?')
+  assert.ok(stated.question.startsWith('Is the literature range justified?'))
+  assert.ok(stated.question.includes('[1/10, 17/100]'))
+  assert.ok(researchObjective(problem, 'x'.repeat(5000)).question.length <= 2000)
 })

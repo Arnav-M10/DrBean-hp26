@@ -104,11 +104,14 @@ def main(argv):
 
         _, caps, _ = Client(None).call("GET", PREFIX + "/capabilities")
         science, gemini = caps["science"], caps["gemini"]
-        facts["science_capabilities"] = {k: science.get(k) for k in ("implemented", "configured",
-                                                                     "verified_in_environment", "reason",
-                                                                     "native_replay")}
+        facts["science_capabilities"] = {k: science.get(k) for k in (
+            "implemented", "configured", "available", "verified_in_environment", "adapter", "adapter_version",
+            "reason", "baseline_discovery", "design_tiers", "native_replay", "browser_replay")}
+        facts["ai_mode_reported_by_api"] = caps.get("ai_mode")
         check("gemini-live-disabled-despite-decoy-key", not gemini["configured"] and not gemini["account_gate_passed"]
-              and gemini["model"] is None, f"configured={gemini['configured']} model={gemini['model']}")
+              and gemini["model"] is None and not gemini.get("dispatch_enabled", False),
+              f"configured={gemini['configured']} model={gemini['model']} "
+              f"dispatch_enabled={gemini.get('dispatch_enabled')} ai_mode={caps.get('ai_mode')}")
         status, _, _ = Client(None).call("GET", PREFIX + "/workspaces")
         check("unauthenticated-request-refused", status == 401, status)
 
@@ -144,7 +147,11 @@ def main(argv):
             "budget": {"provider_turns": 0, "tool_calls": 2, "scientific_reservations": 1, "wall_seconds": 120,
                        "scientific_wall_seconds": 120},
             "provider_disclosure": {"provider": "none", "model": None, "source_asset_ids": [],
-                                    "context_fields": [], "permission_id": None}, "parent_plan_id": None}}
+                                    "context_fields": [], "permission_id": None}, "parent_plan_id": None,
+            "scientific_profile": "counterdex.v1", "objective": {
+                "question": "Do the reviewed synthetic measurements force ke into the claimed closed interval?",
+                "success_criterion": "A checked compatible candidate outside the interval, or an honest "
+                                     "unresolved or unavailable status."}}}
         status, plan, _ = client.call("POST", f"{PREFIX}/workspaces/{w}/plans", plan_request)
         check("plan-frozen", status == 201, plan if status != 201 else plan["digest"][:12])
         run_body = {"approval_id": "missing", "expected_plan_digest": plan["digest"]}
@@ -222,12 +229,21 @@ def main(argv):
     launch_ok = all(item["passed"] for item in checks)
     result = facts.get("baseline_result") or {}
     science = facts.get("science_capabilities") or {}
-    real_science = bool(science.get("verified_in_environment")) and result.get("scientific_outcome") in (
-        "certified_counterexample", "numerical_candidate", "no_counterexample_found", "inconclusive")
-    g1 = {"passed": launch_ok and real_science,
-          "reason": "a real scientific result came back through the API" if real_science else
-          f"not passed: the API's scientific adapter is unavailable ({science.get('reason')}); the baseline "
-          f"returned {result.get('scientific_outcome')!r}. No scientific computation ran."}
+    real_science = result.get("scientific_outcome") in (
+        "certified_counterexample", "numerical_candidate", "no_counterexample_found", "inconclusive") \
+        and result.get("reason_code") != "explicit_regression_seed_not_discovery"
+    if real_science:
+        reason = (f"baseline returned {result.get('scientific_outcome')!r} with {facts.get('baseline_candidates')} "
+                  f"candidate(s) and {facts.get('baseline_artifacts')} artifact(s) through ordinary startup")
+    elif science.get("available"):
+        reason = (f"not passed: the {science.get('adapter')} adapter is available for design and replay, but "
+                  f"baseline discovery is not ({science.get('reason')}); the approved baseline returned "
+                  f"{result.get('scientific_outcome')!r} ({result.get('reason_code')}). With no discovered "
+                  "candidates, no design can be requested over HTTP. No scientific computation ran.")
+    else:
+        reason = (f"not passed: the API's scientific adapter is unavailable ({science.get('reason')}); the "
+                  f"baseline returned {result.get('scientific_outcome')!r}. No scientific computation ran.")
+    g1 = {"passed": launch_ok and real_science, "reason": reason}
     commit = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     record = {"recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "tested_commit": commit,
               "platform": f"{platform.system()} {platform.release()} {platform.machine()}",

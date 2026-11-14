@@ -6,7 +6,7 @@ This README states what the repository does at the tested commit. Status by gate
 
 ## Current state in one paragraph
 
-The API, worker and web workspace start with one command and survive a restart. The manual path (exact inputs, frozen plan, approval, one run, report download) works over HTTP and in the browser. **The API does not yet call the scientific engine**: every run returns an honest `unsupported` result, so no counterexample, measurement suggestion or replayable application evidence exists yet. The engine works on its own (CPython 3.11) and replays its prepared synthetic bundle. **Gemini is a placeholder: no model provider has ever been called by this project, and the launcher makes that impossible by removing provider credentials from every process it starts.**
+The API, worker and web workspace start with one command and survive a restart. The manual path (exact inputs, frozen plan, approval, one run, report download) works over HTTP and in the browser. The API now reaches the scientific engine for fixed-pair design and native replay, **but baseline discovery is not available**: an approved baseline returns an honest `unsupported` result with no candidates, and without candidates no design can be requested. So no counterexample, measurement suggestion or replayable evidence has yet been produced through the application. The engine works on its own (CPython 3.11) and replays its prepared synthetic bundle. **Gemini is a placeholder: no model provider has ever been called by this project, and the launcher makes that impossible by removing provider credentials from every process it starts.**
 
 ## Run it
 
@@ -45,13 +45,13 @@ If a start fails, the launcher prints the log tail and stops what it started. Po
 | Area | State | Check |
 |---|---|---|
 | One-command launch, restart, reopen evidence | works | `python3 scripts/release/stack_smoke.py` (25 checks, isolated store) |
-| Manual HTTP path: dataset, problem, plan, approval, one run, report | works; result is `unsupported` | same smoke; `uv run pytest -q` (164 backend tests) |
+| Manual HTTP path: dataset, problem, plan, approval, one run, report | works; result is `unsupported` | same smoke; `uv run pytest -q` (264 backend tests) |
 | Browser to API: plan, approval, run retrieval, downloads | works | `node apps/web/check-backend.mjs` |
 | Web editor: exact entry, validation, export | works | `node --test` in `apps/web`; `tests/integration/web_manual_smoke.mjs` |
 | Counterdex engine standalone: fixed-pair design, exact check, native replay | works on CPython 3.11 | 138 engine tests; replay of the prepared synthetic bundle |
 | Source intake and review, deepagents graph | backend-tested with **controlled placeholder** models only | backend tests |
-| Baseline discovery through the API (gate G1) | **not integrated** | smoke reports G1 not passed |
-| Design, follow-up and native export through the API (gate G2) | **not integrated** | |
+| Baseline discovery through the API (gate G1) | **not available** (`baseline_producer_unavailable`) | smoke reports G1 not passed |
+| Design, native export and replay through the API (gate G2) | backend-tested from a seeded regression pair only; unreachable over ordinary HTTP until discovery exists | backend tests |
 | Browser controls for source review, design and follow-up | **not built** (waits for G1) | |
 | Live Gemini | **not run; disabled** | |
 

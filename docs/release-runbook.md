@@ -43,7 +43,7 @@ scripts/dev/stop.sh
 |---|---|
 | Web workspace | `http://127.0.0.1:4173` |
 | API and docs | `http://127.0.0.1:8000`, `/docs`, `/api/bean/v1/capabilities` |
-| Store (one, authoritative) | `var/bean.sqlite3`, sources in `var/sources/` |
+| Store (one, authoritative) | `var/bean.sqlite3`, sources in `var/sources/`, native artifacts in `var/artifacts/` |
 | Bearer token | private file `var/auth.json`; paste it into the web connection panel or the docs page's Authorize control |
 | Logs and pid records | `var/run/*.log`, `var/run/*.json` |
 | Binding | loopback only; no hosted boundary exists |
@@ -87,7 +87,7 @@ The same from a clean clone with freshly installed runtimes and its own empty st
 python3 scripts/release/stack_smoke.py --require-science
 ```
 
-The single command the engine bridge must make pass (gate G1). Without `--require-science` it qualifies only the launch path.
+The single command baseline discovery must make pass (gate G1). Without `--require-science` it qualifies only the launch path.
 
 Add `--fast` to the checklist to skip checks that need ports 8000 and 4173. Stop a running stack before the full checklist: the smoke refuses to share ports and never stops your processes.
 

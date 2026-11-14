@@ -29,8 +29,9 @@ class ChildEnvironment(unittest.TestCase):
 
     def test_one_store_with_absolute_paths(self):
         env = launcher.child_env()
-        for name in ("BEAN_DATABASE_PATH", "BEAN_BLOB_DIR", "BEAN_AUTH_FILE"):
+        for name in ("BEAN_DATABASE_PATH", "BEAN_BLOB_DIR", "BEAN_AUTH_FILE", "BEAN_ARTIFACT_DIR"):
             self.assertTrue(os.path.isabs(env[name]) and env[name].startswith(launcher.VAR), name)
+        self.assertEqual(env["BEAN_COUNTERDEX_PYTHON"], launcher.ENGINE_PY)  # not a python3.11 from PATH
 
 
 class OwnedProcesses(unittest.TestCase):
@@ -98,6 +99,8 @@ class Doctor(unittest.TestCase):
         rows, ok = launcher.summarize(static, service)
         self.assertTrue(ok)
         self.assertIn(("ok", "Gemini live", "disabled, not tested"), rows)
+        service["capabilities"]["gemini"]["dispatch_enabled"] = True
+        self.assertFalse(launcher.summarize(static, service)[1])
 
     def test_missing_runtimes_block_start_with_an_explanation(self):
         rows, ok = launcher.summarize({"uv": None, "node": None, "backend": None, "engine": None,

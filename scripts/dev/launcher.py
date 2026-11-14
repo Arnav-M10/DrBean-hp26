@@ -64,7 +64,9 @@ def child_env() -> dict:
         BEAN_DATABASE_PATH=os.path.join(VAR, "bean.sqlite3"),
         BEAN_BLOB_DIR=os.path.join(VAR, "sources"),
         BEAN_AUTH_FILE=os.path.join(VAR, "auth.json"),
-        BEAN_ENGINE_PYTHON=ENGINE_PY,  # proposed seam for the engine bridge (Owners 1/2); unused until adopted
+        BEAN_ARTIFACT_DIR=os.path.join(VAR, "artifacts"),
+        BEAN_SCIENCE_ADAPTER="counterdex",
+        BEAN_COUNTERDEX_PYTHON=ENGINE_PY,  # the qualified CPython 3.11 engine runtime, never a python3.11 found on PATH
         PYTHONDONTWRITEBYTECODE="1",
         # Defence in depth only, never relied on: if anything did try to dispatch, send it to a closed
         # loopback port instead of a provider. Owner 5 supplies the real process-level network guard.
@@ -213,11 +215,12 @@ def static_facts() -> dict:
 
 def service_facts() -> dict:
     facts = {name: ({"pid": rec["pid"]} if (rec := owned(name)) else None) for name in SERVICES}
-    report = {"owned_processes": facts, "api_ready": False, "web_ready": False,
+    report = {"owned_processes": facts, "api_ready": False, "web_ready": False, "worker_observed_by_api": None,
               "worker_ready": facts["worker"] is not None, "capabilities": None}
     try:
         status, body = http_json(f"http://{HOST}:{API_PORT}/healthz")
-        report["api_ready"] = status == 200 and (body or {}).get("status") == "ready"
+        report["api_ready"] = status == 200 and (body or {}).get("service") == "dr-bean"
+        report["worker_observed_by_api"] = ((body or {}).get("worker") or {}).get("state")
         report["capabilities"] = http_json(f"http://{HOST}:{API_PORT}/api/bean/v1/capabilities")[1]
     except (urllib.error.URLError, OSError, ValueError):
         pass
@@ -263,21 +266,27 @@ def summarize(static: dict, service: dict | None) -> tuple[list[tuple[str, str, 
     science, gemini = caps.get("science") or {}, caps.get("gemini") or {}
     run = lambda good, fact, detail: rows.append(("ok" if good else "no", fact, detail))  # noqa: E731
     run(service["api_ready"], "API ready", f"http://{HOST}:{API_PORT}" if service["api_ready"] else "not answering /healthz")
-    run(service["worker_ready"], "worker ready", "owned worker process alive" if service["worker_ready"]
-        else "no worker started by this launcher")
+    seen = service.get("worker_observed_by_api")
+    run(service["worker_ready"] and seen in (None, "observed", "stale_or_busy"), "worker ready",
+        (f"owned worker process alive; API reports worker {seen}" if seen else "owned worker process alive")
+        if service["worker_ready"] else "no worker started by this launcher")
     run(service["web_ready"], "web ready", f"http://{HOST}:{WEB_PORT}" if service["web_ready"] else "not answering")
     if caps:
         run(bool(science.get("implemented")), "scientific adapter available in the API",
-            "yes" if science.get("implemented") else f"no ({science.get('reason')}). The API still selects the "
-            "unavailable adapter; the engine bridge is pending Owners 1/2.")
+            f"yes ({science.get('adapter') or science.get('name') or 'adapter'})" if science.get("implemented")
+            else f"no ({science.get('reason')})")
         run(bool(science.get("verified_in_environment")), "scientific adapter qualified",
             "yes" if science.get("verified_in_environment") else "no")
         run(bool(science.get("native_replay")), "native replay through the API",
             "yes" if science.get("native_replay") else "no (engine CLI replay is separate, see above)")
-        live = bool(gemini.get("configured")) or bool(gemini.get("account_gate_passed"))
+        run(bool(science.get("baseline_discovery")), "baseline discovery through the API",
+            "yes" if science.get("baseline_discovery") else f"no ({science.get('reason')})")
+        live = bool(gemini.get("configured")) or bool(gemini.get("account_gate_passed")) \
+            or bool(gemini.get("dispatch_enabled"))
         rows.append(("ALERT" if live else "ok", "Gemini live",
                      "CONFIGURED. This sprint requires placeholder mode: stop, and start with scripts/dev/start.sh"
-                     if live else "disabled, not tested"))
+                     if live else "disabled, not tested"
+                     + (f" (API reports ai_mode {caps['ai_mode']})" if caps.get("ai_mode") else "")))
         if live:
             ok = False
     return rows, ok

@@ -2,7 +2,7 @@
 
 Maintained by Workstream 4. Each entry has a reproducible input, expected behaviour, actual evidence, responsible owner and retest status. Nobody fixes another owner's component. Summary by gate: [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md).
 
-Entries I-001 to I-010 were opened before the backend and engine were merged. Their original text is kept below; the table gives their current status. Entries from I-011 were opened on the integrated tree at `586fb9b`.
+Entries I-001 to I-010 were opened before the backend and engine were merged. Their original text is kept below; the table gives their current status. Entries from I-011 were opened on the integrated tree at `586fb9b` and rechecked after PR #3 (`main` at `fa91e13`).
 
 | ID | Owner | Status | Summary |
 |---|---|---|---|
@@ -17,10 +17,10 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 | I-009 | human team | open | Reuse ruling, names, consultation; live Gemini deliberately deferred |
 | I-010 | 2, 3 | open | Conditional objective for harness cases C08/C09 versus the real plan contract |
 | I-011 | 2 | open, minor | Float in JSON is refused without naming the field |
-| I-012 | 3 | open | Provider enables from environment variables; disabled must be the code default |
-| I-013 | 1, 2 | **open, blocks G1 and G2** | API and worker select the unavailable adapter; engine bridge missing |
-| I-014 | 1, 2 | open | Engine runs only on CPython 3.11; backend needs 3.12 or 3.13 |
-| I-015 | 2 | open, target platform | Historical `RLIMIT_AS` failures on the target Mac need a recheck |
+| I-012 | 3 | **closed on `main` at `fa91e13`** | Provider stays unconfigured with key, model and gate variables set; API reports `ai_mode: disabled_placeholder` |
+| I-013 | 1 | **open, blocks G1 and G2** (narrowed) | Adapter bridge landed in PR #3; baseline discovery is still unavailable, so no candidates exist to design on |
+| I-014 | 1, 2 | **closed** | Two runtimes; the backend calls the engine in a child process on CPython 3.11 |
+| I-015 | 2, 4 | open, target platform | `resource_policy.py` now omits `RLIMIT_AS` on macOS; still unverified on the Mac |
 | I-016 | 5 | open, blocks strict gate | HTTP/invariant suite and offline real-science lane not delivered |
 | I-017 | 4 | open, waits for G1 | Browser controls for source review, design and follow-up not built |
 
@@ -46,6 +46,8 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 - **Actual:** `science.implemented=false`, reason `groundwork_adapter_not_installed`. The run completes with `scientific_outcome: unsupported`, 0 candidates, 0 artifacts. The engine is installed at `.venv-engine` and its interpreter path is passed to both processes as `BEAN_ENGINE_PYTHON`, unused.
 - **Also needed from Owner 1:** candidate discovery from supplied input. The engine's current entry points compare two supplied candidates; they do not search for an outside candidate.
 - **Retest:** the command above exits 0.
+
+**Update after PR #3:** capabilities now report `available: true`, adapter Counterdex 0.1.0, `native_replay: true`, `baseline_discovery: false`, reason `baseline_producer_unavailable`. The approved baseline on the shared five-row example completes with `scientific_outcome: unsupported`, reason `baseline_producer_unavailable`, 0 candidates, 0 artifacts. Design proposals take their two candidates from the historical run's result, and no public route can seed them, which is correct; so design cannot begin over ordinary HTTP. Backend tests exercise real design, native download and replay only from an explicitly seeded regression pair. The remaining work is Owner 1's discovery producer.
 
 ## I-014: two interpreters (Owners 1 and 2)
 

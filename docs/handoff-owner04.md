@@ -4,7 +4,7 @@ Current handoff for the integrated tree. The pre-merge handoff (when only the we
 
 ## Runnable commit and command
 
-Branch `claude/dreamy-lamport-dsttgm`, based on default branch `codex/researcher-reviewer-web` at `586fb9b`. After `scripts/dev/setup.sh`:
+Branch `claude/dreamy-lamport-dsttgm`, merged with default branch `main` at `fa91e13` (includes PR #3, the scientific integration). After `scripts/dev/setup.sh`:
 
 ```sh
 scripts/dev/start.sh
@@ -12,7 +12,7 @@ scripts/dev/start.sh
 
 ## Gate status
 
-G0 passed (Linux). G1 to G4 not passed. See [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md). The one blocker for G1 and G2 is the engine bridge, [issue I-013](issue-ledger.md).
+G0 passed (Linux). G1 to G4 not passed. See [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md). The one blocker for G1 and G2 is baseline discovery, [issue I-013](issue-ledger.md): the engine is now connected, but nothing yet produces candidates.
 
 ## Manual demo steps that work today (placeholder AI, no science)
 
@@ -21,7 +21,7 @@ G0 passed (Linux). G1 to G4 not passed. See [INTEGRATION_STATUS.md](INTEGRATION_
 3. Enter the shared five-row example: times 0.25, 0.5, 1, 2, 4 h; concentrations 4.80, 7.20, 8.00, 6.80, 5.70 mg/L; hard allowance 0.50 each.
 4. Question: experiment identifier, t=0 description, origin Synthetic; A `[0.001, 30]`, ke `[0.015, 0.35]`, ka `[0.4, 8]`; target `[0.10, 0.17]`; describe the allowance origin.
 5. Review, **Save inputs and prepare plan**, read the frozen plan, tick the approval box, approve.
-6. Queue is disabled in the browser because the adapter is unqualified. The same run over HTTP (see `scripts/release/stack_smoke.py`) completes with `unsupported`.
+6. Queue stays disabled in the browser (the adapter reports no qualified baseline). The same run over HTTP (see `scripts/release/stack_smoke.py`) completes with `unsupported`, reason `baseline_producer_unavailable`.
 7. In Investigations, open the run id; download evidence and a report; hashes are checked.
 8. `scripts/dev/stop.sh`, `scripts/dev/start.sh`, reconnect: the run and report reopen unchanged.
 
@@ -32,12 +32,12 @@ The domain, claim and any future times are team-selected assumptions for review,
 | Lane | Result |
 |---|---|
 | Launch path (stack smoke, isolated store) | 25 of 25 checks passed |
-| Gate G1 through the API | not passed: adapter unavailable, outcome `unsupported` |
-| Backend unit and HTTP tests (controlled AI) | 164 passed |
+| Gate G1 through the API | not passed: Counterdex adapter available, baseline discovery unavailable, outcome `unsupported` |
+| Backend unit and HTTP tests (controlled AI; real engine from a seeded regression pair) | 264 passed |
 | Backend lint and schema export | clean; exported schemas match committed |
 | Engine tests (CPython 3.11) | 138 passed; on 3.13: 4 failures, 23 errors |
 | Engine native replay of prepared bundle | replay passed, binding matches, verification valid |
-| Web unit tests | 15 passed |
+| Web unit tests | 16 passed |
 | Browser to real API (`check-backend.mjs`) | passed |
 | Web editor smoke | 14 of 14 passed (editor only, not science) |
 | Launcher tests | 7 passed |
@@ -51,8 +51,8 @@ The domain, claim and any future times are team-selected assumptions for review,
 
 ## Interfaces changed or proposed by this workstream
 
-- `BEAN_AI_MODE=placeholder` is set for every launched process. Proposed for Owner 3 to honour in code (I-012).
-- `BEAN_ENGINE_PYTHON` carries the engine interpreter path to the API and worker. Proposed for Owners 1/2 (I-013).
+- The launcher passes the backend's own variables: `BEAN_COUNTERDEX_PYTHON` (the `.venv-engine` interpreter, never a `python3.11` from PATH), `BEAN_SCIENCE_ADAPTER`, `BEAN_ARTIFACT_DIR`. `BEAN_AI_MODE=placeholder` is informational.
+- `apps/web/manual.mjs`: plans now send `scientific_profile` and a reviewed objective, required since PR #3. A blank goal still does not block: the question is then stated from the exact target interval and shown in the plan review.
 - `DRBEAN_VAR_DIR` selects an isolated store for tests.
 - `apps/web/check-backend.mjs`: Playwright resolution made portable; provider variables removed from the processes it starts. No behaviour change to the page.
 - Release evidence now lives in `docs/release-evidence/`. `evaluation/results/` belongs to Owner 5 and was not modified.
@@ -67,7 +67,7 @@ No scientific result through the application. No source review, design or follow
 
 ## What happens next in this workstream
 
-1. When I-013 closes: run `stack_smoke.py --require-science`, then connect the remaining browser controls (I-017) against real responses.
+1. When baseline discovery lands (I-013): run `stack_smoke.py --require-science`, then connect the remaining browser controls (I-017) against real responses.
 2. Mac recheck with whoever has the device (I-015).
 3. Consultation and observed task: scripts are ready in `docs/human-task/`; the human team arranges the person.
 4. Rehearsal and recording once there is real science to show.

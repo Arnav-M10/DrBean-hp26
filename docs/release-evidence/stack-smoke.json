@@ -11,7 +11,7 @@
       "passed": true
     },
     {
-      "detail": "configured=False model=None",
+      "detail": "configured=False model=None dispatch_enabled=False ai_mode=disabled_placeholder",
       "id": "gemini-live-disabled-despite-decoy-key",
       "passed": true
     },
@@ -21,12 +21,12 @@
       "passed": true
     },
     {
-      "detail": "dataset_651e5296b0b04882aeaa4f02562f79a5",
+      "detail": "dataset_26f41021c82b40b3a4e65edae00e75e2",
       "id": "dataset-accepted",
       "passed": true
     },
     {
-      "detail": "problem_cb238ca98dc94848b9d998635be968dd",
+      "detail": "problem_6e229e41ebc14103bfed37001eeaed12",
       "id": "problem-accepted",
       "passed": true
     },
@@ -36,7 +36,7 @@
       "passed": true
     },
     {
-      "detail": "5c467f911550",
+      "detail": "315e9575f8a0",
       "id": "plan-frozen",
       "passed": true
     },
@@ -46,12 +46,12 @@
       "passed": true
     },
     {
-      "detail": "approval_fbca0dafc3a648029d04731f697b2611",
+      "detail": "approval_bf753046c5a448088fe909ff5a69aab7",
       "id": "approval-recorded",
       "passed": true
     },
     {
-      "detail": "run_bcd4e3b92ad74d99a67d30d0bed37f5b",
+      "detail": "run_5896f8a6da2446e3bd064c26810027d2",
       "id": "run-accepted",
       "passed": true
     },
@@ -86,7 +86,7 @@
       "passed": true
     },
     {
-      "detail": "5bce1fc1c2ce0ebf40e383d042f7d689d4040f6d49f9e8bdfb4cbe33dab086d9",
+      "detail": "c604a68e521a757e75fc860a1cca6c5fca5568501f965d908eb423ac88996744",
       "id": "report-bytes-match-declared-hash",
       "passed": true
     },
@@ -111,12 +111,12 @@
       "passed": true
     },
     {
-      "detail": "run_bcd4e3b92ad74d99a67d30d0bed37f5b",
+      "detail": "run_5896f8a6da2446e3bd064c26810027d2",
       "id": "run-reopens-unchanged-after-restart",
       "passed": true
     },
     {
-      "detail": "5bce1fc1c2ce0ebf40e383d042f7d689d4040f6d49f9e8bdfb4cbe33dab086d9",
+      "detail": "c604a68e521a757e75fc860a1cca6c5fca5568501f965d908eb423ac88996744",
       "id": "report-bytes-identical-after-restart",
       "passed": true
     },
@@ -127,27 +127,38 @@
     }
   ],
   "facts": {
+    "ai_mode_reported_by_api": "disabled_placeholder",
     "baseline_artifacts": 0,
     "baseline_candidates": 0,
     "baseline_result": {
       "expected_binding": "not_supplied",
-      "reason_code": "groundwork_adapter_not_installed",
+      "reason_code": "baseline_producer_unavailable",
       "replay": "unsupported",
       "scientific_outcome": "unsupported",
       "verification": "unsupported"
     },
     "float_refusal_names_the_field": false,
     "science_capabilities": {
-      "configured": false,
-      "implemented": false,
-      "native_replay": false,
-      "reason": "groundwork_adapter_not_installed",
+      "adapter": "Counterdex",
+      "adapter_version": "0.1.0",
+      "available": true,
+      "baseline_discovery": false,
+      "browser_replay": false,
+      "configured": true,
+      "design_tiers": [
+        "numerical_guidance",
+        "checked_pair_separation",
+        "no_separation_established"
+      ],
+      "implemented": true,
+      "native_replay": true,
+      "reason": "baseline_producer_unavailable",
       "verified_in_environment": false
     }
   },
   "g1_actual_core": {
     "passed": false,
-    "reason": "not passed: the API's scientific adapter is unavailable (groundwork_adapter_not_installed); the baseline returned 'unsupported'. No scientific computation ran."
+    "reason": "not passed: the Counterdex adapter is available for design and replay, but baseline discovery is not (baseline_producer_unavailable); the approved baseline returned 'unsupported' (baseline_producer_unavailable). With no discovered candidates, no design can be requested over HTTP. No scientific computation ran."
   },
   "lane": "offline actual stack; AI placeholder; zero provider dispatch by construction",
   "launch_path": {
@@ -156,6 +167,6 @@
     "total_checks": 25
   },
   "platform": "Linux 6.18.44-fc-v470 x86_64",
-  "recorded_at": "2026-11-14T03:14:46+00:00",
-  "tested_commit": "357cf4265da8df424804ff974bc8d7bd0c3b0c98"
+  "recorded_at": "2026-11-14T03:24:55+00:00",
+  "tested_commit": "cb8aef89be4b8f7534ce2e80247d43a36944d378"
 }

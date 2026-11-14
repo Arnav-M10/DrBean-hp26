@@ -52,11 +52,11 @@ export function setupWorkflow(getDraft) {
       problemBody(draft, { id: '', digest: '' })
       const dataset = await api.json(`/workspaces/${workspace}/datasets`, datasetPayload)
       const problem = await api.json(`/workspaces/${workspace}/problems`, problemBody(draft, dataset))
-      const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(problem))
+      const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(problem, draft.question.goal))
       plan = prepared; inputs = { dataset, problem }; frozen = snapshot; approval = undefined
     }, !api || !workspace)
     if (plan) {
-      review.append(node('p', `Plan ${plan.id} · server digest ${plan.digest}`), node('p', 'One baseline; no optional scenario. Provider: none; no source transmission. Limits: 0 provider turns, 2 tool calls, 1 scientific reservation, 120 seconds. Design work requires a separate approval.'), exactRecord('Exact frozen dataset and problem', inputs), exactRecord('Exact frozen plan', plan))
+      review.append(node('p', `Plan ${plan.id} · server digest ${plan.digest}`), node('p', `Reviewed objective: ${plan.body.objective?.question ?? 'none recorded'}`), node('p', 'One baseline; no optional scenario. Provider: none; no source transmission. Limits: 0 provider turns, 2 tool calls, 1 scientific reservation, 120 seconds. Design work requires a separate approval.'), exactRecord('Exact frozen dataset and problem', inputs), exactRecord('Exact frozen plan', plan))
       if (!currentPlan()) review.append(node('p', 'Draft changed. Prepare a new plan before approving or queueing.'))
       const label = node('label', ' I reviewed the exact frozen plan and approve only this scope.')
       const check = document.createElement('input'); check.type = 'checkbox'; check.id = 'approve-scope'; check.disabled = !currentPlan() || Boolean(approval) || busy
