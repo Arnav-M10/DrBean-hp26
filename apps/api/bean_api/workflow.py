@@ -643,11 +643,23 @@ class Workflow:
             if child is None or child["state"] != "completed" or not child["result_id"]:
                 raise DomainError("historical_evidence_required", "The selected scenario needs usable historical evidence before design.", 422)
             evidence = self._get(conn, actor, child["result_id"], "evidence")["body"]["result"]
+            native_design = evidence.get("projection_version") == "DB-SC-1-to-groundwork-v1"
             if evidence.get("expected_binding") == "mismatch":
                 raise DomainError("binding_mismatch", "Mismatched evidence cannot support a design proposal.", 422)
+            if native_design:
+                if request.get("scientific_profile") != "counterdex.v1" or request.get("requested_tier") != "checked_pair_separation":
+                    raise DomainError("unsupported_design_tier", "Native baseline design supports a reviewed request for checked pair separation.",
+                                      422, ["requested_tier"])
+                if (evidence.get("verification") != "valid" or evidence.get("replay") != "passed"
+                        or evidence.get("expected_binding") != "matches"):
+                    raise DomainError("historical_evidence_required", "Design requires matching freshly checked historical evidence.", 422)
+                refs = evidence.get("artifacts", [])
+                if len(refs) != 1 or request["source_artifact_ids"] != [refs[0]["id"]]:
+                    raise DomainError("historical_artifact_required", "Select the original native baseline artifact for this pair.",
+                                      422, ["source_artifact_ids"])
             if request.get("scientific_profile") == "counterdex.v1":
                 from fractions import Fraction
-                from .scientific_projection import project_design, project_problem
+                from .scientific_projection import _exact, project_design, project_problem
                 problem = self._get(conn, actor, request["problem_id"], "problem")
                 dataset = self._get(conn, actor, problem["body"]["dataset_id"], "dataset")
                 historical_horizon = max(Fraction(row["time"]) for row in dataset["body"]["rows"] if row["included"])
@@ -659,14 +671,34 @@ class Workflow:
                         raise DomainError("artifact_not_in_scope", "A source artifact must belong to the selected historical scenario.", 422, ["source_artifact_ids"])
                     artifact = self._get(conn, actor, artifact_id, "native_artifact")
                     self._same_workspace(run["workspace_id"], artifact)
-                    if artifact["body"]["sha256"] != historical_artifacts[artifact_id]["sha256"]:
+                    if any(artifact["body"][key] != historical_artifacts[artifact_id][key]
+                           for key in ("sha256", "byte_size", "media_type")):
                         raise DomainError("artifact_binding_mismatch", "Historical native artifact bytes differ from the selected reference.", 422, ["source_artifact_ids"])
-                project_design(request, project_problem(problem, dataset), [None, None])
+                    if native_design and artifact["body"].get("origin") != {
+                            "run_id": run_id, "scenario_id": request["scenario_id"],
+                            "plan_id": current["plan_id"], "approval_id": current["approval_id"]}:
+                        raise DomainError("artifact_binding_mismatch", "Native baseline provenance differs from the selected approved run.", 422)
+                if native_design:
+                    # The new engine mapping consumes the complete native baseline;
+                    # do not reinterpret it through the legacy fixed-pair projection.
+                    for index, time_value in enumerate(request["feasible_times"]):
+                        _exact(time_value, f"feasible_times[{index}]")
+                    _exact(request["future_hard_allowance"], "future_hard_allowance")
+                    _exact(request["maximum_horizon"], "maximum_horizon")
+                    if request["budget"]["pair_verifications"] < 2:
+                        raise DomainError("scientific_admission", "Checking and fresh replay require two approved pair verifications.",
+                                          422, ["budget.pair_verifications"])
+                    if request["candidate_vectors"][0] == request["candidate_vectors"][1]:
+                        raise DomainError("candidate_vector_mismatch", "Select two distinct historical vectors.", 422, ["candidate_vectors"])
+                else:
+                    project_design(request, project_problem(problem, dataset), [None, None])
             candidates = {item.get("id"): item for item in evidence.get("candidates", []) if isinstance(item, dict)}
             for candidate_id, vector in zip(request["candidate_ids"], request["candidate_vectors"], strict=True):
                 candidate = candidates.get(candidate_id)
                 if candidate is None:
                     raise DomainError("candidate_not_in_scope", "Both fixed candidates must be present in the selected historical evidence.", 422, ["candidate_ids"])
+                if native_design and candidate.get("verification") != "valid":
+                    raise DomainError("candidate_not_compatible", "Both selected candidates need valid historical compatibility checks.", 422, ["candidate_ids"])
                 candidate_vector = candidate.get("parameter_vector")
                 if candidate_vector != vector:
                     raise DomainError("candidate_vector_mismatch", "The exact fixed vector differs from its historical candidate.", 422, ["candidate_vectors"])

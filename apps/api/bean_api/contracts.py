@@ -745,7 +745,7 @@ class DesignResult(StrictModel):
     future_hard_allowance: Rational | None = None
     artifacts: list[ArtifactReference] = Field(default_factory=list, max_length=16)
     verification_record: VerificationRecord | None = None
-    projection_version: Literal["bean-to-counterdex.v1"] | None = None
+    projection_version: Literal["bean-to-counterdex.v1", "DB-SC-1-to-groundwork-v1"] | None = None
     scientific_problem_digest: Digest | None = None
     scientific_design_digest: Digest | None = None
     native_suggestion_digest: Digest | None = None
