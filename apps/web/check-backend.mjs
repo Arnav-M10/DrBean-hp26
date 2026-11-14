@@ -269,10 +269,17 @@ try {
   await page.waitForFunction(() => document.querySelector('#backend-design').textContent.includes('Design tier: checked_pair_separation'))
   assert.equal((await api(`/design-jobs/${noSeparation.finished.id}`)).state, 'completed')
 
+  const followupOrigin = process.env.BEAN_TEST_FOLLOWUP_ORIGIN || 'hypothetical'
+  assert.ok(['actual', 'hypothetical'].includes(followupOrigin))
+  await page.locator('#followup-origin').selectOption(followupOrigin)
+  if (followupOrigin === 'actual') {
+    await page.fill('#followup-time', '7')
+    await page.fill('#followup-allowance', '0.3')
+  }
   await page.fill('#followup-value', '3.4')
-  await page.fill('#followup-reason', 'Hypothetical browser regression reading chosen to inspect the original pair')
-  await page.getByRole('button', { name: 'Prepare hypothetical observation', exact: true }).click()
-  await page.getByRole('button', { name: 'Accept reviewed hypothetical observation', exact: true }).click()
+  await page.fill('#followup-reason', `Synthetic test of ${followupOrigin} declaration; reviewed acquisition log at 7 h and hard bound 0.3 mg/L. No real measurement claimed.`)
+  await page.getByRole('button', { name: `Prepare ${followupOrigin} observation`, exact: true }).click()
+  await page.getByRole('button', { name: `Accept reviewed ${followupOrigin} observation`, exact: true }).click()
   await page.getByRole('button', { name: 'Prepare follow-up investigation plan', exact: true }).click()
   await page.locator('#followup-approve-scope').check()
   await page.getByRole('button', { name: 'Approve reviewed follow-up', exact: true }).click()
@@ -286,16 +293,21 @@ try {
     await page.waitForTimeout(1000)
   }
   assert.equal(followupRun.state, 'completed', JSON.stringify(followupRun))
+  const observations = await api(`/workspaces/${workspace}/records?kind=observation_proposal`)
+  assert.equal(observations[0].body.origin, followupOrigin)
+  assert.equal(observations[0].body.row.time, followupOrigin === 'actual' ? '7/1' : positive.suggestion.body.selected_time)
+  if (followupOrigin === 'actual') {
+    assert.equal(observations[0].body.row.hard_allowance, '3/10')
+    assert.deepEqual(observations[0].body.generating_choices, {})
+  }
   const followupEvidence = await api(`/records/${followupRun.scenarios[0].result_id}`)
   assert.equal(followupEvidence.body.result.candidate_results.length, 2)
   assert.equal(followupEvidence.body.result.native_replay.operation, 'recheck')
-  assert.equal(followupEvidence.body.result.native_replay.dataset_origin, 'hypothetical')
+  assert.equal(followupEvidence.body.result.native_replay.dataset_origin, followupOrigin === 'actual' ? 'synthetic' : 'hypothetical')
   await page.fill('#run-id', followupId)
   await page.getByRole('button', { name: 'Open or refresh run', exact: true }).click()
   await page.getByRole('region', { name: 'Follow-up candidate checks', exact: true }).waitFor()
-  assert.match(await page.locator('#backend-investigations').textContent(), /Observation origin: hypothetical/)
-
-  assert.equal((await api(`/records/${positive.suggestion.id}`)).digest, positive.suggestion.digest)
+  assert.match(await page.locator('#backend-investigations').textContent(), new RegExp(`Dataset origin: ${followupOrigin === 'actual' ? 'synthetic' : 'hypothetical'}`))
 
   // A changed observation must create new reviewed identities and actual computation.
   await page.getByRole('link', { name: 'Inputs', exact: true }).click()

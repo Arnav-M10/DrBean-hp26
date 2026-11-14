@@ -1,4 +1,8 @@
-# Workstream 4 operational handoff
+Current handoff (2026-11-14): see [integration status](INTEGRATION_STATUS.md) and [PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27). Local real browser source review, discovery, design, hypothetical follow-up and native replay pass. Strict clean-clone qualification is in progress. Human consultation, observed task and device rehearsal are pending.
+
+The following dated handoff is retained as historical evidence; its unavailable states are not current capability claims.
+
+# Historical Workstream 4 operational handoff
 
 Current handoff for the integrated tree. The pre-merge handoff (when only the web editor existed) is summarized at the end as dated history.
 

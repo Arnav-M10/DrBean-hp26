@@ -125,8 +125,7 @@ def stack_smoke():
     path = os.path.join(REPO, "docs", "release-evidence", "stack-smoke.json")
     if result.get("status") == "unrun" or not os.path.exists(path):
         return {name: {"status": "unrun", "detail": result.get("detail", "")} for name in
-                ("web_source_review_browser_check", "web_design_followup_browser_check",
-                                                  "stack_launch_path", "stack_g1_real_science", "placeholder_ai_no_provider_attempts")}
+                ("stack_launch_path", "stack_g1_real_science", "placeholder_ai_no_provider_attempts")}
     with open(path, encoding="utf-8") as handle:
         record = json.load(handle)
     commit, _ = git_state()
@@ -220,7 +219,7 @@ def _collect(fast):
     skipped = {"status": "unrun", "detail": "skipped by --fast"}
     if fast:
         checks.update({name: skipped for name in ("web_manual_smoke", "web_backend_browser_check",
-                                                  "web_source_review_browser_check", "web_design_followup_browser_check",
+                                                  "web_source_review_browser_check", "web_design_followup_browser_check", "web_actual_followup_browser_check",
                                                   "stack_launch_path", "stack_g1_real_science",
                                                   "placeholder_ai_no_provider_attempts")})
     else:
@@ -228,6 +227,8 @@ def _collect(fast):
         checks["web_backend_browser_check"] = node_check("apps/web/check-backend.mjs", unrun_code=None)
         for name in ("web_source_review_browser_check", "web_design_followup_browser_check"):
             checks[name] = dict(checks["web_backend_browser_check"])
+        checks["web_actual_followup_browser_check"] = node_check("apps/web/check-backend.mjs", unrun_code=None,
+                                                                extra_env={"BEAN_TEST_FOLLOWUP_ORIGIN": "actual"})
         checks.update(stack_smoke())
     for check in checks.values():
         check.pop("output", None)

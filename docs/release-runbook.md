@@ -147,3 +147,14 @@ Deferred until the user gives a new explicit instruction, and not to be run now:
 ## Final six hours (from Sunday 02:00 Eastern)
 
 No new features or integrations. Fix only launch failures, incorrect scientific claims, approval or binding defects, blocked user steps and submission issues. Rehearse on the presentation device with model APIs unreachable. Keep a saved real-science fallback, labelled as saved, plus the recovery commands above. Tag the last commit whose clean-checkout run passed.
+
+## Retain clean-checkout qualification
+
+Set an absolute evidence directory outside the disposable clone:
+
+```sh
+DRBEAN_RELEASE_EVIDENCE_DIR=/absolute/path/to/release-evidence \
+  scripts/release/clean_checkout.sh --strict-offline
+```
+
+The command installs locked dependencies in a fresh clone, runs the offline gates with isolated state, and copies a timestamped report for the exact tested commit before cleanup, including on gate failure. Existing historical reports are not rewritten. Inspect `offline_release_ready`, individual checks, platform facts and tested commit together. A source fixture is controlled intake output; the science and replay checks execute the actual engine. The release verdict does not qualify live Gemini or substitute for a human consultation, observed task, or presentation rehearsal.

@@ -115,4 +115,9 @@ Added a browser path from a checked design to an explicitly hypothetical observa
 
 PR #27 adds retained-source inspection and explicit controlled proposal review, correction, assumption preview and accepted input materialization. Upload selections survive action rendering; changed drafts require a new source-bound preview. The real local browser/API/worker check passed on the target Mac environment with prepared interpreters and Chromium, including real discovery, separately approved positive/no-separation design, hypothetical follow-up and native replay. All 31 web unit tests passed.
 
-Release automation now consumes that actual browser outcome for source and follow-up gates (fast mode remains unrun). Independent clean-checkout qualification is next. Actual acquisition UI remains pending. Consultation, observed task and device rehearsal are explicitly not performed; software comes first per user direction.
+Release automation now consumes that actual browser outcome for source and follow-up gates (fast mode remains unrun). Independent clean-checkout qualification is next. Declared actual acquisition controls are implemented; qualification follows. Consultation, observed task and device rehearsal are explicitly not performed; software comes first per user direction.
+
+
+Clean checkout 366dfe1 passed strict offline qualification on Darwin 25.5 arm64: 5/5 gates, 12/12 boundaries, 588 backend tests, 47 HTTP tests, 31/31 launch checks and real-science counterexample with 2 candidates and native artifact. Retained immutable report: docs/release-evidence/offline-366dfe1-macos.json. All six CI jobs passed for equivalent published integration tree 6a3705a.
+
+The next extension adds declared actual follow-up with separately entered acquisition time, hard allowance and provenance. Tests use synthetic data and do not claim real observation. Dataset origin is labeled as such and preserves synthetic ancestry. Superseded observation parents are still rejected by the server; pending proposals can be revised before acceptance.

@@ -60,9 +60,9 @@ node apps/web/check-backend.mjs
 
 Playwright is found through Node's normal resolution or `NODE_PATH`; `PLAYWRIGHT_MODULE` can name its `index.js` entry file. After `npm install` in `tests/integration`, set `NODE_PATH` to that directory's absolute `node_modules` path when running this browser check. Set `BEAN_TEST_PYTHON` or `CHROMIUM_PATH` to override `.venv/bin/python` and Playwright's own Chromium. Playwright is a test-only dependency and is not shipped with the browser application. A missing runtime or failed scientific run fails this milestone check instead of being counted as a successful demonstration.
 
-## Hypothetical follow-up
+## Follow-up observations
 
-Open a completed checked-separation design, enter a hypothetical concentration and explain its choice. Prepare and inspect the observation, explicitly accept it as a new dataset revision, then prepare and separately approve the follow-up plan before queueing. The flow retains the selected design time and allowance and rechecks the original pair. Open the returned run identifier to retrieve candidate-specific feedback and native evidence. Actual acquisition and changed time/allowance remain outside this admitted flow. The original evidence remains immutable.
+Open a completed checked-separation design, enter a hypothetical concentration and explain its choice. Prepare and inspect the observation, explicitly accept it as a new dataset revision, then prepare and separately approve the follow-up plan before queueing. The flow retains the selected design time and allowance and rechecks the original pair. Open the returned run identifier to retrieve candidate-specific feedback and native evidence. To enter a declared actual observation, choose actual origin and supply its elapsed acquisition time, hard allowance, and acquisition/source justification. Changing origin clears the entered values; it cannot relabel a generated reading. Actual origin is a user declaration, not instrument authentication. A reviewed observation advances the workspace revision. Follow-ups based on older dataset revisions are refused; prepare a new investigation from the current inputs to continue. Before acceptance, Revise observation draft clears the pending proposal for a new review. The original evidence remains immutable.
 
 ## Retained source review
 

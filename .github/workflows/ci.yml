@@ -135,3 +135,9 @@ jobs:
           export NODE_PATH="$PWD/tests/integration/node_modules"
           export BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python"
           node apps/web/check-backend.mjs
+
+      - name: declared actual follow-up with separate acquisition conditions
+        run: |
+          export NODE_PATH="$PWD/tests/integration/node_modules"
+          export BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python"
+          BEAN_TEST_FOLLOWUP_ORIGIN=actual node apps/web/check-backend.mjs

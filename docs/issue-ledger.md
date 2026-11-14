@@ -8,9 +8,9 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 |---|---|---|---|
 | I-001 | 2 | **closed** | Backend and `/api/bean/v1` now exist and start with one command |
 | I-002 | 2 | **closed** | Schemas are published in `shared/contracts/DB-SC-1` |
-| I-003 | 2, 3 | open | Controlled transports must be unreachable in ordinary startup (see I-012) |
+| I-003 | 2, 3 | closed | Ordinary startup leaves provider unconfigured; controlled source fixture is a test-only CLI (see I-012) |
 | I-004 | 2, 3, 5 | open | Two budget ledgers exist (backend SQLite, harness JSONL); one authority must be defined before any live call |
-| I-005 | 1 | partly closed | Engine exists and passes standalone; not integrated (see I-013) |
+| I-005 | 1 | closed | Engine discovery, design and native replay integrated; see I-013 and current browser evidence |
 | I-006 | 2, 4 | open | Decimal input grammar differs between the web parser and the server |
 | I-007 | 4 | open | Draft download cannot be reopened; durable server records can |
 | I-008 | 5 | open | Harness expected transcriptions need a human visual check |
@@ -20,9 +20,9 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 | I-012 | 3 | **closed on `main` at `fa91e13`** | Provider stays unconfigured with key, model and gate variables set; API reports `ai_mode: disabled_placeholder` |
 | I-013 | 2 | **closed on `main` at `1f75bdc` (PR #6)** | Baseline discovery now runs through ordinary startup: `stack_smoke.py --require-science` exits 0 with a certified counterexample, 2 candidates and a native artifact |
 | I-014 | 1, 2 | **closed** | Two runtimes; the backend calls the engine in a child process on CPython 3.11 |
-| I-015 | 2, 4 | open, target platform | `resource_policy.py` now omits `RLIMIT_AS` on macOS; still unverified on the Mac |
-| I-016 | 5 | open, blocks strict gate | HTTP/invariant suite and offline real-science lane not delivered |
-| I-017 | 4 | **open, now unblocked** | Browser controls for source review, design and follow-up not built |
+| I-015 | 2, 4 | closed for named candidate | Clean checkout 366dfe1 on Darwin arm64 passes strict offline gates, 31/31 stack checks and real science; see release-evidence/offline-366dfe1-macos.json |
+| I-016 | 5 | delivered; current qualification required | HTTP/invariant suite runs in CI and strict qualification; retain current results |
+| I-017 | 4 | implemented; qualification in PR #27 | Source review, separately approved design and follow-up controls; local real browser check passes for source/hypothetical flow |
 | I-019 | 2, 4 | **closed** | PR #6 gates queueing on `science.available` and `baseline_discovery` (`baselineAvailable`), the same fields proposed |
 | I-018 | 2 | **partly fixed on `main` at `1f75bdc`; one test still fails on GitHub's runner** | Locally 5 of 5 as an unprivileged user owning 64 processes. On the runner (uid 1001, run 43554490810) 4 of 5: `test_descendant_cannot_escape_by_outliving_adapter` still fails. Whether an approved run completes there is shown by the stack smoke step in the same job. |
 
