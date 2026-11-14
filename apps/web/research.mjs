@@ -12,7 +12,7 @@ export function researchSnapshot(value, workspace) {
       || !Number.isSafeInteger(value.revision) || value.revision < 0 || !['controlled', 'live'].includes(value.mode)
       || !Array.isArray(value.children) || value.children.length > 4 || !Array.isArray(value.reports) || value.reports.some(id => !ID.test(id))) throw new Error('Invalid or mismatched research snapshot.')
   if (value.pending_review && (!ID.test(value.pending_review.id) || !SHA.test(value.pending_review_digest)
-      || value.pending_review.workspace_id !== workspace || value.pending_review.digest !== value.pending_review_digest)) throw new Error('The pending review is not bound to this workspace and digest.')
+      || value.pending_review.workspace_id !== workspace || value.pending_review.digest !== value.pending_review_digest)) throw new Error('This approval request belongs to a different workspace or plan version. Refresh saved state and review it again.')
   return clone(value)
 }
 
@@ -34,7 +34,7 @@ export class ResearchController {
   emit() { this.changed(this.state) }
   persist() {
     try { this.storage?.setItem(this.key(), JSON.stringify({ sessionId: this.state.snapshot?.id ?? null, pending: this.state.pending, form: this.state.form })) }
-    catch { this.state.error = 'Browser storage is unavailable; keep this tab open to retain uncertain request identities.' }
+    catch { this.state.error = 'This browser cannot store data for this page. Keep the tab open until any unanswered request is resolved.' }
   }
   async connect(connection) {
     const same = this.connection.api === connection.api && this.connection.workspaceId === connection.workspaceId && this.connection.identityId === connection.identityId
@@ -69,7 +69,7 @@ export class ResearchController {
   }
   async mutate(path, body, key = crypto.randomUUID()) {
     if (this.state.busy) return
-    if (this.state.pending && (this.state.pending.key !== key || this.state.pending.path !== path)) throw new Error('Resolve the uncertain frozen request before starting another operation.')
+    if (this.state.pending && (this.state.pending.key !== key || this.state.pending.path !== path)) throw new Error('Resolve the unanswered request below before starting anything else.')
     const connection = this.connection, generation = this.generation
     this.state.pending = { path, body: clone(body), key }; this.state.busy = true; this.state.error = ''; this.persist(); this.emit()
     try {
@@ -77,7 +77,7 @@ export class ResearchController {
       if (path.endsWith('/provider-consents')) {
         if (!response || response.kind !== 'research_provider_consent' || response.workspace_id !== connection.workspaceId
             || response.body?.research_session_id !== this.state.snapshot?.id || response.body?.model !== body.model
-            || response.body?.context_digest !== body.expected_context_digest || response.body?.accepted !== true) throw new Error('Provider consent acknowledgement is not bound to this disclosure.')
+            || response.body?.context_digest !== body.expected_context_digest || response.body?.accepted !== true) throw new Error('Your consent does not match the disclosure shown. Read the disclosure and consent again.')
         response = await connection.api.json(`/research-sessions/${response.body.research_session_id}`)
       }
       const result = researchSnapshot(response, connection.workspaceId)
@@ -95,7 +95,7 @@ export class ResearchController {
     let inputs, body
     try {
       const draft = clone(this.getDraft()), constraints = designConstraints(this.state.form), sources = clone(this.getSources())
-      if (!draft.question.goal.trim()) throw new Error('Enter your research question in Question before starting.')
+      if (!draft.question.goal.trim()) throw new Error('Write your question on the Claim and assumptions page first.')
       inputs = await connection.saveReviewedInputs()
       body = { objective: draft.question.goal.trim(), problem_id: inputs.problem.id, expected_problem_digest: inputs.problem.digest,
         source_ids: this.state.form.attachSources ? sources.map(asset => asset.id) : [], mode: this.configuredMode(), design_constraints: constraints }
@@ -115,13 +115,13 @@ export class ResearchController {
     const s = this.state.snapshot, model = this.connection.capabilities?.gemini?.model
     if (s?.mode !== 'live' || !this.state.providerAccepted || !model) throw new Error('Review the exact provider disclosure and consent before live coordination.')
     await this.mutate(`/research-sessions/${s.id}/provider-consents`, { model, expected_context_digest: s.provider_disclosure.context_digest, accepted: true })
-    if (!this.state.pending && !this.state.error) this.state.error = 'Provider consent saved. Starting coordination still requires an explicit remaining allocation.'
+    if (!this.state.pending && !this.state.error) this.state.error = 'Consent saved. The assistant can continue only after the server owner allocates Gemini capacity.'
     this.state.providerAccepted = false; this.emit()
   }
   async advance() { const s = this.state.snapshot; if (s) await this.mutate(`/research-sessions/${s.id}/advance`, { expected_revision: s.revision }) }
   async decide(decision) {
     const s = this.state.snapshot, review = s?.pending_review
-    if (!review || (decision === 'approve' && this.state.reviewAccepted !== `${review.id}:${review.digest}`)) throw new Error('Review the exact pending scientific scope and select its approval checkbox.')
+    if (!review || (decision === 'approve' && this.state.reviewAccepted !== `${review.id}:${review.digest}`)) throw new Error('Read the exact pending scope below, then tick its approval box.')
     await this.mutate(`/research-sessions/${s.id}/decisions`, { expected_revision: s.revision, pending_review_id: review.id, expected_review_digest: review.digest, decision, accepted: true })
   }
   async retry() { const p = this.state.pending; if (p) await this.mutate(p.path, p.body, p.key) }
@@ -207,12 +207,12 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
     clearTimeout(timer); if (!root) return
     const state = controller.state, connection = controller.connection, s = state.snapshot, caps = connection.capabilities?.deepagents
     root.replaceChildren(element('h2', 'Research plan with the assistant'))
-    root.append(element('p', 'The research assistant keeps a step-by-step plan, proposes each scientific operation and stops for your approval before it runs. It is built with LangChain Deep Agents. Every mathematical result still comes from the Counterdex checker, never from the assistant.'))
+    root.append(element('p', 'The assistant keeps a step-by-step research plan. It proposes each check and stops for your approval before anything runs. It is built with LangChain Deep Agents. Mathematical results come only from the Counterdex checker, never from the assistant.'))
     if (!connection.api || !connection.workspaceId) { root.append(element('p', 'Connect to a private workspace to keep a research question and plan.', 'note')); return }
     if (state.error) { const error = element('p', state.error, 'errors'); error.setAttribute('role', 'alert'); root.append(error) }
     const enabled = Boolean(caps?.dispatch_enabled)
     if (!enabled) root.append(element('p', `The assistant cannot take new steps on this server: ${caps?.unavailable_reason || 'no coordinator is configured'}. Saved plans and their evidence can still be opened. The approved check works without it.`, 'note wait'))
-    else root.append(element('p', caps.execution_mode === 'live' ? `Assistant model: Gemini ${connection.capabilities.gemini?.model || ''}, metered separately and limited to capacity the server operator allocates. Saving your inputs does not call the model.` : 'Assistant model: a local controlled policy run through Deep Agents. It makes no external model requests; the checker computes every result.', 'fine'))
+    else root.append(element('p', caps.execution_mode === 'live' ? `Assistant model: Gemini ${connection.capabilities.gemini?.model || ''}, metered separately and limited to capacity the server operator allocates. Saving your inputs does not call the model.` : 'Assistant model: the controlled test policy, run through Deep Agents. It sends nothing to an external model; the checker computes every result.', 'fine'))
     if (state.pending) {
       const box = element('div', '', 'callout'); root.append(box)
       box.append(element('h3', 'A request did not get a clear answer'), element('p', 'The server may or may not have accepted it. Refresh only reads saved state. Retry sends the same frozen request again, so it cannot be applied twice.'))
@@ -286,11 +286,11 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
       button(turn, 'Advance research plan', () => controller.advance(), blocked)
     } else if (s.state === 'completed' && s.reports.length && !s.children.some(child => child.kind === 'design_job')) {
       root.append(turn)
-      turn.append(element('h3', 'Plan the next measurement'), element('p', 'The investigation report is saved. The assistant can propose comparing measurement times next. That does not approve anything: the exact pair, times and allowance come back to you for a separate review.'))
+      turn.append(element('h3', 'Plan the next measurement'), element('p', 'The check report is saved. Next, the assistant can propose comparing measurement times. This approves nothing; you review the exact pair, times and allowance separately.'))
       button(turn, 'Plan next step for separate review', () => controller.advance(), blocked)
     } else if (s.state === 'needs_reconciliation') {
       root.append(turn)
-      turn.append(element('h3', 'Recover the interrupted step'), element('p', 'The last step stopped unexpectedly. Completed evidence and usage are kept. This assistant has not been qualified to continue automatically after a restart.'))
+      turn.append(element('h3', 'Recover the interrupted step'), element('p', 'The last step stopped unexpectedly. Completed evidence and usage counts are kept. The assistant does not resume by itself after a restart; reconcile the step to continue.'))
       button(turn, 'Reconcile interrupted action', () => controller.reconcile(), Boolean(state.pending))
     }
     if (s.action?.error_code) root.append(element('p', `The last step stopped: ${s.action.error_code}. Completed evidence is kept.`, 'note bad'))
@@ -327,8 +327,8 @@ export function setupResearch({ root, getDraft, getSources, getSourceQuestion, o
       for (const candidate of result.candidate_results ?? []) card.append(element('p', `${candidate.candidate_id}: ${{ valid: 'still fits', invalid: 'ruled out' }[candidate.verification] || 'unresolved'}. ${candidate.reason_code || ''}`, 'fine'))
       const row = element('div', '', 'actions'); card.append(row)
       for (const ref of result.artifacts ?? []) {
-        button(row, 'Download native evidence', async () => { const data = await connection.api.download(`/artifacts/${ref.id}`, ref); save(data.bytes, `dr-bean-${ref.id}.native.json`) }, false, 'secondary')
-        button(row, 'Download independent replay anchors', async () => { const data = await connection.api.download(`/artifacts/${ref.id}/anchor?download=true`); save(data.bytes, `dr-bean-${ref.id}.anchors.json`) }, false, 'secondary')
+        button(row, 'Download evidence file', async () => { const data = await connection.api.download(`/artifacts/${ref.id}`, ref); save(data.bytes, `dr-bean-${ref.id}.native.json`) }, false, 'secondary')
+        button(row, 'Download replay anchors', async () => { const data = await connection.api.download(`/artifacts/${ref.id}/anchor?download=true`); save(data.bytes, `dr-bean-${ref.id}.anchors.json`) }, false, 'secondary')
       }
       const tech = details(card, 'Technical details', { verification: result.verification, expected_binding: result.expected_binding || result.verification_record?.expected_binding, replay: result.replay, candidates: result.candidates, candidate_ids: result.candidate_ids, candidate_results: result.candidate_results, options: result.options, selected_time: result.selected_time, future_hard_allowance: result.future_hard_allowance }, 'technical')
       for (const ref of result.artifacts ?? []) tech.append(element('pre', `python3.11 -m counterdex replay-native dr-bean-${ref.id}.native.json --anchors dr-bean-${ref.id}.anchors.json`))

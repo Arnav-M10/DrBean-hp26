@@ -86,7 +86,7 @@ browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || c
   const review = await page.locator('#review-summary').textContent() // includes the collapsed exact-values disclosure
   check('review-shows-exact-values', review.includes('[1/10, 3/10]') && review.includes('[1/10, 17/100]'),
     'exact normalized bounds are shown in review')
-  check('planning-honestly-unavailable', (await page.locator('#review').innerText()).includes('Investigation planning is unavailable'),
+  check('planning-honestly-unavailable', (await page.locator('#review').innerText()).includes('Connect to a Dr. Bean server at the top of this page to save inputs and run a check'),
     'the page does not pretend a backend exists')
 
   // Export: scientific inputs are exact strings, never JavaScript numbers.

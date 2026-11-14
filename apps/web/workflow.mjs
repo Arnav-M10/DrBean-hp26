@@ -23,14 +23,14 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
   async function saveReviewedInputs() {
-    if (!api || !workspace) throw new Error('Connect to a private workspace first.')
+    if (!api || !workspace) throw new Error('Connect to your workspace first.')
     if (inputs && frozen === fingerprint()) return inputs
     const draft = getDraft(), snapshot = fingerprint(), client = api, scope = workspace
     const datasetPayload = datasetBody(draft, draft.context)
     problemBody(draft, { id: '', digest: '' })
     const dataset = await client.json(`/workspaces/${scope}/datasets`, datasetPayload)
     const problem = await client.json(`/workspaces/${scope}/problems`, problemBody(draft, dataset))
-    if (client !== api || scope !== workspace) throw new Error('The private workspace connection changed while saving inputs. Reopen the original workspace to inspect the saved records.')
+    if (client !== api || scope !== workspace) throw new Error('Your workspace connection changed while the inputs were saving. Reopen the original workspace to see what was saved.')
     inputs = { dataset, problem }; frozen = snapshot
     return inputs
   }
@@ -63,7 +63,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   }
   async function refreshRun(id = byId('run-id').value.trim()) {
     const loaded = await api.json(`/runs/${encodeURIComponent(id)}`)
-    if (loaded.workspace_id !== workspace) throw new Error('Select the run’s workspace before opening it.')
+    if (loaded.workspace_id !== workspace) throw new Error('Choose the workspace this check belongs to, then open it.')
     const evidence = await Promise.all(loaded.scenarios.filter(s => s.result_id).map(s => api.json(`/records/${encodeURIComponent(s.result_id)}`)))
     // Read-only context for the result explanation and chart; a failure only hides the chart.
     let inputsRecords = run?.id === loaded.id ? run.inputs : undefined
@@ -89,40 +89,40 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   }
   function renderReview() {
     const review = byId('backend-review'); review.replaceChildren(node('h2', 'Save, approve and start the check'))
-    if (!api) review.append(para('Investigation planning is unavailable until you connect. Connect to a Dr. Bean server at the top of this page; meanwhile you can still prepare and download your draft.', 'note wait'))
+    if (!api) review.append(para('Connect to a Dr. Bean server at the top of this page to save inputs and run a check. Until then you can still edit and download your draft.', 'note wait'))
     else if (!workspace) review.append(para('Choose or create a workspace in the connection panel at the top of this page.', 'note wait'))
     else if (!available()) review.append(para(`You can save and approve a plan, but this server cannot run the check right now: ${capabilities?.science?.reason || 'the configured runtime does not offer baseline discovery'}.`, 'note wait'))
-    review.append(node('h3', '1. Freeze these inputs'), para('Saves the measurements and claim on the server exactly as shown above and prepares a plan for one check. Nothing runs yet. No language model is used.'))
-    button(review, 'Save inputs and prepare plan', async () => {
+    review.append(node('h3', '1. Save the inputs'), para('Stores these inputs on the server exactly as shown and prepares one check for your approval. Nothing runs yet, and no AI model is used.'))
+    button(review, 'Save inputs and prepare check', async () => {
       const reviewed = await saveReviewedInputs()
       plan = await api.json(`/workspaces/${workspace}/plans`, planRequest(reviewed.problem, getDraft().question.goal)); approval = undefined
     }, !api || !workspace)
     if (!plan) return
-    if (!currentPlan()) review.append(para('Draft changed since this plan was saved. Choose Save inputs and prepare plan again before approving.', 'note wait'))
+    if (!currentPlan()) review.append(para('You edited the draft after saving it. Choose Save inputs and prepare check again before approving.', 'note wait'))
     const budget = plan.body.budget ?? {}, provider = plan.body.provider_disclosure?.provider
-    review.append(node('h3', '2. Approve the check'), para('Read exactly what this approval allows. It covers this plan and nothing else.'))
+    review.append(node('h3', '2. Approve the check'), para('Approving allows exactly this check and nothing else.'))
     review.append(definitions([
       ['Question', plan.body.objective.question],
       ['What counts as an answer', plan.body.objective.success_criterion],
-      ['What will run', 'One baseline check of the frozen inputs by the Counterdex checker.'],
+      ['What will run', 'One check of the saved inputs by the Counterdex checker.'],
       ['Limits', `At most ${budget.tool_calls ?? '—'} tool calls, ${budget.scientific_reservations ?? '—'} checker run and ${budget.wall_seconds ?? '—'} seconds.`],
-      ['AI involvement', provider === 'none' ? 'None. No language model is called and nothing is sent to an AI provider.' : `Provider ${provider}. Review the technical record.`],
-      ['Not included', 'Designing a next measurement. That needs its own approval later.'],
+      ['AI involvement', provider === 'none' ? 'None. Nothing is sent to an AI model.' : `Provider ${provider}. Review the technical record.`],
+      ['Not included', 'Comparing measurement times. That needs its own approval later.'],
     ]))
     review.append(technical(`Technical record for plan ${plan.id}`, para(`Server digest ${plan.digest}`, 'tech'), exactRecord('Exact frozen dataset and problem', inputs), exactRecord('Exact frozen plan', plan)))
     const label = node('label', ' I reviewed these exact inputs and approve only this check and its limits.')
     const check = document.createElement('input'); check.type = 'checkbox'; check.id = 'approve-scope'; check.disabled = !currentPlan() || Boolean(approval) || busy
     label.prepend(check); review.append(label)
-    const approve = button(review, approval ? 'Plan approved' : 'Approve reviewed plan', async () => {
-      if (!currentPlan() || !check.checked) throw new Error('Review the current plan and check its approval box.')
+    const approve = button(review, approval ? 'Check approved' : 'Approve check', async () => {
+      if (!currentPlan() || !check.checked) throw new Error('Read what the approval covers, then tick its box.')
       approval = await api.json(`/plans/${plan.id}/approvals`, { expected_plan_digest: plan.digest, expected_current_revision_id: plan.body.problem_id, accepted: true })
     }, true)
     check.addEventListener('change', () => { approve.disabled = !check.checked || busy || Boolean(approval) || !currentPlan() })
-    if (approval) review.append(para('Approved. Changing the draft voids this approval.', 'note ok'), technical('Approval receipt', exactRecord('Approval receipt', approval)))
-    review.append(node('h3', '3. Start the check'), para('Queues the approved check on the server and takes you to Investigate to follow it. The same approval cannot start a second run.'))
-    button(review, 'Queue approved manual run', async () => {
+    if (approval) review.append(para('Approved. Editing the draft cancels this approval.', 'note ok'), technical('Approval receipt', exactRecord('Approval receipt', approval)))
+    review.append(node('h3', '3. Start the check'), para('Starts the approved check on the server and opens Investigate so you can follow it. One approval starts one check.'))
+    button(review, 'Run approved check', async () => {
       capabilities = await api.json('/capabilities')
-      if (!available() || !currentPlan() || !approval) throw new Error('Available baseline discovery and current explicit approval are required.')
+      if (!available() || !currentPlan() || !approval) throw new Error('Running a check needs a server that can run the checker and a current approval.')
       run = await api.json(`/plans/${plan.id}/runs`, { approval_id: approval.id, expected_plan_digest: plan.digest })
       byId('run-id').value = run.id
       report = undefined; location.hash = 'investigations'
@@ -140,10 +140,10 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
       const timeline = node('ol', ''); timeline.className = 'timeline'
       const step = (text, cls) => { const item = node('li', text); item.className = cls; timeline.append(item) }
       step('Inputs frozen on the server', 'done'); step('Check approved by you', 'done')
-      step(run.state === 'completed' ? 'Counterdex check finished' : run.state === 'running' ? 'Counterdex check running' : run.state === 'queued' ? 'Counterdex check waiting for a worker' : `Counterdex check ${label.toLowerCase()}`, run.state === 'completed' ? 'done' : ['failed', 'interrupted', 'cancelled'].includes(run.state) ? 'failed' : '')
+      step(run.state === 'completed' ? 'Counterdex check finished' : run.state === 'running' ? 'Counterdex check running' : run.state === 'queued' ? 'Counterdex check queued' : `Counterdex check ${label.toLowerCase()}`, run.state === 'completed' ? 'done' : ['failed', 'interrupted', 'cancelled'].includes(run.state) ? 'failed' : '')
       step(run.evidence?.length ? `Evidence recorded (${run.evidence.length} ${run.evidence.length === 1 ? 'record' : 'records'})` : 'Evidence not recorded yet', run.evidence?.length ? 'done' : '')
       investigations.append(timeline)
-      if (run.error_code) investigations.append(para(`The check stopped: ${run.error_code}. Any completed evidence is kept. Review the inputs and start a new check.`, 'note bad'))
+      if (run.error_code) investigations.append(para(`The check stopped before finishing (${run.error_code}). Evidence it already recorded is kept. Review the inputs and start a new check.`, 'note bad'))
       if (run.evidence?.length) {
         const callout = node('div', ''); callout.className = 'callout primary'
         callout.append(para('The check finished and recorded evidence.'), link('View results', '#result', 'button'))
@@ -153,11 +153,11 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
       investigations.append(execution, technical('Run and scenario records', exactRecord('Run and scenario records', { ...run, evidence: undefined, inputs: undefined })))
     }
     investigations.append(node('h3', 'Reopen a saved check'))
-    const label = node('label', 'Run identifier'); label.className = 'stack'
+    const label = node('label', 'Check ID'); label.className = 'stack'
     const input = document.createElement('input'); input.type = 'text'; input.id = 'run-id'; input.value = previousId; input.spellcheck = false
     label.append(input); investigations.append(label)
-    button(investigations, 'Open or refresh run', () => refreshRun(), !api || !workspace)
-    investigations.append(para('Keep the run identifier to reopen this check later from the same workspace. Refreshing only reads its status; it never runs the check again.', 'fine'))
+    button(investigations, 'Open check', () => refreshRun(), !api || !workspace)
+    investigations.append(para('Keep the check ID to reopen this check later from the same workspace. Opening a check only reads its status; it never runs it again.', 'fine'))
   }
   function renderEvidence(parent, evidence) {
     const result = evidence.body.result, meaning = interpretResult(result)
@@ -192,14 +192,14 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     }
     const domain = problem?.domain
     card.append(definitions([
-      ['What supports this', result.verification === 'valid' && result.replay === 'passed' ? `${candidates.length ? `${candidates.length} candidate${candidates.length === 1 ? ' was' : 's were'} checked` : 'The result was checked'} with exact arithmetic against every included reading. The evidence matches your saved inputs and can be replayed outside the browser.` : `Checker verification: ${result.verification}. Matches saved inputs: ${result.expected_binding}. Replay: ${result.replay}.`],
+      ['What supports this', result.verification === 'valid' && result.expected_binding === 'matches' && result.replay === 'passed' ? `${candidates.length ? `${candidates.length} candidate${candidates.length === 1 ? ' was' : 's were'} checked` : 'The result was checked'} with exact arithmetic against every included reading. The checker accepted this evidence, it is tied to the inputs you saved, and it can be replayed outside the browser.` : `This result is not fully checked. Checker verification: ${result.verification}. Tied to saved inputs: ${result.expected_binding}. Replay: ${result.replay}.`],
       ['It assumes', domain ? `The two-rate model; your allowances; ka above ke; and the search limits A ${readable(domain.A.lower)}–${readable(domain.A.upper)} mg/L, ke ${readable(domain.ke.lower)}–${readable(domain.ke.upper)} h⁻¹, ka ${readable(domain.ka.lower)}–${readable(domain.ka.upper)} h⁻¹.` : 'The reviewed model, allowances and search limits saved with this check.'],
       ['Still uncertain', meaning.uncertain],
     ]))
     const nextStep = node('div', ''); nextStep.className = 'callout primary'
     if (designCandidates(evidence).length >= 2) nextStep.append(para('Two different candidates both fit your readings. A new reading at a well-chosen time could rule one out.'), link('Compare measurement times', '#next', 'button'))
     else if (meaning.tone === 'none') nextStep.append(para('To probe further, widen the search limits or revisit the allowances on Check inputs, then run a new check. The earlier evidence is kept.'), link('Review inputs', '#inputs', 'button secondary'))
-    else nextStep.append(para('Take this result away as a report, or revise the inputs and run a new check.'), link('Go to report', '#report', 'button secondary'))
+    else nextStep.append(para('Save this result as a report, or revise the inputs and run a new check.'), link('Go to report', '#report', 'button secondary'))
     card.append(nextStep)
     if (candidates.length) {
       const region = node('div', ''); region.className = 'table-region'; region.tabIndex = 0; region.setAttribute('role', 'region'); region.setAttribute('aria-label', 'Computed candidate parameters')
@@ -217,9 +217,9 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
       parent.append(node('h3', 'Candidates'), para('Values are rounded for reading. Each candidate is tied to the exact inputs saved for this check.', 'fine'), region)
     }
     if (['review', 'recheck'].includes(result.native_replay?.operation)) {
-      parent.append(node('h3', 'Follow-up candidate checks'), para(`Dataset origin: ${result.native_replay.dataset_origin ?? 'not supplied'}. This review retains the original candidate identities.`))
+      parent.append(node('h3', 'Recheck of the compared candidates'), para(`Dataset origin: ${result.native_replay.dataset_origin ?? 'not supplied'}. This review retains the original candidate identities.`))
       const region = node('div', ''); region.className = 'table-region'; region.tabIndex = 0
-      region.setAttribute('role', 'region'); region.setAttribute('aria-label', 'Follow-up candidate checks')
+      region.setAttribute('role', 'region'); region.setAttribute('aria-label', 'Recheck of the compared candidates')
       const table = node('table', ''), head = node('thead', ''), headings = node('tr', ''), body = node('tbody', '')
       for (const title of ['Candidate', 'Status after the new reading', 'Readings it misses', 'Reason']) { const th = node('th', title); th.scope = 'col'; headings.append(th) }
       head.append(headings)
@@ -233,34 +233,34 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
       if (!result.candidate_results?.length) parent.append(para('Candidate-specific feedback is unavailable in this record.', 'note'))
     }
     if (result.artifacts?.length) {
-      parent.append(node('h3', 'Download evidence'), para('The native evidence file holds the checker\'s exact working. The replay anchors record which inputs and run it belongs to. Together they let anyone re-run the check with the Counterdex command-line tool.'))
+      parent.append(node('h3', 'Download evidence'), para('The evidence file holds the checker\'s exact working. The replay anchors file records which inputs and check it belongs to. With both, anyone can recompute the recorded candidates using the Counterdex command-line tool. Replay does not repeat the search.'))
       for (const reference of result.artifacts ?? []) {
         const name = `dr-bean-${reference.id}`
         const row = node('div', ''); row.className = 'actions'; parent.append(row)
-        button(row, 'Download native scientific evidence', async () => {
+        button(row, 'Download evidence file', async () => {
           const download = await api.download(`/artifacts/${encodeURIComponent(reference.id)}`, reference)
           save(download.bytes, `${name}.native.json`)
-          byId('status').textContent = 'Native evidence downloaded. Download its separate replay anchors and use a prepared Counterdex interpreter to replay it.'
+          byId('status').textContent = 'Evidence file downloaded. To replay it, also download the replay anchors and use a prepared Counterdex installation.'
         })
         button(row, 'Download replay anchors', async () => {
           const download = await api.download(`/artifacts/${encodeURIComponent(reference.id)}/anchor?download=true`)
           save(download.bytes, `${name}.anchors.json`)
         }).className = 'secondary'
         const replayScope = result.replay === 'passed'
-          ? 'Replay freshly checks the recorded candidate mathematically; it never reruns discovery.'
-          : 'Replay validates evidence integrity and expected identities. It does not rerun discovery or establish the absence of a counterexample.'
-        parent.append(technical('Replay this evidence outside the browser', para(`${reference.byte_size.toLocaleString()} bytes, SHA-256 ${reference.sha256}`, 'tech'), para(`Use the matching prepared Counterdex package with CPython 3.11. Supply the separately downloaded anchors as the expected identities. ${replayScope} A matching download hash shows the bytes are intact, not that the mathematics is valid.`), node('pre', `python3.11 -m counterdex replay-native ${name}.native.json --anchors ${name}.anchors.json`)))
+          ? 'Replay recomputes the recorded candidate with exact arithmetic. It does not repeat the search.'
+          : 'Replay confirms the evidence file is intact and belongs to these inputs. It does not repeat the search, and it cannot show that no counterexample exists.'
+        parent.append(technical('Replay this evidence outside the browser', para(`${reference.byte_size.toLocaleString()} bytes, SHA-256 ${reference.sha256}`, 'tech'), para(`Use the matching Counterdex package with CPython 3.11 and pass the replay anchors file with --anchors. ${replayScope} A matching download hash shows the file is intact, not that the mathematics is valid.`), node('pre', `python3.11 -m counterdex replay-native ${name}.native.json --anchors ${name}.anchors.json`)))
       }
     }
     const details = technical('Technical details: states and exact records',
       para(`Outcome: ${result.scientific_outcome}. Verification: ${result.verification}. Expected binding: ${result.expected_binding}. Replay: ${result.replay}. Reason: ${result.reason_code ?? 'none'}.`, 'tech'),
       para(baselineExplanation(result)),
-      para('These are persisted server states. This browser has not replayed or independently verified scientific evidence.', 'fine'),
+      para('These are the states the server recorded. This browser has not replayed the evidence itself.', 'fine'),
       exactRecord('Exact evidence record', evidence))
     parent.append(details)
     button(details, 'Download exact evidence record', async () => {
       const artifact = await api.download(`/artifacts/${evidence.id}`); save(artifact.bytes, `dr-bean-${evidence.id}.json`)
-      byId('status').textContent = `Downloaded exact bytes. SHA-256 ${artifact.digest}. Byte integrity does not establish scientific validity.`
+      byId('status').textContent = `Downloaded. SHA-256 ${artifact.digest}. A matching hash shows the file is intact, not that the mathematics is valid.`
     }).className = 'secondary'
   }
   function renderResults() {
@@ -295,13 +295,13 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
         ['Limits of this finding', 'It holds only for the two-rate model, these allowances and these search limits. It is not clinical guidance and does not identify the true parameters.'],
       ]))
     }
-    reports.append(para('A report freezes the selected check, its inputs and its list of evidence at the moment you create it, as a JSON file for reviewers. Public sharing is not available. Native evidence and replay anchors are downloaded from the Result step.', 'fine'))
+    reports.append(para('A report is a JSON file that records this check, its inputs and its evidence list as they are now, for a reviewer. Download the evidence file and replay anchors from the Result step. Reports cannot be shared publicly from here.', 'fine'))
     const row = node('div', ''); row.className = 'actions'; reports.append(row)
-    button(row, 'Create report for selected run', async () => { report = await api.json(`/runs/${run.id}/reports`, {}) }, !api || !run)
+    button(row, 'Create report', async () => { report = await api.json(`/runs/${run.id}/reports`, {}) }, !api || !run)
     if (report) {
-      button(row, 'Download exact report JSON', async () => {
+      button(row, 'Download report (JSON)', async () => {
         const download = await api.download(`/reports/${report.id}/download`); save(download.bytes, `dr-bean-${report.id}.json`)
-        byId('status').textContent = `Downloaded SHA-256 ${download.digest}. Browser replay: unsupported.`
+        byId('status').textContent = `Downloaded. SHA-256 ${download.digest}. The browser cannot replay evidence; use the evidence file and replay anchors instead.`
       }).className = 'secondary'
       reports.append(technical('Report snapshot', exactRecord('Report snapshot', report)))
     }
@@ -337,7 +337,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     event.preventDefault(); perform(async () => {
       const candidate = new BeanApi(byId('bearer').value); byId('bearer').value = ''
       const caps = await candidate.json('/capabilities')
-      if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('Unsupported API contract or policy version.')
+      if (caps.contract_version !== 'DB-SC-1' || caps.policy_version !== 'GF-2') throw new Error('This server runs a different version of Dr. Bean than this page. Reload the page. If the message stays, ask the server owner to update.')
       await candidate.json('/workspaces') // Authenticate before retaining the client.
       api = candidate; capabilities = caps; connectionMode = 'local_owner'; connectionIdentity = 'local-owner:' + crypto.randomUUID(); workspace = ''; reset(); await workspaces()
       byId('connection-status').textContent = `Connected. ${available() ? 'The Counterdex checker is available on this server.' : 'This server cannot run the checker right now; you can still review and save inputs.'} ${liveGeminiAvailable(capabilities) ? `Gemini (${capabilities.gemini.model}) is available for image reading and explanations, each only after your separate permission.` : 'Gemini is off, so no AI provider is called.'} Next, choose or create a workspace.`
@@ -345,7 +345,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
   })
   byId('disconnect').addEventListener('click', () => {
     api = capabilities = undefined; workspace = ''; reset(); byId('bearer').value = ''
-    byId('connection-status').textContent = 'Disconnected. Investigation planning is unavailable.'; render()
+    byId('connection-status').textContent = 'Not connected. Connect to save inputs and run checks.'; render()
   })
   byId('workspace-select').addEventListener('change', () => { workspace = byId('workspace-select').value; reset(); render() })
   byId('new-workspace').addEventListener('submit', event => {
@@ -373,7 +373,7 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
     }
     byId('connect-form').hidden = true
     byId('connection-panel').querySelector('summary').textContent = 'Private workspace connection'
-    byId('connection-panel').querySelector('p').textContent = 'Your browser has a private workspace. Gemini uses the server owner’s configuration and shared application allowance. No access token or Gemini key is entered here.'
+    byId('connection-panel').querySelector('p').textContent = 'This browser has its own private workspace. You do not need an access token or a Gemini key. When Gemini is on, it uses the server owner’s key and shared allowance.'
     await perform(async () => {
       const candidate = shared.api
       const caps = await candidate.json('/capabilities')

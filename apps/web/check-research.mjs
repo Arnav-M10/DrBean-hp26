@@ -145,8 +145,8 @@ try {
   assert.equal(report.report_profile, 'research-report.v2')
   assert.equal(report.evidence.length, 2)
   assert.equal(report.native_evidence.length, 2)
-  const nativeButtons = panel.getByRole('button', { name: 'Download native evidence', exact: true })
-  const anchorButtons = panel.getByRole('button', { name: 'Download independent replay anchors', exact: true })
+  const nativeButtons = panel.getByRole('button', { name: 'Download evidence file', exact: true })
+  const anchorButtons = panel.getByRole('button', { name: 'Download replay anchors', exact: true })
   for (let index = 0; index < report.native_evidence.length; index++) {
     const entry = report.native_evidence[index]
     const [native] = await Promise.all([page.waitForEvent('download'), nativeButtons.nth(index).click()])

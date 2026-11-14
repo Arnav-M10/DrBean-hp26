@@ -1,7 +1,7 @@
 import { liveGeminiAvailable } from './api.mjs'
 
 export function explanationRequest({ runId, text, model, revision, operationId }) {
-  if (!runId || !text.trim() || !model || !Number.isSafeInteger(revision) || revision < 0) throw new Error('Select a run and enter a question before asking Gemini.')
+  if (!runId || !text.trim() || !model || !Number.isSafeInteger(revision) || revision < 0) throw new Error('Open a check and enter a question before asking Gemini.')
   return {
     operation: 'explain', client_operation_id: operationId,
     expected_conversation_revision: revision, run_id: runId, text: text.trim(),
@@ -18,14 +18,14 @@ export function setupAssistantWorkflow({ context, button, node, exactRecord }) {
     if (!api || !workspace || !liveGeminiAvailable(capabilities)) return
     if (selectedRun !== run?.id) { reset(); selectedRun = run?.id }
     const section = node('section', ''); section.id = 'gemini-explanation'; parent.append(section)
-    section.append(node('h3', 'Ask Gemini about this investigation'), node('p', `Model: ${capabilities.gemini.model}. This is optional commentary. Scientific verdicts come from the checked evidence above. No new investigation or measurement is authorized by a message.`))
+    section.append(node('h3', 'Ask Gemini about this check'), node('p', `Model: ${capabilities.gemini.model}. Gemini’s answer is commentary only. The result above comes from the checked evidence, and nothing you ask here starts a check or adds a reading.`))
     button(section, 'Show Gemini call budget', async () => { budget = await api.json(`/workspaces/${workspace}/provider-budget`) })
     if (budget) section.append(exactRecord('Server Gemini budget and reservations', budget))
     if (!run || !run.evidence?.length) {
-      section.append(node('p', 'Open a run with retained evidence to ask for an explanation.'))
+      section.append(node('p', 'Open a finished check to ask Gemini about it.'))
       return
     }
-    const questionLabel = node('label', 'Question about the selected run'); questionLabel.className = 'stack'
+    const questionLabel = node('label', 'Your question about this check'); questionLabel.className = 'stack'
     const input = node('textarea', ''); input.id = 'gemini-question'; input.maxLength = 4000; input.value = question; input.disabled = busy
     input.placeholder = 'What does this result mean, and what should I review next?'
     questionLabel.append(input); section.append(questionLabel)
@@ -41,7 +41,7 @@ export function setupAssistantWorkflow({ context, button, node, exactRecord }) {
       }
       try {
         const loaded = await api.assistantTurn(workspace, pending)
-        if (loaded.workspace_id !== workspace || loaded.kind !== 'assistant_response' || loaded.body.input_references.run_id !== run.id) throw new Error('The assistant response does not match this selected run.')
+        if (loaded.workspace_id !== workspace || loaded.kind !== 'assistant_response' || loaded.body.input_references.run_id !== run.id) throw new Error('Gemini’s answer belongs to a different check. Reopen this check and ask again.')
         response = loaded; pending = undefined; consent = false
       } catch (error) {
         // A lost response retains the exact original key and body. Resending it
@@ -55,15 +55,15 @@ export function setupAssistantWorkflow({ context, button, node, exactRecord }) {
       question = input.value; consent = false; pending = undefined; check.checked = false; send.disabled = true
       send.textContent = 'Ask Gemini for an explanation'
     })
-    if (pending) section.append(node('p', 'This request has no confirmed response yet. Retrieving the same request preserves its operation identity. Editing the question prepares a new request only after fresh permission.'))
+    if (pending) section.append(node('p', 'This request has no confirmed answer yet. Retrieving it asks the server about the same request and does not send a new one. Editing the question makes a new request, which needs your permission again.'))
     if (!response) return
     const body = response.body
     section.append(node('h4', 'Statements from the evidence records'))
     for (const statement of body.critical_statements ?? []) section.append(node('p', statement))
-    if (body.model_commentary) section.append(node('h4', 'Gemini commentary, not independently verified'), node('p', body.model_commentary))
-    if (body.commentary_status === 'suppressed') section.append(node('p', 'Gemini commentary was withheld because it did not meet the evidence-grounding checks. The stored scientific results remain available above.'))
+    if (body.model_commentary) section.append(node('h4', 'Gemini commentary, not checked by Dr. Bean'), node('p', body.model_commentary))
+    if (body.commentary_status === 'suppressed') section.append(node('p', 'Gemini commentary was withheld because the evidence records did not support it. The checked results above are unaffected.'))
     if (body.message) section.append(node('p', body.message))
-    if (body.code) section.append(node('p', `Assistant response: ${body.code}.`))
+    if (body.code) section.append(node('p', `Response code: ${body.code}.`))
     section.append(exactRecord('Exact assistant response and provider attempt identity', response))
   }
   return { reset, render }
