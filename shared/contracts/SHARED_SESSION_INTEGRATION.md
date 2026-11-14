@@ -47,8 +47,10 @@ does not claim hardware binding or impossible replay prevention.
 
 The gateway forwards API requests directly to fixed `127.0.0.1:8000` and static
 requests to fixed `127.0.0.1:4173`. It validates the exact approved HTTPS Quick
-Tunnel Host/protocol/origin, rejects cross-site fetches, and requires exact Origin
-on mutations. It discards browser Authorization and client trust/owner headers.
+Tunnel Host/protocol/origin, rejects cross-site API calls/subresources, and requires
+exact Origin on mutations. Only GET/HEAD document navigation to the entry page
+may follow an external link; it grants no API authority. It discards browser
+Authorization and client trust/owner headers.
 Only the named session cookie reaches the API; static requests carry no cookie.
 
 The gateway proves its boundary using `X-Bean-Shared-Gateway` and replaces
