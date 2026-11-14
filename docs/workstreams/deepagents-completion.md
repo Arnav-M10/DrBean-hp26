@@ -113,3 +113,32 @@ existing limitation saying fresh replay is **not** an independently implemented
 proof system. That overbroad predicate was reported to C on PR #60; the limitation
 was preserved. C must refine/re-run its acceptance against the combined browser
 candidate. No live check was performed here.
+
+## Live findings and repair — follow-through
+
+Claude’s first live run at `a2f568b` used five requests: canonical review, approved
+real science and replay succeeded; numeric commentary was correctly rejected.
+A later preferred-workspace run at `a43d5b2` used three requests and stopped on a
+malformed tool call before review/science. Those are failed live acceptance cases,
+not evidence of a qualified Gemini release. The reported sprint use is eight of
+12 physical requests, with ten effective grants; no limit was raised here.
+
+The report instructions now state the exact accepted neutral caption. Scientific
+facts remain in the canonical report, while planning, tools and next_action remain
+model decisions. The run tool explicitly asks for the four prepared identity fields
+verbatim. Numeric validation, operation authority and retry policy are unchanged.
+The two signed-SDK/native-science narration cases both use three calls with the
+same allocation: incorrect numeric prose stays rejected and preserves science;
+the instructed caption persists with an evidence-dependent review_design action.
+Baseline plus design still fits six requests: 63,709 conservative input reservation
+under 64,000. The reserved output remains 3,072; this is offline accounting evidence.
+
+Malformed tool responses now retain bounded diagnostic enums, a declared tool name
+and schema-known missing-field names only. Raw model arguments, unknown names,
+text and IDs are never included. Request/usage accounting and main error codes stay
+unchanged. The prior live malformed call was not retained before its rejection;
+these diagnostics do not claim to identify or repair that historical response.
+
+Claude explicitly authorized adopting the DEMO-09 R1 oracle from `9229150`; that
+exact test update is included. The coordinator action stays failed if required
+commentary fails. Completed science and commentary availability remain separate.
