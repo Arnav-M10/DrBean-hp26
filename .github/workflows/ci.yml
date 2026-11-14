@@ -179,6 +179,18 @@ jobs:
           path: var/test-evidence/model-comparison-ui
           if-no-files-found: warn
           retention-days: 3
+      - name: preferred researcher journey, retained evidence and separate model-failure diagnostic
+        run: |
+          export PLAYWRIGHT_MODULE="$PWD/tests/integration/node_modules/playwright"
+          node workspace-preview/check-static-research.mjs
+          BEAN_RESEARCH_BROWSER_EVIDENCE_DIR=var/test-evidence/preferred-research node workspace-preview/check-research.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preferred-research-ui-evidence
+          path: var/test-evidence/preferred-research
+          if-no-files-found: warn
+          retention-days: 3
       - name: ordinary Deep Agents browser investigation and separate checked pair-design
         run: |
           export NODE_PATH="$PWD/tests/integration/node_modules"

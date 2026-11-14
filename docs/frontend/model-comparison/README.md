@@ -4,7 +4,7 @@ The preferred `workspace-preview` now consumes the merged numerical service thro
 its existing private-session transport. No scientific equations, fitting, API,
 authority, ledger or trusted proxy implementation was independently recreated.
 The pre-existing qualified application remains at `/`; this interface is at
-`/workspace-preview/` on that same origin. Frontend ownership is PR55.
+`/workspace-preview/comparison.html` on that same origin. Frontend ownership is PR55.
 
 ## Exact candidate and scope
 
@@ -71,7 +71,7 @@ client JavaScript errors were observed. Existing services/stores were untouched.
 ## Short walkthrough
 
 Check out PR55's `codex/model-comparison-ui`, run `scripts/dev/setup.sh`, then
-`scripts/dev/start.sh`. Open the printed web origin plus `/workspace-preview/`.
+`scripts/dev/start.sh`. Open the printed web origin plus `/workspace-preview/comparison.html`.
 
 1. **Use synthetic plasma example** → inspect observations and both model families.
 2. **Assumptions** → inspect instrument, density/temperature grid, Gaussian noise,

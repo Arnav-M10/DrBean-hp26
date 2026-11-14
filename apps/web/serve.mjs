@@ -61,6 +61,10 @@ function repeatedHeader(request) {
 }
 const routes = new Map([
   ['/workspace-preview/', ['../../workspace-preview/index.html', 'text/html']],
+  ['/workspace-preview/research-ui.mjs', ['../../workspace-preview/research-ui.mjs', 'text/javascript']],
+  ['/workspace-preview/research-view.mjs', ['../../workspace-preview/research-view.mjs', 'text/javascript']],
+  ['/workspace-preview/comparison.html', ['../../workspace-preview/comparison.html', 'text/html']],
+  ['/research-api.mjs', ['research-api.mjs', 'text/javascript']],
   ['/workspace-preview/index.html', ['../../workspace-preview/index.html', 'text/html']],
   ['/workspace-preview/comparison.mjs', ['../../workspace-preview/comparison.mjs', 'text/javascript']],
   ['/workspace-preview/comparison-core.mjs', ['../../workspace-preview/comparison-core.mjs', 'text/javascript']],
@@ -180,6 +184,11 @@ const server = createServer(async (request, response) => {
   }
 
   const [path] = request.url.split('?');
+  if (path === '/workspace-preview/research-service.json') {
+    const bytes = Buffer.from(JSON.stringify({ schema_version: 'DB-RESEARCH-CONNECTION-1', available: true, mode: 'private_session', module: '/research-api.mjs' }));
+    response.writeHead(200, { ...SAFE_HEADERS, 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': bytes.length });
+    response.end(request.method === 'HEAD' ? undefined : bytes); return;
+  }
   // The study page: only files inside ./study with a known type. No "..", no hidden
   // names, no percent-encoding, so a path can never leave that folder. Saved run
   // outputs (fixtures/) and tests are for the test suite, not the browser.
