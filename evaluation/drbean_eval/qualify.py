@@ -135,19 +135,26 @@ def _replay_checks(observation: dict, evidence_dir: str, records: dict, science_
                     and len(data) == reference.get("byte_size"), "detail": "saved packet matches its reference"})
         anchor_records = [records[name] for name in item.get("anchor_records", []) if name in records]
         anchors = native.anchors_from_record(*anchor_records)
+        application = native.classify(data).get("profile") == "application_bundle"
+        full = next((r.get("anchor") for r in anchor_records if isinstance(r.get("anchor"), dict)), None)
         if not science_python or not package_dir:
             out.append({"id": f"replay:{item.get('artifact_id')}", "passed": False,
                         "detail": "no replay interpreter available to the qualifier"})
             continue
-        if not anchors.get("problem_digest") or not anchors.get("suggestion_digest"):
+        if (application and not full) or (not application and (not anchors.get("problem_digest")
+                                                                or not anchors.get("suggestion_digest"))):
             out.append({"id": f"replay:{item.get('artifact_id')}", "passed": False,
                         "detail": "anchors are not present in the saved authenticated records"})
             continue
-        report = native.replay(science_python, package_dir, data, anchors)
+        report = native.replay(science_python, package_dir, data, anchors,
+                               application_anchor=full if application else None)
         body = report.get("report") or {}
-        out.append({"id": f"replay:{item.get('artifact_id')}", "passed": report["status"] == "passed"
-                    and body.get("integrity") == "passed" and body.get("expected_binding") == "matches",
-                    "detail": f"fresh replay {report['status']}"})
+        bound = body.get("integrity") == "passed" and body.get("expected_binding") == "matches"
+        if item.get("expect_checked", True):
+            ok, what = report["status"] == "passed" and bound, f"fresh replay {report['status']}"
+        else:  # numerical-only packet: no checked evidence exists to replay; bytes must still bind
+            ok, what = bound, f"integrity/binding of a numerical-only packet ({body.get('reason_code')})"
+        out.append({"id": f"replay:{item.get('artifact_id')}", "passed": ok, "detail": what})
     return out
 
 

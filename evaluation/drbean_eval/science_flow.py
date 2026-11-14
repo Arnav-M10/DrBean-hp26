@@ -272,7 +272,7 @@ class Flow:
     # -- artifacts ---------------------------------------------------------
     def download(self, reference: dict, label: str) -> dict:
         """GET the referenced bytes. Owner 2 owns the final byte route; both shapes are tried."""
-        attempts = []
+        attempts, last = [], None
         for path in (f"/artifacts/{reference['id']}", f"/artifacts/{reference['id']}/content"):
             response = self.client.raw("GET", path)
             attempts.append({"route": path.replace(reference["id"], "{id}"), "status": response.status})
@@ -298,17 +298,17 @@ class Flow:
                     return result
                 self.other_bytes[f"download:{label}:{reference['id']}"] = saved
                 last = result
-        else:
-            last = None
         return last or {"reference": reference, "route_attempts": attempts, "classification": {"class": "unavailable"}}
 
     def replay_checks(self, checks: Checks, downloads: list[dict], anchors: dict, prefix: str,
-                      anchor_records: list[str] | None = None) -> list[dict]:
+                      anchor_records: list[str] | None = None, expect_checked: bool = True) -> list[dict]:
         reports = []
         natives = [d for d in downloads if d["classification"]["class"] == "native_packet"]
         for item in self.native_saved:  # the qualifier re-extracts anchors from exactly these saved records
-            if any(d["saved"]["path"] == item["path"] for d in natives) and not item["anchor_records"]:
-                item["anchor_records"] = list(anchor_records or [])
+            if any(d["saved"]["path"] == item["path"] for d in natives):
+                item["expect_checked"] = expect_checked
+                if not item["anchor_records"]:
+                    item["anchor_records"] = list(anchor_records or [])
         if not downloads:
             checks.add(f"{prefix}_native_bytes_downloadable", "blocked",
                        "the result references no artifacts to download", finding="F-NATIVE-BYTES")
@@ -328,6 +328,18 @@ class Flow:
         for item in natives:
             item_anchors = native.anchors_from_record(item["anchor_record"]) if item.get("anchor_record") else anchors
             source = "artifact anchor route" if item.get("anchor_record") else "evidence record fields"
+            application = item["classification"].get("profile") == "application_bundle"
+            if application:
+                full = (item.get("anchor_record") or {}).get("anchor")
+                if not isinstance(full, dict) or not full:
+                    checks.add(f"{prefix}_anchor_from_authenticated_record", "blocked",
+                               "application-bound packet needs the complete anchor from GET /artifacts/{id}/anchor",
+                               finding="F-ANCHOR-RECORD")
+                    continue
+                checks.add(f"{prefix}_anchor_from_authenticated_record", "passed",
+                           f"complete application anchor ({len(full)} fields) from the artifact anchor route")
+                self._replay_one(checks, item, prefix, {}, full, expect_checked)
+                continue
             if not item_anchors.get("problem_digest") or not item_anchors.get("suggestion_digest"):
                 checks.add(f"{prefix}_anchor_from_authenticated_record", "blocked",
                            f"authenticated records expose anchors {sorted(item_anchors)} ({source}); replay needs "
@@ -336,26 +348,41 @@ class Flow:
                 continue
             checks.add(f"{prefix}_anchor_from_authenticated_record", "passed",
                        f"anchors {sorted(item_anchors)} from the {source}")
-            anchors = item_anchors
-            report = native.replay(self.science_python, self.package_dir, item["data"], anchors,
-                                   guard_log=self.guard_log)
-            reports.append({"artifact_id": item["reference"]["id"], **report})
-            body = report.get("report") or {}
-            checks.expect(f"{prefix}_fresh_native_replay", report["status"] == "passed"
-                          and body.get("integrity") == "passed" and body.get("expected_binding") == "matches",
-                          f"status {report['status']}, integrity {body.get('integrity')}, binding "
-                          f"{body.get('expected_binding')}, error {(report.get('error') or {}).get('code')}")
-            tampered = native.replay(self.science_python, self.package_dir, native.flip_one_byte(item["data"]),
-                                     anchors, guard_log=self.guard_log)
-            checks.expect(f"{prefix}_altered_byte_rejected", tampered["status"] != "passed",
-                          f"tampered replay status {tampered['status']} "
-                          f"({(tampered.get('error') or {}).get('code')})")
-            wrong = native.replay(self.science_python, self.package_dir, item["data"],
-                                  {**anchors, "problem_digest": native.wrong_anchor(anchors["problem_digest"])},
-                                  guard_log=self.guard_log)
-            checks.expect(f"{prefix}_wrong_problem_anchor_rejected", wrong["status"] != "passed",
-                          f"wrong-anchor replay status {wrong['status']} ({(wrong.get('error') or {}).get('code')})")
+            reports.append(self._replay_one(checks, item, prefix, item_anchors, None, expect_checked))
         return reports
+
+    def _replay_one(self, checks: Checks, item: dict, prefix: str, anchors: dict, full: dict | None,
+                    expect_checked: bool) -> dict:
+        """Fresh replay plus integrity and binding negatives. A numerical-only packet is held to integrity/binding."""
+        report = native.replay(self.science_python, self.package_dir, item["data"], anchors,
+                               guard_log=self.guard_log, application_anchor=full)
+        body = report.get("report") or {}
+        detail = (f"status {report['status']}, integrity {body.get('integrity')}, binding "
+                  f"{body.get('expected_binding')}, replay {body.get('replay')}, reason {body.get('reason_code')}, "
+                  f"error {(report.get('error') or {}).get('code')}")
+        if expect_checked:
+            checks.expect(f"{prefix}_fresh_native_replay", report["status"] == "passed"
+                          and body.get("integrity") == "passed" and body.get("expected_binding") == "matches", detail)
+        else:  # e.g. numerical guidance without pair evidence: nothing checked to replay, bytes must still bind
+            checks.expect(f"{prefix}_native_integrity_and_binding", body.get("integrity") == "passed"
+                          and body.get("expected_binding") == "matches", detail)
+            checks.add(f"{prefix}_fresh_native_replay", "not_applicable",
+                       "packet carries no checked pair evidence; " + detail, level=INFO)
+        tampered = native.replay(self.science_python, self.package_dir, native.flip_one_byte(item["data"]),
+                                 anchors, guard_log=self.guard_log, application_anchor=full)
+        checks.expect(f"{prefix}_altered_byte_rejected", tampered["status"] != "passed",
+                      f"tampered replay status {tampered['status']} ({(tampered.get('error') or {}).get('code')})")
+        if full is not None:
+            wrong_anchor = {**full, **{k: native.wrong_anchor(v) for k, v in full.items()
+                                       if k == "application_problem_digest"}}
+        else:
+            wrong_anchor = {**anchors, "problem_digest": native.wrong_anchor(anchors["problem_digest"])}
+        wrong = native.replay(self.science_python, self.package_dir, item["data"],
+                              anchors if full is not None else wrong_anchor, guard_log=self.guard_log,
+                              application_anchor=wrong_anchor if full is not None else None)
+        checks.expect(f"{prefix}_wrong_problem_anchor_rejected", wrong["status"] != "passed",
+                      f"wrong-anchor replay status {wrong['status']} ({(wrong.get('error') or {}).get('code')})")
+        return {"artifact_id": item["reference"]["id"], **report}
 
 
 # ---------------------------------------------------------------------------
@@ -638,9 +665,12 @@ def scenario_hero(flow: Flow, packet: dict) -> dict:
         refs = (suggestion.get("body") or {}).get("artifacts") or []
         downloads = [flow.download(ref, "hero-design") for ref in refs]
         anchors = native.anchors_from_record(suggestion, design.get("plan") or {}, *evidence)
+        tier = (suggestion.get("body") or {}).get("design_tier")
         observation["design_replay"] = flow.replay_checks(checks, downloads, anchors, "design_packet",
                                                           ["hero-suggestion", "hero-design-plan",
-                                                           "hero-evidence-baseline"])
+                                                           "hero-evidence-baseline"],
+                                                          expect_checked=tier in ("checked_pair_separation",
+                                                                                  "no_separation_established"))
         report = flow.client.post(f"/runs/{base['run']['id']}/reports", label="hero-report")
         download = flow.client.raw("GET", f"/reports/{report['id']}/download")
         kind = native.classify(download.data)
@@ -653,10 +683,9 @@ def scenario_hero(flow: Flow, packet: dict) -> dict:
 
 def scenario_changed_input(flow: Flow, hero: dict, changed: dict) -> dict:
     checks = Checks()
-    original = flow.cache.get("hero")
-    if not original or original.get("blocked"):
-        original = flow.baseline(hero, label="original")
-        flow.cache["hero"] = original
+    # Its own workspace: a new revision moves the workspace's current dataset, which must not disturb the hero
+    # lineage that later follow-ups extend (the API correctly refuses stale parents).
+    original = flow.baseline(hero, label="original")
     workspace = original["workspace_id"]
     revised = {**changed["dataset"], "experiment_id": original["dataset"]["body"]["experiment_id"],
                "parent_id": original["dataset"]["id"]}

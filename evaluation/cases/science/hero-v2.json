@@ -1,0 +1,180 @@
+{
+  "dataset": {
+    "change_reason": "Initial synthetic hero dataset entered by the evaluation harness as the reviewing user.",
+    "experiment_id": "drbean_hero_synthetic_v1",
+    "origin": "synthetic",
+    "parent_id": null,
+    "rows": [
+      {
+        "concentration": "24/5",
+        "hard_allowance": "1/2",
+        "id": "row_1",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "4.80",
+          "hard_allowance": "0.50",
+          "time": "0.25"
+        },
+        "source_asset_id": null,
+        "time": "1/4"
+      },
+      {
+        "concentration": "36/5",
+        "hard_allowance": "1/2",
+        "id": "row_2",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "7.20",
+          "hard_allowance": "0.50",
+          "time": "0.5"
+        },
+        "source_asset_id": null,
+        "time": "1/2"
+      },
+      {
+        "concentration": "8/1",
+        "hard_allowance": "1/2",
+        "id": "row_3",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "8.00",
+          "hard_allowance": "0.50",
+          "time": "1"
+        },
+        "source_asset_id": null,
+        "time": "1/1"
+      },
+      {
+        "concentration": "34/5",
+        "hard_allowance": "1/2",
+        "id": "row_4",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "6.80",
+          "hard_allowance": "0.50",
+          "time": "2"
+        },
+        "source_asset_id": null,
+        "time": "2/1"
+      },
+      {
+        "concentration": "57/10",
+        "hard_allowance": "1/2",
+        "id": "row_5",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "5.70",
+          "hard_allowance": "0.50",
+          "time": "4"
+        },
+        "source_asset_id": null,
+        "time": "4/1"
+      }
+    ],
+    "schema_version": "DB-SC-1",
+    "time_origin": "Elapsed hours from this synthetic experiment's declared t=0 (single dose)"
+  },
+  "design_review": {
+    "allow_construction": true,
+    "allow_continuation": true,
+    "allowance_description": "Team-selected future hard allowance for review; not an instrument specification.",
+    "allowance_origin": "hypothetical",
+    "feasible_times": [
+      "6/1",
+      "8/1"
+    ],
+    "future_hard_allowance": "1/5",
+    "maximum_horizon": "8/1"
+  },
+  "designation": {
+    "basis": "An independently checked outside witness exists (fixed-pair-regression-v1 'outside', ke=0.074 < 0.10). A bounded production search may select a different pair; only predicates are asserted, never particular floats.",
+    "known_positive": true,
+    "predicates": [
+      "fresh_outside_candidate_compatible",
+      "candidates_bind_reviewed_problem",
+      "design_uses_same_candidates",
+      "every_approved_grid_time_retained",
+      "selected_checked_margin_strictly_positive",
+      "native_replay_against_expected_revision"
+    ]
+  },
+  "followups": [
+    {
+      "allowance": "1/5",
+      "branch": "reading-3.4",
+      "reading": "17/5",
+      "reading_spelling": "3.4",
+      "time": "8/1"
+    },
+    {
+      "allowance": "1/5",
+      "branch": "reading-4.57",
+      "reading": "457/100",
+      "reading_spelling": "4.57",
+      "time": "8/1"
+    },
+    {
+      "allowance": "1/5",
+      "branch": "reading-4.0",
+      "reading": "4/1",
+      "reading_spelling": "4.0",
+      "time": "8/1"
+    }
+  ],
+  "identity_note": "The shared five-row scientific hero. A different packet from the C01-C12 source corpus; never substitute expected answers across packets.",
+  "packet_id": "hero-v2",
+  "packet_kind": "offline_real_science_input",
+  "packet_version": 2,
+  "problem": {
+    "concentration_unit": "mg/L",
+    "domain": {
+      "A": {
+        "lower": "1/1000",
+        "upper": "30/1"
+      },
+      "ka": {
+        "lower": "2/5",
+        "upper": "8/1"
+      },
+      "ke": {
+        "lower": "3/200",
+        "upper": "7/20"
+      },
+      "rate_order": "ke_lt_ka"
+    },
+    "initial_concentration": "0/1",
+    "model": "two_rate_concentration",
+    "observable": "concentration",
+    "rate_unit": "1/h",
+    "schema_version": "DB-SC-1",
+    "target": {
+      "closed": true,
+      "lower": "1/10",
+      "parameter": "ke",
+      "upper": "17/100"
+    },
+    "time_unit": "h"
+  },
+  "provenance": {
+    "authored_by": "Workstream 5 evaluation harness (Claude coding session)",
+    "independent_review": "pending: a second teammate should confirm these values against the image and the shared prompt",
+    "measurements_from": "fixtures/intake/clean.png expected fields (sha256 6363da39c1a7a86e45e5a9d5f17aa87006130cc75c61844f4902be0f118c0b06): five rows and the closed ke claim",
+    "not_extracted_from_image": "Domains and every future/design choice are human-reviewed scenario assumptions, not source content.",
+    "origin": "synthetic",
+    "team_selected_assumptions_for_review": [
+      "parameter domains A [0.001,30], ke [0.015,0.35], ka [0.4,8]",
+      "feasible future elapsed times 6 h and 8 h",
+      "future hard allowance 0.2 mg/L",
+      "construction through 8 h"
+    ]
+  },
+  "supersedes": {
+    "packet": "hero-v1",
+    "reason": "hero-v1 set allow_continuation false, contradicting the shared example's reviewed 'construction/continuation through 8 hours'. Candidates checked to the 4 h historical horizon cannot be extended to 6/8 h without extension authority, so checked design was refused (observed on backend/browser-baseline cc779bf as numerical_guidance / invalid_input). Inputs and every other reviewed choice are unchanged; hero-v1 is kept byte-identical because earlier attempts cite its digest."
+  }
+}

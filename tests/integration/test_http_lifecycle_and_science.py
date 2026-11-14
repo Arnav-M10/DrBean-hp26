@@ -11,7 +11,7 @@ import pytest
 from drbean_support import REPO, launcher, load_packet, other_actor, reviewer
 from drbean_eval import science_flow as sf
 
-HERO = load_packet("hero-v1")
+HERO = load_packet("hero-v2")
 CHANGED = load_packet("changed-input-v1")
 
 

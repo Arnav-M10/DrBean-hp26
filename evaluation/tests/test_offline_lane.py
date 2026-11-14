@@ -25,9 +25,10 @@ from drbean_eval.subject import NoSubject, RecordedSubject  # noqa: E402
 def fabricated(entry_id="RS-HERO-FULL", **changes):
     """An observation that *claims* success, with nothing behind it."""
     m = manifest.load(ROOT)
+    packet = next(e["packet"] for e in m["schedule"]["offline_real_science"] if e["entry_id"] == entry_id)
     obs = {"schema": "eval-observation/v1", "lane": "offline_real_science", "operation": "science",
            "tested_commit": runner.git_state(REPO)["commit"],
-           "case_sha256": m["science_packets"]["hero-v1"]["sha256"],
+           "case_sha256": m["science_packets"][packet]["sha256"],
            "provider": {"transport": "none"}, "tools": {"transport": "real"}, "provider_requests": 0,
            "state": "completed", "status": "passed",
            "external_dispatch": {"verified": True, "egress_attempts": 0, "client_constructions": 0},
@@ -141,8 +142,7 @@ class OfflineLaneRunner(Base):
         directory = tempfile.mkdtemp()
         try:
             with open(os.path.join(directory, "RS-HERO-FULL.observation.json"), "w", encoding="utf-8") as handle:
-                m = manifest.load(ROOT)
-                json.dump(fabricated(case_sha256=m["science_packets"]["hero-v1"]["sha256"]), handle)
+                json.dump(fabricated(), handle)
             record = self.run_lane(RecordedSubject(directory), ["RS-HERO-FULL"])[0]
             self.assertEqual(record["status"], "failed")
             self.assertEqual(record["evidence_class"], "imported_claim")

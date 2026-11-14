@@ -192,8 +192,8 @@ class LaunchedHttpSubject:
             raise SubjectUnavailable("the local test stack is not running")
         context = self.attempt_context
         self.flow.begin_entry(context["evidence_dir"])
-        packets = {name: _load_packet(self.repo, name) for name in ("hero-v1", "changed-input-v1")}
-        hero = packets["hero-v1"]
+        packets = {name: _load_packet(self.repo, name) for name in ("hero-v2", "changed-input-v1")}
+        hero = packets["hero-v2"]
         scenario = {
             "RS-HERO-FULL": lambda: sf.scenario_hero(self.flow, hero),
             "RS-CHANGED-INPUT": lambda: sf.scenario_changed_input(self.flow, hero, packets["changed-input-v1"]),
