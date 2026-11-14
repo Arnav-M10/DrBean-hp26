@@ -1,146 +1,193 @@
 # Counterdex
 
-A dependency-free scientific package for one admitted kinetics template:
-`C(t) = A * (exp(-ke*t) - exp(-ka*t))`, with hours, mg/L, positive ordered
-rates, `x(0)=1`, and `c(0)=0`. Qualified native runtime: **CPython 3.11**.
-The Python import and command-line module are `counterdex`; the console command
-is also `counterdex`. The repository ownership directory remains
-`packages/groundwork_adapter/`.
+**Check a parameter claim against measurements, find a competing explanation, and
+compare what to measure next.** Counterdex is a Python library and command-line
+tool for bounded scientific investigation with portable, freshly replayable
+evidence. It uses only the Python standard library and makes no network or model
+provider calls.
 
-It discovers candidate vectors from reviewed observations with a deterministic
-bounded rate grid and amplitude screening. Every retained exact vector is
-independently checked against the historical hard allowances. One compatible
-vector strictly outside the closed claim is a checked counterexample; failure
-to find one says only what this bounded search found.
+Version **0.3.0** supports one model:
 
-It then compares two frozen parameter vectors on a reviewed finite grid. The
-numerical tier provides finite binary64 diagnostics with an exact-input boundary.
-The exact tier uses a fixed rational exponential enclosure rule, freshly checks
-both candidates against every included historical hard bound, and applies the
-strict margin `abs(p1-p2)-e1-e2-2*eta > 0`. Its certificate is specific to this
-analytic template. It is not a general ODE checker or a global design optimizer.
-
-Pair design requires two checked candidates and an explicit positive future hard
-allowance. A single historical witness remains useful with pair design disabled.
-A checked time can rule out fitting **both selected choices**; a datum
-can exclude either or both. None of this establishes physical truth, instrument
-precision, the entire compatible parameter set, or the original interval claim.
-
-## Install and check
-
-From the repository root, using CPython 3.11:
-
-```sh
-python3.11 -m pip install --no-deps ./packages/groundwork_adapter
-python3.11 -m unittest discover -s packages/groundwork_adapter/tests -v
-python3.11 -m counterdex capabilities
+```text
+C(t) = A · (exp(−ke · t) − exp(−ka · t))
+A > 0,  0 < ke < ka
 ```
 
-For the complete application-shaped discovery → design → hypothetical reading
-→ replay loop, use [the prepared runtime bridge](docs/BRIDGE.md),
-[exact application mapping](docs/APPLICATION_MAPPING.md), and
-[the executed synthetic decision example](docs/DECISION_EXAMPLE.md).
-The standalone commands also include `baseline`, `replay-baseline`, `bridge`,
-and `replay-native`; run `python3.11 -m counterdex --help` for their inputs.
+Time is in hours, concentration in mg/L, and rates in inverse hours. The admitted
+initial conditions are `x(0)=1` and `c(0)=0`. Exact scientific execution and replay
+are qualified on **CPython 3.11**.
 
-For source-only development, prefix commands with
-`PYTHONPATH=packages/groundwork_adapter`. Build tooling is separate from the
-zero-dependency runtime. No network, account, numerical solver, or provider SDK
-is required for scientific work or replay.
+## What Counterdex does
 
-## Run and replay the complete synthetic example
+- **Discover competing candidates.** Search a bounded rate grid with amplitude
+  screening, then independently check retained exact parameter vectors against
+  every included measurement and its declared hard allowance. A compatible
+  vector strictly outside a **closed** claimed interval is a counterexample;
+  either endpoint is inside the claim.
+- **Compare a selected pair.** Evaluate researcher-supplied feasible measurement
+  times and a declared future allowance. Numerical guidance stays numerical.
+  Checked separation requires two freshly compatible candidates and a strictly
+  positive exact separation margin. Touching bands do not separate.
+- **Review a new reading.** Recheck the original candidates using an appended
+  actual, transcribed or hypothetical observation at its own declared time and
+  allowance. Preserve the parent evidence and candidate vectors rather than
+  silently searching for replacements.
+- **Replay evidence independently of the application.** Check native bytes,
+  complete lineage and exact input bindings against separately supplied expected
+  identities, then recompute the scientific checks with the matching prepared
+  package.
 
-All supplied examples are synthetic. Their workflow IDs are fixture IDs, not
-real approvals. The backend must validate real approval and operation scope.
+No counterexample found means **inconclusive**, never “claim proved.” Excluding
+one or both selected candidates does not exclude every other model. A successful
+replay confirms the recorded calculation under its declared scope; it does not
+upgrade an inconclusive result or establish the truth of the physical model.
+
+## Install
+
+Create a CPython 3.11 environment:
 
 ```sh
-python3.11 -m counterdex run \
-  packages/groundwork_adapter/fixtures/checked_success.request.json \
-  --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json \
-  --output /tmp/counterdex-example.bundle.json
-python3.11 -m counterdex replay /tmp/counterdex-example.bundle.json \
-  --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json
+python3.11 -m venv .counterdex-env
+.counterdex-env/bin/python -m pip install --no-deps "counterdex==0.3.0"
+.counterdex-env/bin/python -m counterdex capabilities
 ```
 
-The output destination must not already exist. Anchors are separate expected
-identities supplied by the caller; for real review, obtain them through a trusted
-channel. Replacing both a packet and its anchor does not prove authorship or
-honest data collection. A source-version mismatch returns `unsupported_runtime`:
-prepare the recorded package version, rather than importing anything named by
-the artifact. Missing evidence returns `incomplete_export`.
+The distribution, Python import and console command are all named `counterdex`.
+The package has **no runtime dependencies**. Build and publication tools are
+separate development dependencies. Python 3.12/3.13 applications should invoke a
+separately prepared CPython 3.11 scientific process rather than relax the
+package's Python requirement.
 
-`run` supports fresh candidate construction from a request file. Python callers
-can also supply bounded artifact bytes to reuse an existing matching pair. A
-numerical-only bundle can pass record-integrity checks but returns scientific
-replay `unsupported`; it never receives an exact badge.
+## Try a complete native replay
 
-## Python integration
+This example uses synthetic measurements, a retained counterexample and its
+separately stored anchors. Download the two public fixture files into a new
+folder; the replay itself is offline and requires no repository checkout:
 
-```python
-from counterdex import create_suggestion, normalize_problem, normalize_design
+```sh
+mkdir counterdex-demo
+cd counterdex-demo
+curl --fail --location --output hero-baseline.native.json \
+  https://raw.githubusercontent.com/Arnav-M10/DrBean-hp26/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/fixtures/repro/hero-baseline.native.json
+curl --fail --location --output hero-baseline.anchors.json \
+  https://raw.githubusercontent.com/Arnav-M10/DrBean-hp26/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/fixtures/repro/hero-baseline.anchors.json
+../.counterdex-env/bin/python -I -m counterdex replay-native \
+  hero-baseline.native.json --anchors hero-baseline.anchors.json
+```
 
-problem = normalize_problem(reviewed_problem_projection)
-design = normalize_design(frozen_design_projection, problem)
-bundle_bytes = create_suggestion(
-    problem.to_payload(), design.to_payload(),
-    expected_problem_digest=approved_problem_digest,
-    expected_design_digest=approved_design_digest,
-    workflow={"plan_id": plan_id, "approval_id": approval_id,
-              "operation_id": operation_id, "execution_id": execution_id},
+For this fixture the result has `verification: "valid"`,
+`expected_binding: "matches"`, `replay: "passed"`, and scientific outcome
+`"certified_counterexample"`. It checks two compatible exact vectors, including
+one strictly outside the reviewed closed claim. It is synthetic evidence, not an
+acquired experiment or an application approval.
+
+For real work, obtain expected anchors through the reviewer's trusted channel.
+Replacing both an artifact and its anchors does not prove authorship or honest
+data collection. Old evidence needs its matching prepared source; Counterdex
+never installs or imports a version chosen by an evidence packet.
+
+## Python API
+
+After downloading the two files above, the same fresh replay is available from
+Python:
+
+```sh
+../.counterdex-env/bin/python -I - <<'PY'
+import json
+from pathlib import Path
+from counterdex import replay_packet
+
+result = replay_packet(
+    Path("hero-baseline.native.json").read_bytes(),
+    expected=json.loads(Path("hero-baseline.anchors.json").read_text()),
 )
+print({key: result[key] for key in ("verification", "expected_binding", "replay")})
+print(result["outcome"]["scientific_outcome"])
+PY
 ```
 
-These are **package-local scientific projections**, not competing application
-transport DTOs. Owner 2 maintains the shared transport schema, authorization,
-durable records and hard process supervision. The adapter supplies cooperative
-cancellation and cannot authorize work. Publish a checked report and its complete
-bytes atomically. Owner 3 consumes typed tiers and the fixed interpretation
-selector; browser replay remains unavailable. Owner 4 qualifies deployment.
-Counterdex's standalone CPython 3.11 qualification differs from the backend's
-Python 3.12/3.13 environment. The prepared subprocess bridge and parent example
-connect those runtimes without widening exact runtime qualification. Ordinary
-API/worker wiring and independent HTTP acceptance remain separate integration
-work; passing package tests does not establish that gate.
+The public API also exposes:
 
-The problem identity includes row order, excluded rows, notes and provenance.
-The design identity includes candidate vectors/IDs/artifact associations, grid,
-allowance and origin, policies and limits. New values normalize to reduced `n/d`.
-The bundle identity excludes only its named top-level `suggestion_digest` field.
-Raw artifact SHA-256 hashes remain separate from DB-SC-1 semantic identities.
-The existing `groundwork.*.v1` schema identifiers, `dr-bean` hash domains, and
-model/proof/selection policy identifiers remain compatibility data. The public
-package preserves those normative values.
+| Entry point | Purpose |
+| --- | --- |
+| `normalize_problem`, `normalize_design`, `normalize_times` | Validate exact scientific projections without changing their reviewed meaning. |
+| `create_baseline` | Discover and check candidates for a reviewed historical problem. |
+| `replay_baseline` | Recompute historical compatibility and outside-claim checks. |
+| `create_suggestion` | Compare a frozen pair under the reviewed design scope. |
+| `replay_bundle` | Replay a standalone pair-design bundle. |
+| `replay_packet` | Replay an application-bound native packet and its required lineage. |
+| `capabilities` | Report supported operations and runtime qualification; this is not a verdict on supplied data. |
+| `ExecutionContext`, `AdapterError` | Provide cooperative execution limits and typed failures. |
 
-## Evidence and release
+See the [scientific input contract](https://github.com/Arnav-M10/DrBean-hp26/blob/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/docs/INTEGRATION.md)
+for complete input shapes and identities. Scientific scalar inputs use exact
+rational strings, not JSON floating-point numbers. Row order, excluded rows,
+notes and provenance participate in the problem identity. Candidate vectors,
+feasible times, allowance provenance, policies and limits participate in the
+design identity.
 
-- [Scientific integration contract](docs/INTEGRATION.md)
-- [Result semantics and permitted claims](docs/RESULT_SEMANTICS.md)
-- [Current backend adoption handoff](docs/OWNER2_BRIDGE_ADOPTION.md)
-- [Portable offline replay packet](fixtures/repro/README.md)
-- [Exact analytic argument](docs/ANALYTIC_ARGUMENT.md)
-- [Automated second-reader review](docs/REVIEW.md)
-- [Executed fixture ledger](fixtures/manifest.json)
-- [Validation and publishing handoff](docs/VALIDATION.md)
-- [Immutable initial-release archive](fixtures/archive/initial-published-release/README.md)
-
-Regenerate fixtures after any package code change:
+## Command line and application integration
 
 ```sh
-python3.11 packages/groundwork_adapter/scripts/generate_fixtures.py
-python3.11 packages/groundwork_adapter/scripts/generate_decision_fixtures.py
+.counterdex-env/bin/python -m counterdex --help
 ```
 
-The generator writes current fixtures only. The initial published fixture
-archive retains its original bytes and requires its original prepared source
-for fresh replay. The original 0.2.0 bridge evidence is also retained under
-`fixtures/archive/0.2.0-bridge/`. This sprint prepares version 0.3.0; it does not
-upload to PyPI. Explicit design requests preserve their reviewed tier, horizon
-and allowance provenance. The additive `recheck` operation binds an appended
-observation proposal and rechecks the original candidates at the reading's own
-time and allowance. See [the bridge contract](docs/BRIDGE.md).
+Run the command above from the directory where the environment was created.
+Commands include `capabilities`, `baseline`, `replay-baseline`, `run`, `replay`,
+`bridge`, and `replay-native`; each command has `--help`. Evidence-producing CLI
+commands require an explicit output path and refuse to overwrite an existing
+file.
 
-The partial fixture uses a deterministic cancellation callback; rerunning its
-request through the CLI without that callback produces a new completed result.
-Timing strings in the fixture ledger are observations, not latency guarantees.
-The release is intentionally narrow: no provider calls, browser verification,
-application routes, equipment control, or hosting are included.
+The bounded JSON subprocess bridge offers `handshake`, `admission`,
+`investigate`, `design`, `review`, `recheck`, and `replay` operations. In
+particular, `recheck` binds a separately reviewed observation proposal and its
+revised inputs to the original baseline or design packet. Read the
+[bridge contract](https://github.com/Arnav-M10/DrBean-hp26/blob/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/docs/BRIDGE.md)
+and [exact application mapping](https://github.com/Arnav-M10/DrBean-hp26/blob/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/docs/APPLICATION_MAPPING.md)
+for request schemas, approved limits, lineage and the POSIX parent-supervision
+example. Those technical documents retain dated integration notes; the library
+scope and release information on this page describe this distribution.
+
+Counterdex checks mathematics and scope bindings. The calling application owns
+authentication, human review, approval, durable storage, provider consent and hard
+process supervision. Workflow IDs alone confer no authority. A new measurement
+design or changed assumptions need fresh application review and approval. Native
+bytes and the accepted report should be published together after checking their
+exact bindings.
+
+The Dr. Bean application coordinates this workflow using its own backend and
+Deep Agents integration. They are separate from the Counterdex distribution;
+installing this library does not start a server, configure an AI provider or
+supply a browser verifier.
+
+## Scientific limits
+
+This release does not establish global identifiability, search completeness,
+physical truth, model adequacy, instrument precision, a global design optimum,
+or a confidence interval. Hard allowances are reviewed bounds, not automatically
+inferred statistical uncertainties. The exact checker uses a fixed rational
+exponential-enclosure rule for the admitted analytic template. An unresolved
+enclosure is not evidence of incompatibility.
+
+Generic ODE families, interventions, resets, shared offsets, correlated errors
+and nonlinear observables are unsupported. Native replay is qualified on
+CPython 3.11; in-browser mathematical replay is not qualified. Pair separation
+concerns only the two named candidates and approved feasible times. Numerical
+scores cannot be promoted to checked guarantees.
+
+The public package preserves existing schema identifiers, hash domains and
+proof/selection-policy identifiers as compatibility data. Archived evidence
+retains its original bytes and source requirements.
+
+## Documentation and source
+
+- [Counterdex 0.3.0 release notes](https://github.com/Arnav-M10/DrBean-hp26/blob/main/packages/groundwork_adapter/docs/RELEASE_0_3_0.md)
+- [Result semantics and permitted claims](https://github.com/Arnav-M10/DrBean-hp26/blob/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/docs/RESULT_SEMANTICS.md)
+- [Exact analytic argument](https://github.com/Arnav-M10/DrBean-hp26/blob/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/docs/ANALYTIC_ARGUMENT.md)
+- [Synthetic discovery, design and follow-up examples](https://github.com/Arnav-M10/DrBean-hp26/tree/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/fixtures/decision)
+- [Portable replay packet](https://github.com/Arnav-M10/DrBean-hp26/tree/b60e9d997cdc262e50107953bafc422398435297/packages/groundwork_adapter/fixtures/repro)
+- [Repository and issue tracker](https://github.com/Arnav-M10/DrBean-hp26)
+
+The source distribution includes tests, technical documentation, synthetic
+fixtures and the parent-supervision example. The wheel supplies the scientific
+runtime. The repository package directory is `packages/groundwork_adapter/`.
