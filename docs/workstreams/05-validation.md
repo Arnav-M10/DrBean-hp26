@@ -33,7 +33,7 @@ See `evaluation/FINDINGS.md` for input, command, expected, observed and retests.
 
 - **Owner 2:** F-MAC-NPROC (P0, new: RLIMIT_NPROC per user on macOS blocks spawning CPython 3.11), F-BASELINE-DISCOVERY (P0, adapter wiring with Owner 1), F-NATIVE-BYTES (fixed pending HTTP retest), F-REVIEW-MATERIALIZATION (fixed pending retest), F-RESTART-UNOBSERVABLE, F-TEST-VAR-LEAK (P2).
 - **Owner 1:** F-BASELINE-DISCOVERY producer side, F-FOLLOWUP-FEEDBACK (with Owner 2).
-- **Owner 3:** F-COORDINATOR-OPTIONAL-STATUS, F-COORDINATOR-PROVIDER-LABEL (P2 residuals; integrated boundary passes).
+- **Owner 3:** F-EXPLANATION-QUALIFIER, F-EXPLANATION-NUMBER-FORMS, F-EXPLANATION-PARAPHRASE (P2, explanation guard gaps found by `tests/integration/test_explanation_guard.py`; P1 before any live model writes user-visible prose). F-COORDINATOR-OPTIONAL-STATUS and F-COORDINATOR-PROVIDER-LABEL closed by retest on `main` `55403ab`.
 - **Owner 4:** F-LINT-CHECKLIST (P2).
 - Closed by retest on `main`: F-PLATFORM-RLIMIT (image part), F-ADAPTER-SELECTION, F-PLACEHOLDER-AUTO, F-PLACEHOLDER-MODE, F-OPTIONAL-VANISHES, F-CONTROLLED-PROVENANCE; harness defects H-* fixed in this workstream.
 

@@ -35,6 +35,9 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 | F-LAUNCHER-HIDDEN-PTH | P1 | 4 | open | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
 | F-LAUNCHER-ENV-READ | P2 | 4 | open | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 | H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
+| F-EXPLANATION-QUALIFIER | P2 | 3 | open | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
+| F-EXPLANATION-NUMBER-FORMS | P2 | 3 | open | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
+| F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
 
@@ -271,6 +274,30 @@ Application code commit `55403ab`, observed with harness `f992b48` on macOS 26.7
 - **Observed:** the scenario released the barrier while the orphaned spawn child was alive; the child resumed and started its CPython 3.11 engine grandchild after the last descendant snapshot; teardown tracked only by parent pid, reported no orphans, and the grandchild ran past the CLI's exit before finishing on its own
 - **Evidence:** {"results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier (first attempt)"}
 - **Retest at f992b48 on merged main 80f95a4:** the orphan (spawn child) was terminated before the barrier release; teardown found nothing left and no stack process outlived the CLI (evidence: {"attempts": ["att_593e67a5ca214685"], "results": "evaluation/results/previews/main-b827c61/relax_nproc+science_barrier"})
+
+## F-EXPLANATION-QUALIFIER (P2, owner 3, open)
+
+- **Input:** 'Without any doubt this proves the interval.' / 'It is not an exaggeration to say this proves the interval.'
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
+- **Expected:** unsupported_claim: the exemption should apply only when the qualifier hedges or negates the claim itself ('does not prove', 'may prove')
+- **Observed:** accepted (None); `_QUALIFIER` matches 'without'/'not'/'whether' anywhere in the clause prefix, so an intensifier exempts the claim
+- **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+
+## F-EXPLANATION-NUMBER-FORMS (P2, owner 3, open)
+
+- **Input:** 'Sample again at 7hrs to separate them.' (no 7 h in any cited fact)
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
+- **Expected:** unsupported_numeric_claim, as for 'ke 0.05' and '15%'
+- **Observed:** accepted (None): `_NUMBER`'s lookarounds skip digits glued to letters or hyphens, and words/unicode fractions are never parsed
+- **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
+
+## F-EXPLANATION-PARAPHRASE (P2, owner 3, open)
+
+- **Input:** 'This establishes that the interval is correct.', 'Every other model is ruled out by these data.', 'We identified the actual parameter of the drug.', '8 h is the optimal sampling time for any experiment.'
+- **Command:** `.venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX`
+- **Expected:** unsupported_claim (master brief 2.17: proof of the interval, elimination of outside models, physical truth, global optimality)
+- **Observed:** accepted (None)
+- **Evidence:** {"end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes", "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)"}
 
 ## Check-level finding ids (raised only when the check fails)
 

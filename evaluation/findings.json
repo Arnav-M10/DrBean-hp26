@@ -879,6 +879,57 @@
           }
         }
       ]
+    },
+    {
+      "id": "F-EXPLANATION-QUALIFIER",
+      "title": "An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause",
+      "minimal_input": "'Without any doubt this proves the interval.' / 'It is not an exaggeration to say this proves the interval.'",
+      "expected": "unsupported_claim: the exemption should apply only when the qualifier hedges or negates the claim itself ('does not prove', 'may prove')",
+      "observed": "accepted (None); `_QUALIFIER` matches 'without'/'not'/'whether' anywhere in the clause prefix, so an intensifier exempts the claim",
+      "impact": "an AI explanation can assert proof of the interval; today only scripted controlled models write explanations and the route labels them unverified, so P2; becomes P1 before any live model writes user-visible prose",
+      "owner": "3",
+      "severity": "P2",
+      "status": "open",
+      "command": ".venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX",
+      "evidence": {
+        "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
+        "end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes"
+      },
+      "retests": []
+    },
+    {
+      "id": "F-EXPLANATION-NUMBER-FORMS",
+      "title": "Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding",
+      "minimal_input": "'Sample again at 7hrs to separate them.' (no 7 h in any cited fact)",
+      "expected": "unsupported_numeric_claim, as for 'ke 0.05' and '15%'",
+      "observed": "accepted (None): `_NUMBER`'s lookarounds skip digits glued to letters or hyphens, and words/unicode fractions are never parsed",
+      "impact": "the guard's strongest property (every number grounded exactly) is bypassed by common spellings; P2 at the controlled tier, P1 before live explanations",
+      "owner": "3",
+      "severity": "P2",
+      "status": "open",
+      "command": ".venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX",
+      "evidence": {
+        "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
+        "end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes"
+      },
+      "retests": []
+    },
+    {
+      "id": "F-EXPLANATION-PARAPHRASE",
+      "title": "Paraphrased overclaims in all four forbidden categories pass the phrase-list guard",
+      "minimal_input": "'This establishes that the interval is correct.', 'Every other model is ruled out by these data.', 'We identified the actual parameter of the drug.', '8 h is the optimal sampling time for any experiment.'",
+      "expected": "unsupported_claim (master brief 2.17: proof of the interval, elimination of outside models, physical truth, global optimality)",
+      "observed": "accepted (None)",
+      "impact": "string checks are regressions, not a semantic detector: human assessment remains required for explanations; consider typed explanation templates for the four categories",
+      "owner": "3",
+      "severity": "P2",
+      "status": "open",
+      "command": ".venv/bin/python -m pytest -q tests/integration/test_explanation_guard.py -rxX",
+      "evidence": {
+        "tests": "tests/integration/test_explanation_guard.py (strict xfail; 6 controls pass)",
+        "end_to_end": "explain route returns commentary_status 'unverified_model_commentary' with the text shown; coordinator keeps the final explanation and completes"
+      },
+      "retests": []
     }
   ],
   "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14.",
