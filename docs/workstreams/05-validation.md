@@ -2,6 +2,16 @@
 
 Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw evidence and machine-readable findings live in `evaluation/`; this log links them and is not a second status source.
 
+## C status: narrow LangChain demo (scope change, 2026-11-14)
+
+| Item | Value |
+|---|---|
+| Profile | `evaluation/coordinator/demo-profile.langchain-narrow-demo.v1.json`. It is separate from the frozen 54, has `release_qualification: false` and lists 31 deferred predicates. |
+| Candidate | **Final merge: main `cdb9d69`** (B's PR #43: A's controlled factory, B's integration, C's demo checks), observed on C `7eaf257`; earlier the same results on PR #43 `c2e0743` and A's PR #44 `0491939` |
+| Results | On the final merge: HTTP demo and related C checks 34 passed, 1 skipped; browser probe 10/10; release gate exit 0 (acceptance 7/7, controls 27/27, all three lanes passed after removing iCloud duplicates from the local engine venv). Claims: DEMO-01..09 passed; DEMO-10 not_run (no coordinated live sample). Record: `evaluation/results/coordinator/demo-main-cdb9d69.json` |
+| Findings | Closed by retest on the final merge: F-RESEARCH-WORKER-UNGUARDED (B's fix 9b7ee31), F-CI-BROWSER-CHECK-INTERMITTENT (16/16 CI passes since the fix), F-SESSION-CAPACITY-EXHAUSTION. Still open: F-RESEARCH-PLAN-PROGRESS-PENDING (P3, B/A). No P0; open P1s only on unmerged PRs #35/#36 |
+| Next | Verify one coordinated live sample (DEMO-10) if A and B run it; otherwise live stays not_run |
+
 ## C status: DB-COORDINATOR-3OWNER-1 (current; the sections below are the earlier sprint's record)
 
 | Item | Value |
