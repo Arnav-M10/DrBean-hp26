@@ -67,11 +67,27 @@ def git_state(repo: str) -> dict:
 
 
 def read_attempts(results_dir: str) -> list[dict]:
+    """All attempt records. A malformed line is kept on disk and surfaced as an explicit error record."""
     path = os.path.join(results_dir, "attempts.jsonl")
     if not os.path.exists(path):
         return []
-    with open(path, encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+    records = []
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        for number, line in enumerate(handle, 1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+                if not isinstance(record, dict):
+                    raise ValueError("not an object")
+            except ValueError:
+                record = {"attempt_id": f"malformed-line-{number}", "entry_id": f"<malformed line {number}>",
+                          "lane": "unknown", "status": "error", "attempt_number": 0, "tested_commit": None,
+                          "worktree_dirty": None, "duration_ms": None, "provider_requests": None,
+                          "reason": "history line is not valid JSON; preserved unchanged, needs explicit recovery",
+                          "malformed_line": number}
+            records.append(record)
+    return records
 
 
 def lane_rules(manifest: dict, lane: str) -> dict:

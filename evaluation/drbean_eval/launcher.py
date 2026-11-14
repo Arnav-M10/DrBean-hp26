@@ -347,6 +347,9 @@ class LocalStack:
         with open(self.guard_log, encoding="utf-8") as handle:
             return [json.loads(line) for line in handle if line.strip()]
 
+    def credential_reads(self) -> list[dict]:
+        return [e for e in self.guard_events() if e.get("kind") == "credential_read"]
+
     def external_attempts(self) -> list[dict]:
         return [e for e in self.guard_events() if e.get("kind") in ("egress_blocked", "provider_client_blocked")]
 

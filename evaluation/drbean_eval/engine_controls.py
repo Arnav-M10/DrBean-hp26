@@ -38,6 +38,10 @@ from . import kinetics, native
 
 _WORKER = r"""
 import base64, json, os, sys
+if os.environ.get("DRBEAN_GUARD_FILE") and os.environ.get("DRBEAN_EGRESS_GUARD_LOG"):
+    import importlib.util
+    _spec = importlib.util.spec_from_file_location("drbean_guard", os.environ["DRBEAN_GUARD_FILE"])
+    _spec.loader.exec_module(importlib.util.module_from_spec(_spec))
 sys.path.insert(0, os.environ["DRBEAN_COUNTERDEX_DIR"])
 from counterdex import create_suggestion, normalize_problem, normalize_design
 from counterdex.errors import AdapterError
@@ -146,10 +150,19 @@ def engine_design(pair: list[dict], times: list[str], allowance: str, scenario: 
             "requested_tier": "checked_pair_separation", "observable": "c", "limits": LIMITS, **POLICIES}
 
 
+GUARD_LOG: str | None = None  # set by run(); every control subprocess loads the egress guard with it
+
+
+def _replay(*args, **kwargs):
+    return native.replay(*args, guard_log=GUARD_LOG, **kwargs)
+
+
 def _worker(science_python: str, package_dir: str, job: dict, timeout: float = 180.0) -> dict:
     with tempfile.TemporaryDirectory(prefix="drbean-control-") as work:
         env = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "HOME": work, "TMPDIR": work,
-               "DRBEAN_COUNTERDEX_DIR": os.path.abspath(package_dir)}
+               "DRBEAN_COUNTERDEX_DIR": os.path.abspath(package_dir), "DRBEAN_GUARD_FILE": native.GUARD_FILE}
+        if GUARD_LOG:
+            env["DRBEAN_EGRESS_GUARD_LOG"] = GUARD_LOG
         done = subprocess.run([science_python, "-I", "-c", _WORKER], input=json.dumps(job), capture_output=True,
                               text=True, timeout=timeout, env=env, cwd=work)
     if done.returncode:
@@ -226,7 +239,7 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
         bundles[control["control"]] = (bundle, out)
         selected, checked = _selected(out["report"])
         anchors = {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]}
-        replayed = native.replay(science_python, package_dir, bundle, anchors)
+        replayed = _replay(science_python, package_dir, bundle, anchors)
         candidates = {c["candidate_id"]: c for c in (replayed.get("report") or {}).get("fresh_checked", {})
                       .get("candidate_results", [])}
         expected = control["expected"]
@@ -251,21 +264,21 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
     if base:
         bundle, out = base
         anchors = {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]}
-        wrong = native.replay(science_python, package_dir, bundle,
+        wrong = _replay(science_python, package_dir, bundle,
                               {**anchors, "problem_digest": native.wrong_anchor(anchors["problem_digest"])})
         record("defense:wrong_expected_identity", replay_class(wrong) == "binding_failure",
                "binding_failure", replay_class(wrong), "expected identity supplied separately from the bundle")
-        flipped = native.replay(science_python, package_dir, native.flip_one_byte(bundle), anchors)
+        flipped = _replay(science_python, package_dir, native.flip_one_byte(bundle), anchors)
         record("defense:changed_byte", replay_class(flipped) == "integrity_failure", "integrity_failure",
                replay_class(flipped), "one byte changed; original anchors")
         mutated = _worker(science_python, package_dir, {"op": "mutate", "bundle_b64": out["bundle_b64"],
                           "candidate_index": 0, "time": "6/1", "delta": "1/10"})
         mutated_bytes = base64.b64decode(mutated["bundle_b64"])
-        original_anchor = native.replay(science_python, package_dir, mutated_bytes, anchors)
+        original_anchor = _replay(science_python, package_dir, mutated_bytes, anchors)
         record("defense:mutation_rejected_by_original_anchor", replay_class(original_anchor) == "integrity_failure",
                "integrity_failure", replay_class(original_anchor),
                "false enclosure (+1/10 at 6 h) with internal hashes recomputed; real original anchor")
-        diagnostic = native.replay(science_python, package_dir, mutated_bytes,
+        diagnostic = _replay(science_python, package_dir, mutated_bytes,
                                    {**anchors, "suggestion_digest": mutated["suggestion_digest"]})
         record("defense:mutation_rejected_by_fresh_mathematics", replay_class(diagnostic) == "mathematical_failure",
                "mathematical_failure", {"class": replay_class(diagnostic),
@@ -274,7 +287,7 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
                "packet authentication on purpose and authenticates nothing; real releases use the original anchor")
         # Touching bands: allowance = half the engine's own centre gap at 8 h gives a non-positive exact margin.
         rows = {r["time"]: r for r in (out["report"]["checked"].get("rows") or [])}
-        replayed = native.replay(science_python, package_dir, bundle, anchors)
+        replayed = _replay(science_python, package_dir, bundle, anchors)
         fresh_rows = {r["time"]: r for r in (replayed.get("report") or {}).get("fresh_checked", {}).get("rows", [])}
         centres = (fresh_rows.get("8/1") or {}).get("centers") or {}
         if len(centres) == 2:
@@ -300,19 +313,19 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
     if base and bundles.get("grid-6-allowance-0.2"):
         bundle, out = base
         anchors = {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]}
-        truncated = native.replay(science_python, package_dir, bundle[: len(bundle) // 2], anchors)
+        truncated = _replay(science_python, package_dir, bundle[: len(bundle) // 2], anchors)
         record("defense:truncated_packet", replay_class(truncated) not in ("passed", "infrastructure_failure"),
                "rejected (not passed, not a crash)", {"class": replay_class(truncated),
                                                        "code": (truncated.get("error") or {}).get("code")},
                "packet cut in half; original anchors")
         oversized = bundle[:-1] + b"," + b'"pad":"' + b"x" * (4 * 1024 * 1024) + b'"}'
-        big = native.replay(science_python, package_dir, oversized, anchors)
+        big = _replay(science_python, package_dir, oversized, anchors)
         record("defense:oversized_packet", replay_class(big) in ("exhausted", "unsupported_format", "integrity_failure"),
                "exhausted (byte cap) before any parsing work", {"class": replay_class(big),
                                                                  "code": (big.get("error") or {}).get("code")},
                "packet padded past the 4 MiB admitted limit")
         other_bundle, other_out = bundles["grid-6-allowance-0.2"]
-        crossed = native.replay(science_python, package_dir, other_bundle, anchors)
+        crossed = _replay(science_python, package_dir, other_bundle, anchors)
         record("defense:another_runs_valid_packet", replay_class(crossed) in ("integrity_failure", "binding_failure"),
                "integrity or binding failure", {"class": replay_class(crossed),
                                                 "code": (crossed.get("error") or {}).get("code")},
@@ -322,8 +335,8 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
                              ("unknown_profile", ("unsupported_format",))):
             edited = _worker(science_python, package_dir, {"op": "edit", "bundle_b64": out["bundle_b64"], "edit": edit})
             data = base64.b64decode(edited["bundle_b64"])
-            real = native.replay(science_python, package_dir, data, anchors)
-            diagnostic = native.replay(science_python, package_dir, data,
+            real = _replay(science_python, package_dir, data, anchors)
+            diagnostic = _replay(science_python, package_dir, data,
                                        {**anchors, "suggestion_digest": edited["suggestion_digest"]})
             # A format check may legitimately run before the digest check, so the real anchor may yield either.
             record(f"defense:{edit}", replay_class(real) in ("integrity_failure", "unsupported_format")
@@ -345,7 +358,7 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
                       "workflow": workflow, "design": engine_design(order, list(times), "1/5", "wk5-metamorphic")})
         if "error" in out:
             return None, out, None
-        replayed = native.replay(science_python, package_dir, base64.b64decode(out["bundle_b64"]),
+        replayed = _replay(science_python, package_dir, base64.b64decode(out["bundle_b64"]),
                                  {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]})
         found = {c["candidate_id"]: ("compatible" if c.get("verification") == "valid" else
                                      "excluded" if c.get("verification") == "invalid" else c.get("verification"))
@@ -397,7 +410,7 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
         record("semantics:closed_endpoint_is_inside", False, "outside_closed_claim false", out["error"],
                "engine create_suggestion")
     else:
-        replayed = native.replay(science_python, package_dir, base64.b64decode(out["bundle_b64"]),
+        replayed = _replay(science_python, package_dir, base64.b64decode(out["bundle_b64"]),
                                  {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]})
         found = {c["candidate_id"]: c for c in (replayed.get("report") or {}).get("fresh_checked", {})
                  .get("candidate_results", [])}
@@ -420,7 +433,7 @@ def run(science_python: str, package_dir: str, repo: str) -> list[dict]:
         if "error" in out:
             record(f"followup:{follow['reading']}", False, follow["expected"], out["error"], "engine")
             continue
-        replayed = native.replay(science_python, package_dir, base64.b64decode(out["bundle_b64"]),
+        replayed = _replay(science_python, package_dir, base64.b64decode(out["bundle_b64"]),
                                  {"problem_digest": out["problem_digest"], "suggestion_digest": out["suggestion_digest"]})
         found = {c["candidate_id"]: ("compatible" if c.get("verification") == "valid" else
                                      "excluded" if c.get("verification") == "invalid" else c.get("verification"))

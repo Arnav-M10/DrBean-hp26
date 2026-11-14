@@ -182,6 +182,27 @@ class _WrapAfterImport:
         return None
 
 
+def _watch_credential_reads() -> None:
+    """Record when a process reads a provider-credential variable that is present. Name only, never the value.
+
+    Covers os.environ[...] and os.getenv/os.environ.get in this interpreter. It cannot see native code that calls
+    getenv(3) directly; the launcher's allowlisted environment is the primary control.
+    """
+    environ_type = type(os.environ)
+    if getattr(environ_type.__getitem__, "_drbean_watched", False):
+        return
+    original = environ_type.__getitem__
+
+    def watched(self, key):
+        value = original(self, key)
+        if key in _CREDENTIAL_NAMES:
+            _record("credential_read", name=key)
+        return value
+
+    watched._drbean_watched = True  # type: ignore[attr-defined]
+    environ_type.__getitem__ = watched
+
+
 def install(log_path: str | None) -> bool:
     """Install once per interpreter. Returns True when this call installed the guard."""
     global _LOG
@@ -192,6 +213,7 @@ def install(log_path: str | None) -> bool:
     present = sorted(name for name in _CREDENTIAL_NAMES if os.environ.get(name) is not None)
     _record("guard_installed", python=sys.version.split()[0], credential_names_present=present)
     sys.addaudithook(_audit)
+    _watch_credential_reads()
     overrides = set(filter(None, os.environ.get("DRBEAN_DIAGNOSTIC_OVERRIDES", "").split(",")))
     if "relax_nproc" in overrides:
         _WrapAfterImport.targets = {**_WrapAfterImport.targets, "bean_api.science": _relax_nproc}

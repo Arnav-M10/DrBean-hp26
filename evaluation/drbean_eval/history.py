@@ -49,7 +49,7 @@ def verify(results_dir: str, filename: str = "attempts.jsonl") -> list[str]:
     path = os.path.join(results_dir, filename)
     if not os.path.exists(path):
         return []
-    problems, previous, chained = [], None, False
+    problems, previous, chained, seen = [], None, False, {}
     with open(path, "rb") as handle:
         lines = [line for line in handle if line.strip()]
     for number, raw in enumerate(lines, 1):
@@ -59,6 +59,11 @@ def verify(results_dir: str, filename: str = "attempts.jsonl") -> list[str]:
             problems.append(f"line {number}: not valid JSON")
             previous = raw
             continue
+        attempt_id = record.get("attempt_id")
+        if attempt_id in seen:
+            problems.append(f"line {number}: duplicate attempt_id {attempt_id} (first on line {seen[attempt_id]})")
+        elif attempt_id:
+            seen[attempt_id] = number
         expected_prev = line_digest(previous) if previous is not None else GENESIS
         if "prev_record_sha256" in record:
             chained = True

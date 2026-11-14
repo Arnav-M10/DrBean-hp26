@@ -66,7 +66,36 @@ def selftest() -> dict:
     return counts
 
 
+def _guard_harness_process() -> str:
+    """Load the egress guard into this CLI process; returns the log path (shared with control subprocesses)."""
+    import tempfile
+    from drbean_eval.guard import sitecustomize as guard
+    log = os.environ.get("DRBEAN_EGRESS_GUARD_LOG") or os.path.join(tempfile.gettempdir(),
+                                                                     f"drbean-cli-guard-{os.getpid()}.jsonl")
+    guard.install(log)
+    return log
+
+
+def _harness_attempts(log: str) -> list[dict]:
+    if not log or not os.path.exists(log):
+        return []
+    with open(log, encoding="utf-8") as handle:
+        events = [json.loads(line) for line in handle if line.strip()]
+    return [e for e in events if e.get("kind") in ("egress_blocked", "provider_client_blocked")]
+
+
 def main(argv=None) -> int:
+    guard_log = _guard_harness_process()
+    code = _main(argv, guard_log)
+    attempts = _harness_attempts(guard_log)
+    if attempts:  # an external-model attempt by the harness itself is a P0, even though the guard blocked it
+        print(f"P0: the evaluation harness attempted {len(attempts)} external connection(s): "
+              f"{sorted({a.get('host') or a.get('client') for a in attempts})}")
+        return 4
+    return code
+
+
+def _main(argv, guard_log) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("verify")
@@ -148,7 +177,7 @@ def main(argv=None) -> int:
         print(f"{args.lane}: {len(records)} attempt(s) recorded: {tally}")
         return 0 if all(r["status"] == "passed" for r in records) else 2
     if args.command == "controls":
-        return run_controls(args.results)
+        return run_controls(args.results, guard_log)
     if args.command in ("gate", "inventory"):
         state = runner.git_state(REPO)
         result = gates.compute(ROOT, args.results, state["commit"], state["dirty"],
@@ -209,10 +238,11 @@ def main(argv=None) -> int:
     return 1
 
 
-def run_controls(results_dir: str) -> int:
+def run_controls(results_dir: str, guard_log: str | None = None) -> int:
     """Engine-level native controls in fresh CPython 3.11 processes; appended to controls.jsonl."""
     from datetime import datetime, timezone
     from drbean_eval import engine_controls, launcher
+    engine_controls.GUARD_LOG = guard_log
     state = runner.git_state(REPO)
     try:
         python = launcher.science_python()
