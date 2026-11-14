@@ -22,6 +22,7 @@ class ScienceAdapter(Protocol):
     def capabilities(self) -> dict[str, Any]: ...
     def investigate(self, problem: dict[str, Any], dataset: dict[str, Any], limits: dict[str, int]) -> dict[str, Any]: ...
     def design(self, request: dict[str, Any], historical_evidence: dict[str, Any]) -> dict[str, Any]: ...
+    def review(self, problem: dict[str, Any], dataset: dict[str, Any], limits: dict[str, int], context: dict[str, Any]) -> dict[str, Any]: ...
 
 
 @dataclass
@@ -75,7 +76,7 @@ def _child(connection: Any, adapter: ScienceAdapter, operation: str, args: tuple
 def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], *, wall_seconds: int,
                 cancelled: Callable[[], bool] = lambda: False, memory_bytes: int = 1024 * 1024 * 1024,
                 result_cap: int = 4 * 1024 * 1024) -> dict[str, Any]:
-    if operation not in {"investigate", "design"} or not 1 <= wall_seconds <= 300:
+    if operation not in {"investigate", "design", "review"} or not 1 <= wall_seconds <= 300:
         raise ValueError("Unsupported scientific worker operation or limit")
     context = multiprocessing.get_context("spawn")
     receiver, sender = context.Pipe(duplex=False)
