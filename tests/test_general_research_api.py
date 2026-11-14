@@ -50,7 +50,10 @@ def test_upload_retrieve_list_and_page_routes(controlled):
     assert asset["pages"] == [{"page_index": 0, "page_number": 1, "width": None, "height": None, "dimension_unit": None,
                                "rotation": None, "image_sha256": None, "image_media_type": None, "image_width": None,
                                "image_height": None, "text_sha256": asset["pages"][0]["text_sha256"],
-                               "text_layer": "decoded_text", "char_count": len(SOIL_CSV.decode())}]
+                               "text_layer": "decoded_text", "char_count": len(SOIL_CSV.decode()),
+                               "text_preview": SOIL_CSV.decode()}]
+    assert asset["provenance"]["media_type_detection"] == "declared"
+    assert asset["tables"][0]["columns"][:2] == ["site_id", "depth (cm)"] and asset["tables"][0]["row_count"] == 4
     assert client.get(PREFIX + f"/research-assets/{asset['id']}").json() == asset
     assert [a["id"] for a in client.get(PREFIX + f"/workspaces/{w}/research-assets").json()] == [asset["id"]]
     text = client.get(PREFIX + f"/research-assets/{asset['id']}/pages/0/text").json()
@@ -152,8 +155,10 @@ ATTACK_OUTPUT = output(
         "rows": [["10", "23.4", "5.10", "loam"], ["30", "99.9", "3.85", "loam"], ["10", None, "1.1 × 101", "sandy loam"]],
         "citation_ids": ["C5"], "notes": None}],
     limitations=["Two files only."], clarifications=[{"question": "Is 1.1 × 101 meant as 1.1 × 10^1?",
-                                                      "reason": "Superscripts may be flattened."}],
-    suggested_next_steps=[{"action": "Check units", "rationale": "One unit is unclear.", "kind": "check_units"}])
+                                                      "reason": "Superscripts may be flattened.",
+                                                      "citation_ids": ["C6", "C8"]}],
+    suggested_next_steps=[{"text": "Check units", "rationale": "One unit is unclear.", "kind": "check_units",
+                           "citation_ids": ["C5"]}])
 
 
 def test_analysis_validates_citations_claims_and_tables_without_certifying(controlled):
@@ -161,18 +166,20 @@ def test_analysis_validates_citations_claims_and_tables_without_certifying(contr
     w = workspace(client)
     paper = upload(client, w, paper_pdf(), "application/pdf", origin="synthetic_example")
     soil = upload(client, w, SOIL_CSV, "text/csv", origin="real_observation")
-    result = analyze(client, w, analysis_body([paper, soil]))
+    record = analyze(client, w, analysis_body([paper, soil]))
+    assert record["kind"] == "research_analysis" and record["workspace_id"] == w and len(record["digest"]) == 64
+    result = record["body"]
     assert result["status"] == "completed" and result["execution_mode"] == "controlled"
     assert result["label"].startswith("Controlled test response") and "not mathematically verified" in result["label"]
     assert result["verification"] == {"status": "not_mathematically_verified", "supported_adapter": None,
                                       "reason": result["verification"]["reason"], "checked_record_id": None}
-    status = {c["id"] + ("*" if i == 8 else ""): c["status"] for i, c in enumerate(result["citations"])}
+    status = {c["id"]: c["status"] for c in result["citations"]}
     assert status == {"C1": "verified", "C2": "not_found", "C3": "partial_token_match", "C4": "verified",
-                      "C5": "verified", "C6": "verified", "C7": "invalid_page", "C8": "invalid_source",
-                      "C1*": "duplicate_id", "C9": "verified"}
+                      "C5": "verified", "C6": "verified", "C1.dup9": "duplicate_id", "C9": "verified"}
+    assert {c["id"]: c["status"] for c in result["rejected_citations"]} == {"C7": "invalid_page", "C8": "invalid_source"}
     c1 = result["citations"][0]
     assert c1["source_sha256"] == paper["sha256"] and c1["page_index"] == 0 and c1["page_number"] == 1
-    assert c1["bbox_space"] == "page_normalized_top_left" and all(0 <= v <= 1 for v in c1["bbox"])
+    assert c1["bbox_space"] == "normalized_top_left" and all(0 <= v <= 1 for v in c1["bbox"])
     assert c1["bbox"][0] < c1["bbox"][2] and c1["bbox"][1] < c1["bbox"][3]
     assert result["citations"][4]["bbox"] is None and result["citations"][4]["bbox_space"] is None   # CSV: no boxes
     assert "possible_flattened_exponent" in result["citations"][5]["flags"]
@@ -184,12 +191,15 @@ def test_analysis_validates_citations_claims_and_tables_without_certifying(contr
     assert claims["K4"]["support"] == "supported" and claims["K4"]["flags"] == []   # SD elsewhere is irrelevant
     assert "hard_bound_conflicts_with_statistical_qualifier" in claims["K5"]["flags"]
     assert claims["K6"]["support"] == "uncited"
-    assert {"unknown_citation_id", "verification_language_not_a_verification"} <= set(claims["K7"]["flags"])
+    assert {"citation_not_bound_to_a_selected_page", "verification_language_not_a_verification"} <= set(claims["K7"]["flags"])
+    assert claims["K7"]["citation_ids"] == [] and claims["K7"]["rejected_citation_ids"] == ["C99"]
     assert "model_used_verification_language" in result["flags"]
     assert any("No mathematical verification was performed" in item for item in result["limitations"])
     table, = result["extracted_tables"]
-    assert [c["unit_status"] for c in table["columns"]] == ["printed_in_source", "not_found_in_source",
-                                                           "printed_in_source", "not_stated"]
+    assert table["columns"] == ["depth (cm)", "moisture (%)", "nitrate [mg/kg]", "texture"]
+    assert [c["unit_status"] for c in table["column_details"]] == ["printed_in_source", "not_found_in_source",
+                                                                  "printed_in_source", "not_stated"]
+    assert all(len(row) == len(table["columns"]) for row in table["rows"])
     assert table["cell_checks"]["unsupported_cells"] == [[1, 1], [2, 2]]
     assert table["cell_checks"]["ambiguous_exponent_cells"] == [[2, 2]]
     assert table["review_status"] == "unreviewed" and table["rows"][2][1] is None
@@ -198,6 +208,10 @@ def test_analysis_validates_citations_claims_and_tables_without_certifying(contr
     attempt, = attempts(app)
     assert attempt["state"] == "completed" and result["provider_attempt_id"] == attempt["id"]
     assert json.loads(attempt["metadata"])["external_provider_calls"] == 0
+    for step in result["suggested_next_steps"] + result["clarifications"]:
+        assert set(step["citation_ids"]) <= set(status)
+    assert result["clarifications"][0]["citation_ids"] == ["C6"]
+    assert result["clarifications"][0]["rejected_citation_ids"] == ["C8"]
     call, = factory.clients[0].calls
     prompt = call["contents"][0].parts[0].text
     assert "untrusted" in call["config"].system_instruction
@@ -213,7 +227,7 @@ def test_reopen_and_duplicate_requests_never_dispatch_again(controlled):
     body = analysis_body([soil])
     first = analyze(client, w, body)
     assert analyze(client, w, body) == first
-    assert client.get(PREFIX + f"/research-analyses/{first['id']}").json() == first
+    assert client.get(PREFIX + f"/research-analyses/{first['id']}").json() == first and first["body"]["status"] == "completed"
     assert [a["id"] for a in client.get(PREFIX + f"/workspaces/{w}/research-analyses").json()] == [first["id"]]
     assert factory.calls == 1 and len(attempts(app)) == 1
     changed = analyze(client, w, {**body, "question": "Something else?"}, expect=409)
@@ -236,7 +250,7 @@ def test_consent_must_cover_exactly_the_request(controlled, change, code, status
     body["consent"].update(change)
     assert analyze(client, w, body, expect=status)["code"] == code
     assert factory.calls == 0 and attempts(app) == []
-    assert analyze(client, w, {**analysis_body([soil]), "client_operation_id": "op-1"})["status"] == "completed"
+    assert analyze(client, w, {**analysis_body([soil]), "client_operation_id": "op-1"})["body"]["status"] == "completed"
 
 
 def test_stale_digest_is_refused_before_anything_is_sent(controlled):
@@ -265,7 +279,7 @@ def test_material_beyond_the_request_context_must_be_narrowed(controlled):
     paper = upload(client, w, document.to_bytes(), "application/pdf")
     assert analyze(client, w, analysis_body([paper], operation="op-pdf"), expect=413)["code"] == "analysis_context_exceeded"
     narrowed = analysis_body([{"id": paper["id"], "sha256": paper["sha256"], "page_indices": [2]}], operation="op-p3")
-    result = analyze(client, w, narrowed)
+    result = analyze(client, w, narrowed)["body"]
     assert result["assets"][0]["pages_sent"] == [{"page_index": 2, "sent_as": "text",
                                                   "text_sha256": paper["pages"][2]["text_sha256"], "image_sha256": None}]
     assert result["assets"][0]["page_count"] == 4
@@ -277,7 +291,7 @@ def test_citation_to_a_page_that_was_not_sent(controlled):
     w = workspace(client)
     paper = upload(client, w, paper_pdf(), "application/pdf")
     result = analyze(client, w, analysis_body([{"id": paper["id"], "sha256": paper["sha256"], "page_indices": [1]}]))
-    assert result["citations"][0]["status"] == "page_not_sent"
+    assert result["body"]["citations"][0]["status"] == "page_not_sent"
 
 
 def test_budget_refusal_happens_before_dispatch_and_is_not_retried(tmp_path):
@@ -297,12 +311,14 @@ def test_timeout_is_an_accounted_unknown_outcome_and_replays_without_a_second_ca
     w = workspace(client)
     soil = upload(client, w, SOIL_CSV, "text/csv")
     body = analysis_body([soil])
-    result = analyze(client, w, body)
-    assert result["status"] == "unknown_outcome" and result["failure"]["code"] == "provider_timeout_unknown_outcome"
-    assert result["summary"] is None and result["citations"] == []
+    error = analyze(client, w, body, expect=422)
+    assert error["code"] == "provider_timeout_unknown_outcome" and "without another call" in error["message"]
+    record, = client.get(PREFIX + f"/workspaces/{w}/research-analyses").json()
+    result = record["body"]
+    assert result["status"] == "unknown_outcome" and result["summary"] is None and result["citations"] == []
     attempt, = attempts(app)
     assert attempt["state"] == "unknown_outcome" and result["provider_attempt_id"] == attempt["id"]
-    assert analyze(client, w, body) == result and factory.calls == 1
+    assert analyze(client, w, body, expect=422)["code"] == "provider_timeout_unknown_outcome" and factory.calls == 1
 
 
 @pytest.mark.parametrize("script,options,code", [
@@ -315,9 +331,10 @@ def test_rejected_model_outputs_are_recorded_failures(controlled, script, option
     app, factory, client = controlled(*script, **options)
     w = workspace(client)
     soil = upload(client, w, SOIL_CSV, "text/csv")
-    result = analyze(client, w, analysis_body([soil]))
-    assert result["status"] == "failed" and result["failure"]["code"] == code
-    assert result["verification"]["status"] == "not_mathematically_verified"
+    assert analyze(client, w, analysis_body([soil]), expect=422)["code"] == code
+    record, = client.get(PREFIX + f"/workspaces/{w}/research-analyses").json()
+    assert record["body"]["status"] == "failed" and record["body"]["failure"]["code"] == code
+    assert record["body"]["verification"]["status"] == "not_mathematically_verified"
     assert attempts(app)[0]["state"] == "failed" and factory.calls == 1
 
 
@@ -342,9 +359,8 @@ def test_cancellation_during_the_call_keeps_the_reservation_and_records_unknown_
     asyncio.run(scenario())
     attempt, = attempts(app)
     assert attempt["state"] == "unknown_outcome"
-    reopened = analyze(client, w, analysis_body([soil]))
-    assert reopened["status"] == "unknown_outcome" and reopened["failure"]["code"] == "provider_cancelled_unknown_outcome"
-    assert factory.calls == 1
+    reopened = analyze(client, w, analysis_body([soil]), expect=422)
+    assert reopened["code"] == "provider_cancelled_unknown_outcome" and factory.calls == 1
 
 
 def test_an_interrupted_operation_is_reconciled_as_unknown(controlled):
@@ -358,9 +374,10 @@ def test_an_interrupted_operation_is_reconciled_as_unknown(controlled):
     assert analyze(client, w, body, expect=409)["code"] == "operation_pending"
     with app.state.workflow.store.transaction() as conn:
         conn.execute("UPDATE operations SET created_at='2026-01-01T00:00:00.000Z' WHERE operation_key='op-1'")
-    reconciled = analyze(client, w, body)
-    assert reconciled["status"] == "unknown_outcome"
-    assert reconciled["failure"]["code"] == "analysis_interrupted_unknown_outcome" and factory.calls == 0
+    reconciled = analyze(client, w, body, expect=422)
+    assert reconciled["code"] == "analysis_interrupted_unknown_outcome" and factory.calls == 0
+    record, = client.get(PREFIX + f"/workspaces/{w}/research-analyses").json()
+    assert record["body"]["status"] == "unknown_outcome"
 
 
 def test_scans_and_images_are_sent_as_images_and_their_quotes_stay_unverifiable(controlled):
@@ -373,12 +390,12 @@ def test_scans_and_images_are_sent_as_images_and_their_quotes_stay_unverifiable(
     scan = upload(client, w, scanned_pdf(), "application/pdf")
     soil = upload(client, w, SOIL_CSV, "text/csv")
     photo = upload(client, w, jpeg_bytes((2400, 1600)), "image/jpeg")
-    result = analyze(client, w, analysis_body([scan, soil]))
+    result = analyze(client, w, analysis_body([scan, soil]))["body"]
     assert result["citations"][0]["status"] == "unverifiable_no_text_layer"
     assert result["claims"][0]["support"] == "unverifiable"
     assert [p["sent_as"] for a in result["assets"] for p in a["pages_sent"]] == ["image", "text"]
     assert any("without local OCR" in item for item in result["limitations"])
-    second = analyze(client, w, analysis_body([photo], operation="op-photo"))
+    second = analyze(client, w, analysis_body([photo], operation="op-photo"))["body"]
     assert second["citations"][0]["status"] == "unverifiable_no_text_layer"
     assert second["assets"][0]["pages_sent"][0]["image_sha256"] != photo["sha256"]   # the declared preview was sent
     first_parts = factory.clients[0].calls[0]["contents"][0].parts
@@ -393,7 +410,7 @@ def test_supported_adapter_is_only_a_signal(controlled):
     _, _, client = controlled(output())
     w = workspace(client)
     table = upload(client, w, b"time (h),concentration (mg/L)\n0.5,7.2\n1,8.0\n", "text/csv")
-    result = analyze(client, w, analysis_body([table]))
+    result = analyze(client, w, analysis_body([table]))["body"]
     assert result["verification"]["status"] == "not_mathematically_verified"
     assert result["verification"]["supported_adapter"] == "two_rate_concentration"
     assert "not a check" in result["verification"]["reason"]
@@ -406,7 +423,8 @@ def test_disabled_server_uploads_but_never_dispatches(tmp_path, monkeypatch):
     w = workspace(client)
     soil = upload(client, w, SOIL_CSV, "text/csv")
     capabilities = client.get(PREFIX + "/research-capabilities").json()
-    assert capabilities["routes_registered"] is True and capabilities["available"] is False
+    assert capabilities["routes_registered"] is True and capabilities["available"] is True   # uploads work
+    assert capabilities["analysis"]["available"] is False and capabilities["analysis"]["reason"]
     assert capabilities["analysis"]["unavailable_reason"] == "provider_dispatch_disabled"
     refused = analyze(client, w, analysis_body([soil], model="gemini-3.5-flash-lite"), expect=503)
     assert refused["code"] == "general_analysis_unavailable" and attempts(app) == []
@@ -418,7 +436,7 @@ def test_controlled_demo_mode_is_labelled_and_spends_nothing(tmp_path, monkeypat
     client = client_for(app)
     w = workspace(client)
     soil = upload(client, w, SOIL_CSV, "text/csv")
-    result = analyze(client, w, analysis_body([soil], model="controlled-general-analysis"))
+    result = analyze(client, w, analysis_body([soil], model="controlled-general-analysis"))["body"]
     assert result["status"] == "completed" and result["provider"] == "controlled"
     assert result["citations"][0]["status"] == "verified"
     assert result["extracted_tables"][0]["cell_checks"]["unsupported_cells"] == []
@@ -448,7 +466,7 @@ def test_live_path_sends_one_bounded_request_and_never_stores_the_key(tmp_path, 
     w = workspace(client)
     soil = upload(client, w, SOIL_CSV, "text/csv", origin="real_observation")
     photo = upload(client, w, png_bytes((300, 200)), "image/png")
-    result = analyze(client, w, analysis_body([soil, photo], model=LIVE_MODEL))
+    result = analyze(client, w, analysis_body([soil, photo], model=LIVE_MODEL))["body"]
     assert result["execution_mode"] == "live" and result["provider"] == "gemini"
     assert result["label"] == "AI analysis — not mathematically verified"
     sdk, = clients
@@ -522,7 +540,7 @@ def test_live_gates_make_analysis_unavailable(tmp_path, monkeypatch, change, rea
     app = make_app(tmp_path, transport_for=lambda app: GeneralAnalysisTransport(live_config(**change), app.state.ledger))
     client = client_for(app)
     capabilities = client.get(PREFIX + "/research-capabilities").json()
-    assert capabilities["available"] is False and capabilities["analysis"]["unavailable_reason"] == reason
+    assert capabilities["analysis"]["available"] is False and capabilities["analysis"]["unavailable_reason"] == reason
     w = workspace(client)
     soil = upload(client, w, SOIL_CSV, "text/csv")
     assert analyze(client, w, analysis_body([soil], model=change.get("model", LIVE_MODEL)), expect=503)["code"] == \
@@ -540,7 +558,25 @@ def test_a_validation_fault_after_a_completed_call_is_recorded_not_lost(controll
     soil = upload(client, w, SOIL_CSV, "text/csv")
     service = app.state.general_research
     monkeypatch.setattr(service, "_validate_output", lambda plan, value: 1 / 0)
-    result = analyze(client, w, analysis_body([soil]))
-    assert result["status"] == "failed" and result["failure"]["code"] == "analysis_validation_failed"
-    assert attempts(app)[0]["state"] == "completed" and result["provider_attempt_id"] == attempts(app)[0]["id"]
-    assert analyze(client, w, analysis_body([soil])) == result and factory.calls == 1
+    assert analyze(client, w, analysis_body([soil]), expect=422)["code"] == "analysis_validation_failed"
+    record, = client.get(PREFIX + f"/workspaces/{w}/research-analyses").json()
+    assert record["body"]["failure"]["code"] == "analysis_validation_failed"
+    assert attempts(app)[0]["state"] == "completed" and record["body"]["provider_attempt_id"] == attempts(app)[0]["id"]
+    assert analyze(client, w, analysis_body([soil]), expect=422)["code"] == "analysis_validation_failed"
+    assert factory.calls == 1
+
+
+def test_undeclared_uploads_are_detected_from_bytes_and_get_a_fallback_name(controlled):
+    _, _, client = controlled()
+    w = workspace(client)
+    csv = upload(client, w, SOIL_CSV, "application/octet-stream", name="cores.csv")
+    assert csv["media_type"] == "text/csv" and csv["provenance"]["media_type_detection"] == "filename_extension_hint"
+    pdf = upload(client, w, paper_pdf(), "application/octet-stream")
+    assert pdf["media_type"] == "application/pdf" and pdf["provenance"]["media_type_detection"] == "content_signature"
+    assert pdf["filename"] == f"research-file-{pdf['sha256'][:12]}.pdf"
+    assert pdf["provenance"]["source_name_supplied"] is False
+    sniffed = upload(client, w, b'{"a": [1, 2]}', "application/octet-stream")
+    assert sniffed["media_type"] == "application/json" and sniffed["provenance"]["media_type_detection"] == "content_sniff"
+    assert upload(client, w, b"\x00\x01\x02 unknown binary", "application/octet-stream", expect=422)["code"] == \
+        "binary_content"
+    assert upload(client, w, png_bytes()[:30], "application/octet-stream", expect=422)["code"] == "malformed_image"

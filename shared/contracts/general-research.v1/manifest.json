@@ -69,6 +69,7 @@
   "schemas": [
     "AnalysisEstimate.schema.json",
     "AnalysisEstimateRequest.schema.json",
+    "GeneralResearchCapabilities.schema.json",
     "ModelAnalysisOutput.schema.json",
     "PageText.schema.json",
     "ResearchAnalysis.schema.json",
@@ -91,7 +92,7 @@
     "max_analysis_bytes": 10485760,
     "max_pdf_pages": 10,
     "max_question_chars": 4000,
-    "max_source_name_chars": 255,
+    "max_source_name_chars": 240,
     "max_table_rows": 200000,
     "max_table_columns": 512,
     "max_image_pixels": 50000000,
@@ -99,9 +100,11 @@
   },
   "conventions": {
     "page_index": "zero-based; page_number = page_index + 1 for display",
-    "bbox": "[x0, y0, x1, y1] normalized 0-1, origin top-left of the displayed (rotated) page; bbox_space = page_normalized_top_left; null when no character boxes exist",
+    "bbox": "[x0, y0, x1, y1] normalized 0-1, origin top-left of the displayed (rotated) page; bbox_space = normalized_top_left; null when no character boxes exist",
     "citation": "binds source_sha256 + page_index + exact quote; status verified only for one admissible occurrence after citation-normalization.v1",
     "verification": "every analysis is not_mathematically_verified; checked results are separate records",
+    "records": "analyses are returned as {id, workspace_id, kind, digest, created_at, body}; assets are flat",
+    "failures": "an analysis that used a provider attempt but produced no result is stored and listed, and its POST (and every retry with the same key) returns the standard error envelope (422)",
     "errors": "standard envelope {code, message, field_paths, retryable, current_revision_id, request_id}"
   },
   "generator": "python -m bean_api.general_research.contract"

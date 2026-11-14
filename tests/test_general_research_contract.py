@@ -56,7 +56,9 @@ def test_actual_exchanges_conform_to_the_published_models(recorded):
     S.AnalysisEstimate.model_validate(out["estimate"]["response"]["body"])
     S.ResearchAnalysisRequest.model_validate(out["analysis"]["request"]["body"])
     analysis = S.ResearchAnalysis.model_validate(out["analysis"]["response"]["body"])
-    assert analysis.verification.status == "not_mathematically_verified" and analysis.execution_mode == "controlled"
+    assert analysis.body.verification.status == "not_mathematically_verified"
+    assert analysis.body.execution_mode == "controlled" and analysis.kind == "research_analysis"
+    S.GeneralResearchCapabilities.model_validate(out["capabilities"]["response"]["body"])
     error = out["error-stale-digest"]["response"]
     assert error["status"] == 409 and set(error["body"]) == {"code", "message", "field_paths", "retryable",
                                                               "current_revision_id", "request_id"}
@@ -89,7 +91,7 @@ def test_registration_attaches_routes_once_and_reports_capability(tmp_path):
     assert after["routes_registered"] is True and after["upload_available"] is True
     assert after["verification"]["general_analysis"] == "not_mathematically_verified"
     assert after["citations"] == {"normalization_version": "citation-normalization.v1",
-                                  "bbox_space": "page_normalized_top_left", "page_index_base": 0, "page_number_base": 1}
+                                  "bbox_space": "normalized_top_left", "page_index_base": 0, "page_number_base": 1}
 
 
 @pytest.mark.xfail(strict=True, reason="Integration pending: GPT1 wires register_general_routes(app) and "
@@ -100,3 +102,37 @@ def test_the_assembled_application_serves_general_research(tmp_path):
         client.headers["Authorization"] = "Bearer " + "a" * 40
         assert client.get(PREFIX + "/research-capabilities").status_code == 200
         assert client.get(PREFIX + "/capabilities").json()["general_research"]["routes_registered"] is True
+
+
+UI_CHECK = """
+import { generalCapabilities, validateResearchAsset, validateResearchAnalysis } from '%s'
+const data = JSON.parse(await new Promise(resolve => { let text = ''; process.stdin.on('data', c => text += c); process.stdin.on('end', () => resolve(text)) }))
+const limits = generalCapabilities({ general_research: data.capabilities })
+const assets = data.assets.map(asset => validateResearchAsset(asset, { id: asset.id, sha256: asset.sha256, workspaceId: data.workspace }))
+validateResearchAnalysis(data.analysis, assets, data.workspace)
+console.log(JSON.stringify({ limits, assets: assets.length }))
+"""
+
+
+def test_the_merged_browser_validators_accept_actual_responses(recorded, tmp_path):
+    """Run apps/web/general-workspace.mjs's own validators (the UI owner's code) on real backend output."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed; the browser-side contract check needs it")
+    module = contract.ROOT / "apps" / "web" / "general-workspace.mjs"
+    if not module.is_file():
+        pytest.skip("the general research UI module is not on this branch")
+    out, _ = recorded
+    analysis = out["analysis"]["response"]["body"]
+    assets = [out["upload-csv"]["response"]["body"], out["upload-scanned-pdf"]["response"]["body"]]
+    script = tmp_path / "check.mjs"
+    script.write_text(UI_CHECK % module.as_uri(), encoding="utf-8")
+    payload = {"capabilities": out["capabilities"]["response"]["body"], "assets": assets, "analysis": analysis,
+               "workspace": analysis["workspace_id"]}
+    result = subprocess.run([node, str(script)], input=json.dumps(payload), capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr[-2000:]
+    limits = json.loads(result.stdout)["limits"]
+    assert limits["available"] is True and limits["analysisAvailable"] is True
+    assert (limits["maxFiles"], limits["maxPdfPages"]) == (5, 10) and limits["model"] == "controlled-general-analysis"

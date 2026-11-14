@@ -113,13 +113,15 @@ class ModelClaim(Strict):
 class ModelClarification(Strict):
     question: Annotated[str, Field(min_length=1, max_length=300)]
     reason: Annotated[str, Field(max_length=300)]
+    citation_ids: list[Annotated[str, Field(max_length=8)]] = Field(max_length=4)
 
 
 class ModelNextStep(Strict):
-    action: Annotated[str, Field(min_length=1, max_length=300)]
+    text: Annotated[str, Field(min_length=1, max_length=300)]
     rationale: Annotated[str, Field(max_length=300)]
     kind: Literal["collect_data", "review_extracted_values", "check_units", "consult_source",
                   "mathematical_check_candidate", "other"]
+    citation_ids: list[Annotated[str, Field(max_length=8)]] = Field(max_length=4)
 
 
 class ModelAnalysisOutput(Strict):
@@ -148,6 +150,7 @@ class Provenance(Strict):
     source_name_supplied: bool
     declared_media_type: str
     detected_media_type: str
+    media_type_detection: Literal["declared", "content_signature", "filename_extension_hint", "content_sniff"]
     text_encoding: str | None
     parser: ParserInfo
     uploaded_at: str
@@ -168,6 +171,8 @@ class PageDescriptor(Strict):
     text_sha256: Sha256 | None
     text_layer: Literal["native_pdf_text", "decoded_text", "none", "unreliable"]
     char_count: int
+    text_preview: str | None = Field(description="First characters of the page text (bounded); the full text is "
+                                                 "at /research-assets/{id}/pages/{page_index}/text")
 
 
 class ColumnSummary(Strict):
@@ -264,6 +269,14 @@ class PdfSummary(Strict):
     executes_document_scripts: Literal[False]
 
 
+class TablePreview(Strict):
+    source: Literal["delimited", "json"]
+    json_path: str | None
+    columns: list[str]
+    rows: list[list[str | None]]
+    row_count: int
+
+
 class ResearchAsset(Strict):
     id: str
     workspace_id: str
@@ -277,6 +290,7 @@ class ResearchAsset(Strict):
     provenance: Provenance
     content_summary: Annotated[TableSummary | JsonSummary | TextSummary | ImageSummary | PdfSummary,
                                Field(discriminator="kind")]
+    tables: list[TablePreview]
     active_content_detected: list[str]
     active_content_policy: Literal["never_executed_or_followed"]
     warnings: list[str]
@@ -339,7 +353,7 @@ class Citation(Strict):
                     "unverifiable_no_text_layer", "unverifiable_text_layer", "invalid_source", "invalid_page",
                     "page_not_sent", "quote_too_short", "quote_too_long", "duplicate_id"]
     bbox: list[float] | None
-    bbox_space: Literal["page_normalized_top_left"] | None
+    bbox_space: Literal["normalized_top_left"] | None
     match: CitationMatch | None
     normalizations: list[str]
     flags: list[str]
@@ -349,7 +363,8 @@ class Citation(Strict):
 class TableColumn(Strict):
     name: str
     unit: str | None
-    unit_status: Literal["printed_in_source", "not_found_in_source", "unverifiable", "not_stated"]
+    unit_status: Literal["printed_in_source", "not_found_in_source", "unverifiable", "not_stated",
+                         "added_for_unlabelled_cells"]
 
 
 class CellChecks(Strict):
@@ -366,9 +381,11 @@ class ExtractedTable(Strict):
     source_sha256: Sha256 | None
     page_index: int
     page_number: int
-    columns: list[TableColumn]
-    rows: list[list[str | None]]
+    columns: list[str] = Field(description="Column names exactly as the model copied them")
+    column_details: list[TableColumn]
+    rows: list[list[str | None]] = Field(description="Every row has one cell per column; null is an empty cell")
     citation_ids: list[str]
+    rejected_citation_ids: list[str]
     notes: str | None
     review_status: Literal["unreviewed"]
     cell_checks: CellChecks
@@ -381,6 +398,7 @@ class Claim(Strict):
     kind: str
     uncertainty: str
     citation_ids: list[str]
+    rejected_citation_ids: list[str]
     support: Literal["supported", "partially_supported", "unsupported", "unverifiable", "uncited"]
     unsupported_numbers: list[str]
     flags: list[str]
@@ -390,13 +408,17 @@ class Clarification(Strict):
     id: str
     question: str
     reason: str
+    citation_ids: list[str]
+    rejected_citation_ids: list[str]
 
 
 class NextStep(Strict):
     id: str
-    action: str
+    text: str
     rationale: str
     kind: str
+    citation_ids: list[str]
+    rejected_citation_ids: list[str]
 
 
 class Verification(Strict):
@@ -424,9 +446,7 @@ class Failure(Strict):
     message: str
 
 
-class ResearchAnalysis(Strict):
-    id: str
-    workspace_id: str
+class ResearchAnalysisBody(Strict):
     contract_version: Literal["general-research.v1"]
     client_operation_id: str
     status: Literal["completed", "failed", "unknown_outcome"]
@@ -443,7 +463,8 @@ class ResearchAnalysis(Strict):
     limitations: list[str]
     clarifications: list[Clarification]
     suggested_next_steps: list[NextStep]
-    citations: list[Citation]
+    citations: list[Citation] = Field(description="Citations bound to a selected file and an existing page")
+    rejected_citations: list[Citation] = Field(description="Citations naming no selected file or a missing page")
     citation_summary: CitationSummary
     verification: Verification
     provider_attempt_id: str | None
@@ -453,7 +474,16 @@ class ResearchAnalysis(Strict):
     reservation: Reservation
     flags: list[str]
     failure: Failure | None
+
+
+class ResearchAnalysis(Strict):
+    """The durable record envelope, like other workspace records: identity outside, content in ``body``."""
+    id: str
+    workspace_id: str
+    kind: Literal["research_analysis"]
+    digest: Sha256
     created_at: str
+    body: ResearchAnalysisBody
 
 
 class BudgetView(Strict):
@@ -480,6 +510,55 @@ class AnalysisEstimate(Strict):
     estimate_method: str
 
 
+class AnalysisCapability(Strict):
+    available: bool
+    model: str | None
+    reason: str | None
+    execution_mode: Literal["live", "controlled", "disabled"]
+    dispatch_enabled: bool
+    unavailable_reason: str | None
+    accounting: str
+    free_tier_user_asserted: bool
+    billing_verified: Literal[False]
+    live_qualification: str
+    max_input_tokens: int
+    max_output_tokens: int
+    retry_policy: Literal["none"]
+
+
+class RemainingBudget(Strict):
+    requests: int | None
+    input_tokens: int | None
+    output_tokens: int | None
+
+
+class CapabilityBudget(Strict):
+    accounting: Literal["shared_global_ledger", "controlled_zero_spend"]
+    remaining: RemainingBudget
+    remaining_requests: int | None
+    remaining_input_tokens: int | None
+    remaining_output_tokens: int | None
+    billing_verified: Literal[False]
+
+
+class GeneralResearchCapabilities(BaseModel):
+    """The ``general_research`` block of ``/capabilities`` (also ``GET /research-capabilities``)."""
+    model_config = ConfigDict(extra="allow")
+    implemented: Literal[True]
+    contract_version: str
+    routes_registered: bool
+    available: bool = Field(description="File admission is available (uploads never contact a provider)")
+    upload_available: bool | None = None
+    unavailable_reason: str | None = None
+    media_types: list[str]
+    max_assets: int
+    max_file_bytes: int
+    max_total_bytes: int
+    max_pdf_pages: int
+    analysis: AnalysisCapability | None = None
+    budget: CapabilityBudget | None = None
+
+
 PUBLIC_MODELS = {model.__name__: model for model in (
     ResearchAnalysisRequest, AnalysisEstimateRequest, ResearchAsset, PageText, ResearchAnalysis,
-    AnalysisEstimate, ModelAnalysisOutput)}
+    AnalysisEstimate, ModelAnalysisOutput, GeneralResearchCapabilities)}

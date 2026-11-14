@@ -24,7 +24,10 @@ from ..providers import AttemptContext, ProviderFailure
 from ..store import utc_now
 from ..workflow import DomainError
 from . import limits as L
-from .admission import DATA_ORIGINS, Refusal, canonical_media_type, encode_text_layer, parse, source_name
+from .admission import (
+    DATA_ORIGINS, EXTENSIONS, Refusal, canonical_media_type, detect_media_type, encode_text_layer, parse, source_name,
+    table_previews,
+)
 from .citations import (
     PageText, contains_token, has_flattened_exponent, locate, normalize, numbers_in, separators_for,
     statistical_qualifiers, token_occurrences,
@@ -127,6 +130,9 @@ class GeneralResearchService:
                               "synthetic_example, hypothetical or unspecified.")
         except Refusal as exc:
             raise _error(exc.code, exc.message, exc.status) from None
+        detection = "declared"
+        if media_type is None:
+            media_type, detection = detect_media_type(raw, filename)
         digest = hashlib.sha256(raw).hexdigest()
         request = {"sha256": digest, "byte_size": len(raw), "declared_media_type": declared, "filename": filename,
                    "data_origin": origin}
@@ -146,12 +152,14 @@ class GeneralResearchService:
             for content in parsed.blobs.values():
                 self.blobs.put(content)
             layer_sha = self.blobs.put(canonical_bytes(encode_text_layer(digest, parsed.text_pages)))
+            shown_name = filename or f"research-file-{digest[:12]}.{EXTENSIONS[parsed.media_type]}"
             body = {"contract_version": L.CONTRACT_VERSION, "sha256": digest, "media_type": parsed.media_type,
-                    "byte_size": len(raw), "filename": filename,
+                    "byte_size": len(raw), "filename": shown_name,
                     "provenance": {"data_origin": origin,
                                    "origin_declared_by": "not_declared" if origin == "unspecified" else "uploader",
                                    "origin_verified": False, "source_name_supplied": filename is not None,
                                    "declared_media_type": declared, "detected_media_type": parsed.media_type,
+                                   "media_type_detection": detection,
                                    "text_encoding": parsed.encoding, "parser": parsed.parser,
                                    "uploaded_at": utc_now(),
                                    "note": "The origin is the uploader's declaration; Dr. Bean does not verify it."},
@@ -183,6 +191,7 @@ class GeneralResearchService:
                 "pages": [{**page, "width": _number(page["width"]), "height": _number(page["height"])}
                           for page in body["pages"]],
                 "provenance": body["provenance"], "content_summary": body["content_summary"],
+                "tables": table_previews(body["content_summary"]),
                 "active_content_detected": body["active_content_detected"],
                 "active_content_policy": "never_executed_or_followed", "warnings": body["warnings"],
                 "created_at": record["created_at"]}
@@ -436,8 +445,8 @@ class GeneralResearchService:
             if failure.attempt_id is None:
                 self.workflow.fail_operation(actor, workspace_id, "research-analysis", key, failure.code)
                 raise
-            return self._store_failure(actor, workspace_id, key, request, plan, consent["id"], failure.code,
-                                       failure.attempt_id)
+            raise self._failure_error(self._store_failure(actor, workspace_id, key, request, plan, consent["id"],
+                                                          failure.code, failure.attempt_id)) from None
         except asyncio.CancelledError:
             if tracker.attempt_id is not None:
                 self._store_failure(actor, workspace_id, key, request, plan, consent["id"],
@@ -447,16 +456,17 @@ class GeneralResearchService:
             raise
         except Exception:
             if tracker.attempt_id is not None:
-                return self._store_failure(actor, workspace_id, key, request, plan, consent["id"],
-                                           "provider_request_failed_unknown_outcome", tracker.attempt_id)
+                raise self._failure_error(self._store_failure(
+                    actor, workspace_id, key, request, plan, consent["id"], "provider_request_failed_unknown_outcome",
+                    tracker.attempt_id)) from None
             self.workflow.fail_operation(actor, workspace_id, "research-analysis", key, "analysis_setup_failed")
             raise
         # Validation and storage run without a cancellation point: a completed attempt is always recorded.
         try:
             checked = self._validate_output(plan, result.value)
         except Exception:
-            return self._store_failure(actor, workspace_id, key, request, plan, consent["id"],
-                                       "analysis_validation_failed", result.attempt_id)
+            raise self._failure_error(self._store_failure(actor, workspace_id, key, request, plan, consent["id"],
+                                                          "analysis_validation_failed", result.attempt_id)) from None
         record_body = self._record_body(request, plan, consent["id"], status="completed",
                                         attempt_id=result.attempt_id, checked=checked)
         record = self.workflow.create_record(actor, workspace_id, ANALYSIS_KIND, record_body, key,
@@ -467,7 +477,10 @@ class GeneralResearchService:
     def _replayed_analysis(self, actor: str, workspace_id: str, operation: dict,
                            request: ResearchAnalysisRequest) -> dict:
         if operation["state"] == "completed":
-            return self.analysis(actor, operation["response"]["analysis_id"])
+            record = self.workflow.get(actor, operation["response"]["analysis_id"], ANALYSIS_KIND)
+            if record["body"]["status"] != "completed":
+                raise self._failure_error(self.public_analysis(record))
+            return self.public_analysis(record)
         if operation["state"] == "reserved":
             created = datetime.fromisoformat(operation["created_at"].replace("Z", "+00:00"))
             age = (datetime.now(timezone.utc) - created).total_seconds()
@@ -497,8 +510,16 @@ class GeneralResearchService:
             plan = self._plan(actor, workspace_id, request.question, request.assets)
         except DomainError:
             plan = Plan([], "", [], [], 0, 0, [], None)
-        return self._store_failure(actor, workspace_id, request.client_operation_id, request, plan, consent_id,
-                                   "analysis_interrupted_unknown_outcome", attempt_id)
+        raise self._failure_error(self._store_failure(actor, workspace_id, request.client_operation_id, request, plan,
+                                                      consent_id, "analysis_interrupted_unknown_outcome", attempt_id))
+
+    @staticmethod
+    def _failure_error(record: dict) -> DomainError:
+        """A finished attempt that produced no analysis: one standard error, the same on every retry."""
+        failure = record["body"]["failure"]
+        return _error(failure["code"], f"{failure['message']} One provider attempt was recorded for this request "
+                      f"({record['id']}); retrying it returns this outcome without another call. Start a new "
+                      "analysis to ask again.", 422)
 
     def _store_failure(self, actor, workspace_id, key, request, plan, consent_id, code, attempt_id) -> dict:
         body = self._record_body(request, plan, consent_id, status="unknown_outcome" if "unknown_outcome" in code
@@ -533,18 +554,19 @@ class GeneralResearchService:
                     return needle in cells[source.label]
             return any(token_occurrences(text, needle, source.separators)[0] for text in haystack(source, index))
 
-        citations, by_id = [], {}
-        for item in value.citations:
-            cid = item.id.strip()
+        identifier = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
+        citations, rejected, public_id = [], [], {}
+        for number, item in enumerate(value.citations, 1):
+            raw_id = item.id.strip()
+            cid = raw_id if identifier.fullmatch(raw_id) else f"C{number}.server"
             entry = {"id": cid, "source_label": item.source, "asset_id": None, "source_sha256": None,
                      "page_index": item.page_index, "page_number": item.page_index + 1, "quote": item.quote,
                      "status": "invalid_source", "bbox_e4": None, "match": None, "normalizations": [], "flags": [],
                      "found_on_page_indices": []}
+            if raw_id in public_id:   # a reused id keeps a distinct server identity and is never referenced
+                entry["id"] = f"{cid}.dup{number}"
+                entry["flags"] = ["duplicate_model_id"]
             source = by_label.get(item.source)
-            if cid in by_id:
-                entry["status"] = "duplicate_id"
-                citations.append(entry)
-                continue
             if source is not None:
                 entry.update(asset_id=source.record["id"], source_sha256=source.body["sha256"])
                 sent = {part["page_index"] for part in source.parts}
@@ -555,32 +577,47 @@ class GeneralResearchService:
                 else:
                     located = locate(source.pages_text, item.page_index, item.quote, source.separators)
                     entry.update(status=located["status"], normalizations=located["normalizations"],
-                                 flags=located["flags"],
+                                 flags=entry["flags"] + located["flags"],
                                  found_on_page_indices=[i for i in located["found_on_pages"] if i in sent])
                     if located["match"]:
                         entry["match"] = {**located["match"],
                                           "text_sha256": source.body["pages"][item.page_index]["text_sha256"]}
                     entry["bbox_e4"] = located["bbox_e4"]
-            by_id[cid] = entry
-            citations.append(entry)
+                if "duplicate_model_id" in entry["flags"]:
+                    entry["status"] = "duplicate_id"
+            bound = entry["status"] not in ("invalid_source", "invalid_page")
+            (citations if bound else rejected).append(entry)   # unbound: no selected file, or no such page
+            public_id.setdefault(raw_id, entry["id"] if bound else None)
+        by_id = {raw: next(c for c in citations if c["id"] == mapped) for raw, mapped in public_id.items()
+                 if mapped is not None}
+
+        def bind(identifiers) -> tuple[list[str], list[str], list[dict]]:
+            kept, dropped, entries = [], [], []
+            for raw in identifiers:
+                entry = by_id.get(raw.strip())
+                if entry is None:
+                    dropped.append(raw)
+                elif entry["id"] not in kept:
+                    kept.append(entry["id"])
+                    entries.append(entry)
+            return kept, dropped, entries
 
         claims = []
         for number, claim in enumerate(value.claims, 1):
-            cited = [by_id.get(identifier) for identifier in claim.citation_ids]
-            flags = ["unknown_citation_id"] if any(entry is None for entry in cited) else []
-            cited = [entry for entry in cited if entry is not None]
+            kept, dropped, cited = bind(claim.citation_ids)
+            flags = ["citation_not_bound_to_a_selected_page"] if dropped else []
             verified = [entry for entry in cited if entry["status"] == "verified"]
             unverifiable = [entry for entry in cited if entry["status"].startswith("unverifiable")]
             unsupported = [token for token in numbers_in(claim.text)
                            if not any(contains_token(entry["quote"], token, by_label[entry["source_label"]].separators)
                                       for entry in verified)]
-            if not cited:
+            if not claim.citation_ids:
                 support = "uncited"
-            elif verified and len(verified) == len(cited) and not unsupported:
+            elif verified and len(verified) == len(claim.citation_ids) and not unsupported:
                 support = "supported"
             elif verified:
                 support = "partially_supported"
-            elif unverifiable and len(unverifiable) == len(cited):
+            elif unverifiable and len(unverifiable) == len(claim.citation_ids):
                 support = "unverifiable"
             else:
                 support = "unsupported"
@@ -592,18 +629,20 @@ class GeneralResearchService:
             if VERIFICATION_WORDS.search(claim.text):
                 flags.append("verification_language_not_a_verification")
             claims.append({"id": f"K{number}", "text": claim.text, "kind": claim.kind,
-                           "uncertainty": claim.uncertainty, "citation_ids": list(claim.citation_ids),
+                           "uncertainty": claim.uncertainty, "citation_ids": kept, "rejected_citation_ids": dropped,
                            "support": support, "unsupported_numbers": unsupported, "flags": flags})
 
         tables = []
         for number, table in enumerate(value.extracted_tables, 1):
             source = by_label.get(table.source)
-            flags, columns = [], []
+            flags = []
             valid_page = (source is not None and table.page_index < len(source.body["pages"])
                           and table.page_index in {part["page_index"] for part in source.parts})
             checkable = valid_page and source.pages_text[table.page_index].quality == "usable"
             if not valid_page:
                 flags.append("invalid_source_or_page")
+            names = [column.name for column in table.columns]
+            details = []
             for column in table.columns:
                 if column.unit is None:
                     status = "not_stated"
@@ -611,11 +650,18 @@ class GeneralResearchService:
                     status = "unverifiable"
                 else:
                     status = "printed_in_source" if occurs(source, table.page_index, column.unit) else "not_found_in_source"
-                columns.append({"name": column.name, "unit": column.unit, "unit_status": status})
+                details.append({"name": column.name, "unit": column.unit, "unit_status": status})
+            width = max([len(names)] + [len(row) for row in table.rows])
+            if width > len(names):
+                flags.append("model_rows_wider_than_header")
+                for extra in range(len(names), width):
+                    names.append(f"(unlabelled column {extra + 1})")
+                    details.append({"name": names[-1], "unit": None, "unit_status": "added_for_unlabelled_cells"})
+            if any(len(row) < width for row in table.rows):
+                flags.append("short_rows_padded_with_empty_cells")
+            rows = [list(row) + [None] * (width - len(row)) for row in table.rows]
             unsupported, exponents = [], []
-            for row_index, row in enumerate(table.rows):
-                if len(row) != len(table.columns) and "row_length_differs_from_columns" not in flags:
-                    flags.append("row_length_differs_from_columns")
+            for row_index, row in enumerate(rows):
                 for column_index, cell in enumerate(row):
                     if cell is None or not cell.strip():
                         continue
@@ -623,16 +669,27 @@ class GeneralResearchService:
                         exponents.append([row_index, column_index])
                     if checkable and not occurs(source, table.page_index, cell.strip(), cell=True):
                         unsupported.append([row_index, column_index])
-            if any(identifier not in by_id for identifier in table.citation_ids):
-                flags.append("unknown_citation_id")
+            kept, dropped, _ = bind(table.citation_ids)
+            if dropped:
+                flags.append("citation_not_bound_to_a_selected_page")
             tables.append({"id": f"T{number}", "title": table.title, "source_label": table.source,
                            "asset_id": source.record["id"] if source else None,
                            "source_sha256": source.body["sha256"] if source else None,
-                           "page_index": table.page_index, "page_number": table.page_index + 1, "columns": columns,
-                           "rows": [list(row) for row in table.rows], "citation_ids": list(table.citation_ids),
-                           "notes": table.notes, "review_status": "unreviewed",
+                           "page_index": table.page_index, "page_number": table.page_index + 1, "columns": names,
+                           "column_details": details, "rows": rows, "citation_ids": kept,
+                           "rejected_citation_ids": dropped, "notes": table.notes, "review_status": "unreviewed",
                            "cell_checks": {"checked_against_text_layer": checkable, "unsupported_cells": unsupported,
                                            "ambiguous_exponent_cells": exponents}, "flags": flags})
+
+        clarifications, next_steps = [], []
+        for number, item in enumerate(value.clarifications, 1):
+            kept, dropped, _ = bind(item.citation_ids)
+            clarifications.append({"id": f"Q{number}", "question": item.question, "reason": item.reason,
+                                   "citation_ids": kept, "rejected_citation_ids": dropped})
+        for number, item in enumerate(value.suggested_next_steps, 1):
+            kept, dropped, _ = bind(item.citation_ids)
+            next_steps.append({"id": f"N{number}", "text": item.text, "rationale": item.rationale, "kind": item.kind,
+                               "citation_ids": kept, "rejected_citation_ids": dropped})
 
         record_flags = []
         if VERIFICATION_WORDS.search(value.summary) or any("verification_language_not_a_verification" in claim["flags"]
@@ -643,22 +700,21 @@ class GeneralResearchService:
             limitations.append("The model's wording mentions verification or proof. No mathematical verification was "
                                "performed; this is AI interpretation.")
         return {"summary": value.summary, "extracted_tables": tables, "claims": claims, "limitations": limitations,
-                "clarifications": [{"id": f"Q{i}", "question": c.question, "reason": c.reason}
-                                   for i, c in enumerate(value.clarifications, 1)],
-                "suggested_next_steps": [{"id": f"N{i}", "action": s.action, "rationale": s.rationale, "kind": s.kind}
-                                         for i, s in enumerate(value.suggested_next_steps, 1)],
-                "citations": citations, "flags": record_flags}
+                "clarifications": clarifications, "suggested_next_steps": next_steps, "citations": citations,
+                "rejected_citations": rejected, "flags": record_flags}
 
     # ================================================================== records
     def _record_body(self, request: ResearchAnalysisRequest, plan: Plan, consent_id: str | None, *, status: str,
                      attempt_id: str | None, checked: dict | None = None, failure: str | None = None) -> dict:
         mode = self.transport.mode if self.transport.mode != "disabled" else "controlled"
         checked = checked or {"summary": None, "extracted_tables": [], "claims": [], "limitations": plan.limitations,
-                              "clarifications": [], "suggested_next_steps": [], "citations": [], "flags": []}
+                              "clarifications": [], "suggested_next_steps": [], "citations": [],
+                              "rejected_citations": [], "flags": []}
         citations = checked["citations"]
         verified = sum(c["status"] == "verified" for c in citations)
         ambiguous = sum(c["status"] == "ambiguous" for c in citations)
         unverifiable = sum(c["status"].startswith("unverifiable") for c in citations)
+        total = len(citations) + len(checked["rejected_citations"])
         adapter = plan.supported_adapter
         return {"contract_version": L.CONTRACT_VERSION, "client_operation_id": request.client_operation_id,
                 "status": status, "label": LABELS["live" if mode == "live" else "controlled"],
@@ -672,9 +728,8 @@ class GeneralResearchService:
                             "asset_ids": list(request.consent.asset_ids), "include_question": True,
                             "consent_record_id": consent_id or ""},
                 **checked,
-                "citation_summary": {"total": len(citations), "verified": verified, "ambiguous": ambiguous,
-                                     "unverifiable": unverifiable,
-                                     "rejected": len(citations) - verified - ambiguous - unverifiable},
+                "citation_summary": {"total": total, "verified": verified, "ambiguous": ambiguous,
+                                     "unverifiable": unverifiable, "rejected": total - verified - ambiguous - unverifiable},
                 "verification": {"status": "not_mathematically_verified", "supported_adapter": adapter,
                                  "reason": ("A selected table states hours and mg/L, so the two-rate concentration "
                                             "checker could be offered after explicit review and approval. This "
@@ -691,16 +746,20 @@ class GeneralResearchService:
 
     @staticmethod
     def public_analysis(record: dict) -> dict:
+        """The record envelope used across the API: identity outside, the analysis content in ``body``."""
         body = record["body"]
-        citations = []
-        for citation in body["citations"]:
+
+        def public(citation: dict) -> dict:
             box = citation.get("bbox_e4")
-            public = {key: value for key, value in citation.items() if key != "bbox_e4"}
-            public["bbox"] = [round(v / 10_000, 4) for v in box] if box else None
-            public["bbox_space"] = L.BBOX_SPACE if box else None
-            citations.append(public)
-        return {"id": record["id"], "workspace_id": record["workspace_id"], **body, "citations": citations,
-                "created_at": record["created_at"]}
+            result = {key: value for key, value in citation.items() if key != "bbox_e4"}
+            result["bbox"] = [round(v / 10_000, 4) for v in box] if box else None
+            result["bbox_space"] = L.BBOX_SPACE if box else None
+            return result
+
+        return {"id": record["id"], "workspace_id": record["workspace_id"], "kind": record["kind"],
+                "digest": record["digest"], "created_at": record["created_at"],
+                "body": {**body, "citations": [public(c) for c in body["citations"]],
+                         "rejected_citations": [public(c) for c in body.get("rejected_citations", [])]}}
 
     def analysis(self, actor: str, analysis_id: str) -> dict:
         return self.public_analysis(self.workflow.get(actor, analysis_id, ANALYSIS_KIND))

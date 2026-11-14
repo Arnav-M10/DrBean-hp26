@@ -60,6 +60,8 @@ def _scrub(value, rendered: set[str]):
         for key, item in value.items():
             if key in ("image_sha256",) and item in rendered:
                 result[key] = "<rendered-page-png-sha256>"
+            elif key == "digest" and isinstance(item, str):
+                result[key] = "<record-digest>"
             elif key == "parser" and isinstance(item, dict) and item.get("name") == "pypdfium2":
                 result[key] = {"name": "pypdfium2", "version": "<pypdfium2 version (pdfium build)>"}
             elif key == "isolation":
@@ -175,10 +177,13 @@ def manifest() -> dict:
             "conventions": {
                 "page_index": "zero-based; page_number = page_index + 1 for display",
                 "bbox": "[x0, y0, x1, y1] normalized 0-1, origin top-left of the displayed (rotated) page; "
-                        "bbox_space = page_normalized_top_left; null when no character boxes exist",
+                        "bbox_space = normalized_top_left; null when no character boxes exist",
                 "citation": "binds source_sha256 + page_index + exact quote; status verified only for one "
                             "admissible occurrence after citation-normalization.v1",
                 "verification": "every analysis is not_mathematically_verified; checked results are separate records",
+                "records": "analyses are returned as {id, workspace_id, kind, digest, created_at, body}; assets are flat",
+                "failures": "an analysis that used a provider attempt but produced no result is stored and listed, and "
+                            "its POST (and every retry with the same key) returns the standard error envelope (422)",
                 "errors": "standard envelope {code, message, field_paths, retryable, current_revision_id, request_id}"},
             "generator": "python -m bean_api.general_research.contract"}
 

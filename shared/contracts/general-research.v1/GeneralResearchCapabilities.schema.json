@@ -1,0 +1,321 @@
+{
+  "$defs": {
+    "AnalysisCapability": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "title": "Available",
+          "type": "boolean"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "execution_mode": {
+          "enum": [
+            "live",
+            "controlled",
+            "disabled"
+          ],
+          "title": "Execution Mode",
+          "type": "string"
+        },
+        "dispatch_enabled": {
+          "title": "Dispatch Enabled",
+          "type": "boolean"
+        },
+        "unavailable_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unavailable Reason"
+        },
+        "accounting": {
+          "title": "Accounting",
+          "type": "string"
+        },
+        "free_tier_user_asserted": {
+          "title": "Free Tier User Asserted",
+          "type": "boolean"
+        },
+        "billing_verified": {
+          "const": false,
+          "title": "Billing Verified",
+          "type": "boolean"
+        },
+        "live_qualification": {
+          "title": "Live Qualification",
+          "type": "string"
+        },
+        "max_input_tokens": {
+          "title": "Max Input Tokens",
+          "type": "integer"
+        },
+        "max_output_tokens": {
+          "title": "Max Output Tokens",
+          "type": "integer"
+        },
+        "retry_policy": {
+          "const": "none",
+          "title": "Retry Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "available",
+        "model",
+        "reason",
+        "execution_mode",
+        "dispatch_enabled",
+        "unavailable_reason",
+        "accounting",
+        "free_tier_user_asserted",
+        "billing_verified",
+        "live_qualification",
+        "max_input_tokens",
+        "max_output_tokens",
+        "retry_policy"
+      ],
+      "title": "AnalysisCapability",
+      "type": "object"
+    },
+    "CapabilityBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "accounting": {
+          "enum": [
+            "shared_global_ledger",
+            "controlled_zero_spend"
+          ],
+          "title": "Accounting",
+          "type": "string"
+        },
+        "remaining": {
+          "$ref": "#/$defs/RemainingBudget"
+        },
+        "remaining_requests": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remaining Requests"
+        },
+        "remaining_input_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remaining Input Tokens"
+        },
+        "remaining_output_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remaining Output Tokens"
+        },
+        "billing_verified": {
+          "const": false,
+          "title": "Billing Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "accounting",
+        "remaining",
+        "remaining_requests",
+        "remaining_input_tokens",
+        "remaining_output_tokens",
+        "billing_verified"
+      ],
+      "title": "CapabilityBudget",
+      "type": "object"
+    },
+    "RemainingBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Requests"
+        },
+        "input_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Input Tokens"
+        },
+        "output_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Output Tokens"
+        }
+      },
+      "required": [
+        "requests",
+        "input_tokens",
+        "output_tokens"
+      ],
+      "title": "RemainingBudget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "description": "The ``general_research`` block of ``/capabilities`` (also ``GET /research-capabilities``).",
+  "properties": {
+    "implemented": {
+      "const": true,
+      "title": "Implemented",
+      "type": "boolean"
+    },
+    "contract_version": {
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "routes_registered": {
+      "title": "Routes Registered",
+      "type": "boolean"
+    },
+    "available": {
+      "description": "File admission is available (uploads never contact a provider)",
+      "title": "Available",
+      "type": "boolean"
+    },
+    "upload_available": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Upload Available"
+    },
+    "unavailable_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unavailable Reason"
+    },
+    "media_types": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Media Types",
+      "type": "array"
+    },
+    "max_assets": {
+      "title": "Max Assets",
+      "type": "integer"
+    },
+    "max_file_bytes": {
+      "title": "Max File Bytes",
+      "type": "integer"
+    },
+    "max_total_bytes": {
+      "title": "Max Total Bytes",
+      "type": "integer"
+    },
+    "max_pdf_pages": {
+      "title": "Max Pdf Pages",
+      "type": "integer"
+    },
+    "analysis": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AnalysisCapability"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "budget": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CapabilityBudget"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "implemented",
+    "contract_version",
+    "routes_registered",
+    "available",
+    "media_types",
+    "max_assets",
+    "max_file_bytes",
+    "max_total_bytes",
+    "max_pdf_pages"
+  ],
+  "title": "GeneralResearchCapabilities",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dr-bean:general-research.v1:GeneralResearchCapabilities"
+}

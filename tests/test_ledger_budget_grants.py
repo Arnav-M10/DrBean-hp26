@@ -118,6 +118,6 @@ def test_a_grant_admits_a_live_analysis_that_the_exhausted_ledger_refused(tmp_pa
                  reason="Allow one bounded general analysis", requests=0, input_tokens=20_000, output_tokens=0)
     budget = client.get(PREFIX + f"/workspaces/{w}/provider-budget").json()
     assert budget["effective_caps"]["input_tokens"] == 84_000 and budget["remaining"]["input_tokens"] == 24_568
-    result = analyze(client, w, analysis_body([soil], model=LIVE_MODEL, operation="op-after-grant"))
+    result = analyze(client, w, analysis_body([soil], model=LIVE_MODEL, operation="op-after-grant"))["body"]
     assert result["status"] == "completed" and len(clients) == 1 and len(attempts(app)) == 6
     assert json.loads(attempts(app)[-1]["metadata"])["operation"] == "general_analysis"

@@ -428,6 +428,18 @@
         "char_count": {
           "title": "Char Count",
           "type": "integer"
+        },
+        "text_preview": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First characters of the page text (bounded); the full text is at /research-assets/{id}/pages/{page_index}/text",
+          "title": "Text Preview"
         }
       },
       "required": [
@@ -443,7 +455,8 @@
         "image_height",
         "text_sha256",
         "text_layer",
-        "char_count"
+        "char_count",
+        "text_preview"
       ],
       "title": "PageDescriptor",
       "type": "object"
@@ -551,6 +564,16 @@
           "title": "Detected Media Type",
           "type": "string"
         },
+        "media_type_detection": {
+          "enum": [
+            "declared",
+            "content_signature",
+            "filename_extension_hint",
+            "content_sniff"
+          ],
+          "title": "Media Type Detection",
+          "type": "string"
+        },
         "text_encoding": {
           "anyOf": [
             {
@@ -581,12 +604,74 @@
         "source_name_supplied",
         "declared_media_type",
         "detected_media_type",
+        "media_type_detection",
         "text_encoding",
         "parser",
         "uploaded_at",
         "note"
       ],
       "title": "Provenance",
+      "type": "object"
+    },
+    "TablePreview": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "enum": [
+            "delimited",
+            "json"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "json_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Json Path"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "row_count": {
+          "title": "Row Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source",
+        "json_path",
+        "columns",
+        "rows",
+        "row_count"
+      ],
+      "title": "TablePreview",
       "type": "object"
     },
     "TableRowPreview": {
@@ -891,6 +976,13 @@
       ],
       "title": "Content Summary"
     },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/TablePreview"
+      },
+      "title": "Tables",
+      "type": "array"
+    },
     "active_content_detected": {
       "items": {
         "type": "string"
@@ -926,6 +1018,7 @@
     "pages",
     "provenance",
     "content_summary",
+    "tables",
     "active_content_detected",
     "active_content_policy",
     "warnings",

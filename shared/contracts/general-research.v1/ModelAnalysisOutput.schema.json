@@ -110,11 +110,21 @@
           "maxLength": 300,
           "title": "Reason",
           "type": "string"
+        },
+        "citation_ids": {
+          "items": {
+            "maxLength": 8,
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Citation Ids",
+          "type": "array"
         }
       },
       "required": [
         "question",
-        "reason"
+        "reason",
+        "citation_ids"
       ],
       "title": "ModelClarification",
       "type": "object"
@@ -153,10 +163,10 @@
     "ModelNextStep": {
       "additionalProperties": false,
       "properties": {
-        "action": {
+        "text": {
           "maxLength": 300,
           "minLength": 1,
-          "title": "Action",
+          "title": "Text",
           "type": "string"
         },
         "rationale": {
@@ -175,12 +185,22 @@
           ],
           "title": "Kind",
           "type": "string"
+        },
+        "citation_ids": {
+          "items": {
+            "maxLength": 8,
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Citation Ids",
+          "type": "array"
         }
       },
       "required": [
-        "action",
+        "text",
         "rationale",
-        "kind"
+        "kind",
+        "citation_ids"
       ],
       "title": "ModelNextStep",
       "type": "object"

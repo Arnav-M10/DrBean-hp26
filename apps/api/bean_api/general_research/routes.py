@@ -134,20 +134,35 @@ def general_research_capabilities(app: FastAPI) -> dict:
     """Capability block for ``/capabilities``: available only when routes and a dispatch path are reachable."""
     service: GeneralResearchService | None = getattr(app.state, "general_research", None)
     base = {"implemented": True, "contract_version": L.CONTRACT_VERSION, "media_types": SUPPORTED_MEDIA_TYPES,
+            "max_assets": L.MAX_ANALYSIS_ASSETS, "max_file_bytes": L.MAX_ASSET_BYTES,
+            "max_total_bytes": L.MAX_ANALYSIS_BYTES, "max_pdf_pages": L.MAX_PDF_PAGES,
             "limits": L.public_limits(), "data_origins": list(DATA_ORIGINS)}
     if service is None:
         return {**base, "routes_registered": False, "available": False,
                 "unavailable_reason": "general_routes_not_registered"}
     transport = service.transport.capabilities()
+    budget = service._budget()
+    reasons = {"provider_dispatch_disabled": "Gemini analysis is not enabled on this server.",
+               "provider_not_configured": "Gemini is not configured on this server.",
+               "provider_live_model_not_allowed": "The configured model is not on the free-tier allowlist.",
+               "provider_free_tier_assertion_required": "The server owner has not asserted free-tier use."}
+    reason = transport["unavailable_reason"]
     return {**base, "routes_registered": True,
+            "available": True,            # file admission: uploads never contact a provider
             "upload_available": True,
-            "available": bool(transport["dispatch_enabled"]),
-            "unavailable_reason": transport["unavailable_reason"],
-            "analysis": {key: transport[key] for key in (
-                "execution_mode", "model", "dispatch_enabled", "unavailable_reason", "accounting",
-                "free_tier_user_asserted", "billing_verified", "live_qualification", "max_input_tokens",
-                "max_output_tokens", "retry_policy")},
-            "budget": service._budget(),
+            "unavailable_reason": None,
+            "analysis": {"available": bool(transport["dispatch_enabled"]),
+                         "reason": None if reason is None else reasons.get(reason, f"Analysis is unavailable ({reason})."),
+                         **{key: transport[key] for key in (
+                             "model", "execution_mode", "dispatch_enabled", "unavailable_reason", "accounting",
+                             "free_tier_user_asserted", "billing_verified", "live_qualification", "max_input_tokens",
+                             "max_output_tokens", "retry_policy")}},
+            "budget": {"accounting": budget["accounting"],
+                       "remaining": {"requests": budget["remaining_requests"],
+                                     "input_tokens": budget["remaining_input_tokens"],
+                                     "output_tokens": budget["remaining_output_tokens"]},
+                       **{key: budget[key] for key in ("remaining_requests", "remaining_input_tokens",
+                                                       "remaining_output_tokens", "billing_verified")}},
             "verification": {"general_analysis": "not_mathematically_verified",
                              "checkable_adapters": ["two_rate_concentration"],
                              "rule": "AI analysis is interpretation. Only a separately approved checker run produces "

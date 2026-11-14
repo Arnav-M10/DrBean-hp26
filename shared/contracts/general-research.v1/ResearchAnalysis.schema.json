@@ -190,7 +190,7 @@
         "bbox_space": {
           "anyOf": [
             {
-              "const": "page_normalized_top_left",
+              "const": "normalized_top_left",
               "type": "string"
             },
             {
@@ -334,6 +334,13 @@
           "title": "Citation Ids",
           "type": "array"
         },
+        "rejected_citation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rejected Citation Ids",
+          "type": "array"
+        },
         "support": {
           "enum": [
             "supported",
@@ -366,6 +373,7 @@
         "kind",
         "uncertainty",
         "citation_ids",
+        "rejected_citation_ids",
         "support",
         "unsupported_numbers",
         "flags"
@@ -387,12 +395,28 @@
         "reason": {
           "title": "Reason",
           "type": "string"
+        },
+        "citation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Citation Ids",
+          "type": "array"
+        },
+        "rejected_citation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rejected Citation Ids",
+          "type": "array"
         }
       },
       "required": [
         "id",
         "question",
-        "reason"
+        "reason",
+        "citation_ids",
+        "rejected_citation_ids"
       ],
       "title": "Clarification",
       "type": "object"
@@ -488,13 +512,22 @@
           "type": "integer"
         },
         "columns": {
+          "description": "Column names exactly as the model copied them",
           "items": {
-            "$ref": "#/$defs/TableColumn"
+            "type": "string"
           },
           "title": "Columns",
           "type": "array"
         },
+        "column_details": {
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          },
+          "title": "Column Details",
+          "type": "array"
+        },
         "rows": {
+          "description": "Every row has one cell per column; null is an empty cell",
           "items": {
             "items": {
               "anyOf": [
@@ -516,6 +549,13 @@
             "type": "string"
           },
           "title": "Citation Ids",
+          "type": "array"
+        },
+        "rejected_citation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rejected Citation Ids",
           "type": "array"
         },
         "notes": {
@@ -554,8 +594,10 @@
         "page_index",
         "page_number",
         "columns",
+        "column_details",
         "rows",
         "citation_ids",
+        "rejected_citation_ids",
         "notes",
         "review_status",
         "cell_checks",
@@ -590,8 +632,8 @@
           "title": "Id",
           "type": "string"
         },
-        "action": {
-          "title": "Action",
+        "text": {
+          "title": "Text",
           "type": "string"
         },
         "rationale": {
@@ -601,15 +643,234 @@
         "kind": {
           "title": "Kind",
           "type": "string"
+        },
+        "citation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Citation Ids",
+          "type": "array"
+        },
+        "rejected_citation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rejected Citation Ids",
+          "type": "array"
         }
       },
       "required": [
         "id",
-        "action",
+        "text",
         "rationale",
-        "kind"
+        "kind",
+        "citation_ids",
+        "rejected_citation_ids"
       ],
       "title": "NextStep",
+      "type": "object"
+    },
+    "ResearchAnalysisBody": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "general-research.v1",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "client_operation_id": {
+          "title": "Client Operation Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "unknown_outcome"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "execution_mode": {
+          "enum": [
+            "live",
+            "controlled"
+          ],
+          "title": "Execution Mode",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "gemini",
+            "controlled"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/AnalysisAssetSnapshot"
+          },
+          "title": "Assets",
+          "type": "array"
+        },
+        "consent": {
+          "$ref": "#/$defs/ConsentSnapshot"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Summary"
+        },
+        "extracted_tables": {
+          "items": {
+            "$ref": "#/$defs/ExtractedTable"
+          },
+          "title": "Extracted Tables",
+          "type": "array"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "clarifications": {
+          "items": {
+            "$ref": "#/$defs/Clarification"
+          },
+          "title": "Clarifications",
+          "type": "array"
+        },
+        "suggested_next_steps": {
+          "items": {
+            "$ref": "#/$defs/NextStep"
+          },
+          "title": "Suggested Next Steps",
+          "type": "array"
+        },
+        "citations": {
+          "description": "Citations bound to a selected file and an existing page",
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "rejected_citations": {
+          "description": "Citations naming no selected file or a missing page",
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Rejected Citations",
+          "type": "array"
+        },
+        "citation_summary": {
+          "$ref": "#/$defs/CitationSummary"
+        },
+        "verification": {
+          "$ref": "#/$defs/Verification"
+        },
+        "provider_attempt_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider Attempt Id"
+        },
+        "prompt_version": {
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "output_schema_version": {
+          "title": "Output Schema Version",
+          "type": "string"
+        },
+        "normalization_version": {
+          "title": "Normalization Version",
+          "type": "string"
+        },
+        "reservation": {
+          "$ref": "#/$defs/Reservation"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Flags",
+          "type": "array"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contract_version",
+        "client_operation_id",
+        "status",
+        "label",
+        "execution_mode",
+        "provider",
+        "model",
+        "question",
+        "assets",
+        "consent",
+        "summary",
+        "extracted_tables",
+        "claims",
+        "limitations",
+        "clarifications",
+        "suggested_next_steps",
+        "citations",
+        "rejected_citations",
+        "citation_summary",
+        "verification",
+        "provider_attempt_id",
+        "prompt_version",
+        "output_schema_version",
+        "normalization_version",
+        "reservation",
+        "flags",
+        "failure"
+      ],
+      "title": "ResearchAnalysisBody",
       "type": "object"
     },
     "Reservation": {
@@ -701,7 +962,8 @@
             "printed_in_source",
             "not_found_in_source",
             "unverifiable",
-            "not_stated"
+            "not_stated",
+            "added_for_unlabelled_cells"
           ],
           "title": "Unit Status",
           "type": "string"
@@ -755,6 +1017,7 @@
     }
   },
   "additionalProperties": false,
+  "description": "The durable record envelope, like other workspace records: identity outside, content in ``body``.",
   "properties": {
     "id": {
       "title": "Id",
@@ -764,199 +1027,30 @@
       "title": "Workspace Id",
       "type": "string"
     },
-    "contract_version": {
-      "const": "general-research.v1",
-      "title": "Contract Version",
+    "kind": {
+      "const": "research_analysis",
+      "title": "Kind",
       "type": "string"
     },
-    "client_operation_id": {
-      "title": "Client Operation Id",
+    "digest": {
+      "title": "Digest",
       "type": "string"
-    },
-    "status": {
-      "enum": [
-        "completed",
-        "failed",
-        "unknown_outcome"
-      ],
-      "title": "Status",
-      "type": "string"
-    },
-    "label": {
-      "title": "Label",
-      "type": "string"
-    },
-    "execution_mode": {
-      "enum": [
-        "live",
-        "controlled"
-      ],
-      "title": "Execution Mode",
-      "type": "string"
-    },
-    "provider": {
-      "enum": [
-        "gemini",
-        "controlled"
-      ],
-      "title": "Provider",
-      "type": "string"
-    },
-    "model": {
-      "title": "Model",
-      "type": "string"
-    },
-    "question": {
-      "title": "Question",
-      "type": "string"
-    },
-    "assets": {
-      "items": {
-        "$ref": "#/$defs/AnalysisAssetSnapshot"
-      },
-      "title": "Assets",
-      "type": "array"
-    },
-    "consent": {
-      "$ref": "#/$defs/ConsentSnapshot"
-    },
-    "summary": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Summary"
-    },
-    "extracted_tables": {
-      "items": {
-        "$ref": "#/$defs/ExtractedTable"
-      },
-      "title": "Extracted Tables",
-      "type": "array"
-    },
-    "claims": {
-      "items": {
-        "$ref": "#/$defs/Claim"
-      },
-      "title": "Claims",
-      "type": "array"
-    },
-    "limitations": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Limitations",
-      "type": "array"
-    },
-    "clarifications": {
-      "items": {
-        "$ref": "#/$defs/Clarification"
-      },
-      "title": "Clarifications",
-      "type": "array"
-    },
-    "suggested_next_steps": {
-      "items": {
-        "$ref": "#/$defs/NextStep"
-      },
-      "title": "Suggested Next Steps",
-      "type": "array"
-    },
-    "citations": {
-      "items": {
-        "$ref": "#/$defs/Citation"
-      },
-      "title": "Citations",
-      "type": "array"
-    },
-    "citation_summary": {
-      "$ref": "#/$defs/CitationSummary"
-    },
-    "verification": {
-      "$ref": "#/$defs/Verification"
-    },
-    "provider_attempt_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Provider Attempt Id"
-    },
-    "prompt_version": {
-      "title": "Prompt Version",
-      "type": "string"
-    },
-    "output_schema_version": {
-      "title": "Output Schema Version",
-      "type": "string"
-    },
-    "normalization_version": {
-      "title": "Normalization Version",
-      "type": "string"
-    },
-    "reservation": {
-      "$ref": "#/$defs/Reservation"
-    },
-    "flags": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Flags",
-      "type": "array"
-    },
-    "failure": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/Failure"
-        },
-        {
-          "type": "null"
-        }
-      ]
     },
     "created_at": {
       "title": "Created At",
       "type": "string"
+    },
+    "body": {
+      "$ref": "#/$defs/ResearchAnalysisBody"
     }
   },
   "required": [
     "id",
     "workspace_id",
-    "contract_version",
-    "client_operation_id",
-    "status",
-    "label",
-    "execution_mode",
-    "provider",
-    "model",
-    "question",
-    "assets",
-    "consent",
-    "summary",
-    "extracted_tables",
-    "claims",
-    "limitations",
-    "clarifications",
-    "suggested_next_steps",
-    "citations",
-    "citation_summary",
-    "verification",
-    "provider_attempt_id",
-    "prompt_version",
-    "output_schema_version",
-    "normalization_version",
-    "reservation",
-    "flags",
-    "failure",
-    "created_at"
+    "kind",
+    "digest",
+    "created_at",
+    "body"
   ],
   "title": "ResearchAnalysis",
   "type": "object",

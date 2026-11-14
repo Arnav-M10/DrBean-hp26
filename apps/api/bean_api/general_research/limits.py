@@ -10,14 +10,14 @@ MiB = 1024 * 1024
 
 CONTRACT_VERSION = "general-research.v1"
 CITATION_NORMALIZATION_VERSION = "citation-normalization.v1"
-BBOX_SPACE = "page_normalized_top_left"
+BBOX_SPACE = "normalized_top_left"
 
 # Upload and analysis selection (shared API contract).
 MAX_ASSET_BYTES = 5 * MiB
 MIN_ANALYSIS_ASSETS = 1
 MAX_ANALYSIS_ASSETS = 5
 MAX_ANALYSIS_BYTES = 10 * MiB
-MAX_SOURCE_NAME_CHARS = 255
+MAX_SOURCE_NAME_CHARS = 240
 MAX_SOURCE_NAME_HEADER_BYTES = 1024
 MAX_QUESTION_CHARS = 4000
 
@@ -53,6 +53,7 @@ MAX_FIELD_CHARS = 100_000
 MAX_JSON_DEPTH = 64
 MAX_JSON_NODES = 500_000
 TABLE_PREVIEW_ROWS = 20
+TEXT_PREVIEW_CHARS = 2000
 
 # Isolated worker processes (resource isolation, not a complete security sandbox).
 WORKER_TIMEOUT_SECONDS = {"pdf": 45, "image": 20}

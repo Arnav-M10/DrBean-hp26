@@ -40,12 +40,37 @@ class Refusal(Exception):
         self.code, self.message, self.status = code, message, status
 
 
-def canonical_media_type(header: str | None) -> tuple[str, str]:
+UNDECLARED = ("", "application/octet-stream", "binary/octet-stream")
+EXTENSION_HINTS = {"csv": "text/csv", "tsv": "text/tab-separated-values", "tab": "text/tab-separated-values",
+                   "json": "application/json", "geojson": "application/json", "md": "text/markdown",
+                   "markdown": "text/markdown", "txt": "text/plain", "text": "text/plain"}
+EXTENSIONS = {"text/csv": "csv", "text/tab-separated-values": "tsv", "application/json": "json", "text/plain": "txt",
+              "text/markdown": "md", "image/png": "png", "image/jpeg": "jpg", "application/pdf": "pdf"}
+
+
+def canonical_media_type(header: str | None) -> tuple[str, str | None]:
+    """Return (declared, canonical). ``None`` means undeclared: detect from the bytes."""
     declared = (header or "").split(";")[0].strip().lower()
+    if declared in UNDECLARED:
+        return declared or "application/octet-stream", None
     if declared not in MEDIA_ALIASES:
         raise Refusal("unsupported_media_type", "Supported files are CSV, TSV, JSON, plain text, Markdown, PNG, JPEG "
                       "and PDF. Send the file with its media type.", 415)
     return declared, MEDIA_ALIASES[declared]
+
+
+def detect_media_type(raw: bytes, filename: str | None) -> tuple[str, str]:
+    """For undeclared uploads: binary signature first, then a file-name hint, then a content sniff.
+
+    A hint only chooses the parser; the parser must still succeed on the bytes.
+    """
+    signature = _signature(raw)
+    if signature:
+        return signature, "content_signature"
+    extension = filename.rsplit(".", 1)[-1].lower() if filename and "." in filename else ""
+    if extension in EXTENSION_HINTS:
+        return EXTENSION_HINTS[extension], "filename_extension_hint"
+    return ("application/json" if raw.lstrip()[:1] in (b"{", b"[") else "text/plain"), "content_sniff"
 
 
 def source_name(header: str | None) -> str | None:
@@ -105,7 +130,7 @@ def _text_page(text: str) -> dict:
     return {"page_index": 0, "page_number": 1, "width": None, "height": None, "dimension_unit": None,
             "rotation": None, "image_sha256": None, "image_media_type": None, "image_width": None,
             "image_height": None, "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            "text_layer": "decoded_text", "char_count": len(text)}
+            "text_layer": "decoded_text", "char_count": len(text), "text_preview": text[:L.TEXT_PREVIEW_CHARS]}
 
 
 def parse(raw: bytes, media_type: str) -> Parsed:
@@ -153,7 +178,7 @@ def _parse_image(raw: bytes, media_type: str) -> Parsed:
     page = {"page_index": 0, "page_number": 1, "width": info["display_width"], "height": info["display_height"],
             "dimension_unit": "px", "rotation": None, "image_sha256": digest, "image_media_type": media_type,
             "image_width": info["display_width"], "image_height": info["display_height"], "text_sha256": None,
-            "text_layer": "none", "char_count": 0}
+            "text_layer": "none", "char_count": 0, "text_preview": None}
     preview = info.get("preview")
     parsed = Parsed(media_type, [page], {
         "kind": "image", "width": info["width"], "height": info["height"], "display_width": info["display_width"],
@@ -182,7 +207,8 @@ def _parse_pdf(raw: bytes) -> Parsed:
                       "image_width": page["image_width"], "image_height": page["image_height"],
                       "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest() if quality != "none" else None,
                       "text_layer": {"usable": "native_pdf_text", "none": "none", "unreliable": "unreliable"}[quality],
-                      "char_count": len(text)})
+                      "char_count": len(text),
+                      "text_preview": text[:L.TEXT_PREVIEW_CHARS] if quality != "none" else None})
         text_pages.append({"page_index": page["page_index"], "text": text if quality != "none" else "",
                            "char_boxes": page["char_boxes"] if quality != "none" else None, "quality": quality})
     without = [page["page_index"] for page in pages if page["text_layer"] != "native_pdf_text"]
@@ -194,6 +220,18 @@ def _parse_pdf(raw: bytes) -> Parsed:
         "pages_without_text_layer": without, "ocr": False, "executes_document_scripts": False},
         text_pages, blobs=blobs, warnings=warnings, active_content=info["active_content"],
         parser={"name": "pypdfium2", "version": f"{info['parser']['version']} ({info['parser']['pdfium']})"})
+
+
+def table_previews(summary: dict) -> list[dict]:
+    """Small parsed-table previews for the browser (column names and the first rows)."""
+    if summary.get("kind") == "table":
+        return [{"source": "delimited", "json_path": None, "columns": [c["name"] for c in summary["columns"]],
+                 "rows": [row["cells"] for row in summary["preview_rows"]], "row_count": summary["row_count"]}]
+    if summary.get("kind") == "json":
+        return [{"source": "json", "json_path": table["json_path"], "columns": [c["name"] for c in table["columns"]],
+                 "rows": [row["cells"] for row in table["preview_rows"]], "row_count": table["row_count"]}
+                for table in summary["tables"]]
+    return []
 
 
 def encode_text_layer(asset_sha256: str, text_pages: list[dict]) -> dict:

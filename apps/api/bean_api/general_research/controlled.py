@@ -54,7 +54,8 @@ def demo_responder(envelope: AnalysisEnvelope) -> str:
         "extracted_tables": tables, "claims": claims[:12],
         "limitations": ["This controlled response was produced locally for testing; it is not an analysis."],
         "clarifications": [], "citations": citations[:30],
-        "suggested_next_steps": [{"action": "Review the restated values against the source files.",
+        "suggested_next_steps": [{"text": "Review the restated values against the source files.",
                                   "rationale": "Controlled responses only restate file contents.",
-                                  "kind": "review_extracted_values"}]}
+                                  "kind": "review_extracted_values",
+                                  "citation_ids": [citations[0]["id"]] if citations else []}]}
     return json.dumps(output, ensure_ascii=False)

@@ -38,6 +38,11 @@ and in the `/capabilities` response add:
                 "general_research": general_research_capabilities(app),
 ```
 
+The merged UI reads `capabilities.general_research` with exactly the fields this helper returns
+(`available`, `max_assets`, `max_file_bytes`, `max_total_bytes`, `max_pdf_pages`,
+`analysis.{available,model,reason}`, `budget.remaining`); a backend test runs the UI's own validators
+against real responses.
+
 `register_general_routes(app, transport=None, controlled_responder=None)` builds a
 `GeneralResearchService` from `app.state.workflow`, `app.state.settings.blob_dir` (blobs go to
 `<blob_dir>/research-assets/<sha256[:2]>/<sha256>`), `app.state.provider.config` and `app.state.ledger`
@@ -50,22 +55,23 @@ Then **remove the `xfail` marker** from
 strict: it starts failing (XPASS) the moment the real `create_app` serves the routes, which is the signal
 that integration is verified in the assembled app rather than only in a fixture.
 
-## 3. Authentication and sessions
+## 3. Authentication and sessions (already compatible)
 
-Every route depends on `bean_api.auth.principal` and re-checks workspace membership on every read
-(`Workflow.get`/`authorize`; foreign IDs are 404). When you move to cookie sessions, change
-`principal` itself (or the dependency it uses) so these routes inherit it; there is nothing to change in
-`general_research`. Uploads and analyses are workspace-scoped, so private browser workspaces isolate
-files and analyses automatically.
+Every route depends on `bean_api.auth.principal`, which on current `main` (PR #38/#39) already resolves
+your private browser sessions as well as bearer owners, and every read re-checks workspace membership
+(`Workflow.get`/`authorize`; foreign IDs are 404). Nothing in `general_research` needs to change for
+sessions. Uploads and analyses are workspace-scoped, so private browser workspaces isolate files and
+analyses automatically; please include general assets and analyses in your two-context isolation test.
 
-## 4. Gateway and proxy allowlists
+## 4. Gateway and proxies (mostly done on main)
 
-Forward request headers `Content-Type`, `X-Source-Name` (percent-encoded UTF-8, ≤ 1 KiB) and
-`Idempotency-Key`; allow raw bodies up to 5 MiB on `/workspaces/{id}/research-assets` and JSON bodies up
-to the existing 256 KiB elsewhere. Pass response headers `Content-Disposition`, `X-Artifact-SHA256` and
-`Content-Security-Policy`. Allow `GET` of `/research-assets/{id}/pages/{n}/image` (PNG/JPEG). The analysis
-POST is synchronous and can take up to the configured provider timeout (30 s by default, at most 60 s);
-the gateway timeout must exceed it.
+`apps/web/serve.mjs` and `share-gateway.mjs` on `main` already forward `Content-Type`, `Idempotency-Key`
+and printable-ASCII `X-Source-Name`, pass `Content-Disposition`, `X-Artifact-SHA256` and `X-Request-ID`
+back, and allow 75 s for `research-analyses` (the backend's request timeout is 30 s by default, at most
+60 s). Remaining, optional: also pass `Content-Security-Policy` on `GET /research-assets/{id}/content` and
+`.../pages/{n}/image` responses (the backend sets `default-src 'none'; sandbox`). Raw upload bodies up to
+5 MiB must reach `/workspaces/{id}/research-assets`; JSON bodies elsewhere keep the 256 KiB limit. The
+browser sends `application/octet-stream` when it has no MIME type; the backend detects the real type.
 
 ## 5. Runtime
 
