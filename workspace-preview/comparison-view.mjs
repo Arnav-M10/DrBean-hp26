@@ -25,7 +25,7 @@ export function plot(series,{title,xLabel,yLabel,points=[]}={}) {
   });
   points.forEach(p=>{svg+=`<circle cx="${x(p[0])}" cy="${y(p[1])}" r="4" fill="#f0f1f3" stroke="#151619" stroke-width="1.5"/>`;});
   svg+=`<text x="${(L+W-R)/2}" y="${H-7}" text-anchor="middle">${e(xLabel)}</text><text x="${L}" y="12" text-anchor="start">${e(yLabel)}</text></svg>`;
-  return `<figure class="plot">${svg}<figcaption>${series.map((s,i)=>`<span><i style="--series:${colors[i%colors.length]};border-top-style:${i%2?'dashed':'solid'}"></i>${e(s.label)}</span>`).join('')}${points.length?'<span>● Measurements</span>':''}</figcaption></figure>`;
+  return `<figure class="plot" tabindex="0" aria-label="${e(title)}. Scroll horizontally on narrow screens; returned values are available in the table.">${svg}<figcaption>${series.map((s,i)=>`<span><i style="--series:${colors[i%colors.length]};border-top-style:${i%2?'dashed':'solid'}"></i>${e(s.label)}</span>`).join('')}${points.length?'<span>● Measurements</span>':''}</figcaption></figure>`;
 }
 export function coordinateTable(series,xLabel,yLabel) {
   return table(['Series',xLabel,yLabel],series.flatMap(s=>s.points.map(p=>[s.label,...p])),{caption:'Returned coordinates'});

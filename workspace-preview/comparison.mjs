@@ -14,7 +14,7 @@ function sync(){
  $('job').hidden=!state.operation||(!state.busy&&!requestUncertain&&!state.error);
  $('job-status').textContent=state.busy?'Computation request is in flight. No progress percentage is supplied.':requestUncertain?'The request outcome is uncertain. Read retained history before another deliberate operation.':state.operation?`The requested operation returned${state.record?` status ${state.record.body.status}`:''}.`:'';
  if(state.draft){$('origin').textContent=`${state.draft.review.origin==='synthetic'?'Newly generated synthetic input':state.draft.review.origin==='experimental'?'Experimental input — unsupported':'Origin not yet confirmed'} · ${state.draft.observations.length} observations`;$('area').disabled=$('efficiency').disabled=!state.draft.instrument;}
- if(state.record){$('result-binding').textContent=`${state.stale?'Historical result — draft changed. ':''}Result ${state.record.id}; input ${state.record.body.input_digest}. Applies only to its retained reviewed request.`;$('result-binding').classList.toggle('stale',state.stale);$('result-history').innerHTML=state.history.map((r,i)=>`<option value="${i}" ${r.id===state.record.id?'selected':''}>${e(r.body.status)} — ${e(r.id)}</option>`).join('');}
+ if(state.record){$('result-binding').textContent=`${state.stale?'Historical result — draft changed. ':''}Applies only to the retained reviewed request. Full record identity and digests are available under Inputs & provenance.`;$('result-binding').dataset.resultId=state.record.id;$('result-binding').classList.toggle('stale',state.stale);$('result-history').innerHTML=state.history.map((r,i)=>`<option value="${i}" ${r.id===state.record.id?'selected':''}>${e(r.body.status)} — ${e(r.id)}</option>`).join('');}
  for(const id of ['download-html','download-json','download-provenance'])$(id).disabled=!connection||!state.record;
 }
 function modified(change){state.edit(change);$('review-consent').checked=false;sync();renderInputPlot();}
@@ -66,7 +66,7 @@ async function connect({startNew=false}={}){
  finally{if(epoch===connectionEpoch){$('connect').disabled=false;sync();}}
 }
 function renderResult(){
- const record=state.record;$('result-empty').hidden=!!record;$('result-content').hidden=!record;if(!record){$('result-panel').replaceChildren();$('result-history').replaceChildren();$('result-binding').textContent='';return;}
+ const record=state.record;$('result-empty').hidden=!!record;$('result-content').hidden=!record;if(!record){$('result-panel').replaceChildren();$('result-history').replaceChildren();$('result-binding').textContent='';delete $('result-binding').dataset.resultId;return;}
  const b=record.body;noiseIndex=Math.max(0,Math.min(noiseIndex,b.noise_sweep.length-1));$('result-status').textContent=`Numerical comparison — ${b.status}`;
  document.querySelectorAll('[data-result]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.result===resultTab)));
  let html=failureView(b);
