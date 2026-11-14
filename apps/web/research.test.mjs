@@ -60,6 +60,24 @@ test('changed draft invalidates data acknowledgement before saving records', asy
   await c.create(); assert.equal(saves, 0); assert.match(c.state.error, /Review and accept/)
 })
 
+test('a blank personal question uses the same closed claim question as manual review', async () => {
+  const requests = []
+  const api = { json: async (path, body) => {
+    if (!body) return { items: [] }
+    requests.push(body)
+    return snapshot({ objective: body.objective })
+  } }
+  const { controller, connection, draft } = setup(api)
+  Object.assign(draft.question, { goal: '', targetMin: '0.10', targetMax: '0.17' })
+  connection.saveReviewedInputs = async () => ({ problem: { id: 'problem_test', digest: 'a'.repeat(64),
+    body: { target: { lower: '1/10', upper: '17/100' } } } })
+  await controller.connect(connection)
+  controller.state.dataAccepted = true; controller.state.acceptedDraft = JSON.stringify(draft)
+  await controller.create()
+  assert.equal(requests.length, 1)
+  assert.match(requests[0].objective, /outside the closed interval \[1\/10, 17\/100\]/)
+})
+
 test('approval is bound to the exact server review and rejects chat-like consent', async () => {
   const { controller: c, connection } = setup(empty); await c.connect(connection)
   const review = { id: 'plan_test', digest: 'a'.repeat(64), workspace_id: 'ws_test' }
