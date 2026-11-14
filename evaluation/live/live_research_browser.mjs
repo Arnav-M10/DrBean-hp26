@@ -1,0 +1,230 @@
+// C's bounded live-Gemini sprint journey through the connected browser interface.
+//
+//   LIVE_CASE=dry-run|baseline|clarification LIVE_GRANT=<n> LIVE_OPT_IN=<path to gemini.local.json> \
+//   NODE_PATH=... node evaluation/live/live_research_browser.mjs
+//
+// Lane: live_gemini (dry-run makes zero provider requests). Uses the supported
+// launcher on fresh ports with an isolated temporary store; the user's running
+// app is untouched. The opt-in file is copied (0600) into the temporary store
+// and deleted with it; no credential value is read, printed or recorded.
+// Inputs are public synthetic readings only. No automatic retries: every
+// provider request is reserved by the product's ledger, and the operator grant
+// tool refuses grants beyond the 12-request sprint ceiling.
+import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { createRequire } from 'node:module'
+import { createServer } from 'node:net'
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const root = fileURLToPath(new URL('../../', import.meta.url))
+const CASE = process.env.LIVE_CASE || 'dry-run'
+const GRANT = Number(process.env.LIVE_GRANT || 0)
+assert.ok(['dry-run', 'baseline', 'clarification'].includes(CASE), 'LIVE_CASE must be dry-run, baseline or clarification')
+assert.ok(CASE === 'dry-run' ? GRANT === 0 : GRANT >= 1 && GRANT <= 8, 'A live case needs LIVE_GRANT in 1..8; dry-run grants nothing')
+const commit = (await run('git', ['rev-parse', '--short', 'HEAD'])).trim()
+const appBase = (await run('git', ['merge-base', 'HEAD', 'origin/main'])).trim().slice(0, 7)
+const appDiff = (await run('git', ['diff', '--name-only', 'origin/main', '--', 'apps', 'packages', 'scripts', 'workspace-preview'])).trim()
+const output = resolve(process.env.LIVE_EVIDENCE_DIR || join(root, `evaluation/results/sprint/live-${CASE}-${appBase}`))
+const scratch = await mkdtemp(join(tmpdir(), 'drbean-live-sprint-'))
+const python = resolve(root, '.venv/bin/python'), engine = resolve(root, '.venv-engine/bin/python')
+const apiPort = await freePort(), webPort = await freePort(), base = `http://127.0.0.1:${webPort}`
+const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', DRBEAN_VAR_DIR: scratch, BEAN_AUTH_FILE: join(scratch, 'auth.json'),
+  BEAN_DEV_API_PORT: String(apiPort), BEAN_DEV_WEB_PORT: String(webPort), BEAN_RESEARCH_MODE: 'live',
+  PYTHONPATH: join(root, 'apps/api'), LANGSMITH_TRACING: 'false' }
+const record = { schema_version: 'c-sprint-live-run.v1', lane: CASE === 'dry-run' ? 'live_gemini (dry run, zero requests)' : 'live_gemini',
+  case: CASE, harness_commit: commit, application_tree: appDiff ? `differs from origin/main: ${appDiff.split('\n').length} files` : `identical to origin/main ${appBase}`, grant: GRANT, started_at: new Date().toISOString(), checks: [], observations: {} }
+let browser, context, page, launched = false
+
+async function run(executable, args, extraEnv = null, timeout = 60000) {
+  const child = spawn(executable, args, { cwd: root, env: extraEnv || process.env, stdio: ['ignore', 'pipe', 'pipe'] })
+  let text = '', timer
+  for (const stream of [child.stdout, child.stderr]) stream.on('data', bytes => { text = (text + bytes).slice(-262144) })
+  const code = await new Promise((yes, no) => { child.once('error', no); child.once('exit', yes)
+    timer = setTimeout(() => { child.kill('SIGTERM'); no(new Error(`${args[0]} timed out`)) }, timeout) }).finally(() => clearTimeout(timer))
+  if (code !== 0) throw new Error(`${executable} ${args[0]} exited ${code}: ${text.slice(-2000)}`)
+  return text
+}
+async function freePort() {
+  const server = createServer()
+  await new Promise((yes, no) => { server.once('error', no); server.listen(0, '127.0.0.1', yes) })
+  const port = server.address().port
+  await new Promise(yes => server.close(yes))
+  return port
+}
+async function api(path) {
+  const response = await context.request.get(`${base}/api/bean/v1${path}`)
+  assert.equal(response.status(), 200, `${path}: ${response.status()}`)
+  return response.json()
+}
+const check = (id, detail = '') => { record.checks.push({ id, detail }); console.log(`ok ${id}${detail ? ': ' + detail : ''}`) }
+const list = value => Array.isArray(value) ? value : (value.items || [])
+const sha = bytes => createHash('sha256').update(bytes).digest('hex')
+
+try {
+  await mkdir(output, { recursive: true })
+  const optIn = process.env.LIVE_OPT_IN
+  assert.ok(optIn, 'LIVE_OPT_IN must name the existing free-tier opt-in file')
+  await copyFile(optIn, join(scratch, 'gemini.local.json'))
+  await chmod(join(scratch, 'gemini.local.json'), 0o600)
+  await run(python, ['-m', 'bean_api.bootstrap'], env, 15000)
+  await run(python, ['scripts/dev/launcher.py', 'start'], env, 90000)
+  launched = true
+  const capabilities = await (await fetch(`${base}/api/bean/v1/capabilities`)).json()
+  const deep = capabilities.deepagents, gemini = capabilities.gemini
+  record.observations.capabilities = { deepagents: { execution_mode: deep.execution_mode, dispatch_enabled: deep.dispatch_enabled,
+    unavailable_reason: deep.unavailable_reason, session_limits: deep.session_limits },
+    gemini: { model: gemini?.model, execution_mode: gemini?.execution_mode, dispatch_enabled: gemini?.dispatch_enabled,
+      retry_policy: gemini?.retry_policy, billing_verified: gemini?.billing_verified } }
+  assert.equal(deep.execution_mode, 'live', JSON.stringify(record.observations.capabilities))
+  assert.equal(deep.dispatch_enabled, true)
+  assert.equal(gemini.model, 'gemini-3.5-flash-lite')
+  check('server-configured-for-live-free-tier-coordination', `model ${gemini.model}, retry ${gemini.retry_policy}`)
+
+  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath() })
+  context = await browser.newContext({ acceptDownloads: true })
+  page = await context.newPage()
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  // Automatic private access: the browser gets its own private workspace without a pasted credential.
+  await page.goto(base + (CASE === 'clarification' ? '#research' : '#inputs'))
+  await page.waitForFunction(() => document.querySelector('#workspace-select').value !== '', null, { timeout: 30000 })
+  const workspace = await page.locator('#workspace-select').inputValue()
+  const panel = page.locator('#durable-research')
+
+  if (CASE === 'clarification') {
+    // Missing reviewed model: only an untrusted file and a question, no measurements or claim.
+    const file = join(scratch, 'synthetic-notes.csv')
+    await writeFile(file, 'note\nSynthetic public example: concentration readings were not supplied.\n')
+    await page.locator('#research-files').setInputFiles(file)
+    await page.locator('#general-assets article').first().waitFor()
+    await page.locator('#general-assets input[type=checkbox]').first().check()
+    await page.locator('#research-question').fill('Does a one-compartment oral model with ke between 0.10 and 0.17 per hour fit my readings?')
+    await page.evaluate(() => { location.hash = 'investigations' })
+    await panel.getByRole('button', { name: 'Save selected files and research question', exact: true }).click()
+  } else {
+    const file = join(scratch, 'public-synthetic-readings.csv')
+    await writeFile(file, 'time,concentration,epsilon\n0.25,4.80,0.50\n0.5,7.20,0.50\n1,8.00,0.50\n2,6.80,0.50\n4,5.70,0.50\n')
+    await page.locator('#csv-file').setInputFiles(file)
+    await page.getByRole('button', { name: 'Use these rows', exact: true }).click()
+    await page.getByLabel('Row 1, concentration', { exact: true }).fill('4.81')
+    await page.click('#measurements button[type=submit]')
+    for (const [id, value] of Object.entries({ 'experiment-id': 'c-live-sprint-public-synthetic', 'time-origin': 'Synthetic elapsed hours from t=0',
+      aMin: '0.001', aMax: '30', keMin: '0.015', keMax: '0.35', kaMin: '0.4', kaMax: '8', targetMin: '0.10', targetMax: '0.17',
+      allowanceOrigin: 'Synthetic hard bound of 0.50 mg/L for a public example, not an instrument claim',
+      goal: 'Do these synthetic readings challenge the claimed ke range of 0.10 to 0.17 per hour, and what should be measured next?' })) await page.fill(`#${id}`, value)
+    await page.selectOption('#dataset-origin', 'synthetic')
+    await page.click('#question-form button[type=submit]')
+    await page.goto(base + '#investigations')
+    await panel.getByText('Feasible next-measurement constraints (optional until design)', { exact: true }).click()
+    for (const [name, value] of Object.entries({ times: '8, 6', allowance: '0.2', horizon: '8', allowanceReason: 'Synthetic prospective hard bound for a public example' }))
+      await panel.locator(`[name="${name}"]`).fill(value)
+    await panel.getByLabel('I reviewed the exact measurement values, units, time origin, hard allowances, parameter bounds and question assumptions.', { exact: true }).check()
+    await panel.getByRole('button', { name: 'Save reviewed inputs and research question', exact: true }).click()
+  }
+  await panel.getByRole('button', { name: 'Save provider consent', exact: true }).waitFor({ timeout: 30000 })
+  let session = (await api(`/workspaces/${workspace}/research-sessions`)).items[0]
+  assert.equal(session.mode, 'live')
+  assert.equal(session.provider_allocation.physical_requests, 0)
+  check('live-session-created-from-the-browser-with-zero-default-allocation', session.id)
+
+  // Consent through the UI: the exact disclosure, explicitly accepted.
+  await panel.getByLabel('I consent to sending this research question, reviewed inputs, plan, retained evidence and source references to the disclosed Gemini model.', { exact: true }).check()
+  await panel.getByRole('button', { name: 'Save provider consent', exact: true }).click()
+  await page.waitForFunction(() => document.querySelector('#durable-research').textContent.match(/(Provider consent|Consent) saved/), null, { timeout: 30000 })
+  check('consent-recorded-through-the-browser')
+  const attemptsBefore = list(await api(`/workspaces/${workspace}/provider-attempts`)).length
+  assert.equal(attemptsBefore, 0, 'Saving inputs or consent must not call the provider')
+
+  if (CASE === 'dry-run') {
+    const advance = panel.getByRole('button', { name: 'Advance research plan', exact: true })
+    assert.equal(await advance.isDisabled(), true, 'Advance must stay disabled with no operator allocation')
+    const revision = (await api(`/research-sessions/${session.id}`)).revision
+    const refused = await page.evaluate(async ({ id, revision }) => {
+      const response = await fetch(`/api/bean/v1/research-sessions/${id}/advance`, { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'c-dry-run' }, body: JSON.stringify({ expected_revision: revision }) })
+      return { status: response.status, text: await response.text() }
+    }, { id: session.id, revision })
+    record.observations.unallocated_advance = { status: refused.status, code: (() => { try { return JSON.parse(refused.text).code } catch { return refused.text.slice(0, 200) } })() }
+    assert.equal(refused.status, 409, JSON.stringify(record.observations.unallocated_advance))
+    check('unallocated-live-advance-refused-before-any-request', record.observations.unallocated_advance.code)
+  } else {
+    const granted = JSON.parse(await run(python, ['evaluation/live/operator_grant.py', join(scratch, 'bean.sqlite3'), session.id,
+      String(GRANT), '64000', String(Math.min(16000, GRANT * 512)), `${CASE}-${commit}`], env))
+    record.observations.grant = granted
+    check('operator-granted-explicit-allocation', `${granted.granted} requests; sprint total ${granted.sprint_granted_total}/12`)
+    await panel.getByRole('button', { name: 'Refresh saved state', exact: true }).first().click()
+    const advance = panel.getByRole('button', { name: 'Advance research plan', exact: true })
+    await page.waitForFunction(() => [...document.querySelectorAll('#durable-research button')].some(b => b.textContent === 'Advance research plan' && !b.disabled), null, { timeout: 15000 })
+    await advance.click()
+    const settled = async (timeout) => {
+      await page.waitForFunction(() => {
+        const text = document.querySelector('#durable-research').textContent
+        return /Review the investigation operation|Review the separate|The assistant needs more information|State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped/.test(text)
+      }, null, { timeout })
+      return api(`/research-sessions/${session.id}`)
+    }
+    session = await settled(240000)
+    record.observations.after_first_advance = { state: session.state, pending_review: session.pending_review?.kind ?? null,
+      error_code: session.action?.error_code ?? null, usage: session.usage }
+    if (CASE === 'baseline' && session.pending_review?.kind === 'plan') {
+      assert.equal(session.children.length, 0, 'No science before approval')
+      const approve = panel.getByRole('button', { name: 'Approve exact operation and continue', exact: true })
+      assert.equal(await approve.isDisabled(), true)
+      check('live-plan-stops-for-approval-with-no-child')
+      await panel.getByLabel('I approve only this frozen scientific scope and its limits.', { exact: true }).check()
+      await approve.click()
+      await page.waitForFunction(() => /State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped|Review the separate/.test(
+        document.querySelector('#durable-research').textContent), null, { timeout: 300000 })
+      session = await api(`/research-sessions/${session.id}`)
+    }
+    record.observations.final = { state: session.state, pending_review: session.pending_review?.kind ?? null,
+      error_code: session.action?.error_code ?? null, usage: session.usage, provider_allocation: session.provider_allocation,
+      children: session.children.map(child => ({ id: child.id, kind: child.kind, state: child.state, scientific_reservations: child.scientific_reservations })),
+      reports: session.reports, plan_steps: session.plan?.body?.steps?.map(step => ({ title: step.title, status: step.status })) ?? [] }
+  }
+
+  // Provider ledger, events and evidence: public fields only.
+  const attempts = list(await api(`/workspaces/${workspace}/provider-attempts`))
+  record.observations.attempts = attempts.map(item => ({ id: item.id, state: item.state, provider: item.provider, model: item.model,
+    operation: item.metadata?.operation, execution_mode: item.metadata?.execution_mode ?? item.execution_mode,
+    usage: item.usage ?? item.metadata?.usage ?? null, error_code: item.error_code ?? item.metadata?.error_code ?? null,
+    created_at: item.created_at }))
+  const events = (await api(`/research-sessions/${session.id}/events?after=-1`)).items
+  record.observations.events = events.map(event => ({ type: event.event_type, summary: event.summary, references: event.reference_ids,
+    execution_mode: event.execution_mode ?? event.body?.execution_mode ?? null }))
+  record.physical_requests = attempts.length
+  if (session.reports?.length) {
+    const report = await context.request.get(`${base}/api/bean/v1/reports/${session.reports.at(-1)}/download`)
+    const bytes = await report.body()
+    await writeFile(join(output, 'research-report.json'), bytes)
+    record.observations.report = { id: session.reports.at(-1), sha256: sha(bytes), fields: Object.keys(JSON.parse(bytes).body) }
+    for (const entry of JSON.parse(bytes).body.native_evidence || []) {
+      const native = await context.request.get(`${base}${entry.download_path}`), anchor = await context.request.get(`${base}${entry.anchor_path}`)
+      const nativePath = join(output, entry.native_filename), anchorPath = join(output, entry.anchor_filename)
+      await writeFile(nativePath, await native.body()); await writeFile(anchorPath, await anchor.body())
+      const replay = JSON.parse(await run(engine, ['-I', '-m', 'counterdex', 'replay-native', nativePath, '--anchors', anchorPath], null, 120000))
+      record.observations.replay = [...(record.observations.replay || []), { evidence_id: entry.evidence_id, integrity: replay.integrity,
+        replay: replay.replay, expected_binding: replay.expected_binding, outcome: replay.outcome?.scientific_outcome ?? replay.fresh_checked?.tier }]
+    }
+  }
+  assert.deepEqual(errors, [])
+  record.status = 'completed'
+} catch (error) {
+  record.status = 'error'
+  record.error = String(error.message).slice(0, 4000)
+  if (page) await page.screenshot({ path: join(output, 'failure.png'), fullPage: true }).catch(() => {})
+  if (page) record.panel_text = await page.locator('#durable-research').innerText({ timeout: 5000 }).catch(() => null)
+  process.exitCode = 1
+} finally {
+  record.finished_at = new Date().toISOString()
+  await writeFile(join(output, 'record.json'), JSON.stringify(record, null, 2) + '\n')
+  await browser?.close()
+  if (launched) await run(python, ['scripts/dev/launcher.py', 'stop'], env, 60000).catch(error => { console.error(error.message); process.exitCode = 1 })
+  await rm(scratch, { recursive: true, force: true })
+  console.log(JSON.stringify({ status: record.status, case: CASE, physical_requests: record.physical_requests ?? 0, output }, null, 2))
+}
