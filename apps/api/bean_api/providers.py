@@ -422,7 +422,7 @@ class ControlledSourceProposer:
         observed_digest = hashlib.sha256(source_bytes).hexdigest()
         result = {"schema_version": self.schema_version, "prompt_version": SOURCE_PROPOSAL_PROMPT_VERSION,
             "prompt_sha256": hashlib.sha256(prepared_prompt.encode("utf-8")).hexdigest(),
-            "status": "unavailable", "code": "controlled_source_unavailable", "fixture_id": None,
+            "status": "unavailable", "code": "controlled_source_unavailable", "fixture_id": None, "fixture_digest": None,
             "authorship": "controlled_fixture", "label": "Controlled example; not Gemini transcription.",
             "review_state": "unaccepted", "execution_approved": False, "external_provider_calls": 0,
             "live_qualification": "not_run", "lookup_method": "frozen_fixture_lookup",
@@ -444,7 +444,8 @@ class ControlledSourceProposer:
                 or packet["media_type"] != admitted.observed_media_type or packet["byte_size"] != admitted.byte_size):
             result["code"] = "controlled_source_binding_mismatch"
             return result
-        result.update(status=packet["status"], fixture_id=packet["fixture_id"], diagnostics=packet["diagnostics"],
+        result.update(status=packet["status"], fixture_id=packet["fixture_id"],
+                      fixture_digest=hashlib.sha256(frozen).hexdigest(), diagnostics=packet["diagnostics"],
                       code="controlled_preview_ready" if packet["status"] == "controlled_example" else "controlled_fixture_abstained")
         if packet["status"] == "unavailable":
             return result

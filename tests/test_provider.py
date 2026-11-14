@@ -279,6 +279,7 @@ def test_controlled_source_preview_is_labeled_bound_and_has_no_execution_authori
     assert len(result["prompt_sha256"]) == 64
     assert result["fixture_version"] == "controlled-source-fixtures.v1"
     assert result["fixture_review_status"] == "pending_independent_owner_review"
+    assert len(result["fixture_digest"]) == 64
     assert result["review_state"] == "unaccepted" and result["execution_approved"] is False
     assert result["external_provider_calls"] == 0 and result["live_qualification"] == "not_run"
     assert result["authorship"] == "controlled_fixture" and "not Gemini transcription" in result["label"]
@@ -313,6 +314,7 @@ def test_ambiguous_digits_missing_units_and_sd_remain_unresolved(controlled_sour
     allowances = [f for f in ambiguous["fields"] if f["field_path"].endswith("hard_allowance")]
     assert len(allowances) == 5
     assert all(f["candidate_exact"] is None and f["ambiguity"] for f in allowances)
+    assert all(f["locator"]["excerpt"] == "" for f in allowances)
     missing = preview(*controlled_sources, fixture="missing_units")
     assert any(d["code"] == "missing_unit" and d["blocking"] for d in missing["diagnostics"])
     standard_deviation = preview(*controlled_sources, fixture="standard_deviation")
