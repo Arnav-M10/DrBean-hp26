@@ -100,10 +100,14 @@ def test_checked_design_statement_needs_every_verification_gate(gates):
 # Legitimate supported narration: correct limiting statements grounded in the cited record must be kept. The
 # declared evidence-bound policy (PR #28 623ae19) withholds all four, including PR #20's own coordinator narration,
 # so the two PRs fail together (tests/test_coordinator.py::test_separately_approved_design_has_one_completed_
-# callback_observation). Strict xfail only under that policy; it passes on the legacy guard.
-OVERSUPPRESSED = pytest.mark.xfail(not LEGACY_GUARD, strict=True, reason="F-NARRATION-OVERSUPPRESSION (P2, Owner 3): "
-                                   "the evidence-bound policy withholds correct limiting statements grounded in the "
-                                   "cited record [declared policy]")
+# callback_observation). The expected failure is scoped to the declared policy versions observed with the gap (v1
+# and v2, the latter on main 299a356); any other declared version must pass these as ordinary assertions. A's
+# evidence-bound-statements.v3 (PR #42 051b4d6) was observed to keep all four. The legacy guard keeps them too.
+OVERSUPPRESSING_POLICIES = {"evidence-bound-statements.v1", "evidence-bound-statements.v2"}
+OVERSUPPRESSED = pytest.mark.xfail(_declared_policy() in OVERSUPPRESSING_POLICIES, strict=True,
+                                   reason="F-NARRATION-OVERSUPPRESSION (P2, A): the evidence-bound policy withholds "
+                                   "correct limiting statements grounded in the cited record [declared policy "
+                                   "v1/v2]")
 
 
 @OVERSUPPRESSED
@@ -116,6 +120,48 @@ OVERSUPPRESSED = pytest.mark.xfail(not LEGACY_GUARD, strict=True, reason="F-NARR
 ], ids=["numerical_guidance", "no_separation", "not_checked", "inconclusive"])
 def test_correct_limiting_statements_grounded_in_the_cited_record_are_kept(fact, text):
     assert rejection_with({"id": "design-evidence", "problem_id": "problem", **fact}, text) is None
+
+
+# The converse: each limiting sentence is admissible only when the cited record itself has that status. C wrote these
+# after reading A's v3 change and its stated negative categories, without reading A's tests/test_limiting_commentary.py,
+# so they are a fresh variant, not a copy. Each case is false, unsupported or ambiguous for its record set and must be
+# withheld under every policy. Facts are cited unless passed as uncited context. Replay status never upgrades an
+# outcome (SCI-05, SCI-08).
+NG, NS, NC, INC = ("The returned design remains numerical guidance.",
+                   "No separation was established on the reviewed grid.",
+                   "This design is numerical guidance without checked pair separation.",
+                   "The result is inconclusive.")
+
+
+@pytest.mark.parametrize("text, facts, context", [
+    (NG, [{"id": "d1", "design_tier": "checked_pair_separation"}], None),
+    (NS, [{"id": "d1", "design_tier": "checked_pair_separation", "verification": "passed"}], None),
+    (INC, [{"id": "r1", "scientific_outcome": "certified_counterexample"}], None),
+    (NC, [{"id": "d1", "design_tier": "numerical_guidance", "verification": "passed"}], None),
+    (NC, [{"id": "d1", "design_tier": "checked_pair_separation", "verification": "not_checked"}], None),
+    (INC, [{"id": "r1", "verification": "passed"}], None),
+    (NC, [{"id": "d1", "design_tier": "numerical_guidance"}, {"id": "d2", "verification": "not_checked"}], None),
+    (NG, [{"id": "d1", "design_tier": "numerical_guidance"}, {"id": "d2", "design_tier": "checked_pair_separation"}],
+     None),
+    (INC, [{"id": "r1"}], [{"id": "r1", "scientific_outcome": "inconclusive"}]),
+    (INC, [{"id": "r1", "scientific_outcome": "inconclusive"}],
+     [{"id": "r1", "scientific_outcome": "certified_counterexample"}]),
+    ("The result is inconclusive, so the claimed range is proven.", [{"id": "r1", "scientific_outcome": "inconclusive"}],
+     None),
+    ("The result is inconclusive. The claimed range is proven.", [{"id": "r1", "scientific_outcome": "inconclusive"}],
+     None),
+    ("The returned design remains numerical guidance. The pair is checked separated.",
+     [{"id": "d1", "design_tier": "numerical_guidance"}], None),
+    ("The result is inconclusive. Replay passed, so the claim is verified.",
+     [{"id": "r1", "scientific_outcome": "inconclusive", "replay": "passed"}], None),
+], ids=["guidance_vs_checked", "no_separation_vs_checked", "inconclusive_vs_counterexample",
+        "not_checked_vs_passed", "not_checked_on_checked_tier", "status_absent", "split_across_records",
+        "conflicting_cited_designs", "context_only_support", "same_record_context_conflict",
+        "appended_overclaim_clause", "appended_overclaim_sentence", "appended_tier_upgrade",
+        "replay_upgrade"])
+def test_limiting_statements_without_matching_cited_support_are_withheld(text, facts, context):
+    from bean_api.ai_prompts import commentary_rejection
+    assert commentary_rejection(text, facts, context_facts=context) is not None
 
 
 QUALIFIER = gap("F-EXPLANATION-QUALIFIER (P2, Owner 3): any hedge word earlier in "
