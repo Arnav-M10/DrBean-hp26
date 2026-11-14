@@ -211,6 +211,11 @@ def _main(argv, guard_log) -> int:
                 for item in f.get("retests", []):
                     lines.append(f"- **Retest at {item['at_commit']}:** {item['result']} "
                                  f"(evidence: {json.dumps(item.get('evidence', {}), sort_keys=True)})")
+        catalog = data.get("check_catalog") or {}
+        if catalog.get("ids"):
+            lines += ["", "## Check-level finding ids (raised only when the check fails)", "", catalog["note"], "",
+                      "| ID | Owner | Raised when |", "|---|---|---|"]
+            lines += [f"| {key} | {item['owner']} | {item['meaning']} |" for key, item in sorted(catalog["ids"].items())]
         with open(os.path.join(ROOT, "FINDINGS.md"), "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines) + "\n")
         print("wrote evaluation/FINDINGS.md")

@@ -1,7 +1,7 @@
 {
   "schema": "drbean-findings/v1",
   "maintained_by": "Workstream 5 (independent adversarial validation)",
-  "updated_at": "2026-11-14T06:00:00Z",
+  "updated_at": "2026-11-14",
   "application_code_commit": "9cc90e0 (origin/main incl. PR #6 browser-baseline, #7 Owner 4, #8 this branch to 4ea7cb3)",
   "observed_at_harness_commit": "8bb1fbe",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
@@ -21,7 +21,19 @@
         "results": "evaluation/results/previews/main-d6a71c2/science_barrier (RS-CANCEL-RESTART no_orphan_after_worker_kill)",
         "context": "packages/groundwork_adapter/docs/BRIDGE.md requires the launching parent to kill the session before its own exit; a SIGKILLed parent cannot",
         "suggested_seam": "parent-death watchdog in science._child (poll os.getppid() or pipe EOF, then killpg own session), plus persisting the child pgid so worker --recover can kill leftovers"
-      }
+      },
+      "retests": [
+        {
+          "at_commit": "preview of backend/followup 8525cab (harness 1760df0; diagnostics relax_nproc + science_barrier)",
+          "result": "Still reproduces: 1 live scientific child when the worker was SIGKILLed, still alive after `worker --recover` (the run itself is correctly marked interrupted and not redispatched). Running cancellation kills its child (passes). The harness released the barrier and reaped the orphan at teardown.",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-followup-8525cab/relax_nproc+science_barrier",
+            "attempts": [
+              "att_3cf444719093428e"
+            ]
+          }
+        }
+      ]
     },
     {
       "id": "F-AI-INTEGRATION-SEAM",
@@ -184,8 +196,8 @@
     {
       "id": "F-FOLLOWUP-FEEDBACK",
       "severity": "P0",
-      "owner": "1 and 2",
-      "status": "open",
+      "owner": "2 (design-bound follow-up, PR #11) and 1 (wider native admission)",
+      "status": "fixed_pending_retest",
       "title": "No application route reports candidate-specific outcomes for the prior pair after a hypothetical reading",
       "minimal_input": "hero design pair + hypothetical 3.4 / 4.57 / 4.0 mg/L at the selected time, allowance 0.2",
       "command": "python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --only RS-HERO-FULL RS-FOLLOWUP",
@@ -219,6 +231,17 @@
           "result": "Still no candidate-specific result for the prior pair after a hypothetical reading (lineage passes).",
           "evidence": {
             "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"
+          }
+        },
+        {
+          "at_commit": "preview of backend/followup 8525cab (PR #11, stacked on PR #9; harness 1760df0; diagnostic relax_nproc; evidence class diagnostic, never acceptance)",
+          "result": "Design-bound follow-up (PlanBody.followup) passes all three branches, 73/73 required checks and 125/125 qualifier re-checks. Application, fresh native replay and the independent decimal oracle agree per candidate: 3.4 keeps the inside candidate only (inconclusive), 4.57 excludes both (inconclusive, no counterexample flag), 4.0 keeps the outside candidate (certified_counterexample). Tampered design digest -> 422 binding_mismatch, baseline artifact substituted -> 422 artifact_binding_mismatch, another workspace's design -> 404; baseline and design approvals -> 403; retried start returns the same run; exactly the original vectors are re-checked with no new discovery; exclusions name the new reading; design bytes and record unchanged; report keeps lineage without storage locators. Scope stays narrow by design: one hypothetical row at the checked selected time and reviewed allowance (actual or off-design readings are refused before approval; Owner 1 extends native admission). Close on main by a non-diagnostic run after PR #9/#11 merge.",
+          "evidence": {
+            "results": "evaluation/results/previews/backend-followup-8525cab/relax_nproc",
+            "attempts": [
+              "att_158c6358ca2b4d49",
+              "att_9a4ac710315648c6"
+            ]
           }
         }
       ]
@@ -668,7 +691,105 @@
       "title": "Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace",
       "fixed_in": "d6c7f1f, de1aca5",
       "evidence": {}
+    },
+    {
+      "id": "H-CI-ENGINE",
+      "severity": "P1",
+      "owner": "5",
+      "status": "fixed_pending_retest",
+      "title": "Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine",
+      "minimal_input": "CI stack job: `python3 scripts/dev/launcher.py setup` then `.venv/bin/python -m pytest -q tests/integration` with no DRBEAN_SCIENCE_PYTHON and no python3.11 on PATH",
+      "command": ".venv/bin/python -m pytest -q tests/integration",
+      "expected": "the launched stack receives BEAN_COUNTERDEX_PYTHON for the qualified CPython 3.11 engine that setup prepared",
+      "observed": "Reported by Owner 1 from CI run 43556610563 (PR #5 merge 4fc3add): integration suite 36 passed, 7 failed, 2 xfailed; all seven failures were plan admission 503 scientific_runtime_missing. Harness 4ea7cb3 (the copy merged into main) resolves the engine only from DRBEAN_SCIENCE_PYTHON or python3.11 on PATH; the stack job prepares .venv-engine but exports neither, so LocalStack launched the API without BEAN_COUNTERDEX_PYTHON. A harness-environment defect, not a product one.",
+      "fixed_in": "8bb1fbe (science_python prefers <repo>/.venv-engine/bin/python; not yet in main)",
+      "evidence": {
+        "ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43556610563",
+        "reported_in": "origin/codex/science-next docs/workstreams/01-science.md (Post-push CI at 8af34e4)"
+      },
+      "retests": []
     }
   ],
-  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14."
+  "history": "First observed at application 586fb9b with harness da5ecdc; retested at origin/main adac945 (merged as 1862ebf) with harness d2d3c53 on 2026-11-14.",
+  "check_catalog": {
+    "note": "Finding ids that a check names when it fails. They are not observed findings: an id appears in `findings` only after a check actually failed or was blocked. Every id cited by evaluation/drbean_eval or tests/integration must be a finding or listed here (enforced by evaluation/tests).",
+    "ids": {
+      "F-ANCHOR-RECORD": {
+        "owner": "2",
+        "meaning": "authenticated records do not expose the complete replay anchor for a downloaded native packet"
+      },
+      "F-APPROVAL-REUSE": {
+        "owner": "2",
+        "meaning": "an earlier baseline or design approval started work on a different plan"
+      },
+      "F-CREDENTIAL-READ": {
+        "owner": "2 and 3",
+        "meaning": "a guarded API/worker process read a present provider credential variable while AI is a placeholder"
+      },
+      "F-DESIGN-AUTHORITY": {
+        "owner": "2",
+        "meaning": "a design was proposed, approved or started without its own separate, current authority"
+      },
+      "F-DESIGN-JOB": {
+        "owner": "2",
+        "meaning": "a design job ended non-completed without a named worker or runtime cause"
+      },
+      "F-DESIGN-TIER": {
+        "owner": "1 and 2",
+        "meaning": "a reviewed design request returned an unexpected or unexplained tier"
+      },
+      "F-EXTERNAL-ATTEMPT": {
+        "owner": "2 and 3",
+        "meaning": "the egress guard recorded an external connection or a provider client construction"
+      },
+      "F-FALSE-CHECKED": {
+        "owner": "1 and 2",
+        "meaning": "checked separation claimed without a strictly positive exact margin, valid verification, passed replay and matching binding"
+      },
+      "F-FOLLOWUP-BINDING": {
+        "owner": "2",
+        "meaning": "a follow-up plan accepted a tampered, substituted or foreign design scope"
+      },
+      "F-HERO-NO-PAIR": {
+        "owner": "1 and 2",
+        "meaning": "the hero baseline produced no two distinct fixed candidates (inside and outside the claim) to design on"
+      },
+      "F-HERO-NO-WITNESS": {
+        "owner": "1",
+        "meaning": "the known-positive hero baseline returned no individually compatible strict outside candidate"
+      },
+      "F-ORPHAN-CANCEL": {
+        "owner": "2",
+        "meaning": "a scientific child process is still alive after cancelling its running job"
+      },
+      "F-RUNTIME-MISSING": {
+        "owner": "4 and 5 (environment)",
+        "meaning": "the API reports scientific_runtime_missing: no prepared CPython 3.11 engine was configured for the stack (set DRBEAN_SCIENCE_PYTHON or run scripts/dev/launcher.py setup); see H-CI-ENGINE"
+      },
+      "F-SCHEMA-DRIFT": {
+        "owner": "2",
+        "meaning": "the API now requires request fields the reviewed packet does not define"
+      },
+      "F-SCIENCE-WORKER": {
+        "owner": "2",
+        "meaning": "a run failed with scientific_worker_failed (the bounded scientific child failed)"
+      },
+      "F-SOURCE-ADMISSION": {
+        "owner": "2",
+        "meaning": "a valid synthetic PNG was refused for a reason other than a malformed image"
+      },
+      "F-SOURCE-BYPASS": {
+        "owner": "2",
+        "meaning": "a dataset citing a source asset was accepted without review and materialization"
+      },
+      "F-STALE-APPROVAL": {
+        "owner": "2",
+        "meaning": "an approval for an outdated plan or revision still started work"
+      },
+      "F-WORKER": {
+        "owner": "2",
+        "meaning": "a run failed with worker_failed"
+      }
+    }
+  }
 }

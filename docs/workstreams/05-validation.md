@@ -6,12 +6,12 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 
 | Item | Value |
 |---|---|
-| Branch | `claude/adversarial-validation` (pushed); PR #8 merged it into `main` up to `4ea7cb3`; `main` `9cc90e0` merged back as `7be805a` |
+| Branch | `claude/adversarial-validation` (pushed); PR #8 merged it into `main` up to `4ea7cb3`; `main` `9cc90e0` merged back as `7be805a`. Later harness commits (native consumer, `.venv-engine` discovery, barrier diagnostic, design-bound follow-up) are **not in `main`** until a new PR merges them |
 | Integration branch | `main` (GitHub default since the PR #3/#4 merges) |
 | Last recorded lane run | harness `8bb1fbe` against merged `main` `9cc90e0` (acceptance: science fails on this Mac, F-MAC-NPROC; diagnostic: `evaluation/results/previews/main-8bb1fbe/`) |
 | Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 |
 | AI mode | zero external model dispatch, verified by the egress guard in API, worker and pytest; live Gemini `NOT_RUN` |
-| Findings | `evaluation/findings.json` → `evaluation/FINDINGS.md` (open P0: F-MAC-NPROC, F-BASELINE-DISCOVERY on main, F-NATIVE-BYTES pending retest, F-FOLLOWUP-FEEDBACK) |
+| Findings | `evaluation/findings.json` → `evaluation/FINDINGS.md` (open P0: F-MAC-NPROC, F-ORPHAN-WORKER-KILL; F-FOLLOWUP-FEEDBACK passes in the PR #11 preview, pending merge; check-level ids catalogued there too) |
 | Release gate | `python3.11 evaluation/cli.py gate --require release` → failed (exit 3) |
 
 ## Gate evidence (current)
@@ -57,6 +57,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 1. `docs/ownership-and-layout.md`: replace the pre-merge component table with the five-workstream allocation in master brief §1.31 (Workstream 5: `evaluation/**`, `docs/evaluation-protocol.md`, `scripts/evaluate.py`, `tests/test_evaluation.py`, new Python tests in `tests/integration/`, this log). I briefly edited that file and reverted it (`3f87487`) because it is yours.
 2. `docs/issue-ledger.md`: I-001/I-002/I-005 are superseded by the merged backend and engine; current statuses are in `evaluation/FINDINGS.md`.
 3. CI: run the commands above; treat `gate --require release` exit 3 as a failing release, exit 0 from `inventory` as informational only. `scripts/release/checklist.py:25` has an unused import (F-LINT-CHECKLIST).
+4. CI stack job (H-CI-ENGINE, reported by Owner 1 from run 43556610563): the integration suite's 7 failures are `scientific_runtime_missing` because the harness copy in `main` does not find `.venv-engine`. Fixed on this branch (`8bb1fbe`); until it merges, export `DRBEAN_SCIENCE_PYTHON="$PWD/.venv-engine/bin/python"` for that step. Either fix alone is sufficient.
 
 ## Previews of unmerged branches (never acceptance)
 
@@ -64,6 +65,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 | Branch | Commit | Result |
 |---|---|---|
+| `backend/followup` (PR #11, stacked on PR #9) | `8525cab` | diagnostic relax_nproc: **6/7 entries pass incl. RS-FOLLOWUP** (design-bound `PlanBody.followup`: application, fresh replay and decimal oracle agree per candidate on all three readings; tampered/substituted/foreign scopes refused; qualifier 125/125); RS-CANCEL-RESTART unrun without the barrier. With relax_nproc + science_barrier: running cancel passes, **worker SIGKILL still orphans the child** (F-ORPHAN-WORKER-KILL). |
 | `backend/browser-design` | `8451c1f` | plain: hero fails (F-MAC-NPROC). diagnostic: **RS-HERO-FULL passes** — discovery, checked design with documented source ids (8 h, positive exact margin), both native packets replay fresh, 33/33 qualifier re-checks; follow-up per-candidate still blocked. |
 | `codex/ai-offline-milestones` | `c6f04c2` | worker-boundary controlled lane passes (F-AI-INTEGRATION-SEAM resolved); both coordinator P2 residuals XPASS; all 5 backend failures are F-MAC-NPROC. |
 | `main` + `codex/gemini-offline-integration` (local merge) | `9cc90e0` + `c95ab28` | zero-dispatch passes; Owner 3 fixes both coordinator P2 residuals (strict xfail XPASS); the worker's controlled lane breaks with `provider_placeholder_disabled` until Owner 2 selects mode=controlled (F-AI-INTEGRATION-SEAM). |
@@ -71,10 +73,11 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 
 ## Next exact actions
 
-1. Done: Owner 3 preview recorded. When it merges, remove the two strict-xfail markers (they will fail the suite) and rerun the worker-boundary tests after Owner 2 adopts mode=controlled.
-2. Cancellation is now observable with `--diagnostic science_barrier` (a harness-side barrier inside the scientific child): running cancellation passes; a worker SIGKILL leaves an orphan computation (P0 F-ORPHAN-WORKER-KILL, Owner 2). Ask Owner 2 for a product-side test barrier so this can become acceptance evidence.
-3. Remaining master-brief gaps in my lane: stale-approval-after-revision HTTP check, extended native negative controls (truncation, missing dependency, wrong profile, duplicate member, oversized, another run's packet), endpoint-level admission goldens from `shared/contracts/DB-SC-1/fixtures/admission-golden.json`, guard coverage for the CLI process and credential-read detection, ledger corruption handling, metamorphic engine controls, and grading C08/C09 from the real graph at the controlled tier.
-4. Retest F-MAC-NPROC, F-BASELINE-DISCOVERY, F-NATIVE-BYTES and F-FOLLOWUP-FEEDBACK whenever `main` moves.
+1. When PR #9 and PR #11 merge: merge `main`, run the acceptance lane with no diagnostics on a host without F-MAC-NPROC (or after Owner 2's platform-aware process guard), then close F-FOLLOWUP-FEEDBACK, F-DESIGN-SOURCE-ARTIFACTS and F-NATIVE-BYTES by retest.
+2. When PR #10 (Owner 3) merges: remove the two strict-xfail markers (they will XPASS and fail the suite) and rerun the worker-boundary tests.
+3. F-ORPHAN-WORKER-KILL (P0, Owner 2): reproduced on `8525cab` too. Ask Owner 2 for a product-side test barrier so this can become acceptance evidence instead of a diagnostic.
+4. Owner 4's launcher (`scripts/dev/launcher.py`): `doctor` in an isolated `DRBEAN_VAR_DIR` is ready except `.venv-engine` and the local auth file; acceptance through that path is still to be run (master brief §2.7).
+5. Retest F-MAC-NPROC, F-BASELINE-DISCOVERY and F-NATIVE-BYTES whenever `main` moves.
 
 ## Conditional future work (not authorized now)
 

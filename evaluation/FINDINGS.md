@@ -10,7 +10,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 | F-ADAPTER-SELECTION | P0 | 2 (with 1 for the runtime bridge) | retested | Ordinary API and worker startup select UnavailableAdapter; no real scientific path exists through HTTP |
 | F-BASELINE-DISCOVERY | P0 | 1 (producer) and 2 (adapter wiring) | fixed_pending_retest | Counterdex has no bounded baseline candidate-discovery operation (investigate) |
 | F-NATIVE-BYTES | P0 | 2 (bytes, anchor record) and 1 (complete packet) | fixed_pending_retest | No authenticated route returns native packet bytes; /artifacts/{id} serves the entity envelope; records expose no scientific anchors |
-| F-FOLLOWUP-FEEDBACK | P0 | 1 and 2 | open | No application route reports candidate-specific outcomes for the prior pair after a hypothetical reading |
+| F-FOLLOWUP-FEEDBACK | P0 | 2 (design-bound follow-up, PR #11) and 1 (wider native admission) | fixed_pending_retest | No application route reports candidate-specific outcomes for the prior pair after a hypothetical reading |
 | F-PLACEHOLDER-AUTO | P0 | 3 | retested | The legacy documented live switch (dummy values only) constructs google.genai.Client and attempts dispatch |
 | F-PLACEHOLDER-MODE | P1 | 3 | retested | Capabilities declare no explicit placeholder/disabled provider mode |
 | F-OPTIONAL-VANISHES | P1 | 3 (graph) and 2 (callbacks) | retested | The actual deepagents graph completes while a reviewed optional scenario is neither executed nor skipped |
@@ -31,6 +31,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 | H-DIRTY-FLAG | P1 | 5 | retested | git_state stripped porcelain output and marked every record dirty (since harness 0.1.0) |
 | H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
 | H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
+| H-CI-ENGINE | P1 | 5 | fixed_pending_retest | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, open)
 
@@ -39,6 +40,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Expected:** no scientific computation outlives its job: the child detects parent death and ends its session, or recovery kills sessions recorded at dispatch
 - **Observed:** child pid alive 1 s after the worker was killed and still alive after worker --recover marked the run interrupted; only the harness teardown removed it. API cancellation of a running job does kill the child (passes).
 - **Evidence:** {"context": "packages/groundwork_adapter/docs/BRIDGE.md requires the launching parent to kill the session before its own exit; a SIGKILLed parent cannot", "results": "evaluation/results/previews/main-d6a71c2/science_barrier (RS-CANCEL-RESTART no_orphan_after_worker_kill)", "suggested_seam": "parent-death watchdog in science._child (poll os.getppid() or pipe EOF, then killpg own session), plus persisting the child pgid so worker --recover can kill leftovers"}
+- **Retest at preview of backend/followup 8525cab (harness 1760df0; diagnostics relax_nproc + science_barrier):** Still reproduces: 1 live scientific child when the worker was SIGKILLed, still alive after `worker --recover` (the run itself is correctly marked interrupted and not redispatched). Running cancellation kills its child (passes). The harness released the barrier and reaped the orphan at teardown. (evidence: {"attempts": ["att_3cf444719093428e"], "results": "evaluation/results/previews/backend-followup-8525cab/relax_nproc+science_barrier"})
 
 ## F-AI-INTEGRATION-SEAM (P1, owner 2 and 3, fixed_pending_retest)
 
@@ -89,7 +91,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Retest at preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance):** Native bytes, X-Artifact-SHA256, length, media type and the separate anchor route all verified over HTTP for baseline and design packets; altered bytes and wrong anchors rejected. Pending a non-diagnostic run on main. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc"})
 - **Retest at main 9cc90e0 (merged as 7be805a, harness 8bb1fbe) with diagnostic relax_nproc:** Integrated on main; diagnostic run verifies bytes, header, length, anchors, tamper and wrong-anchor rejection for baseline and design packets. (evidence: {"results": "evaluation/results/previews/main-8bb1fbe/relax_nproc"})
 
-## F-FOLLOWUP-FEEDBACK (P0, owner 1 and 2, open)
+## F-FOLLOWUP-FEEDBACK (P0, owner 2 (design-bound follow-up, PR #11) and 1 (wider native admission), fixed_pending_retest)
 
 - **Input:** hero design pair + hypothetical 3.4 / 4.57 / 4.0 mg/L at the selected time, allowance 0.2
 - **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch --only RS-HERO-FULL RS-FOLLOWUP`
@@ -99,6 +101,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Retest at adac945 via merge 1862ebf (harness d2d3c53):** ScientificResult now carries candidate_results; Owner 1's unmerged codex/science-next adds original-candidate observation rechecks. No integrated HTTP route yet exercised here (blocked behind the hero run). (evidence: {"attempts": ["att_86aae8c45eb24619"]})
 - **Retest at preview of backend/browser-baseline cc779bf (harness de1aca5; diagnostic relax_nproc; evidence class diagnostic, never acceptance):** Lineage now verified for all three what-if branches (new hypothetical dataset, parent link, old approval refused, new approval required); candidate-specific outcomes for the prior pair still have no route. Independent oracle expectations are recorded per branch for the eventual route. (evidence: {"results": "evaluation/results/previews/backend-browser-baseline-cc779bf/relax_nproc (RS-FOLLOWUP)"})
 - **Retest at backend/browser-design 8451c1f (preview):** Still no candidate-specific result for the prior pair after a hypothetical reading (lineage passes). (evidence: {"results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"})
+- **Retest at preview of backend/followup 8525cab (PR #11, stacked on PR #9; harness 1760df0; diagnostic relax_nproc; evidence class diagnostic, never acceptance):** Design-bound follow-up (PlanBody.followup) passes all three branches, 73/73 required checks and 125/125 qualifier re-checks. Application, fresh native replay and the independent decimal oracle agree per candidate: 3.4 keeps the inside candidate only (inconclusive), 4.57 excludes both (inconclusive, no counterexample flag), 4.0 keeps the outside candidate (certified_counterexample). Tampered design digest -> 422 binding_mismatch, baseline artifact substituted -> 422 artifact_binding_mismatch, another workspace's design -> 404; baseline and design approvals -> 403; retried start returns the same run; exactly the original vectors are re-checked with no new discovery; exclusions name the new reading; design bytes and record unchanged; report keeps lineage without storage locators. Scope stays narrow by design: one hypothetical row at the checked selected time and reviewed allowance (actual or off-design readings are refused before approval; Owner 1 extends native admission). Close on main by a non-diagnostic run after PR #9/#11 merge. (evidence: {"attempts": ["att_158c6358ca2b4d49", "att_9a4ac710315648c6"], "results": "evaluation/results/previews/backend-followup-8525cab/relax_nproc"})
 
 ## F-PLACEHOLDER-AUTO (P0, owner 3, retested)
 
@@ -221,3 +224,37 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Expected:** comparing several hypothetical readings from the same history is a natural planning task; either allow sibling forks or document 'one fork per workspace'
 - **Observed:** 409 stale_revision for the second fork (the first moved the current dataset); the harness now uses one workspace per branch
 - **Evidence:** {"note": "correct immutability behaviour; product/UX gap, not a safety defect"}
+
+## H-CI-ENGINE (P1, owner 5, fixed_pending_retest)
+
+- **Input:** CI stack job: `python3 scripts/dev/launcher.py setup` then `.venv/bin/python -m pytest -q tests/integration` with no DRBEAN_SCIENCE_PYTHON and no python3.11 on PATH
+- **Command:** `.venv/bin/python -m pytest -q tests/integration`
+- **Expected:** the launched stack receives BEAN_COUNTERDEX_PYTHON for the qualified CPython 3.11 engine that setup prepared
+- **Observed:** Reported by Owner 1 from CI run 43556610563 (PR #5 merge 4fc3add): integration suite 36 passed, 7 failed, 2 xfailed; all seven failures were plan admission 503 scientific_runtime_missing. Harness 4ea7cb3 (the copy merged into main) resolves the engine only from DRBEAN_SCIENCE_PYTHON or python3.11 on PATH; the stack job prepares .venv-engine but exports neither, so LocalStack launched the API without BEAN_COUNTERDEX_PYTHON. A harness-environment defect, not a product one.
+- **Evidence:** {"ci_run": "https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43556610563", "reported_in": "origin/codex/science-next docs/workstreams/01-science.md (Post-push CI at 8af34e4)"}
+
+## Check-level finding ids (raised only when the check fails)
+
+Finding ids that a check names when it fails. They are not observed findings: an id appears in `findings` only after a check actually failed or was blocked. Every id cited by evaluation/drbean_eval or tests/integration must be a finding or listed here (enforced by evaluation/tests).
+
+| ID | Owner | Raised when |
+|---|---|---|
+| F-ANCHOR-RECORD | 2 | authenticated records do not expose the complete replay anchor for a downloaded native packet |
+| F-APPROVAL-REUSE | 2 | an earlier baseline or design approval started work on a different plan |
+| F-CREDENTIAL-READ | 2 and 3 | a guarded API/worker process read a present provider credential variable while AI is a placeholder |
+| F-DESIGN-AUTHORITY | 2 | a design was proposed, approved or started without its own separate, current authority |
+| F-DESIGN-JOB | 2 | a design job ended non-completed without a named worker or runtime cause |
+| F-DESIGN-TIER | 1 and 2 | a reviewed design request returned an unexpected or unexplained tier |
+| F-EXTERNAL-ATTEMPT | 2 and 3 | the egress guard recorded an external connection or a provider client construction |
+| F-FALSE-CHECKED | 1 and 2 | checked separation claimed without a strictly positive exact margin, valid verification, passed replay and matching binding |
+| F-FOLLOWUP-BINDING | 2 | a follow-up plan accepted a tampered, substituted or foreign design scope |
+| F-HERO-NO-PAIR | 1 and 2 | the hero baseline produced no two distinct fixed candidates (inside and outside the claim) to design on |
+| F-HERO-NO-WITNESS | 1 | the known-positive hero baseline returned no individually compatible strict outside candidate |
+| F-ORPHAN-CANCEL | 2 | a scientific child process is still alive after cancelling its running job |
+| F-RUNTIME-MISSING | 4 and 5 (environment) | the API reports scientific_runtime_missing: no prepared CPython 3.11 engine was configured for the stack (set DRBEAN_SCIENCE_PYTHON or run scripts/dev/launcher.py setup); see H-CI-ENGINE |
+| F-SCHEMA-DRIFT | 2 | the API now requires request fields the reviewed packet does not define |
+| F-SCIENCE-WORKER | 2 | a run failed with scientific_worker_failed (the bounded scientific child failed) |
+| F-SOURCE-ADMISSION | 2 | a valid synthetic PNG was refused for a reason other than a malformed image |
+| F-SOURCE-BYPASS | 2 | a dataset citing a source asset was accepted without review and materialization |
+| F-STALE-APPROVAL | 2 | an approval for an outdated plan or revision still started work |
+| F-WORKER | 2 | a run failed with worker_failed |
