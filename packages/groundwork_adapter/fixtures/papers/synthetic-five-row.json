@@ -1,0 +1,137 @@
+{
+  "schema_version": "counterdex.authored-paper-fixture.v1",
+  "fixture_id": "synthetic-five-row",
+  "title": "Synthetic two-rate concentration experiment: a deterministic robustness exercise",
+  "authorship": "authored_synthetic_scientific_content",
+  "origin": "synthetic",
+  "pdf_status": "not_rendered_or_parsed",
+  "source_reference": "packages/groundwork_adapter/fixtures/decision/hero-baseline.request.json",
+  "warning": "Authored test data; not a publication, collected measurements, Gemini extraction result or proof of document authenticity.",
+  "planned_source": {
+    "identity_status": "planned_until_owner4_renders_and_hashes_actual_bytes",
+    "coordinate_status": "No bounding boxes, page asset identities or original PDF digest exist in this fixture.",
+    "pages": [
+      {
+        "physical_page": 1,
+        "purpose": "Methods, explicit assumptions and reviewed deterministic question",
+        "cell_keys": [
+          "methods.model",
+          "methods.initial_concentration",
+          "methods.time_origin",
+          "methods.trajectory",
+          "methods.units",
+          "methods.domain.A",
+          "methods.domain.ke",
+          "methods.domain.ka",
+          "claim.deterministic_interval",
+          "claim.analysis_question"
+        ]
+      },
+      {
+        "physical_page": 2,
+        "purpose": "Table 1 and separately reviewed future-measurement exercise",
+        "table_key": "table1",
+        "row_keys": ["row_0", "row_1", "row_2", "row_3", "row_4"],
+        "column_keys": ["time", "concentration", "hard_allowance"],
+        "cell_key_pattern": "table1.row_0.time (substitute the listed row and column keys)",
+        "additional_cell_keys": ["table1.inclusion", "table1.allowance_semantics", "design.future_times", "design.future_allowance", "design.maximum_horizon"]
+      }
+    ]
+  },
+  "model": {
+    "expression": "C(t) = A * (exp(-ke*t) - exp(-ka*t))",
+    "initial_state": "C(0) = 0",
+    "rate_order": "0 < ke < ka",
+    "time_origin": "Elapsed hours from reviewed fixed initial state",
+    "trajectory": "One authored synthetic trajectory, not a pooled cohort or population mean",
+    "input_assumptions": "Single input; no repeated dosing, infusion or nonzero initial concentration",
+    "amplitude_meaning": "Effective concentration amplitude; does not separately identify dose, bioavailability or volume"
+  },
+  "canonical_source": {
+    "units": {"time": "h", "concentration": "mg/L", "hard_allowance": "mg/L"},
+    "allowance_semantics": "Authored deterministic absolute bound for this synthetic robustness exercise; not SD, SEM, a confidence interval, measured error or instrument resolution",
+    "rows": [
+      {"id": "row_0", "time": "0.25", "concentration": "4.80", "hard_allowance": "0.50", "included": true},
+      {"id": "row_1", "time": "0.5", "concentration": "7.20", "hard_allowance": "0.50", "included": true},
+      {"id": "row_2", "time": "1", "concentration": "8.00", "hard_allowance": "0.50", "included": true},
+      {"id": "row_3", "time": "2", "concentration": "6.80", "hard_allowance": "0.50", "included": true},
+      {"id": "row_4", "time": "4", "concentration": "5.70", "hard_allowance": "0.50", "included": true}
+    ],
+    "domain": {
+      "A": {"lower": "0.001", "upper": "30", "unit": "mg/L"},
+      "ke": {"lower": "0.015", "upper": "0.35", "unit": "1/h"},
+      "ka": {"lower": "0.4", "upper": "8", "unit": "1/h"}
+    },
+    "claim": {
+      "parameter": "ke",
+      "lower": "0.10",
+      "upper": "0.17",
+      "unit": "1/h",
+      "closed": true,
+      "semantics": "Deliberately authored deterministic robustness target; not a statistical interval"
+    }
+  },
+  "unit_variant_source": {
+    "status": "authored_alternate_representation_not_rendered",
+    "units": {"time": "min", "concentration": "ng/mL", "hard_allowance": "ng/mL"},
+    "rows": [
+      {"id": "row_0", "time": "15", "concentration": "4800", "hard_allowance": "500", "included": true},
+      {"id": "row_1", "time": "30", "concentration": "7200", "hard_allowance": "500", "included": true},
+      {"id": "row_2", "time": "60", "concentration": "8000", "hard_allowance": "500", "included": true},
+      {"id": "row_3", "time": "120", "concentration": "6800", "hard_allowance": "500", "included": true},
+      {"id": "row_4", "time": "240", "concentration": "5700", "hard_allowance": "500", "included": true}
+    ],
+    "unchanged_source_fields": ["model", "canonical_source.domain", "canonical_source.claim"],
+    "exact_conversions": {
+      "time": {"operation": "multiply", "factor": "1/60", "from_unit": "min", "to_unit": "h"},
+      "concentration": {"operation": "multiply", "factor": "1/1000", "from_unit": "ng/mL", "to_unit": "mg/L"},
+      "hard_allowance": {"operation": "multiply", "factor": "1/1000", "from_unit": "ng/mL", "to_unit": "mg/L"}
+    }
+  },
+  "expected_normalized": {
+    "dataset_origin": "synthetic",
+    "time_origin": "Elapsed hours from reviewed fixed initial state",
+    "model": "two_rate_concentration",
+    "initial_concentration": "0/1",
+    "observable": "concentration",
+    "units": {"time": "h", "concentration": "mg/L", "rate": "1/h"},
+    "rows": [
+      {"id": "row_0", "time": "1/4", "concentration": "24/5", "hard_allowance": "1/2", "included": true},
+      {"id": "row_1", "time": "1/2", "concentration": "36/5", "hard_allowance": "1/2", "included": true},
+      {"id": "row_2", "time": "1/1", "concentration": "8/1", "hard_allowance": "1/2", "included": true},
+      {"id": "row_3", "time": "2/1", "concentration": "34/5", "hard_allowance": "1/2", "included": true},
+      {"id": "row_4", "time": "4/1", "concentration": "57/10", "hard_allowance": "1/2", "included": true}
+    ],
+    "domain": {
+      "A": {"lower": "1/1000", "upper": "30/1"},
+      "ke": {"lower": "3/200", "upper": "7/20"},
+      "ka": {"lower": "2/5", "upper": "8/1"},
+      "rate_order": "ke_lt_ka"
+    },
+    "target": {"parameter": "ke", "lower": "1/10", "upper": "17/100", "closed": true}
+  },
+  "reviewed_question": "Do these synthetic measurements, under the stated two-rate model and hard allowances, force ke to lie in the closed interval [0.10,0.17] 1/h?",
+  "design_exercise": {
+    "status": "requires_separate_review_and_approval",
+    "feasible_times": ["8/1", "6/1"],
+    "future_hard_allowance": "1/5",
+    "maximum_horizon": "8/1",
+    "allowance_semantics": "Separately selected future precision assumption; not inferred from historical hard allowances",
+    "candidate_source": "Use the actual two compatible candidates returned by the newly executed baseline; never hardcode old fixture IDs/vectors"
+  },
+  "correction_control": {
+    "field_path": "rows[4].concentration",
+    "original_source_value": "5.70",
+    "accepted_correction": "5.30",
+    "unit": "mg/L",
+    "expected_normalized_value": "53/10",
+    "requires_new_review_and_authority": true,
+    "preserve_original_proposal_and_evidence": true
+  },
+  "equivalence_scope": {
+    "equal_fields": ["model", "initial_concentration", "observable", "normalized units", "time-origin meaning", "domain", "closed target", "ordered row time/concentration/hard_allowance/inclusion"],
+    "intentionally_distinct_identities": ["original source bytes", "page and subset manifests", "application IDs and digests", "full scientific projection digest", "candidate IDs", "native artifact bytes and anchors"],
+    "requires_actual_execution": true,
+    "does_not_establish": ["PDF parsing or Gemini extraction accuracy", "document authenticity", "physical measurement authenticity", "real-world model validity", "a refuted statistical result", "global optimality or exclusion of every unsearched model"]
+  }
+}

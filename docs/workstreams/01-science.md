@@ -2,6 +2,50 @@
 
 Owner: Person 1 / Counterdex.
 
+## Paper sprint — exact mapping and defensible scientific scope
+
+Started an isolated `codex/paper-science-mapping` worktree from actual main
+`cbfa5ef0494bb681d4d8748cfd2d2487a1e0887d`. Inspected PR #32 (`754412c`),
+#28 (`4390836`) and Claude #22 (`ab67b71`); did not merge divergent provider or
+evaluator implementations. The new sprint explicitly supersedes the earlier
+placeholder-only product instruction, but live allocation remains zero until
+user-enabled consent/budget. Owner 1 makes no application provider calls.
+
+Implemented `counterdex.paper_mapping`: bounded exact unit conversions, oral
+amplitude arithmetic, and eligibility/meaning checks on existing normalized
+application records via `project_application`. No numerical-kernel, API schema,
+provider, coordinator or UI changes. The compatibility checklist distinguishes
+mechanical checks from authenticated human/source review. An eligible assessment
+grants neither execution approval, mathematical verification nor authenticity.
+Statistical intervals require a separate deterministic user question; hypothetical
+allowances and independent oral-amplitude relaxation cannot be called a literal
+paper reproduction. Aggregate means and figure digitization remain in review.
+
+Authored the existing five-row synthetic paper content and exact minutes/ng-per-mL
+variant without fabricating PDF/page bytes or parser results. New tests compute
+manual and controlled paper mappings freshly, retain different provenance
+identities, replay native bytes against separate anchors, and verify that a
+reviewed concentration correction changes actual candidate vectors. Added the
+missing both-compatible branch and fresh grid/precision/horizon controls while
+preserving original vectors and the existing four-outcome regression.
+
+Initial focused result: **12 new tests passed in 3.488 s**, using a new isolated
+CPython 3.11.17 install of this source. This is an unreleased Counterdex 0.3.0
+source candidate; its exact implementation digest, not the version string alone,
+must match the installed runtime. Historical 0.3.0 runtimes/artifacts are retained
+unchanged. Full regression and committed-candidate evidence follow separately.
+
+[Scientific contract and first compatibility checklist](../../packages/groundwork_adapter/docs/PAPER_SCIENCE_CONTRACT.md)
+and [synthetic PDF scientific content](../../packages/groundwork_adapter/docs/PAPER_FIXTURE_SPEC.md)
+are ready for Owners 2–4. Owner 2 owns shared schemas/application admission and
+now coordinator/tests; Owner 3 owns the shared metered adapter and narration;
+Owner 4 owns PDF parsing/rendered fixture bytes/UI/release and must reconcile the
+ownership document. At initial inspection no published paper interface, rendered
+paper fixture or selected public experiment was available. Actual PDF-to-app
+acceptance, public-paper scope review and final combined qualification depend on
+those deliveries. Do not label the controlled scientific seam as PDF parsing,
+Gemini accuracy or live qualification. No live run has been performed.
+
 ## Current review — normal-source API and final follow-up replay
 
 Owner 4 supplied combined product `31a8ed3c9b66ed721cf2f37179ab3fe62ebe0d09`,
