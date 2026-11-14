@@ -1084,7 +1084,7 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
                     "application_per_candidate": per_candidate}
         if scope and evidence:
             observed.update(_check_native_followup(flow, checks, name, label, evidence[0], design, scope, vectors,
-                                                   row, expected, run["id"]))
+                                                   row, expected, run["id"], packet["problem"]["target"]))
         branches.append(observed)
     check_original_unchanged(checks, flow, hero, "original_evidence_unchanged_after_followups")
     return {"checks": checks, "observation": {"branches": branches, "design_was_isolation_probe": isolation,
@@ -1131,7 +1131,7 @@ def _verdict(value) -> str:
 
 
 def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, evidence: dict, design: dict,
-                           scope: dict, vectors: dict, row: dict, expected: dict, run_id: str) -> dict:
+                           scope: dict, vectors: dict, row: dict, expected: dict, run_id: str, target: dict) -> dict:
     """The design-bound follow-up re-checks exactly the original pair, replays fresh and keeps its lineage."""
     result = result_of(evidence)
     candidates = {c.get("id"): c.get("parameter_vector") for c in result.get("candidates") or []}
@@ -1154,6 +1154,15 @@ def _check_native_followup(flow: Flow, checks: Checks, name: str, label: str, ev
         checks.expect(f"{name}_no_claim_from_excluded_candidates",
                       result.get("scientific_outcome") != "certified_counterexample" and not claims,
                       f"outcome {result.get('scientific_outcome')}; counterexample flags {claims}")
+    # The outcome follows from the verdicts: a counterexample remains iff an original candidate the oracle keeps
+    # lies outside the closed claim (exact rational comparison; an indeterminate verdict leaves it undecided).
+    survivors_outside = [c for c in vectors if expected[c] == "compatible" and kinetics.outside_closed_claim(
+        vectors[c][target["parameter"]], target["lower"], target["upper"])]
+    if all(v != "indeterminate" for v in expected.values()):
+        certified = result.get("scientific_outcome") == "certified_counterexample"
+        checks.expect(f"{name}_outcome_follows_from_survivors", certified == bool(survivors_outside),
+                      f"outcome {result.get('scientific_outcome')}; surviving candidates outside the closed claim "
+                      f"(independent oracle) {survivors_outside}")
     downloads = [flow.download(ref, f"{label}-review") for ref in result.get("artifacts") or []]
     reports = flow.replay_checks(checks, downloads, native.anchors_from_record(evidence), f"{name}_review_packet",
                                  [f"{label}-evidence-baseline"])

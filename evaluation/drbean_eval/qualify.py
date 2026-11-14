@@ -171,6 +171,13 @@ def _followup_links(label: str, scope: dict, records: dict) -> list[dict]:
     check("followup_verdicts_match_oracle", set(observed) == set(vectors) and all(
         expected[c] == "indeterminate" or observed[c] == expected[c] for c in vectors),
         f"application {observed}, independent oracle {expected}")
+    target = ((records.get(f"{label}-problem") or {}).get("body") or {}).get("target") or {}
+    if target and all(v != "indeterminate" for v in expected.values()):
+        outside = [c for c in vectors if expected[c] == "compatible" and kinetics.outside_closed_claim(
+            vectors[c][target["parameter"]], target["lower"], target["upper"])]
+        certified = result.get("scientific_outcome") == "certified_counterexample"
+        check("followup_outcome_follows_from_survivors", certified == bool(outside),
+              f"outcome {result.get('scientific_outcome')}; oracle survivors outside the closed claim {outside}")
     return out
 
 

@@ -25,7 +25,7 @@ SCOPE = {"design_job_id": "djob_1", "design_result_id": "sugg_1", "design_result
          "observation_proposal_id": "prop_1", "source_artifact_id": "art_design"}
 
 
-def records(verdicts=None, **overrides):
+def records(verdicts=None, outcome="inconclusive", **overrides):
     """A consistent saved-record set for label 'fu-x'; overrides replace whole records."""
     verdicts = verdicts or {"reference": "valid", "outside": "invalid"}
     parent_rows = HERO["dataset"]["rows"]
@@ -35,7 +35,8 @@ def records(verdicts=None, **overrides):
         "fu-x-parent-dataset": {"id": "ds_1", "digest": "1" * 64, "workspace_id": "ws",
                                 "body": {"origin": "synthetic", "rows": parent_rows}},
         "fu-x-problem": {"id": "pr_2", "digest": "3" * 64, "workspace_id": "ws",
-                         "body": {"dataset_id": "ds_2", "dataset_digest": "2" * 64}},
+                         "body": {"dataset_id": "ds_2", "dataset_digest": "2" * 64,
+                                  "target": HERO["problem"]["target"]}},
         "fu-x-plan": {"id": "pl_2", "digest": "4" * 64, "workspace_id": "ws",
                       "body": {"problem_id": "pr_2", "problem_digest": "3" * 64, "dataset_id": "ds_2",
                                "followup": dict(SCOPE)}},
@@ -47,7 +48,7 @@ def records(verdicts=None, **overrides):
             "run_id": "run_2", "problem_id": "pr_2", "expected_problem_digest": "3" * 64,
             "result": {"candidates": [{"id": cid, "parameter_vector": VECTORS[cid]} for cid in IDS],
                        "candidate_results": [{"candidate_id": cid, "verification": verdicts[cid]} for cid in IDS],
-                       "baseline_search": None}}},
+                       "baseline_search": None, "scientific_outcome": outcome}}},
         "fu-x-proposal": {"id": "prop_1", "workspace_id": "ws", "body": {"origin": "hypothetical", "row": ROW}},
         "fu-x-bound-design-job": {"id": "djob_1", "result_id": "sugg_1", "plan_id": "dplan_1", "workspace_id": "ws"},
         "fu-x-bound-suggestion": {"id": "sugg_1", "digest": "d" * 64, "workspace_id": "ws",
@@ -73,12 +74,28 @@ class FollowupQualifierTests(unittest.TestCase):
     def test_consistent_followup_passes_every_link(self):
         checks = followup_checks(records())
         self.assertEqual(set(checks), {"followup_binds_its_design", "followup_appends_exactly_the_reviewed_row",
-                                       "followup_rechecks_the_design_pair", "followup_verdicts_match_oracle"})
+                                       "followup_rechecks_the_design_pair", "followup_verdicts_match_oracle",
+                                       "followup_outcome_follows_from_survivors"})
         self.assertTrue(all(c["passed"] for c in checks.values()), checks)
 
     def test_verdict_disagreeing_with_the_oracle_fails(self):
         checks = followup_checks(records({"reference": "valid", "outside": "valid"}))
         self.assertFalse(checks["followup_verdicts_match_oracle"]["passed"])
+
+    def test_outcome_must_follow_from_which_candidates_survive(self):
+        # Reading 3.4 keeps only the reference candidate (ke 0.122, inside the closed claim): no counterexample.
+        self.assertFalse(followup_checks(records(outcome="certified_counterexample"))[
+            "followup_outcome_follows_from_survivors"]["passed"])
+        # Reading 4.57 keeps only the outside candidate (ke 0.074): the counterexample must be reported.
+        row = {**ROW, "concentration": "457/100"}
+        overrides = {"fu-x-proposal": {"id": "prop_1", "body": {"origin": "hypothetical", "row": row}}}
+        swapped = {"reference": "invalid", "outside": "valid"}
+        for outcome, passed in (("certified_counterexample", True), ("inconclusive", False)):
+            saved = records(swapped, outcome=outcome, **overrides)
+            saved["fu-x-dataset"]["body"]["rows"][-1] = row
+            checks = followup_checks(saved)
+            self.assertTrue(checks["followup_verdicts_match_oracle"]["passed"], checks)
+            self.assertEqual(checks["followup_outcome_follows_from_survivors"]["passed"], passed, outcome)
 
     def test_tampered_scope_digest_fails(self):
         saved = records()
