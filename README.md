@@ -36,7 +36,7 @@ scripts/dev/doctor.py
 
 Reports, as separate facts: API ready, worker ready, scientific adapter available and qualified, native replay supported, and Gemini opt-in/server dispatch state. Configuration and readiness do not establish live qualification.
 
-Open `http://127.0.0.1:4173`, expand **Server connection**, and paste the researcher access token from the private file `var/auth.json`. The token stays in memory only. Never put it in a URL, a screenshot or chat. API documentation is at `http://127.0.0.1:8000/docs`.
+Open the web address printed by the launcher. It connects automatically to a private browser workspace; researchers do not enter an access token or provider key. Reloads and additional tabs reuse the session cookie. Saved work stays on the server; unsaved drafts stay in the current tab. Operator API documentation remains at `http://127.0.0.1:8000/docs`.
 
 If a start fails, the launcher prints the log tail and stops what it started. Port already in use: it refuses and kills nothing. After an unclean stop, run `python3 scripts/dev/launcher.py recover` before the next start. Details: [docs/release-runbook.md](docs/release-runbook.md).
 
@@ -66,9 +66,9 @@ python3 scripts/dev/share.py start
 python3 scripts/dev/share.py status
 ```
 
-The printed HTTPS link opens the same running server, data and Gemini configuration for teammates. They expand **Server connection**, enter a researcher access token supplied privately by the owner, then choose or create a workspace. They do not enter a Gemini key or start a local backend. The existing prototype token represents a shared researcher identity; people using it can see that identity's workspaces. All workspaces share the same conservative Gemini budget, including earlier tests; sharing never resets or increases that budget.
+The printed HTTPS link opens the running application. Each browser connects automatically to its own private workspace. Sharing the URL does not share another visitor’s research. Teammates do not enter an access token or provider key, or start a backend. All workspaces share the existing conservative provider budget, including earlier tests; connecting never resets or increases it.
 
-The API, web server and sharing gateway remain bound to loopback. The gateway admits the exact current HTTPS tunnel origin and preserves bearer authentication. It never reads or sends the Gemini key. This is a temporary development preview: keep the Mac on and connected; the URL changes on a new sharing session. Status/health checks make no model calls. Stop the public link separately with:
+The API, web server and sharing gateway remain bound to loopback. The gateway admits the exact current HTTPS tunnel origin, strips visitor-supplied owner credentials, and forwards only the private session cookie. It never reads or sends the Gemini key. This is a temporary development preview: keep the Mac on and connected; the URL changes on a new sharing session. Status/health checks make no model calls. Stop the public link separately with:
 
 ```sh
 python3 scripts/dev/share.py stop

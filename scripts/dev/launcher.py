@@ -28,6 +28,7 @@ import json
 import os
 import platform
 import re
+import secrets
 import shutil
 import signal
 import socket
@@ -72,6 +73,7 @@ PROVIDER_ENV_EXACT = {
     "DATABASE_URL", "BEAN_AUTH_TOKENS_JSON", "BEAN_SHARED_GATEWAY_FILE",
 }
 PROVIDER_ENV_PREFIXES = ("BEAN_GEMINI_", "GOOGLE_GEMINI_", "GOOGLE_GENAI_", "GOOGLE_CLOUD_", "VERTEX",
+                         "BEAN_LOCAL_",
                          "LANGSMITH_", "ANTHROPIC_", "OPENAI_", "BEAN_SHARE_")
 SERVICES = ("api", "worker", "web")
 SHARING_SERVICES = ("share-tunnel", "share-gateway", "share-awake")
@@ -188,6 +190,8 @@ def child_env() -> dict:
         BEAN_SCIENCE_ADAPTER="counterdex",
         BEAN_COUNTERDEX_PYTHON=ENGINE_PY,  # the qualified CPython 3.11 engine runtime, never a python3.11 found on PATH
         BEAN_WEB_API_PORT=str(API_PORT),
+        BEAN_LOCAL_GATEWAY_FILE=os.path.join(VAR, "local-gateway.json"),
+        BEAN_LOCAL_BROWSER_ORIGIN=f"http://{HOST}:{WEB_PORT}",
         PYTHONDONTWRITEBYTECODE="1",
         # Defence in depth only, never relied on: if anything did try to dispatch, send it to a closed
         # loopback port instead of a provider. Owner 5 supplies the real process-level network guard.
@@ -226,6 +230,41 @@ def http_json(url: str, timeout=3.0):
 # ---------------------------------------------------------------- owned processes
 class LifecycleError(RuntimeError):
     """A safe, nonsecret diagnostic for process-control failures."""
+
+
+def ensure_local_gateway() -> None:
+    """Create a private local transport proof once; preserve every existing file."""
+    os.makedirs(VAR, mode=0o700, exist_ok=True)
+    path = os.path.join(VAR, "local-gateway.json")
+    if not os.path.lexists(path):
+        descriptor, temporary = tempfile.mkstemp(prefix=".local-gateway-", suffix=".tmp", dir=VAR)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                json.dump({"version": 1, "secret": secrets.token_urlsafe(32)}, handle)
+                handle.flush()
+                os.fsync(handle.fileno())
+            # Atomic publication without ever replacing another launcher’s file.
+            try:
+                os.link(temporary, path)
+            except FileExistsError:
+                pass
+        except OSError:
+            raise LifecycleError("Cannot prepare private browser access; existing files were preserved.") from None
+        finally:
+            os.unlink(temporary)
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+        with os.fdopen(descriptor, "r", encoding="utf-8") as handle:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600 or info.st_size > 1024:
+                raise ValueError("unsafe file")
+            data = json.loads(handle.read(1025), object_pairs_hook=_unique_json_object)
+            if (not isinstance(data, dict) or set(data) != {"version", "secret"}
+                    or type(data["version"]) is not int or data["version"] != 1
+                    or not isinstance(data["secret"], str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", data["secret"])):
+                raise ValueError("invalid file")
+    except (OSError, ValueError, UnicodeError):
+        raise LifecycleError("Private browser access configuration must be a valid owner-only regular file (0600). Existing files were preserved.") from None
 
 
 @contextmanager
@@ -585,6 +624,11 @@ def cmd_setup(_args) -> int:
     print("   " + text.replace("\n", "\n   "))
     if code != 0:
         return 1
+    try:
+        ensure_local_gateway()
+    except LifecycleError as error:
+        print(str(error))
+        return 1
     os.makedirs(RUN, exist_ok=True)
     print()
     return cmd_doctor(argparse.Namespace(json=False))
@@ -632,6 +676,7 @@ def cmd_start(_args) -> int:
         print(f"Port(s) {busy} on {HOST} are in use by a process this launcher did not start. "
               "Nothing was started and nothing was killed. Free the port and retry.")
         return 1
+    ensure_local_gateway()
     env = child_env()
     provider_env = provider_child_env(env, live)
     try:
@@ -667,7 +712,7 @@ def cmd_start(_args) -> int:
     print("Dr. Bean is running (loopback only)")
     print_rows(rows)
     print(f"\n  open      http://{HOST}:{WEB_PORT}\n  API docs  http://{HOST}:{API_PORT}/docs"
-          f"\n  token     private file var/auth.json (read it locally; never paste it into a URL or chat)"
+          f"\n  access    private browser session connects automatically"
           f"\n  logs      var/run/*.log\n  stop      scripts/dev/stop.sh")
     alert = any(state == "ALERT" for state, _, _ in rows)
     return 1 if alert else 0

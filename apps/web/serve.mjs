@@ -1,9 +1,64 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, open } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { createServer, request as upstreamRequest } from 'node:http';
 
 const host = '127.0.0.1';
 const port = Number(process.argv[2] ?? 4173);
 const apiPort = Number(process.env.BEAN_WEB_API_PORT ?? 8000);
+const gatewayFile = process.env.BEAN_LOCAL_GATEWAY_FILE;
+const SESSION_COOKIE = 'bean_local_session';
+const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+const CLEAR_COOKIE = `${SESSION_COOKIE}=""; Max-Age=0; Path=/; HttpOnly; SameSite=Strict`;
+const SAFE_HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' };
+
+async function gatewaySecret() {
+  if (!gatewayFile) throw new Error('Local access is not configured.');
+  const handle = await open(gatewayFile, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile() || info.uid !== process.getuid() || (info.mode & 0o777) !== 0o600 || info.size > 1024) throw new Error('Invalid local access configuration.');
+    const record = JSON.parse(await handle.readFile('utf8'));
+    if (record?.version !== 1 || !TOKEN.test(record.secret) || Object.keys(record).sort().join(',') !== 'secret,version') throw new Error('Invalid local access configuration.');
+    return record.secret;
+  } finally { await handle.close(); }
+}
+
+function browserCookie(value) {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || value.length > 8192) throw new Error('Invalid browser session.');
+  const matches = value.split(';').map(part => part.trim()).filter(part => part.split('=', 1)[0] === SESSION_COOKIE);
+  if (!matches.length) return undefined;
+  if (matches.length !== 1 || !matches[0].startsWith(`${SESSION_COOKIE}=`) || !TOKEN.test(matches[0].slice(SESSION_COOKIE.length + 1))) throw new Error('Invalid browser session.');
+  return matches[0];
+}
+
+function responseCookie(values) {
+  if (values === undefined) return undefined;
+  if (!Array.isArray(values) || values.length !== 1 || values[0].length > 1024) throw new Error('Invalid upstream session cookie.');
+  const [pair, ...parts] = values[0].split(';').map(part => part.trim());
+  if (!pair.startsWith(`${SESSION_COOKIE}=`)) throw new Error('Invalid upstream session cookie.');
+  const value = pair.slice(SESSION_COOKIE.length + 1), attributes = new Map();
+  for (const part of parts) {
+    const index = part.indexOf('='), name = (index < 0 ? part : part.slice(0, index)).toLowerCase();
+    if (attributes.has(name) || !['path', 'httponly', 'samesite', 'max-age', 'expires'].includes(name)) throw new Error('Invalid upstream session cookie.');
+    attributes.set(name, index < 0 ? '' : part.slice(index + 1));
+  }
+  if (attributes.get('path') !== '/' || attributes.get('httponly') !== '' || attributes.get('samesite')?.toLowerCase() !== 'strict'
+    || (!TOKEN.test(value) && !(['', '""'].includes(value) && attributes.get('max-age') === '0'))
+    || !/^\d{1,5}$/.test(attributes.get('max-age') ?? '') || Number(attributes.get('max-age')) > 86400
+    || (attributes.has('expires') && !Number.isFinite(Date.parse(attributes.get('expires'))))) throw new Error('Invalid upstream session cookie.');
+  return values;
+}
+
+function repeatedHeader(request) {
+  const counts = new Map();
+  for (let index = 0; index < request.rawHeaders.length; index += 2) {
+    const name = request.rawHeaders[index].toLowerCase();
+    if (['host', 'origin', 'sec-fetch-site', 'content-type', 'idempotency-key', 'x-source-name'].includes(name)) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.values()].some(count => count > 1);
+}
 const routes = new Map([
   ['/examples/controlled-source.png', ['../../fixtures/intake/clean.png', 'image/png']],
   ['/', ['index.html', 'text/html']],
@@ -34,35 +89,59 @@ if (!Number.isInteger(apiPort) || apiPort < 1 || apiPort > 65535) {
 }
 
 const server = createServer(async (request, response) => {
-  // Fixed loopback upstream. Never proxy cookies, redirects, or arbitrary destinations.
+  // Fixed loopback upstream with a separate, server-controlled session boundary.
   if (request.url.startsWith('/api/bean/v1/')) {
     const expectedHost = `127.0.0.1:${server.address().port}`;
+    const origin = `http://${expectedHost}`, site = request.headers['sec-fetch-site'];
     if (request.headers.host !== expectedHost ||
-        (request.headers.origin && request.headers.origin !== `http://${expectedHost}`) ||
-        request.headers['sec-fetch-site'] === 'cross-site') {
-      response.writeHead(403).end(); return;
+        (request.headers.origin && request.headers.origin !== origin) ||
+        (site && !['same-origin', 'none'].includes(site)) ||
+        (request.method === 'POST' && (request.headers.origin !== origin || (site && site !== 'same-origin'))) || repeatedHeader(request)) {
+      response.writeHead(403, SAFE_HEADERS).end(); return;
     }
     if (!['GET', 'POST'].includes(request.method) || request.url.includes('\\')) {
       response.writeHead(405).end(); return;
     }
-    // Browser sessions belong to the HTTPS gateway, which reaches the API
-    // directly. This local bearer-only transport has no trusted session hop.
-    if (request.method === 'GET' && request.url.split('?')[0] === '/api/bean/v1/shared-session') {
-      response.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
-      response.end(JSON.stringify({ code: 'shared_access_unavailable', message: 'Private browser sessions are available through the shared HTTPS link.' }));
+    // Never forward Authorization, arbitrary cookies, gateway proofs or forwarded
+    // headers supplied by a visitor. Operator bearer access stays on the API.
+    const headers = {};
+    let cookie;
+    try { cookie = browserCookie(request.headers.cookie); } catch {
+      response.writeHead(401, { ...SAFE_HEADERS, 'Content-Type': 'application/json', 'Set-Cookie': CLEAR_COOKIE });
+      response.end(JSON.stringify({ code: 'invalid_browser_session', message: 'This browser session is no longer available. Start a new private session to continue.' }));
       return;
     }
-    const headers = {};
-    const sourceName = request.headers['x-source-name'];
-    if (sourceName !== undefined && (typeof sourceName !== 'string' || sourceName.length > 255 || !/^[\x20-\x7e]+$/.test(sourceName) || /[/\\]/.test(sourceName))) {
-      response.writeHead(400).end(); return;
+    for (const key of ['content-type', 'idempotency-key', 'x-source-name']) {
+      const value = request.headers[key];
+      if (value !== undefined) {
+        if (typeof value !== 'string' || value.length > (key === 'idempotency-key' ? 128 : 255) || !/^[\x20-\x7e]+$/.test(value)
+          || (key === 'x-source-name' && /[/\\]/.test(value))) {
+          response.writeHead(400, SAFE_HEADERS).end(); return;
+        }
+        headers[key] = value;
+      }
     }
-    for (const key of ['authorization', 'content-type', 'idempotency-key', 'x-source-name']) {
-      if (request.headers[key]) headers[key] = request.headers[key];
+    try { headers['x-bean-local-gateway'] = await gatewaySecret(); } catch {
+      response.writeHead(503, { ...SAFE_HEADERS, 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ code: 'local_access_unavailable', message: 'Private browser access is not ready. Restart the application and try again.' }));
+      return;
     }
+    headers['x-bean-local-origin'] = origin;
+    if (cookie) headers.cookie = cookie;
+    if (request.headers.origin) headers.origin = request.headers.origin;
+    if (site) headers['sec-fetch-site'] = site;
     const upstream = upstreamRequest({ hostname: '127.0.0.1', port: apiPort,
       path: request.url, method: request.method, headers }, result => {
-      const safeHeaders = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
+      const safeHeaders = { ...SAFE_HEADERS };
+      try {
+        const cookie = responseCookie(result.headers['set-cookie']);
+        if (cookie) safeHeaders['Set-Cookie'] = cookie;
+      } catch {
+        result.resume();
+        response.writeHead(502, { ...SAFE_HEADERS, 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ code: 'local_response_invalid', message: 'The server could not confirm a private browser session.' }));
+        return;
+      }
       for (const key of ['content-type', 'content-disposition', 'x-artifact-sha256', 'x-request-id']) {
         if (result.headers[key]) safeHeaders[key] = result.headers[key];
       }
@@ -73,8 +152,9 @@ const server = createServer(async (request, response) => {
     upstream.setTimeout(providerOperation ? 75000 : 15000, () => upstream.destroy());
     upstream.on('error', () => {
       if (!response.headersSent) response.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      response.end(JSON.stringify({ code: 'backend_unavailable', message: `Start the local API on 127.0.0.1:${apiPort}.` }));
+      response.end(JSON.stringify({ code: 'backend_unavailable', message: 'The application server is temporarily unavailable. Try connecting again shortly.' }));
     });
+    request.on('aborted', () => upstream.destroy());
     request.pipe(upstream);
     return;
   }

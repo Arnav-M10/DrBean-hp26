@@ -39,12 +39,13 @@ class ChildEnvironment(unittest.TestCase):
         class NamesOnlySecrets(dict):
             def __getitem__(self, name):
                 if name in {"GEMINI_API_KEY", "LANGSMITH_API_KEY", "OPENAI_API_KEY", "BEAN_AUTH_TOKENS_JSON",
-                            "BEAN_SHARED_GATEWAY_FILE", "BEAN_SHARE_GATEWAY_FILE"}:
+                            "BEAN_SHARED_GATEWAY_FILE", "BEAN_SHARE_GATEWAY_FILE", "BEAN_LOCAL_GATEWAY_FILE", "BEAN_LOCAL_BROWSER_ORIGIN"}:
                     raise AssertionError("A discarded provider value was read")
                 return super().__getitem__(name)
 
         planted = NamesOnlySecrets(GEMINI_API_KEY="dummy", LANGSMITH_API_KEY="dummy", OPENAI_API_KEY="dummy",
                                    BEAN_AUTH_TOKENS_JSON="dummy", BEAN_SHARE_GATEWAY_FILE="dummy", BEAN_SHARED_GATEWAY_FILE="dummy",
+                                   BEAN_LOCAL_GATEWAY_FILE="dummy", BEAN_LOCAL_BROWSER_ORIGIN="http://evil.test",
                                    PATH=os.defpath, PYTHONPATH="/operator/guard")
         completed = subprocess.CompletedProcess([], 0, stdout="probe ok", stderr="")
         with mock.patch.object(launcher.os, "environ", planted), \
@@ -87,11 +88,68 @@ class ChildEnvironment(unittest.TestCase):
 
     def test_one_store_with_absolute_paths(self):
         env = launcher.child_env()
-        for name in ("BEAN_DATABASE_PATH", "BEAN_BLOB_DIR", "BEAN_AUTH_FILE", "BEAN_ARTIFACT_DIR"):
+        for name in ("BEAN_DATABASE_PATH", "BEAN_BLOB_DIR", "BEAN_AUTH_FILE", "BEAN_ARTIFACT_DIR", "BEAN_LOCAL_GATEWAY_FILE"):
             self.assertTrue(os.path.isabs(env[name]) and env[name].startswith(launcher.VAR), name)
         self.assertEqual(env["BEAN_COUNTERDEX_PYTHON"], launcher.ENGINE_PY)  # not a python3.11 from PATH
         self.assertNotIn("BEAN_SHARE_GATEWAY_FILE", env)
         self.assertNotIn("BEAN_SHARED_GATEWAY_FILE", env)
+        self.assertEqual(env["BEAN_LOCAL_BROWSER_ORIGIN"], f"http://127.0.0.1:{launcher.WEB_PORT}")
+
+
+class PrivateLocalGateway(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        patch = mock.patch.object(launcher, "VAR", self.directory.name)
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.path = os.path.join(self.directory.name, "local-gateway.json")
+
+    def test_creation_is_private_and_repeat_calls_preserve_credential_and_other_files(self):
+        preserved = {}
+        for name in ("auth.json", "share-gateway.json", "bean.sqlite3", "gemini.local.json"):
+            path = os.path.join(self.directory.name, name)
+            with open(path, "wb") as handle:
+                handle.write(b"DRBEAN-DUMMY-preserved")
+            preserved[path] = os.stat(path)
+        launcher.ensure_local_gateway()
+        with open(self.path, "rb") as handle:
+            original = handle.read()
+        data = json.loads(original)
+        self.assertEqual(set(data), {"version", "secret"})
+        self.assertEqual(data["version"], 1)
+        self.assertRegex(data["secret"], r"^[A-Za-z0-9_-]{43}$")
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600)
+        launcher.ensure_local_gateway()
+        with open(self.path, "rb") as handle:
+            self.assertEqual(handle.read(), original)
+        for path, info in preserved.items():
+            self.assertEqual(os.stat(path), info)
+        self.assertFalse(any(name.startswith(".local-gateway-") for name in os.listdir(self.directory.name)))
+
+    def test_invalid_configuration_is_refused_without_replacement(self):
+        for raw, mode in [(b'{}', 0o600), (b'{"version":1,"secret":"DRBEAN-DUMMY-invalid"}', 0o600),
+                          (b'{"version":1,"secret":"' + b'a' * 43 + b'"}', 0o644),
+                          (b'{"version":1,"version":1,"secret":"' + b'a' * 43 + b'"}', 0o600)]:
+            with self.subTest(raw=raw, mode=mode):
+                with open(self.path, "wb") as handle:
+                    handle.write(raw)
+                os.chmod(self.path, mode)
+                with self.assertRaises(launcher.LifecycleError):
+                    launcher.ensure_local_gateway()
+                with open(self.path, "rb") as handle:
+                    self.assertEqual(handle.read(), raw)
+                self.assertEqual(os.stat(self.path).st_mode & 0o777, mode)
+
+    def test_symlink_configuration_is_refused_and_target_preserved(self):
+        target = os.path.join(self.directory.name, "target")
+        with open(target, "w", encoding="utf-8") as handle:
+            handle.write("DRBEAN-DUMMY-preserved")
+        os.symlink(target, self.path)
+        with self.assertRaises(launcher.LifecycleError):
+            launcher.ensure_local_gateway()
+        with open(target, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "DRBEAN-DUMMY-preserved")
 
 
 class OwnedProcesses(unittest.TestCase):
@@ -334,6 +392,9 @@ class LiveOptIn(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
+        var_patch = mock.patch.object(launcher, "VAR", self.directory.name)
+        var_patch.start()
+        self.addCleanup(var_patch.stop)
         self.path = os.path.join(self.directory.name, "gemini.local.json")
         patch = mock.patch.object(launcher, "LIVE_CONFIG", self.path)
         patch.start()
@@ -466,6 +527,11 @@ class LiveOptIn(unittest.TestCase):
             self.assertNotIn("GOOGLE_GEMINI_BASE_URL", environments[name])
         self.assertNotIn("GEMINI_API_KEY", environments["web"])
         self.assertEqual(environments["web"]["BEAN_AI_MODE"], "placeholder")
+        for name in ("api", "worker", "web"):
+            self.assertEqual(environments[name]["BEAN_LOCAL_GATEWAY_FILE"], os.path.join(self.directory.name, "local-gateway.json"))
+            self.assertEqual(environments[name]["BEAN_LOCAL_BROWSER_ORIGIN"], f"http://127.0.0.1:{launcher.WEB_PORT}")
+        self.assertNotIn("read it locally", output.getvalue())
+        self.assertIn("private browser session connects automatically", output.getvalue())
         self.assertNotIn(self.config["GEMINI_API_KEY"], output.getvalue())
 
     def test_invalid_config_blocks_start_without_spawning(self):
