@@ -4,7 +4,7 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 
 - Manifest version 3 (ancestry: v1, v2), contract GF-2 / DB-SC-1
 - Holdouts: prepared and sealed by digest; not used for prompt tuning; ungraded
-- Attempts recorded: 119; history verification: OK
+- Attempts recorded: 126; history verification: OK
 - Live activation: disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared accounted allocation, Owner 3's operator path and independent grading of predeclared cases. The CLI has no switch for it.
 
 ## Lanes
@@ -15,13 +15,13 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 | live_intake | 1 | NOT_RUN (disabled) | live | any | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | live_agent_controlled_tools | 1 | NOT_RUN (disabled) | live | controlled | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | actual_full_stack | 1 | NOT_RUN (disabled) | live | real | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
-| offline_real_science | 1 | yes | none/controlled | real | 7 | 85 | 41 | 21 | 23 | 0 | 0 | 0 | 0 | 0 |
+| offline_real_science | 1 | yes | none/controlled | real | 7 | 92 | 48 | 21 | 23 | 0 | 0 | 0 | 0 | 0 |
 
 Records with manifest_version 1 / harness 0.1.0 are the pre-merge inventory: 34 entries recorded before the backend and science package were merged, all `unrun` with a stale reason. They are kept byte-for-byte and interpreted as written, never relabelled as current results.
 
 Evidence classes: `executed_acceptance` (the runner executed the subject against a stack it launched and re-verified the evidence), `imported_claim` (recorded observations; never qualification).
 
-Evidence class counts (harness >= 0.2.0): executed_acceptance: 85.
+Evidence class counts (harness >= 0.2.0): executed_acceptance: 92.
 
 ## Latest attempt per scheduled entry
 
@@ -61,25 +61,25 @@ Evidence class counts (harness >= 0.2.0): executed_acceptance: 85.
 | live_intake | C01-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live1 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
-| offline_real_science | RS-CANCEL-RESTART | passed | 30ab5f8f24 | False |  |
-| offline_real_science | RS-CHANGED-INPUT | passed | 30ab5f8f24 | False |  |
-| offline_real_science | RS-DESIGN-AUTHORITY | passed | 30ab5f8f24 | False |  |
-| offline_real_science | RS-FOLLOWUP | passed | 30ab5f8f24 | False |  |
-| offline_real_science | RS-HERO-FULL | passed | 30ab5f8f24 | False |  |
-| offline_real_science | RS-RETRY-CONCURRENT | passed | 30ab5f8f24 | False |  |
-| offline_real_science | RS-ZERO-DISPATCH | passed | 30ab5f8f24 | False |  |
+| offline_real_science | RS-CANCEL-RESTART | passed | c8d39b56be | False |  |
+| offline_real_science | RS-CHANGED-INPUT | passed | c8d39b56be | False |  |
+| offline_real_science | RS-DESIGN-AUTHORITY | passed | c8d39b56be | False |  |
+| offline_real_science | RS-FOLLOWUP | passed | c8d39b56be | False |  |
+| offline_real_science | RS-HERO-FULL | passed | c8d39b56be | False |  |
+| offline_real_science | RS-RETRY-CONCURRENT | passed | c8d39b56be | False |  |
+| offline_real_science | RS-ZERO-DISPATCH | passed | c8d39b56be | False |  |
 
 ## Scientific jobs and external model requests (separate counts)
 
-- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 109. This accumulated count spans historical attempts; see each attempt for its scientific outcome and the latest-entry table for current results.
-- External model requests: verified zero by the egress guard in 85 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
+- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 127. This accumulated count spans historical attempts; see each attempt for its scientific outcome and the latest-entry table for current results.
+- External model requests: verified zero by the egress guard in 92 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
 - Synthetic budget-ledger reservations in unit tests use temporary stores and are not provider charges.
 - Durations are harness wall time on loopback; they are not provider latency.
 - Harness budget ledger: no cohort opened; none may be opened now.
 
 ## Engine-level native controls (latest run; engine public operations, not HTTP)
 
-Commit 30ab5f8f24, interpreter CPython 3.11.17.
+Commit c8d39b56be, interpreter CPython 3.11.17.
 
 | Control | Result | Observed |
 |---|---|---|
@@ -106,7 +106,7 @@ Commit 30ab5f8f24, interpreter CPython 3.11.17.
 | followup:4.57 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "compatible", "reference": "excluded"}, "per_candidate": {"outside": "compatible", "refe |
 | followup:4.0 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "excluded"}, "per_candidate": {"outside": "excluded", "referenc |
 
-## Release gates at c0e6995070 (overall: passed)
+## Release gates at 58e968f4c8 (overall: passed)
 
 | Gate | Status |
 |---|---|
@@ -285,3 +285,10 @@ Commit 30ab5f8f24, interpreter CPython 3.11.17.
 | 117 | RS-FOLLOWUP | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 12948.325 |  |
 | 118 | RS-CANCEL-RESTART | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 7145.2 |  |
 | 119 | RS-ZERO-DISPATCH | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 99.897 |  |
+| 120 | RS-HERO-FULL | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 2247.224 |  |
+| 121 | RS-CHANGED-INPUT | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 2179.191 |  |
+| 122 | RS-RETRY-CONCURRENT | offline_real_science | 14 | passed | executed_acceptance | c8d39b56be | False | 1013.597 |  |
+| 123 | RS-DESIGN-AUTHORITY | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 91.32 |  |
+| 124 | RS-FOLLOWUP | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 12117.649 |  |
+| 125 | RS-CANCEL-RESTART | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 7061.833 |  |
+| 126 | RS-ZERO-DISPATCH | offline_real_science | 13 | passed | executed_acceptance | c8d39b56be | False | 82.429 |  |
