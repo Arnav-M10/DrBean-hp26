@@ -1,0 +1,152 @@
+"""Dr. Bean evaluation egress guard. Loaded only into processes the harness launches.
+
+Put this directory first on PYTHONPATH and set DRBEAN_EGRESS_GUARD_LOG to a file.
+Python then imports it at startup (site.py), in the API, the worker and every
+spawned scientific child that inherits that environment.
+
+What it does, and nothing else:
+
+* Installs an audit hook that refuses DNS lookups and socket connections to any
+  non-loopback address, and records each refusal. Local HTTP between the harness,
+  API and worker keeps working; AF_UNIX sockets and socket pairs are untouched.
+* Wraps ``google.genai.client.Client.__init__`` after that module loads, so that
+  constructing a network-capable Gemini client is recorded and refused. Importing
+  the SDK, its types and schemas stays allowed. LangChain's Gemini chat model
+  builds this same client, so it is covered too.
+* Records which provider-credential variable *names* are present at startup. It
+  never reads, logs or transmits a value.
+
+Every event is one JSON line: {"pid", "kind", ...}. The harness treats any
+``egress_blocked`` or ``provider_client_blocked`` event as an external-model
+attempt (a P0 finding), even though the guard prevented any packet or charge.
+"""
+from __future__ import annotations
+
+import ipaddress
+import json
+import os
+import sys
+import time
+import traceback
+
+_LOG: str | None = None
+_CREDENTIAL_NAMES = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_GENAI_API_KEY",
+                     "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LANGSMITH_API_KEY", "LANGCHAIN_API_KEY")
+_LOOPBACK_NAMES = {"localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback"}
+
+
+def _record(kind: str, **fields) -> None:
+    if not _LOG:
+        return
+    stack = [f"{frame.filename.rsplit('/', 2)[-1]}:{frame.lineno}:{frame.name}"
+             for frame in traceback.extract_stack()[-12:-2]]
+    event = {"pid": os.getpid(), "ppid": os.getppid(), "at": time.time(), "kind": kind,
+             "argv0": (sys.argv[0] if sys.argv else "")[-80:], "stack": stack, **fields}
+    try:
+        with open(_LOG, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, sort_keys=True, default=str) + "\n")
+    except OSError:
+        pass
+
+
+def _loopback(host) -> bool:
+    if host is None:
+        return True  # getaddrinfo(None, port) resolves the local wildcard
+    if isinstance(host, bytes):
+        host = host.decode("ascii", "replace")
+    host = str(host).strip("[]").split("%", 1)[0].lower()
+    if host in _LOOPBACK_NAMES or host == "":
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_unspecified
+
+
+def _address_host(address):
+    if isinstance(address, tuple) and address:
+        return address[0]
+    return None  # AF_UNIX path or abstract address: local by construction
+
+
+class EgressDenied(ConnectionRefusedError):
+    pass
+
+
+def _audit(event: str, args) -> None:
+    if event == "socket.getaddrinfo" or event == "socket.gethostbyname" or event == "socket.gethostbyaddr":
+        host = args[0] if args else None
+        if not _loopback(host):
+            _record("egress_blocked", event=event, host=str(host)[:200])
+            raise EgressDenied(f"drbean egress guard: external lookup of {str(host)[:80]!r} denied")
+    elif event in ("socket.connect", "socket.sendto", "socket.sendmsg"):
+        address = args[1] if len(args) > 1 else None
+        host = _address_host(address)
+        if host is not None and not _loopback(host):
+            _record("egress_blocked", event=event, host=str(host)[:200],
+                    port=address[1] if isinstance(address, tuple) and len(address) > 1 else None)
+            raise EgressDenied(f"drbean egress guard: external connection to {str(host)[:80]!r} denied")
+
+
+def _wrap_client(module) -> None:
+    client = getattr(module, "Client", None)
+    if client is None or getattr(client.__init__, "_drbean_guarded", False):
+        return
+    original = client.__init__
+
+    def guarded_init(self, *args, **kwargs):
+        _record("provider_client_blocked", client="google.genai.Client",
+                vertexai=bool(kwargs.get("vertexai")), api_key_supplied=kwargs.get("api_key") is not None)
+        raise RuntimeError("drbean egress guard: constructing a network-capable Gemini client is denied "
+                           "in the offline placeholder lane")
+
+    guarded_init._drbean_guarded = True  # type: ignore[attr-defined]
+    guarded_init._drbean_original = original  # type: ignore[attr-defined]
+    client.__init__ = guarded_init
+
+
+class _WrapAfterImport:
+    """Meta-path finder that patches google.genai.client once Python finishes loading it."""
+    targets = {"google.genai.client": _wrap_client}
+
+    def find_spec(self, name, path=None, target=None):
+        if name not in self.targets:
+            return None
+        for finder in sys.meta_path:
+            if finder is self or not hasattr(finder, "find_spec"):
+                continue
+            spec = finder.find_spec(name, path, target)
+            if spec is not None and spec.loader is not None and hasattr(spec.loader, "exec_module"):
+                loader, patch = spec.loader, self.targets[name]
+
+                class _Loader:
+                    def create_module(self, spec):
+                        return loader.create_module(spec) if hasattr(loader, "create_module") else None
+
+                    def exec_module(self, module):
+                        loader.exec_module(module)
+                        patch(module)
+
+                spec.loader = _Loader()
+                return spec
+        return None
+
+
+def install(log_path: str | None) -> bool:
+    """Install once per interpreter. Returns True when this call installed the guard."""
+    global _LOG
+    if not log_path or getattr(sys, "_drbean_guard_installed", False):
+        return False
+    _LOG = log_path
+    sys._drbean_guard_installed = True  # type: ignore[attr-defined]
+    present = sorted(name for name in _CREDENTIAL_NAMES if os.environ.get(name) is not None)
+    _record("guard_installed", python=sys.version.split()[0], credential_names_present=present)
+    sys.addaudithook(_audit)
+    sys.meta_path.insert(0, _WrapAfterImport())
+    if "google.genai.client" in sys.modules:
+        _wrap_client(sys.modules["google.genai.client"])
+    return True
+
+
+install(os.environ.get("DRBEAN_EGRESS_GUARD_LOG"))

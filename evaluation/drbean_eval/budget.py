@@ -1,9 +1,20 @@
-"""One shared provider-budget ledger for the bounded live cohort (section 7).
+"""Harness-side provider-budget ledger for a future bounded live cohort (section 7).
 
 Append-only JSONL. A request's maximum is reserved before dispatch and
 reconciled afterwards. Unknown acceptance stays reserved. Nothing here calls a
-provider; Owner 02's provider layer (or the harness runner, per invocation)
-reserves against it. Caps are ceilings, not measurements.
+provider. Caps are ceilings, not measurements.
+
+This is NOT the backend's persistent provider ledger (``bean_api/ledger.py``),
+which reconciles conservatively by ``max(reserved, actual)``. The two are not one
+enforced budget. No live cohort is open and live lanes are disabled; any future
+activation needs a new explicit user instruction and one agreed authoritative
+dispatch ledger whose actual attempt records this harness then *observes*
+instead of reserving a second budget. See docs/evaluation-protocol.md.
+
+Revision 2 hardening (Workstream 5): reported usage is validated (no negative,
+boolean, non-integer or missing counts; ``network_attempts`` >= 1), every actual
+network attempt counts as a provider request, and a usage report that cannot be
+trusted keeps the full maximum reserved as unknown instead of refunding it.
 """
 from __future__ import annotations
 
@@ -26,6 +37,16 @@ INVOCATION_LIMITS = {
 
 class BudgetStop(Exception):
     """The next request cannot be shown to fit; do not dispatch it."""
+
+
+class UsageRejected(ValueError):
+    """Reported usage is malformed or inconsistent; nothing may be refunded on its basis."""
+
+
+def _count(value, name: str, minimum: int = 0) -> int:
+    if type(value) is not int or value < minimum:
+        raise UsageRejected(f"{name} must be an integer >= {minimum}, got {value!r}")
+    return value
 
 
 def _now() -> str:
@@ -73,7 +94,9 @@ class BudgetLedger:
         for item in reservations.values():
             if item["status"] == "released_unsent":
                 continue  # provably never left this machine
-            used["provider_requests"] += 1
+            # Every actual network attempt is a provider request, including retries.
+            attempts = item.get("network_attempts", 1)
+            used["provider_requests"] += attempts if type(attempts) is int and attempts >= 1 else 1
             if item["status"] == "reconciled":
                 used["input_tokens"] += item["input_tokens"]
                 used["output_tokens"] += item["output_tokens"]
@@ -88,6 +111,8 @@ class BudgetLedger:
             "reservations": reservations,
             "unreconciled": sorted(k for k, v in reservations.items()
                                    if v["status"] in ("reserved", "unknown_acceptance")),
+            "overruns": sorted(k for k, v in reservations.items() if v.get("overrun")),
+            "exceeded": sorted(k for k in used if caps and used[k] > caps[k]),
         }
 
     # -- commands --------------------------------------------------------
@@ -142,19 +167,35 @@ class BudgetLedger:
 
     def reconcile(self, reservation_id: str, input_tokens: int, output_tokens: int, outcome: str,
                   provider_request_id: str | None = None, network_attempts: int = 1) -> dict:
-        """Record provider-reported usage. Overruns are kept and flagged, never hidden."""
+        """Record provider-reported usage. Overruns are kept and flagged, never hidden.
+
+        Malformed usage raises UsageRejected and records nothing; the caller must then
+        mark the reservation unknown so its full maximum stays committed.
+        """
+        _count(input_tokens, "input_tokens")
+        _count(output_tokens, "output_tokens")
+        _count(network_attempts, "network_attempts", 1)
+        if not isinstance(outcome, str) or not outcome:
+            raise UsageRejected("outcome must be a nonempty string")
         item = self.state()["reservations"].get(reservation_id) or {}
         overrun = (input_tokens > item.get("max_input_tokens", 0)
-                   or output_tokens > item.get("max_output_tokens", 0))
+                   or output_tokens > item.get("max_output_tokens", 0) or network_attempts > 1)
         return self._close(reservation_id, {"event": "reconciled", "input_tokens": input_tokens,
                                             "output_tokens": output_tokens, "outcome": outcome,
                                             "provider_request_id": provider_request_id,
                                             "network_attempts": network_attempts, "overrun": overrun})
 
     def mark_unknown(self, reservation_id: str, reason: str, network_attempts: int = 1) -> dict:
-        """Timeout or lost response: acceptance unknown, so the maximum stays reserved."""
-        return self._close(reservation_id, {"event": "unknown_acceptance", "reason": reason,
+        """Timeout, lost response or untrusted usage: acceptance unknown, so the maximum stays reserved."""
+        if type(network_attempts) is not int or network_attempts < 1:
+            network_attempts = 1  # never fewer than the one request a reservation stands for
+        return self._close(reservation_id, {"event": "unknown_acceptance", "reason": str(reason)[:300],
                                             "network_attempts": network_attempts})
+
+    def record_error(self, context: str, error: str) -> dict:
+        """A reconciliation failure is itself evidence; reservations it touched stay open."""
+        with self._locked() as handle:
+            return self._append(handle, {"event": "reconcile_error", "context": context[:200], "error": error[:300]})
 
     def release_unsent(self, reservation_id: str, reason: str) -> dict:
         """Only for a request that provably was never dispatched."""

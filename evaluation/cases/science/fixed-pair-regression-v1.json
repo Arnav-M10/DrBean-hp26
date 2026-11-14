@@ -1,0 +1,103 @@
+{
+  "controls": [
+    {
+      "control": "grid-6-8-allowance-0.2",
+      "expected": {
+        "margin_positive": true,
+        "selected_time": "8",
+        "tier": "checked_pair_separation"
+      },
+      "feasible_times": [
+        "6",
+        "8"
+      ],
+      "future_allowance": "0.2"
+    },
+    {
+      "control": "grid-6-allowance-0.2",
+      "expected": {
+        "margin_positive": true,
+        "selected_time": "6",
+        "tier": "checked_pair_separation"
+      },
+      "feasible_times": [
+        "6"
+      ],
+      "future_allowance": "0.2"
+    },
+    {
+      "control": "grid-6-8-allowance-0.6",
+      "expected": {
+        "pair_compatible": true,
+        "selected_time": null,
+        "tier": "no_separation_established"
+      },
+      "feasible_times": [
+        "6",
+        "8"
+      ],
+      "future_allowance": "0.6"
+    }
+  ],
+  "display_context_only": {
+    "bands_8h_mg_per_L": {
+      "outside": [
+        "4.374006",
+        "4.774006"
+      ],
+      "reference": [
+        "3.206816",
+        "3.606816"
+      ]
+    },
+    "margin_6h_approx": "0.55535",
+    "margin_8h_approx": "0.76719"
+  },
+  "followups_at_8h_allowance_0.2": [
+    {
+      "expected": {
+        "outside": "excluded",
+        "reference": "compatible"
+      },
+      "reading": "3.4"
+    },
+    {
+      "expected": {
+        "outside": "compatible",
+        "reference": "excluded"
+      },
+      "reading": "4.57"
+    },
+    {
+      "expected": {
+        "outside": "excluded",
+        "reference": "excluded"
+      },
+      "reading": "4.0"
+    }
+  ],
+  "identity_note": "Audit-only fixed pair. A regression oracle for engine-level fixed-pair controls; NEVER a production result lookup and never fed to the application as a discovered result.",
+  "packet_id": "fixed-pair-regression-v1",
+  "packet_kind": "regression_oracle",
+  "packet_version": 1,
+  "pair": [
+    {
+      "A": "9.041075603155",
+      "id": "reference",
+      "ka": "3.54",
+      "ke": "0.122"
+    },
+    {
+      "A": "8.267973235218",
+      "id": "outside",
+      "ka": "4.17",
+      "ke": "0.074"
+    }
+  ],
+  "problem_from_packet": "hero-v1",
+  "provenance": {
+    "applies_to": "this exact pair and grid only",
+    "origin": "synthetic",
+    "source": "Shared work-order audit (bounded 255,696-combination exploration, frozen to exact decimals); recomputed here by fresh engine calls, not copied."
+  }
+}

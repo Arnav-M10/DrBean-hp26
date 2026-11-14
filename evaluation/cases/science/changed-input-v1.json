@@ -1,0 +1,150 @@
+{
+  "dataset": {
+    "change_reason": "Changed-input variant: row 3 concentration reviewed as 7.60 mg/L.",
+    "experiment_id": "drbean_changed_input_synthetic_v1",
+    "origin": "synthetic",
+    "parent_id": null,
+    "rows": [
+      {
+        "concentration": "24/5",
+        "hard_allowance": "1/2",
+        "id": "row_1",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "4.80",
+          "hard_allowance": "0.50",
+          "time": "0.25"
+        },
+        "source_asset_id": null,
+        "time": "1/4"
+      },
+      {
+        "concentration": "36/5",
+        "hard_allowance": "1/2",
+        "id": "row_2",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "7.20",
+          "hard_allowance": "0.50",
+          "time": "0.5"
+        },
+        "source_asset_id": null,
+        "time": "1/2"
+      },
+      {
+        "concentration": "38/5",
+        "hard_allowance": "1/2",
+        "id": "row_3",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "7.60",
+          "hard_allowance": "0.50",
+          "time": "1"
+        },
+        "source_asset_id": null,
+        "time": "1/1"
+      },
+      {
+        "concentration": "34/5",
+        "hard_allowance": "1/2",
+        "id": "row_4",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "6.80",
+          "hard_allowance": "0.50",
+          "time": "2"
+        },
+        "source_asset_id": null,
+        "time": "2/1"
+      },
+      {
+        "concentration": "57/10",
+        "hard_allowance": "1/2",
+        "id": "row_5",
+        "included": true,
+        "notes": "",
+        "original_values": {
+          "concentration": "5.70",
+          "hard_allowance": "0.50",
+          "time": "4"
+        },
+        "source_asset_id": null,
+        "time": "4/1"
+      }
+    ],
+    "schema_version": "DB-SC-1",
+    "time_origin": "Elapsed hours from this synthetic experiment's declared t=0 (single dose)"
+  },
+  "design_review": {
+    "allow_construction": true,
+    "allow_continuation": false,
+    "allowance_description": "Team-selected future hard allowance for review; not an instrument specification.",
+    "allowance_origin": "hypothetical",
+    "feasible_times": [
+      "6/1",
+      "8/1"
+    ],
+    "future_hard_allowance": "1/5",
+    "maximum_horizon": "8/1"
+  },
+  "designation": {
+    "known_positive": false,
+    "predicates": [
+      "fresh_identities_and_computation",
+      "original_result_unchanged",
+      "candidates_bind_reviewed_problem",
+      "honest_scope_without_forced_positive"
+    ]
+  },
+  "identity_note": "Changed-input variant of hero-v1: row 3 concentration 8.00 -> 7.60 (a plausible transcription correction). Not a designated positive: no counterexample found or no separation established are acceptable outcomes if freshly computed and honestly scoped.",
+  "packet_id": "changed-input-v1",
+  "packet_kind": "offline_real_science_input",
+  "packet_version": 1,
+  "problem": {
+    "concentration_unit": "mg/L",
+    "domain": {
+      "A": {
+        "lower": "1/1000",
+        "upper": "30/1"
+      },
+      "ka": {
+        "lower": "2/5",
+        "upper": "8/1"
+      },
+      "ke": {
+        "lower": "3/200",
+        "upper": "7/20"
+      },
+      "rate_order": "ke_lt_ka"
+    },
+    "initial_concentration": "0/1",
+    "model": "two_rate_concentration",
+    "observable": "concentration",
+    "rate_unit": "1/h",
+    "schema_version": "DB-SC-1",
+    "target": {
+      "closed": true,
+      "lower": "1/10",
+      "parameter": "ke",
+      "upper": "17/100"
+    },
+    "time_unit": "h"
+  },
+  "provenance": {
+    "authored_by": "Workstream 5 evaluation harness (Claude coding session)",
+    "independent_review": "pending: a second teammate should confirm these values against the image and the shared prompt",
+    "measurements_from": "fixtures/intake/clean.png expected fields (sha256 6363da39c1a7a86e45e5a9d5f17aa87006130cc75c61844f4902be0f118c0b06): five rows and the closed ke claim",
+    "not_extracted_from_image": "Domains and every future/design choice are human-reviewed scenario assumptions, not source content.",
+    "origin": "synthetic",
+    "team_selected_assumptions_for_review": [
+      "parameter domains A [0.001,30], ke [0.015,0.35], ka [0.4,8]",
+      "feasible future elapsed times 6 h and 8 h",
+      "future hard allowance 0.2 mg/L",
+      "construction through 8 h"
+    ]
+  }
+}
