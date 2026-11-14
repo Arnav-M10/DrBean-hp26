@@ -8,10 +8,11 @@ Standard-library Python, run with CPython 3.11. Owner: Workstream 5 (independent
 
 | Command | What it does | Exit |
 |---|---|---|
-| `python3.11 -m unittest discover -s evaluation/tests -v` | harness unit tests (82) | 0 = pass |
-| `python3.11 evaluation/cli.py verify` | frozen manifest v2 + archived ancestry + science packets | 0 = OK, 1 = drift |
+| `python3.11 -m unittest discover -s evaluation/tests -v` | harness unit tests (108) | 0 = pass |
+| `python3.11 evaluation/cli.py verify` | frozen manifest v3 + archived ancestry + science packets | 0 = OK, 1 = drift |
 | `python3.11 evaluation/cli.py selftest` | grader exemplars (24 compliant, 62 violating). Harness only, never product evidence | 0 / raises |
 | `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch` | launches an isolated API + worker (fresh temp SQLite, blobs, in-memory tokens, allowlisted env, egress guard) and drives the real HTTP routes; appends attempts | 0 only if every entry passed; 2 otherwise |
+| `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher` | the same scenarios through Owner 4's unmodified `scripts/dev/launcher.py start` (isolated `DRBEAN_VAR_DIR`, harness-written synthetic `auth.json`, egress guard via `PYTHONPATH`, dummy provider credentials in the launcher's own environment). Needs `launcher.py setup` once and ports 8000/4173 free; a failed unmodified start is recorded before one labelled retry with `apps/api` on `PYTHONPATH`. Separate history; worker kill/restart stays on `http-launch` | as `run` |
 | `python3.11 evaluation/cli.py controls` | engine-level native controls in fresh CPython 3.11 processes (not HTTP); appends `results/controls.jsonl` | 0 all passed, 2 otherwise |
 | `python3.11 evaluation/cli.py gate --require release [--output FILE]` | machine-readable release gates from recorded evidence at the tested commit | 0 only if every required gate passed on a clean tree; 3 otherwise |
 | `python3.11 evaluation/cli.py inventory` | same gates, informational | 0 unless the harness itself is broken |
@@ -20,7 +21,7 @@ Standard-library Python, run with CPython 3.11. Owner: Workstream 5 (independent
 | `.venv/bin/python -m pytest tests/integration -m "real_stack or controlled_app or zero_dispatch"` | Python HTTP/invariant tests (needs the locked backend env; markers below) | pytest |
 | `.venv/bin/python scripts/evaluate.py` | compatibility inventory: `fixtures/intake` corpus integrity + imported evidence; mirrors the harness gates | 0 unless corpus integrity fails |
 
-Interpreters are operator-selected, never chosen by evidence: `DRBEAN_BACKEND_PYTHON` (default `.venv/bin/python`, the `uv sync --locked` env) and `DRBEAN_SCIENCE_PYTHON` (default `python3.11`, must be CPython 3.11). Non-credential `BEAN_*` stack settings can be passed with `--stack-env BEAN_NAME=VALUE`; credential-shaped names are refused.
+Interpreters are operator-selected, never chosen by evidence: `DRBEAN_BACKEND_PYTHON` (default `.venv/bin/python`, the `uv sync --locked` env) and `DRBEAN_SCIENCE_PYTHON` (default Owner 4's `.venv-engine/bin/python` when present, else `python3.11`; must be CPython 3.11). Non-credential `BEAN_*` stack settings can be passed with `--stack-env BEAN_NAME=VALUE`; credential-shaped names are refused.
 
 pytest markers (`tests/integration/conftest.py`): `real_stack` (launches processes), `real_science` (needs the real scientific adapter end to end), `controlled_app` (in-process app with controlled provider/model doubles), `zero_dispatch`. The whole pytest session runs under the egress guard once that directory is collected.
 

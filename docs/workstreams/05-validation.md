@@ -8,8 +8,8 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 |---|---|
 | Branch | `claude/adversarial-validation` (pushed); PR #8 merged it into `main` up to `4ea7cb3`; `main` `9cc90e0` merged back as `7be805a`. Later harness commits (native consumer, `.venv-engine` discovery, barrier diagnostic, design-bound follow-up) are **not in `main`** until a new PR merges them |
 | Integration branch | `main` (GitHub default since the PR #3/#4 merges) |
-| Last recorded lane run | harness `8bb1fbe` against merged `main` `9cc90e0` (acceptance: science fails on this Mac, F-MAC-NPROC; diagnostic: `evaluation/results/previews/main-8bb1fbe/`) |
-| Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 |
+| Last recorded lane run | `3b55843` (app code = `main` `9cc90e0`), on **both launch paths**: the harness's own isolated launch (`evaluation/results/`) and Owner 4's `scripts/dev/launcher.py` (`evaluation/results/owner4-launcher/`). Same verdicts: hero and changed input fail with `scientific_runtime_unavailable` (F-MAC-NPROC); retry/concurrency and zero dispatch pass. Owner 4's path with `relax_nproc`: `evaluation/results/owner4-launcher/relax_nproc/` |
+| Host | macOS 26.7 arm64; backend CPython 3.13.18 (`uv sync --locked`); Counterdex/replay CPython 3.11.17 from Owner 4's `.venv-engine` (created by `launcher.py setup`); checkout under iCloud-synced `~/Documents` (see F-LAUNCHER-HIDDEN-PTH) |
 | AI mode | zero external model dispatch, verified by the egress guard in API, worker and pytest; live Gemini `NOT_RUN` |
 | Findings | `evaluation/findings.json` → `evaluation/FINDINGS.md` (open P0: F-MAC-NPROC, F-ORPHAN-WORKER-KILL; F-FOLLOWUP-FEEDBACK passes in the PR #11 preview, pending merge; check-level ids catalogued there too) |
 | Release gate | `python3.11 evaluation/cli.py gate --require release` → failed (exit 3) |
@@ -22,7 +22,7 @@ Durable resumption record required by the master brief (DB-MASTER-1 §2.22). Raw
 | G1 real manual investigation (HTTP) | **blocked on `main`** | `RS-HERO-FULL` fails: on the Mac `scientific_runtime_unavailable` (F-MAC-NPROC); on any host the baseline producer is unavailable on `main` (F-BASELINE-DISCOVERY). Image admission passes. **Preview of Owner 2's `backend/browser-baseline` cc779bf (diagnostic relax_nproc):** real discovery, certified counterexample, baseline packet download + fresh `replay-native` all pass. |
 | G2 decision loop | blocked | engine-level controls 12/12. Preview: changed input, design authority, three hypothetical lineages pass; checked design blocked by F-DESIGN-SOURCE-ARTIFACTS (without source ids the same pair separates at 8 h and replays fresh); per-candidate follow-up feedback has no route (F-FOLLOWUP-FEEDBACK). |
 | G3 AI-ready offline | mostly evidenced | zero-dispatch tests 7/7 incl. legacy live switch; controlled boundary 28 passed + 2 strict xfail (P2 residuals); real Worker + deepagents graph contrast and vanished-scenario refusal pass |
-| G4 usable release | not started here | Owner 4 |
+| G4 usable release | **blocked on this Mac** | Owner 4's one-command start fails here (F-LAUNCHER-HIDDEN-PTH, P1): iCloud Drive hides `.venv`, CPython skips its editable `.pth`, `bean_api` is not importable, doctor still says ready. With `apps/api` on `PYTHONPATH` the unmodified launcher passes readiness and zero dispatch and keeps provider credentials out of the API and worker |
 
 ## Unresolved findings and owners
 
@@ -47,6 +47,7 @@ DRBEAN_BACKEND_PYTHON=$PWD/.venv/bin/python python3.11 evaluation/cli.py run --l
 python3.11 evaluation/cli.py controls
 python3.11 evaluation/cli.py gate --require release --output /tmp/drbean-gates.json   # exit 0 only when releasable
 python3.11 evaluation/cli.py inventory      # same gates, informational, exit 0
+python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher   # Owner 4's launcher; needs `launcher.py setup` once, ports 8000/4173 free
 .venv/bin/python -m pytest tests/integration -m "zero_dispatch or controlled_app or real_stack"
 ```
 
@@ -58,6 +59,8 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 2. `docs/issue-ledger.md`: I-001/I-002/I-005 are superseded by the merged backend and engine; current statuses are in `evaluation/FINDINGS.md`.
 3. CI: run the commands above; treat `gate --require release` exit 3 as a failing release, exit 0 from `inventory` as informational only. `scripts/release/checklist.py:25` has an unused import (F-LINT-CHECKLIST).
 4. CI stack job (H-CI-ENGINE, reported by Owner 1 from run 43556610563): the integration suite's 7 failures are `scientific_runtime_missing` because the harness copy in `main` does not find `.venv-engine`. Fixed on this branch (`8bb1fbe`); until it merges, export `DRBEAN_SCIENCE_PYTHON="$PWD/.venv-engine/bin/python"` for that step. Either fix alone is sufficient.
+5. Launcher (F-LAUNCHER-HIDDEN-PTH, P1): pass `--app-dir apps/api` to uvicorn and add `apps/api` to `PYTHONPATH` in `child_env()` (as `shared/contracts/BACKEND_INTEGRATION.md` documents), and let doctor import `bean_api` with the services' environment. Reproduction: `evaluation/results/owner4-launcher/HIDDEN-PTH-REPRO.md`.
+6. Launcher (F-LAUNCHER-ENV-READ, P2): build the child environment from names only (`os.environ.items()` reads every credential value) and give doctor probes the scrubbed environment.
 
 ## Previews of unmerged branches (never acceptance)
 
@@ -76,7 +79,7 @@ Expected durations on this Mac: harness unit tests ≈ 3 s; lane ≈ 10 s while 
 1. When PR #9 and PR #11 merge: merge `main`, run the acceptance lane with no diagnostics on a host without F-MAC-NPROC (or after Owner 2's platform-aware process guard), then close F-FOLLOWUP-FEEDBACK, F-DESIGN-SOURCE-ARTIFACTS and F-NATIVE-BYTES by retest.
 2. When PR #10 (Owner 3) merges: remove the two strict-xfail markers (they will XPASS and fail the suite) and rerun the worker-boundary tests.
 3. F-ORPHAN-WORKER-KILL (P0, Owner 2): reproduced on `8525cab` too. Ask Owner 2 for a product-side test barrier so this can become acceptance evidence instead of a diagnostic.
-4. Owner 4's launcher (`scripts/dev/launcher.py`): `doctor` in an isolated `DRBEAN_VAR_DIR` is ready except `.venv-engine` and the local auth file; acceptance through that path is still to be run (master brief §2.7).
+4. Owner 4's launcher (master brief §2.7): done at `3b55843` with both observations retained (`--subject http-owner4-launcher`). Rerun it when Owner 4 fixes F-LAUNCHER-HIDDEN-PTH; the subject then records no workaround.
 5. Retest F-MAC-NPROC, F-BASELINE-DISCOVERY and F-NATIVE-BYTES whenever `main` moves.
 
 ## Conditional future work (not authorized now)

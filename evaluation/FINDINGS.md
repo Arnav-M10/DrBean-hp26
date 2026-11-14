@@ -1,6 +1,6 @@
 # Findings (generated from evaluation/findings.json; edit the JSON, then run `cli.py findings`)
 
-Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
+Application code commit `9cc90e0 (ori`, observed with harness `3b55843` on macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17.
 
 | ID | Sev | Owner | Status | Title |
 |---|---|---|---|---|
@@ -180,6 +180,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Retest at main 9cc90e0 (merged as 7be805a, harness 8bb1fbe):** Still present on the merged main (browser-baseline integrated): RS-HERO-FULL and RS-CHANGED-INPUT fail with scientific_runtime_unavailable on this Mac without diagnostics. Owner 1 recorded an isolated reproduction on codex/science-next (bad5e9f); Owner 4's CI adds scripts/release/user_conditions_check.py for it. (evidence: {"attempts": "evaluation/results/attempts.jsonl at 8bb1fbe"})
 - **Retest at main 9cc90e0 (science.py now passes processes=256):** Insufficient on the team's Mac: this user owns 649 processes, above 256, so spawning the engine still fails with EAGAIN (measured: caps 32 and 64 fail, 4000 succeeds). A per-user count cannot be a per-job cap. (evidence: {"code": "apps/api/bean_api/science.py _child apply_limits(..., processes=256)", "user_processes": 649})
 - **Retest at backend/browser-design 8451c1f and codex/ai-offline-milestones c6f04c2 (previews):** Present on both newer branches: plain hero baseline fails on the Mac; Owner 3's new real-Counterdex coordinator test fails with scientific_runtime_unavailable. This is now the single blocker between the Mac and a passing acceptance hero run. (evidence: {"ai": "evaluation/results/previews/ai-offline-milestones-c6f04c2", "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc"})
+- **Retest at 3b55843 (app code = main 9cc90e0; engine runtime now Owner 4's .venv-engine, CPython 3.11.17):** Still fails on both launch paths: harness path and Owner 4's launcher both report scientific_runtime_unavailable for the hero and changed-input baselines. With only the process-limit guard relaxed (diagnostic), the same launcher runs discovery, changed input, design authority and zero dispatch to a pass. (evidence: {"attempts": ["att_92546adc9fac471e", "att_fe675c60b66a4801", "att_8e959bd4324c48f8"], "results": "evaluation/results, evaluation/results/owner4-launcher, evaluation/results/owner4-launcher/relax_nproc"})
 
 ## F-COORDINATOR-OPTIONAL-STATUS (P2, owner 3, fixed_pending_retest)
 
@@ -241,7 +242,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Command:** `DRBEAN_VAR_DIR=<isolated> python3 scripts/dev/launcher.py setup (then start); harness: python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher`
 - **Expected:** setup finishes (local auth created); start serves API, worker and web; the doctor's 'backend runtime ok' implies the service entry points can import bean_api
 - **Observed:** setup stops at the auth step (`.venv/bin/python -m bean_api.bootstrap`: No module named 'bean_api'); start: the API and worker exit with ModuleNotFoundError, and the launcher correctly stops everything it started and frees both ports; doctor still reports the backend runtime ok because it checks package metadata, not importability. Cause verified on this host: within about 6 s of creation the iCloud Drive File Provider sets UF_HIDDEN recursively on dot-named directories under ~/Documents (the same probe in /private/tmp stays visible), and CPython 3.11.17 and 3.13.18 `site` skip hidden .pth files (probe: visible .pth importable, hidden .pth not), so `_editable_impl_dr_bean_backend.pth` is ignored. With apps/api added to PYTHONPATH (what Owner 2's documented commands do via --app-dir/PYTHONPATH and what the harness launch path does) the same unmodified launcher starts in under a second; readiness then distinguishes API, worker and science, and the product processes receive no provider credentials.
-- **Evidence:** {"reproduction": "evaluation/results/owner4-launcher/HIDDEN-PTH-REPRO.md"}
+- **Evidence:** {"attempts": ["att_fe675c60b66a4801", "att_acd3a5749edf4d22"], "reproduction": "evaluation/results/owner4-launcher/HIDDEN-PTH-REPRO.md", "results": "evaluation/results/owner4-launcher (lane-runs.jsonl: startup_path.launcher_runs shows the unmodified start exit 1, then the labelled retry exit 0)"}
 
 ## F-LAUNCHER-ENV-READ (P2, owner 4, open)
 
@@ -249,7 +250,7 @@ Application code commit `9cc90e0 (ori`, observed with harness `8bb1fbe` on macOS
 - **Command:** `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-owner4-launcher --results evaluation/results/owner4-launcher`
 - **Expected:** names-only filtering (iterate keys, read only the values that are kept) and a scrubbed environment for every child, including probes
 - **Observed:** the guard records a credential_read of each dummy value in the launcher process during cmd_start -> child_env() (`os.environ.items()` reads every value; the code comment says values are never read), and the doctor's backend probe (`.venv/bin/python -c ...`, env=None) starts with all three names present. The API and worker receive none of them: the scrubbing that matters works.
-- **Evidence:** {}
+- **Evidence:** {"attempts": ["att_acd3a5749edf4d22"], "results": "evaluation/results/owner4-launcher (lane-runs.jsonl subject_end.launcher_side_guard_events: credential_read in launcher.py, probe guard_installed with names present; product processes credential_names_present [])"}
 
 ## Check-level finding ids (raised only when the check fails)
 

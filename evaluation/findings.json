@@ -3,7 +3,7 @@
   "maintained_by": "Workstream 5 (independent adversarial validation)",
   "updated_at": "2026-11-14",
   "application_code_commit": "9cc90e0 (origin/main incl. PR #6 browser-baseline, #7 Owner 4, #8 this branch to 4ea7cb3)",
-  "observed_at_harness_commit": "8bb1fbe",
+  "observed_at_harness_commit": "3b55843",
   "host": "macOS 26.7 (25G227) arm64; backend CPython 3.13.18 (uv-locked .venv); replay CPython 3.11.17",
   "status_values": "open | fixed_pending_retest | retested (fixed and re-run) | closed",
   "findings": [
@@ -489,6 +489,18 @@
             "results": "evaluation/results/previews/backend-browser-design-8451c1f/relax_nproc",
             "ai": "evaluation/results/previews/ai-offline-milestones-c6f04c2"
           }
+        },
+        {
+          "at_commit": "3b55843 (app code = main 9cc90e0; engine runtime now Owner 4's .venv-engine, CPython 3.11.17)",
+          "result": "Still fails on both launch paths: harness path and Owner 4's launcher both report scientific_runtime_unavailable for the hero and changed-input baselines. With only the process-limit guard relaxed (diagnostic), the same launcher runs discovery, changed input, design authority and zero dispatch to a pass.",
+          "evidence": {
+            "attempts": [
+              "att_92546adc9fac471e",
+              "att_fe675c60b66a4801",
+              "att_8e959bd4324c48f8"
+            ],
+            "results": "evaluation/results, evaluation/results/owner4-launcher, evaluation/results/owner4-launcher/relax_nproc"
+          }
         }
       ]
     },
@@ -722,7 +734,12 @@
       "impact": "the documented one-command start does not work on the demo Mac in its current location; the harness and Owner 2's documented entry points are unaffected",
       "suggested_fix": "do not depend on the editable .pth: pass `--app-dir apps/api` to uvicorn and put apps/api on PYTHONPATH in child_env for the worker and bootstrap; make doctor import bean_api with the services' environment. Operator workaround: keep the checkout outside iCloud-synced folders.",
       "evidence": {
-        "reproduction": "evaluation/results/owner4-launcher/HIDDEN-PTH-REPRO.md"
+        "reproduction": "evaluation/results/owner4-launcher/HIDDEN-PTH-REPRO.md",
+        "results": "evaluation/results/owner4-launcher (lane-runs.jsonl: startup_path.launcher_runs shows the unmodified start exit 1, then the labelled retry exit 0)",
+        "attempts": [
+          "att_fe675c60b66a4801",
+          "att_acd3a5749edf4d22"
+        ]
       },
       "retests": []
     },
@@ -738,7 +755,12 @@
       "observed": "the guard records a credential_read of each dummy value in the launcher process during cmd_start -> child_env() (`os.environ.items()` reads every value; the code comment says values are never read), and the doctor's backend probe (`.venv/bin/python -c ...`, env=None) starts with all three names present. The API and worker receive none of them: the scrubbing that matters works.",
       "impact": "no dispatch path and nothing leaves the machine; hygiene against the rule that real keys are never read",
       "suggested_fix": "`{k: os.environ[k] for k in os.environ if not provider(k)}` and `env=child_env()` for the doctor probes",
-      "evidence": {},
+      "evidence": {
+        "results": "evaluation/results/owner4-launcher (lane-runs.jsonl subject_end.launcher_side_guard_events: credential_read in launcher.py, probe guard_installed with names present; product processes credential_names_present [])",
+        "attempts": [
+          "att_acd3a5749edf4d22"
+        ]
+      },
       "retests": []
     }
   ],
