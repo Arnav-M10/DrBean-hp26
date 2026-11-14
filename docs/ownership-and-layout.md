@@ -20,4 +20,4 @@ Rules Owner 04 follows:
 - No second DTO definition, Gemini client, approval authority or backend. `evaluation/drbean_eval/contract.py` is a test oracle written from the contract text; Owner 02's canonicalizer and golden fixtures are authoritative.
 - The harness reaches the product only through a subject: observations emitted by the owning component's controlled test boundary, or the published API.
 
-Branches: Owner 03 works on `codex/researcher-reviewer-web`. Owner 04 works on `claude/dreamy-lamport-dsttgm`, based on that branch at `d95c19e`. The remote has no default branch content beyond these.
+Default integration branch: `main`. Start new workstream branches from the current `origin/main`, and keep each workstream's changes on its own branch. Inspect the current tree before relying on the historical component-state table above.
