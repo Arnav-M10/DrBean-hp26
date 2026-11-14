@@ -76,6 +76,10 @@ jobs:
           python -m counterdex replay packages/groundwork_adapter/fixtures/checked_success.bundle.json \
             --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json > replay.json
           python -c "import json; r=json.load(open('replay.json')); assert r['replay']=='passed' and r['expected_binding']=='matches' and r['verification']=='valid', r"
+      - name: numerical model comparison (separate counterdex-models package)
+        run: |
+          python -m unittest discover -s packages/counterdex_models/tests
+          python packages/counterdex_models/examples/demo.py
 
   web:
     name: web unit tests

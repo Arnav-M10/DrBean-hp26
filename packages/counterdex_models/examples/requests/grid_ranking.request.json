@@ -1,0 +1,44 @@
+{
+  "schema_version": "counterdex-models.request.v1",
+  "analysis": "grid_ranking",
+  "note": "Hypotheses are the vectors fitted to the early readings (fit_early).",
+  "hypotheses": [
+    {
+      "label": "single exponential (early fit)",
+      "model": "public.single-exponential",
+      "parameters": {
+        "A": 6.1855,
+        "k": 0.349329
+      }
+    },
+    {
+      "label": "mixture (early fit)",
+      "model": "public.two-exponential-mixture",
+      "parameters": {
+        "A1": 14.9368,
+        "k1": 10.0,
+        "A2": 5.74858,
+        "k2": 0.322995
+      }
+    }
+  ],
+  "times": [
+    6,
+    8,
+    10,
+    12,
+    16,
+    24,
+    36,
+    48
+  ],
+  "noise": {
+    "absolute_sd": 0.05,
+    "relative_sd": 0.08,
+    "label": "Stated synthetic assay noise (standard deviation)"
+  },
+  "detection_threshold": {
+    "value": 0.1,
+    "label": "Stated synthetic detection threshold"
+  }
+}
