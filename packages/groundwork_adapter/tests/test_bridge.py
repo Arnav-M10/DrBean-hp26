@@ -341,6 +341,93 @@ class BridgeTests(unittest.TestCase):
         self.assertNotEqual(response["anchors"]["scenario_id"], self.design["anchors"]["scenario_id"])
         self.assertEqual(self.design, original_design)
 
+    def test_proposal_bound_recheck_distinguishes_survivors_exclusions_and_unresolved(self):
+        """A replayable computation does not turn an unresolved vector into a witness."""
+        original_design = deepcopy(self.design)
+        _, parent = scientific_from(self.design)
+        candidates = parent["design"]["candidates"]
+        checked = {c["candidate_id"]: c for c in self.baseline["result"]["candidate_results"]}
+        reference, = [c for c in candidates if not checked[c["id"]]["is_counterexample"]]
+        outside, = [c for c in candidates if checked[c["id"]]["is_counterexample"]]
+        time, allowance = Fraction(79, 10), Fraction(7, 20)
+        bounds = {c["id"]: concentration_interval(
+            *(Fraction(c["parameters"][key]) for key in ("A", "ke", "ka")), time)
+            for c in candidates}
+        centers = {cid: (lo + hi) / 2 for cid, (lo, hi) in bounds.items()}
+        ref_id, out_id = reference["id"], outside["id"]
+        ref_lo, ref_hi = bounds[ref_id]
+        self.assertLess(ref_lo, ref_hi)
+        # This exact synthetic hard band lies strictly inside the checker's
+        # enclosure. The fixed profile cannot establish compatibility or
+        # incompatibility; changing precision or refitting would change scope.
+        unresolved_allowance = (ref_hi - ref_lo) / 4
+        cases = (
+            ("reference_survives", centers[ref_id], allowance,
+             {ref_id: "valid", out_id: "invalid"}, "inconclusive"),
+            ("outside_survives", centers[out_id], allowance,
+             {ref_id: "invalid", out_id: "valid"}, "certified_counterexample"),
+            ("both_excluded", Fraction(100), allowance,
+             {ref_id: "invalid", out_id: "invalid"}, "inconclusive"),
+            ("reference_unresolved", centers[ref_id], unresolved_allowance,
+             {ref_id: "inconclusive", out_id: "invalid"}, "inconclusive"),
+        )
+        for name, reading, eta, expected, outcome in cases:
+            with self.subTest(name=name):
+                request = recheck_request(self.problem, self.dataset, self.design,
+                    suffix=name, origin="actual", time=rational_text(time),
+                    allowance=rational_text(eta), reading=rational_text(reading))
+                with patch("counterdex.search.search_candidates",
+                           side_effect=AssertionError("Recheck must not discover replacement candidates")):
+                    response = self.dispatch(request)
+                    raw, fresh = self.assert_native(response)
+                replayed = subprocess.run([sys.executable, "-m", "counterdex.bridge"],
+                    input=canonical_bytes({"protocol": PROTOCOL, "operation": "replay",
+                        "native_artifact_base64": base64.b64encode(raw).decode("ascii"),
+                        "expected": response["anchors"]}),
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15,
+                    cwd="/tmp", env={"PATH": os.defpath, "PYTHONPATH": str(PACKAGE)})
+                self.assertEqual(replayed.returncode, 0, replayed.stderr.decode())
+                self.assertEqual(strict_json_loads(replayed.stdout)["result"], fresh)
+                packet, native = scientific_from(response)
+                self.assertEqual(packet["operation"], "recheck")
+                self.assertEqual(packet["history"], artifact_from(self.design))
+                self.assertEqual(packet["binding"]["observation_proposal"], request["observation_proposal"])
+                self.assertEqual(request["dataset"]["body"]["rows"][:-1], self.dataset["body"]["rows"])
+                # The new projection cites its revised dataset digest; the
+                # complete original projection stays in the retained history.
+                for revised, original in zip(native["problem"]["observations"][:-1],
+                                             parent["problem"]["observations"], strict=True):
+                    self.assertEqual({k: v for k, v in revised.items() if k != "provenance"},
+                                     {k: v for k, v in original.items() if k != "provenance"})
+                    self.assertEqual(revised["provenance"],
+                        f"DB-SC-1 dataset {request['dataset']['digest']}; row {revised['id']}; "
+                        "complete source in binding envelope")
+                row = native["problem"]["observations"][-1]
+                self.assertEqual((row["time"], row["value"], row["allowance"]),
+                                 tuple(map(rational_text, (time, reading, eta))))
+                self.assertNotEqual(row["time"], self.design["result"]["selected_time"])
+                self.assertEqual([(c["id"], c["parameters"]) for c in native["candidates"]],
+                                 [(c["id"], c["parameters"]) for c in candidates])
+                self.assertIsNone(native["search"])
+                self.assertEqual(fresh["dataset_origin"], "synthetic")
+                self.assertEqual(response["result"]["scientific_outcome"], outcome)
+                self.assertEqual(fresh["outcome"]["scientific_outcome"], outcome)
+                self.assertEqual({c["candidate_id"]: c["verification"]
+                                  for c in response["result"]["candidate_results"]}, expected)
+                self.assertEqual({c["candidate_id"]: c["verification"]
+                                  for c in fresh["candidate_results"]}, expected)
+                for candidate in fresh["candidate_results"]:
+                    status = expected[candidate["candidate_id"]]
+                    self.assertEqual(candidate["violating_observation_ids"],
+                                     ["row_followup"] if status == "invalid" else [])
+                    self.assertEqual(candidate["unresolved_observation_ids"],
+                                     ["row_followup"] if status == "inconclusive" else [])
+                    if status == "inconclusive":
+                        self.assertEqual(candidate["reason_code"], "insufficient_enclosure")
+                    self.assertEqual(candidate["is_counterexample"],
+                                     status == "valid" and candidate["candidate_id"] == out_id)
+        self.assertEqual(self.design, original_design)
+
     def test_recheck_accepts_one_or_two_original_baseline_candidates(self):
         from counterdex.search import SearchSettings
         lone = self.dispatch(investigation_request(self.problem, self.dataset,
