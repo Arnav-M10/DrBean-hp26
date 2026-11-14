@@ -2,6 +2,37 @@
 
 Owner: Person 1 / Counterdex.
 
+## Post-push CI at `8af34e4`
+
+PR #5 is ready for review, with teammate main `9cc90e0` incorporated. CI
+[run 43556610563](https://github.com/Arnav-M10/DrBean-hp26/actions/runs/43556610563)
+tested PR merge `4fc3add` on Linux. The engine job completed 289 tests in
+15.247 seconds: **287 passed, 2 skipped**, then native replay passed on
+CPython **3.11.18**. The skipped checks require API dependencies and an explicit
+prepared-supervisor executable; their earlier local qualification is recorded
+below. Web unit tests and evaluator self-checks passed.
+
+Backend CI had **294 passed, 1 failed** in 40.78 seconds. The failure is in
+`test_descendant_cannot_escape_by_outliving_adapter`: the test's Linux
+`process_running` helper checks that `/proc/PID/stat` exists, then reads it after
+the process disappears, raising `ProcessLookupError` (errno 3). Owner 2 should
+handle process disappearance in that observation helper while retaining the
+assertion that live descendants cannot survive acknowledgement. This trace
+does not establish a scientific arithmetic failure or prove the whole cleanup
+gate. The separate ordinary-user check had **4 passed, 1 failed** naming the
+same test; its condensed log does not expose a traceback or establish its cause.
+
+Stack launch/restart smoke passed. The independent HTTP suite had **36 passed,
+7 failed, 2 xfailed** in 16.62 seconds; all seven failures were plan admission
+`503 scientific_runtime_missing`. Unlike the backend job, the workflow's
+evaluator step does not configure the prepared engine executable. Owner 4 should
+set `DRBEAN_SCIENCE_PYTHON="$PWD/.venv-engine/bin/python"` for that step; Owner 5's
+existing launcher then supplies the child backend setting. These are additional
+concrete integration triggers alongside the Mac guard and v2 design adoption
+below. Backend, evaluator and workflow files were left to their owners. No
+failed check was weakened or rerun merely to obtain green CI. This follow-up
+only records observed CI evidence; it changes no executable or fixture bytes.
+
 ## Current continuation — proposed native design and evaluator compatibility
 
 Baseline: clean `bad5e9f` on `codex/science-next`, then current `main` `9cc90e0`
