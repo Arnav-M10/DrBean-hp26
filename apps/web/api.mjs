@@ -13,11 +13,11 @@ export class ApiError extends Error {
 }
 
 async function readBounded(response, limit) {
-  const declared = Number(response.headers.get('Content-Length'))
-  if (declared > limit) throw new ApiError('too_large', `The server response is larger than this page accepts (${limit} bytes).`)
+  const tooLarge = () => new ApiError('too_large', `The server response is larger than this page accepts (${limit} bytes).`)
+  if (Number(response.headers.get('Content-Length')) > limit) throw tooLarge()
   if (!response.body?.getReader) {
     const bytes = new Uint8Array(await response.arrayBuffer())
-    if (bytes.length > limit) throw new ApiError('too_large', `The server response is larger than this page accepts (${limit} bytes).`)
+    if (bytes.length > limit) throw tooLarge()
     return bytes
   }
   const reader = response.body.getReader(), chunks = []
@@ -26,7 +26,7 @@ async function readBounded(response, limit) {
     const { done, value } = await reader.read()
     if (done) break
     total += value.length
-    if (total > limit) { await reader.cancel(); throw new ApiError('too_large', `The server response is larger than this page accepts (${limit} bytes).`) }
+    if (total > limit) { await reader.cancel(); throw tooLarge() }
     chunks.push(value)
   }
   const bytes = new Uint8Array(total)
@@ -78,31 +78,34 @@ export class BeanApi {
     return response
   }
   async json(path, body) { return parseJson(await readBounded(await this.request(path, body), MAX_JSON_BYTES)) }
-  // Returns verified bytes. A matching digest shows the bytes arrived intact; it is not a scientific check.
-  async download(path) {
+  // A matching digest shows the bytes arrived intact and are the selected object; it is not a scientific check.
+  async download(path, expected = {}) {
     const response = await this.request(path)
-    const bytes = await readBounded(response, MAX_DOWNLOAD_BYTES)
+    const bytes = (await readBounded(response, MAX_DOWNLOAD_BYTES)).buffer
     const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('')
     if (response.headers.get('X-Artifact-SHA256') !== digest) throw new ApiError('malformed', 'Download byte digest mismatch; no file saved.')
-    return { bytes: bytes.buffer, digest }
+    if ((expected.sha256 && expected.sha256 !== digest) || (expected.byte_size !== undefined && expected.byte_size !== bytes.byteLength)) {
+      throw new ApiError('malformed', 'Download does not match the selected evidence reference; no file saved.')
+    }
+    return { bytes, digest }
   }
+}
+export function baselineAvailable(capabilities) {
+  return capabilities?.contract_version === 'DB-SC-1' && capabilities?.policy_version === 'GF-2'
+    && capabilities.science?.available === true && capabilities.science?.baseline_discovery === true
 }
 
-// Whether this server can run an approved baseline now, and if not, why, in the server's own terms.
-// Fails closed on anything unknown.
-export function scienceReadiness(capabilities) {
-  if (capabilities?.contract_version !== 'DB-SC-1' || capabilities?.policy_version !== 'GF-2') {
-    return { canQueueBaseline: false, reason: 'This server does not report the expected contract and policy versions.' }
+export function baselineExplanation(result) {
+  if (result.scientific_outcome === 'certified_counterexample' && result.verification === 'valid'
+      && result.expected_binding === 'matches' && result.replay === 'passed') {
+    return 'A freshly checked parameter assignment is compatible with the reviewed hard bounds and has ke strictly outside the closed claim. The claim is challenged under these assumptions; this does not identify the true physical model.'
   }
-  const science = capabilities.science ?? {}
-  const template = capabilities.model_templates?.find(t => t.id === 'two_rate_concentration')
-  if (!template) return { canQueueBaseline: false, reason: 'This server does not offer the two-rate concentration model.' }
-  const discovers = science.available === true && science.baseline_discovery === true
-  const legacyQualified = science.verified_in_environment === true && template.scientific_adapter_qualified === true
-  if (discovers || legacyQualified) return { canQueueBaseline: true, reason: '' }
-  const code = typeof science.reason === 'string' ? ` (${science.reason.slice(0, 80)})` : ''
-  return { canQueueBaseline: false, reason: science.available === true
-    ? `The scientific engine is installed, but this server cannot yet search for candidates${code}. Plan review and approval still work; running the investigation does not.`
-    : `No scientific engine is available on this server${code}. Plan review and approval still work; running the investigation does not.` }
+  if (result.scientific_outcome === 'no_counterexample_found') {
+    return 'The bounded search found no checked counterexample. This does not prove that every compatible parameter assignment lies inside the claim.'
+  }
+  if (result.scientific_outcome === 'numerical_candidate') {
+    return 'The search returned a numerical candidate. Its numerical fit alone does not establish a checked counterexample.'
+  }
+  if (result.scientific_outcome === 'unsupported') return 'This investigation is unsupported by the configured scientific runtime. No scientific conclusion was established.'
+  return 'Read the scientific outcome and checking states separately. Incomplete or unsuccessful checking does not prove the claim.'
 }
-export function qualifiedScience(capabilities) { return scienceReadiness(capabilities).canQueueBaseline }

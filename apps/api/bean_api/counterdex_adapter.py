@@ -12,8 +12,13 @@ import shutil
 import subprocess
 
 from .canonical import semantic_digest
-from .scientific_projection import PROJECTION_VERSION, admit_problem, project_design, project_problem
+from .scientific_projection import PROJECTION_VERSION, project_design, project_problem
 from .workflow import DomainError
+
+APPLICATION_MAPPING = "DB-SC-1-to-groundwork-v1"
+NATIVE_PROTOCOL = "counterdex.bridge.v1"
+NATIVE_MEDIA_TYPE = "application/vnd.counterdex.native+json"
+TRANSPORT_CAP = 12 * 1024 * 1024
 
 
 @dataclass
@@ -25,7 +30,7 @@ class CounterdexAdapter:
         if executable is None:
             return {"worker_error": "scientific_runtime_missing"}
         raw = json.dumps(payload, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
-        if len(raw) > 8 * 1024 * 1024:
+        if len(raw) > TRANSPORT_CAP:
             return {"worker_error": "scientific_bridge_input_limit"}
         try:
             # Inherit the owning scientific process group/resource limits. The outer
@@ -37,7 +42,7 @@ class CounterdexAdapter:
             return {"worker_error": "scientific_wall_limit"}
         except OSError:
             return {"worker_error": "scientific_runtime_unavailable"}
-        if result.returncode or len(result.stdout) > 8 * 1024 * 1024:
+        if result.returncode or len(result.stdout) > TRANSPORT_CAP:
             return {"worker_error": "scientific_bridge_failed"}
         try:
             response = json.loads(result.stdout)
@@ -47,35 +52,137 @@ class CounterdexAdapter:
             return {"worker_error": "scientific_bridge_failed"}
         if "engine_error" in response:
             return {"worker_error": response["engine_error"]["code"], "engine_error": response["engine_error"]}
+        if response.get("ok") is False and "error" in response:
+            return {"worker_error": response["error"]["code"], "engine_error": response["error"]}
         return response
 
     def capabilities(self) -> dict:
         probe = self._run({"operation": "probe"}, 5)
         available = "worker_error" not in probe
         return {"implemented": True, "configured": bool(self.python_executable), "available": available,
-                "verified_in_environment": False, "adapter": "Counterdex", "adapter_version": "0.1.0",
-                "projection_version": PROJECTION_VERSION, "runtime": probe.get("identity"),
-                "reason": probe.get("worker_error") or "baseline_producer_unavailable",
-                "baseline_discovery": False, "claim_families": [],
+                "verified_in_environment": False, "adapter": "Counterdex", "adapter_version": "0.2.0",
+                "projection_version": APPLICATION_MAPPING, "runtime": probe.get("identity"),
+                "reason": probe.get("worker_error"),
+                "baseline_discovery": available and probe.get("baseline_discovery") is True,
+                "claim_families": ["closed_ke_interval_counterexample"] if available else [],
                 "design_tiers": ["numerical_guidance", "checked_pair_separation", "no_separation_established"] if available else [],
                 "native_replay": available, "browser_replay": False,
                 "qualification": "Runtime availability; each result requires actual checking and fresh native replay."}
 
-    def admit(self, problem: dict, dataset: dict) -> None:
-        # Building the projection also checks bounded text/provenance without loss.
-        project_problem(problem, dataset)
+    @staticmethod
+    def _projection(response: dict, problem: dict, dataset: dict) -> dict:
+        projection = response.get("result", {})
+        binding = projection.get("binding", {})
+        if (response.get("protocol") != NATIVE_PROTOCOL or response.get("ok") is not True
+                or binding.get("mapping_policy") != APPLICATION_MAPPING
+                or binding.get("problem") != {key: problem[key] for key in ("id", "digest", "body")}
+                or binding.get("dataset") != {key: dataset[key] for key in ("id", "digest", "body")}
+                or semantic_digest("problem", projection.get("problem")) != projection.get("projection_digest")
+                or binding.get("projection_digest") != projection.get("projection_digest")):
+            raise DomainError("scientific_projection_mismatch", "Scientific admission must bind the complete frozen application inputs.", 422)
+        return projection
 
-    def investigate(self, problem: dict, dataset: dict, limits: dict) -> dict:
-        admit_problem(problem, dataset)
-        probe = self._run({"operation": "probe"}, min(5, limits["scientific_wall_seconds"]))
-        if "worker_error" in probe:
-            return probe
-        # No fixture pair, hardcoded optimizer output or local replacement theorem.
-        return {"scientific_outcome": "unsupported", "verification": "unsupported",
-            "expected_binding": "not_supplied", "replay": "unsupported", "reason_code": "baseline_producer_unavailable",
-            "problem_id": problem["id"], "problem_digest": problem["digest"], "candidates": [], "artifacts": [],
-            "projection_version": PROJECTION_VERSION,
-            "scientific_problem_digest": semantic_digest("problem", project_problem(problem, dataset))}
+    def admission_projection(self, problem: dict, dataset: dict) -> dict:
+        response = self._run({"protocol": NATIVE_PROTOCOL, "operation": "admission", "problem": problem, "dataset": dataset}, 5)
+        if "worker_error" in response:
+            code = response["worker_error"]
+            infrastructure = code.startswith("scientific_") or code in {"unsupported_runtime", "bridge_failure"}
+            detail = response.get("engine_error", {})
+            raise DomainError(code if infrastructure else "scientific_admission",
+                detail.get("message", "The prepared scientific runtime is unavailable."),
+                503 if infrastructure else 422, detail.get("field_paths", []))
+        return self._projection(response, problem, dataset)
+
+    def admit(self, problem: dict, dataset: dict) -> None:
+        self.admission_projection(problem, dataset)
+
+    def investigate(self, problem: dict, dataset: dict, limits: dict, scope: dict | None = None) -> dict:
+        # Admission derives the expected projection from reviewed inputs before
+        # looking at any result or packet asserted by the producer.
+        admitted = self._run({"protocol": NATIVE_PROTOCOL, "operation": "admission",
+                              "problem": problem, "dataset": dataset}, min(5, limits["scientific_wall_seconds"]))
+        if "worker_error" in admitted:
+            return admitted
+        projection = self._projection(admitted, problem, dataset)
+        if scope is None:
+            return {"worker_error": "scientific_scope_required"}
+        response = self._run({"protocol": NATIVE_PROTOCOL, "operation": "investigate",
+            "problem": problem, "dataset": dataset, "run_id": scope["run_id"], "scenario_id": scope["scenario_id"],
+            "workflow": scope["workflow"], "limits": {"wall_seconds": limits["scientific_wall_seconds"],
+                "max_bundle_bytes": 4 * 1024 * 1024}, "search_settings": None}, limits["scientific_wall_seconds"])
+        if "worker_error" in response:
+            return response
+        return self._baseline_output(response, problem, dataset, projection, scope)
+
+    @staticmethod
+    def _baseline_output(response: dict, problem: dict, dataset: dict, projection: dict, scope: dict) -> dict:
+        if (response.get("protocol") != NATIVE_PROTOCOL or response.get("ok") is not True
+                or len(response.get("native_artifacts", [])) != 1):
+            return {"worker_error": "incomplete_export"}
+        artifact = response["native_artifacts"][0]
+        try:
+            content = base64.b64decode(artifact["bytes_base64"], validate=True)
+            packet = json.loads(content)
+            native = base64.b64decode(packet["scientific"]["bytes_base64"], validate=True)
+            scientific = json.loads(native)
+        except (KeyError, TypeError, ValueError):
+            return {"worker_error": "invalid_native_artifact"}
+        if (not content or len(content) > 4 * 1024 * 1024 or len(content) != artifact["byte_size"]
+                or hashlib.sha256(content).hexdigest() != artifact["sha256"]
+                or artifact["media_type"] != NATIVE_MEDIA_TYPE
+                or hashlib.sha256(native).hexdigest() != packet["scientific"]["sha256"]):
+            return {"worker_error": "artifact_mismatch"}
+        expected = {"artifact_sha256": artifact["sha256"], "dataset_digest": dataset["digest"],
+            "problem_digest": problem["digest"], "projection_digest": projection["projection_digest"],
+            "app_request_digest": None, "design_digest": None, "scenario_id": scope["scenario_id"], "run_id": scope["run_id"]}
+        if (response.get("anchors") != expected or packet.get("schema_version") != "counterdex.application-bundle.v1"
+                or packet.get("operation") != "investigate" or packet.get("history") is not None
+                or packet.get("binding") != projection["binding"] or packet.get("run_id") != scope["run_id"]
+                or packet.get("scenario_id") != scope["scenario_id"] or scientific.get("problem") != projection["problem"]
+                or scientific.get("operation") != "bounded_discovery" or scientific.get("workflow") != scope["workflow"]
+                or scientific.get("scenario_id") != scope["scenario_id"]):
+            return {"worker_error": "binding_mismatch"}
+        baseline_digest = semantic_digest("report", {key: value for key, value in scientific.items() if key != "baseline_digest"})
+        details = response.get("details", {})
+        fresh = details.get("fresh_replay", {})
+        if (scientific.get("baseline_digest") != baseline_digest or fresh.get("baseline_digest") != baseline_digest
+                or fresh.get("anchors") != expected or details.get("scientific_report") != scientific["report"]
+                or details.get("search") != scientific["search"] or details.get("exact_trials") != scientific["exact_trials"]):
+            return {"worker_error": "artifact_mismatch"}
+        result = response["result"]
+        reference = {key: artifact[key] for key in ("id", "sha256", "byte_size", "media_type")}
+        checked = fresh["candidate_results"]
+        expected_candidates = [{"id": candidate["candidate_id"], "parameter_vector": candidate["parameters"],
+            "problem_id": problem["id"], "problem_digest": problem["digest"], "observable": "concentration",
+            "checked_horizon": scientific["report"]["checked"]["historical_horizon"],
+            "verification": candidate["verification"], "artifact_ids": [reference["id"]]} for candidate in checked]
+        if (result.get("artifacts") != [reference] or result.get("problem_id") != problem["id"]
+                or result.get("problem_digest") != problem["digest"] or result.get("scientific_outcome") != fresh["outcome"]["scientific_outcome"]
+                or result.get("reason_code") != fresh["outcome"]["reason_code"] or result.get("replay") != fresh["replay"]
+                or result.get("expected_binding") != fresh["expected_binding"] or result.get("verification") != fresh["verification"]
+                or result.get("candidates") != expected_candidates):
+            return {"worker_error": "binding_mismatch"}
+        result = {**result, "projection_version": APPLICATION_MAPPING,
+            "scientific_problem_digest": projection["projection_digest"], "native_replay": fresh,
+            "candidate_results": [{key: value for key, value in candidate.items() if key not in {"parameters", "rows"}}
+                                  for candidate in fresh["candidate_results"]]}
+        if result.get("verification_record"):
+            result["verification_record"] = {**result["verification_record"],
+                "expected_scientific_problem_digest": projection["projection_digest"],
+                "observed_scientific_problem_digest": projection["projection_digest"]}
+        search = scientific["search"]
+        result["baseline_search"] = {key: search[key] for key in ("policy", "execution", "reason_code", "partial",
+            "attempted_count", "evaluated_count", "possible_count", "feasible_count", "retained_count", "settings")}
+        result["baseline_search"]["exact_attempts"] = len(scientific["exact_trials"])
+        result["_native_artifacts"] = [{**reference, "content_base64": artifact["bytes_base64"],
+            "artifact_kind": "bundle", "anchor": expected}]
+        result["_application_projection"] = projection
+        return result
+
+    def replay_native(self, content: bytes, *, expected: dict, wall_seconds: int = 120) -> dict:
+        response = self._run({"protocol": NATIVE_PROTOCOL, "operation": "replay",
+            "native_artifact_base64": base64.b64encode(content).decode("ascii"), "expected": expected}, wall_seconds)
+        return response if "worker_error" in response else response["result"]
 
     def design(self, request: dict, historical_evidence: dict) -> dict:
         for name in ("problem", "dataset", "workflow"):

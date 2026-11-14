@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ApiError, BeanApi, MAX_JSON_BYTES, qualifiedScience, scienceReadiness } from './api.mjs'
-import { datasetBody, problemBody, planRequest, researchObjective } from './manual.mjs'
+import { ApiError, BeanApi, MAX_JSON_BYTES, baselineAvailable, baselineExplanation } from './api.mjs'
+import { datasetBody, problemBody, planRequest, investigationObjective } from './manual.mjs'
 
 test('uncertain mutation retry retains its operation key and token never enters body or URL', async () => {
   const seen = []
@@ -20,9 +20,12 @@ test('mismatched download bytes are rejected', async () => {
   const api = new BeanApi('token', async () => new Response('{}', { headers: { 'X-Artifact-SHA256': 'incorrect' } }))
   await assert.rejects(api.download('/artifacts/e'), /digest mismatch/)
 })
-test('unknown or unqualified capabilities fail closed', () => {
-  assert.equal(Boolean(qualifiedScience({})), false)
-  assert.equal(Boolean(qualifiedScience({ contract_version: 'DB-SC-1', policy_version: 'GF-2', science: { verified_in_environment: false } })), false)
+test('baseline availability uses the actual operation without awarding global scientific qualification', () => {
+  assert.equal(Boolean(baselineAvailable({})), false)
+  const configured = { contract_version: 'DB-SC-1', policy_version: 'GF-2', science: { verified_in_environment: false, available: true, baseline_discovery: true } }
+  assert.equal(baselineAvailable(configured), true)
+  assert.equal(baselineAvailable({ ...configured, science: { ...configured.science, available: false } }), false)
+  assert.equal(baselineAvailable({ ...configured, science: { available: true, verified_in_environment: true } }), false)
 })
 test('manual wire mapping preserves excluded duplicates, original spelling and server identities', () => {
   const draft = { rows: [0, 1, 2, 2].map((t, i) => ({ id: i + 1, time: `${t}.00`, concentration: '1.20', epsilon: '0.1', included: i !== 3 })), sources: [], question: {
@@ -38,18 +41,28 @@ test('manual wire mapping preserves excluded duplicates, original spelling and s
   const plan = planRequest({ id: 'server-problem', digest: 'server-problem-digest', body: problem })
   assert.equal(plan.plan.scenarios[0].problem_digest, 'server-problem-digest')
   assert.equal(plan.plan.provider_disclosure.provider, 'none')
+  assert.equal(plan.plan.scientific_profile, 'counterdex.v1')
+  assert.equal(plan.plan.objective.version, 'research-objective.v1')
+  assert.match(plan.plan.objective.question, /\[1\/10, 17\/100\]/)
+  assert.match(plan.plan.objective.success_criterion, /No witness found does not prove the claim/)
+  assert.equal(investigationObjective({ body: problem }, '  Could this experiment support another ke? ').question, 'Could this experiment support another ke?')
+  assert.throws(() => investigationObjective({ body: problem }, 'x'.repeat(2001)), /2,000/)
 })
 
-test('plans carry the Counterdex profile and an explicit objective even when the goal is blank', () => {
-  const problem = { id: 'p', digest: 'd', body: { dataset_id: 'ds', target: { lower: '1/10', upper: '17/100' } } }
-  const blank = planRequest(problem, '   ').plan
-  assert.equal(blank.scientific_profile, 'counterdex.v1')
-  assert.match(blank.objective.question, /closed interval \[1\/10, 17\/100\]/)
-  assert.ok(blank.objective.success_criterion.includes('Nothing here proves the interval'))
-  const stated = researchObjective(problem, 'Is the literature range justified?')
-  assert.ok(stated.question.startsWith('Is the literature range justified?'))
-  assert.ok(stated.question.includes('[1/10, 17/100]'))
-  assert.ok(researchObjective(problem, 'x'.repeat(5000)).question.length <= 2000)
+test('native download must match both transport digest and selected evidence reference', async () => {
+  const content = new TextEncoder().encode('{"native":true}')
+  const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', content)), b => b.toString(16).padStart(2, '0')).join('')
+  const api = new BeanApi('token', async () => new Response(content, { headers: { 'X-Artifact-SHA256': digest } }))
+  assert.equal((await api.download('/artifacts/native', { sha256: digest, byte_size: content.length })).digest, digest)
+  await assert.rejects(api.download('/artifacts/native', { sha256: '0'.repeat(64) }), /evidence reference/)
+  await assert.rejects(api.download('/artifacts/native', { byte_size: content.length + 1 }), /evidence reference/)
+})
+
+test('bounded search and failed checking cannot be explained as proof', () => {
+  assert.match(baselineExplanation({ scientific_outcome: 'no_counterexample_found' }), /does not prove/)
+  assert.match(baselineExplanation({ scientific_outcome: 'numerical_candidate' }), /does not establish/)
+  assert.match(baselineExplanation({ scientific_outcome: 'certified_counterexample', verification: 'invalid' }), /Incomplete or unsuccessful checking/)
+  assert.match(baselineExplanation({ scientific_outcome: 'certified_counterexample', verification: 'valid', expected_binding: 'matches', replay: 'passed' }), /strictly outside/)
 })
 
 test('a lost mutation response is reported as uncertain, a lost read as unreachable, a refusal as rejected', async () => {
@@ -72,15 +85,4 @@ test('oversized and malformed responses are refused, not parsed', async () => {
   await assert.rejects(streamed.json('/x'), e => e.kind === 'too_large')
   const garbage = new BeanApi('t', async () => new Response('<html>'))
   await assert.rejects(garbage.json('/x'), e => e.kind === 'malformed')
-})
-test('queueing follows what the server says it can do and explains why not', () => {
-  const base = { contract_version: 'DB-SC-1', policy_version: 'GF-2', model_templates: [{ id: 'two_rate_concentration', scientific_adapter_qualified: false }] }
-  const installedOnly = scienceReadiness({ ...base, science: { available: true, baseline_discovery: false, reason: 'baseline_producer_unavailable', verified_in_environment: false } })
-  assert.equal(installedOnly.canQueueBaseline, false)
-  assert.match(installedOnly.reason, /cannot yet search for candidates \(baseline_producer_unavailable\)/)
-  assert.equal(scienceReadiness({ ...base, science: { available: true, baseline_discovery: true } }).canQueueBaseline, true)
-  assert.match(scienceReadiness({ ...base, science: { available: false, reason: 'groundwork_adapter_not_installed' } }).reason, /No scientific engine/)
-  assert.equal(scienceReadiness({ ...base, policy_version: 'other', science: { available: true, baseline_discovery: true } }).canQueueBaseline, false)
-  assert.equal(scienceReadiness({ ...base, model_templates: [], science: { available: true, baseline_discovery: true } }).canQueueBaseline, false)
-  assert.equal(qualifiedScience(undefined), false)
 })

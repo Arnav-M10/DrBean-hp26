@@ -297,7 +297,7 @@ byId('example').addEventListener('click', () => {
   previewToken++
   showImportPreview(parseMeasurementsCsv(exampleCsv), {
     name: 'Synthetic two-rate example',
-    description: 'The project’s shared synthetic example: five invented readings, not laboratory data. The hard allowance of 0.50 mg/L per row is a team-chosen assumption for you to review.',
+    description: 'Synthetic five-row research example. Historical hard allowances are team-selected at 0.50 mg/L. Review the model domain and closed claim separately; investigation results are computed from the submitted inputs.',
   })
 })
 

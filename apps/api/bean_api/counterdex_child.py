@@ -16,10 +16,15 @@ def dispatch(request: dict) -> dict:
     from counterdex.errors import AdapterError
     from counterdex.identity import implementation_identity
     identity = implementation_identity()
+    if request.get("protocol") == "counterdex.bridge.v1":
+        # The prepared package owns discovery, its application projection, and
+        # native replay. The server-owned launcher only carries bounded data.
+        from counterdex.bridge import dispatch as native_dispatch
+        return native_dispatch(request)
     operation = request["operation"]
     if operation == "probe":
         from counterdex import capabilities
-        return {"identity": identity, "capabilities": capabilities(), "baseline_discovery": False}
+        return {"identity": identity, "capabilities": capabilities(), "baseline_discovery": True}
     if operation == "replay":
         from counterdex.replay import replay_bundle
         content = base64.b64decode(request["content_base64"], validate=True)
@@ -28,7 +33,7 @@ def dispatch(request: dict) -> dict:
         return replay_bundle(content, expected_problem_digest=request["expected_problem_digest"],
                              expected_suggestion_digest=request["expected_suggestion_digest"])
     if operation != "design":
-        raise AdapterError("unsupported_operation", "This prepared engine has no baseline discovery producer.")
+        raise AdapterError("unsupported_operation", "This operation requires the supported native bridge protocol.")
     from counterdex import normalize_design, normalize_problem
     from counterdex.pipeline import create_suggestion
     from counterdex.replay import replay_bundle
@@ -62,8 +67,8 @@ def dispatch(request: dict) -> dict:
 
 def main() -> None:
     try:
-        raw = sys.stdin.buffer.read(8 * 1024 * 1024 + 1)
-        if len(raw) > 8 * 1024 * 1024:
+        raw = sys.stdin.buffer.read(12 * 1024 * 1024 + 1)
+        if len(raw) > 12 * 1024 * 1024:
             raise ValueError("request_limit")
         result = dispatch(json.loads(raw))
     except Exception as exc:
@@ -73,7 +78,7 @@ def main() -> None:
         else:
             result = {"engine_error": {"code": "scientific_bridge_failure", "message": "The prepared scientific bridge could not complete.", "field_paths": [], "retryable": False}}
     encoded = json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
-    if len(encoded) > 8 * 1024 * 1024:
+    if len(encoded) > 12 * 1024 * 1024:
         encoded = b'{"engine_error":{"code":"resource_exhaustion","message":"Scientific bridge output exceeds its limit.","field_paths":[],"retryable":false}}'
     sys.stdout.buffer.write(encoded)
 

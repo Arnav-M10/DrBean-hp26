@@ -1,7 +1,5 @@
-// Editor-only smoke for the web workspace: local draft entry, validation and export.
-// It starts no backend and is NOT an end-to-end science test. The connected path is
-// apps/web/check-backend.mjs; deeper HTTP invariants are Owner 5's suite. Its request monitor
-// sees browser requests only and cannot prove the backend made no model call.
+// Manual-path smoke for the installed web workspace (early handoff, work order section 2).
+// Drives the real page in a real browser. No backend, no provider key.
 //   node tests/integration/web_manual_smoke.mjs
 // Exit 0: all checks passed. Exit 1: a check failed. Exit 3: unrun (Playwright absent).
 import { spawn } from 'node:child_process'
@@ -29,9 +27,8 @@ const url = await new Promise((resolve, reject) => {
   setTimeout(() => reject(new Error('serve.mjs did not start within 10 s')), 10000)
 })
 
-let browser
+const browser = await chromium.launch()
 try {
-  browser = await chromium.launch() // inside try: a missing browser must not leave the web server running
   const context = await browser.newContext({ acceptDownloads: true })
   const page = await context.newPage()
   const external = []
@@ -63,18 +60,17 @@ try {
   check('imported-rows-kept-not-deleted', (await page.getByRole('button', { name: /^Remove row/ }).count()) === 0, 'imported rows can be excluded but not removed')
   await page.click('#measurements button[type=submit]')
   await page.waitForSelector('#question:not([hidden])')
-  // The shared synthetic example's team-selected domain and claim.
-  const bounds = { aMin: '0.001', aMax: '30', keMin: '0.015', keMax: '0.35', kaMin: '0.4', kaMax: '8', targetMin: '0.10', targetMax: '0.17' }
+  const bounds = { aMin: '1', aMax: '12', keMin: '1/10', keMax: '0.3', kaMin: '1/2', kaMax: '2', targetMin: '0.10', targetMax: '17/100' }
   for (const [id, value] of Object.entries(bounds)) await page.fill(`#${id}`, value)
 
   // A complete structured draft must not be blocked by a blank free-text goal.
-  await page.fill('#allowanceOrigin', 'Team-chosen hard allowance of 0.50 mg/L for the shared synthetic example.')
+  await page.fill('#allowanceOrigin', 'Team-chosen hard allowance of 0.50 mg/L for the synthetic example.')
   await page.fill('#goal', '')
   await page.click('#question-form button[type=submit]')
   await page.waitForSelector('#review:not([hidden])')
   check('blank-goal-not-blocking', await page.isVisible('#review-summary'), 'review reached with an empty goal')
   const review = await page.locator('#review-summary').textContent() // includes the collapsed exact-values disclosure
-  check('review-shows-exact-values', review.includes('[3/200, 7/20]') && review.includes('[1/10, 17/100]'),
+  check('review-shows-exact-values', review.includes('[1/10, 3/10]') && review.includes('[1/10, 17/100]'),
     'exact normalized bounds are shown in review')
   check('planning-honestly-unavailable', (await page.locator('#review').innerText()).includes('Investigation planning is unavailable'),
     'the page does not pretend a backend exists')
@@ -85,7 +81,7 @@ try {
   const scalars = [...draft.rows.flatMap(row => [row.time, row.concentration, row.epsilon]), ...Object.values(bounds).map((_, i) => draft.question[Object.keys(bounds)[i]])]
   check('export-format', draft.format === 'dr-bean-local-draft' && draft.version === 1, `${draft.format} v${draft.version}`)
   check('export-no-floats', scalars.length === 23 && scalars.every(value => typeof value === 'string'), 'every scientific scalar is a string')
-  check('export-keeps-source-spelling', draft.question.keMax === '0.35' && draft.rows[3].concentration === '6.80', 'original spellings retained')
+  check('export-keeps-source-spelling', draft.question.keMax === '0.3' && draft.rows[3].concentration === '6.80', 'original spellings retained')
   check('export-keeps-provenance', draft.sources.length === 1 && draft.rows.every(row => row.sourceId === 1 && row.original), 'rows keep their source and original values')
 
   // The web's exact parser produces DB-SC-1 canonical rationals.
@@ -95,10 +91,8 @@ try {
   check('no-external-requests', external.length === 0, external.join(' ') || 'no request left 127.0.0.1 (no provider call, offline assets)')
   check('no-page-errors', errors.length === 0, errors.join(' | '))
   check('no-credentials-in-browser-storage', await page.evaluate(() => localStorage.length + sessionStorage.length === 0) && (await context.cookies()).length === 0, 'no cookies or storage')
-} catch (error) {
-  check('smoke-completed', false, String(error).slice(0, 300))
 } finally {
-  await browser?.close()
+  await browser.close()
   server.kill()
 }
 const failed = checks.filter(item => !item.passed)

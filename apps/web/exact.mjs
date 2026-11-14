@@ -133,9 +133,9 @@ export function parseMeasurementsCsv(text) {
   });
 }
 
-// Limits of the server's dataset contract (apps/api/bean_api/contracts.py), checked here so a
-// draft is refused before review instead of after it. The server remains the authority.
-export const MAX_ROWS = 500;
+// Limits of the server's dataset contract, checked here so a draft is refused before review
+// instead of after it. The server remains the authority.
+export const MAX_ROWS = 128;
 export const MAX_SPELLING_LENGTH = 256;
 
 export function isBlankRow(row) {
@@ -145,9 +145,7 @@ export function isBlankRow(row) {
 export function validateMeasurements(rows) {
   const errors = [];
   const includedTimes = new Set();
-  if (rows.length > MAX_ROWS) {
-    errors.push({ index: -1, field: "rows", message: `Use at most ${MAX_ROWS} rows. This draft has ${rows.length}.` });
-  }
+  if (rows.length > MAX_ROWS) errors.push({ index: -1, field: 'rows', message: `Counterdex supports at most ${MAX_ROWS} rows, including excluded rows.` });
   rows.forEach((row, index) => {
     if (isBlankRow(row)) {
       // An empty row is never silently dropped or guessed at. It is reported once, with the repair.
@@ -169,6 +167,7 @@ export function validateMeasurements(rows) {
         if (field === "epsilon" && compareExact(value, "0/1") <= 0) {
           throw new Error("Enter a positive hard allowance.");
         }
+        if (field === "concentration" && compareExact(value, "0/1") < 0) throw new Error("Enter a nonnegative concentration.");
       } catch (error) {
         errors.push({ index, field, message: error.message });
       }

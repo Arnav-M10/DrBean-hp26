@@ -31,23 +31,21 @@ export function problemBody(draft, dataset) {
     target: { parameter: 'ke', lower: exact.targetMin, upper: exact.targetMax, closed: true },
   }
 }
-// The backend requires an explicit reviewed objective for Counterdex plans. The researcher's goal is
-// used when given; a blank goal must not block a complete structured draft, so the question is then
-// stated from the exact reviewed target interval. Both strings are shown in the frozen plan for review.
-export function researchObjective(problem, goal = '') {
-  const { lower, upper } = problem.body.target
-  const stated = `Do the reviewed measurements and hard allowances force the elimination rate ke into the closed interval [${lower}, ${upper}] per hour?`
-  const question = goal.trim() ? `${goal.trim().slice(0, 1500)} (Reviewed claim: ke in [${lower}, ${upper}] per hour.)` : stated
-  return { version: 'research-objective.v1', question,
-    success_criterion: 'A checked compatible candidate outside the interval, or an honest unresolved or unavailable status. Nothing here proves the interval.' }
+export function investigationObjective(problem, goal = '') {
+  const question = goal.trim() || `Can a parameter assignment compatible with these reviewed measurements have ke outside the closed interval [${problem.body.target.lower}, ${problem.body.target.upper}] 1/h?`
+  if (question.length > 2000) throw new Error('Keep the research goal within 2,000 characters.')
+  return {
+    version: 'research-objective.v1', question,
+    success_criterion: 'Find and freshly check a compatible parameter assignment strictly outside the reviewed closed claim, or report the bounded search outcome and its limits. No witness found does not prove the claim.',
+  }
 }
 export function planRequest(problem, goal = '') {
   return { expected_current_revision_id: problem.id, plan: {
     schema_version: 'DB-SC-1', problem_id: problem.id, problem_digest: problem.digest, dataset_id: problem.body.dataset_id,
+    scientific_profile: 'counterdex.v1', objective: investigationObjective(problem, goal),
     scenarios: [{ id: 'baseline', problem_id: problem.id, problem_digest: problem.digest, kind: 'baseline', label: 'Reviewed manual baseline' }],
     permitted_tools: ['read_scoped_evidence', 'execute_approved_scenario', 'record_allowed_skip', 'return_grounded_explanation'],
     budget: { provider_turns: 0, tool_calls: 2, scientific_reservations: 1, wall_seconds: 120, scientific_wall_seconds: 120 },
     provider_disclosure: { provider: 'none', model: null, source_asset_ids: [], context_fields: [], permission_id: null }, parent_plan_id: null,
-    scientific_profile: 'counterdex.v1', objective: researchObjective(problem, goal),
   } }
 }
