@@ -589,8 +589,15 @@ class ControlledIntakeConflict(StrictModel):
     proposed_value: Annotated[str, StringConstraints(max_length=256)] | None
 
 
+class IntakeInputContext(StrictModel):
+    """Server-captured workspace heads; null also identifies an exact state."""
+    current_dataset_id: Identifier | None
+    current_problem_id: Identifier | None
+
+
 class ControlledIntakeProposalRecordBody(IntakeProposalBody):
     """Separate additive wire type; legacy Gemini record bytes stay unchanged."""
+    legacy_optional_fields = ("input_context",)
     schema_version: Literal["controlled-intake.v1"] = "controlled-intake.v1"
     execution_mode: Literal["controlled"] = "controlled"
     authorship: Literal["controlled_fixture"] = "controlled_fixture"
@@ -601,6 +608,7 @@ class ControlledIntakeProposalRecordBody(IntakeProposalBody):
     next_action: Literal["review_controlled_preview", "manual_review"]
     conflicts: list[ControlledIntakeConflict] = Field(default_factory=list, max_length=50)
     provenance: ControlledIntakeProvenance
+    input_context: IntakeInputContext | None = None
     review_state: Literal["unaccepted"] = "unaccepted"
     execution_approved: Literal[False] = False
     external_provider_calls: Literal[0] = 0

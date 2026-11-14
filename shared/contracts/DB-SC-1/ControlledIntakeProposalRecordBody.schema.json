@@ -255,6 +255,46 @@
       "title": "FieldDiagnostic",
       "type": "object"
     },
+    "IntakeInputContext": {
+      "additionalProperties": false,
+      "description": "Server-captured workspace heads; null also identifies an exact state.",
+      "properties": {
+        "current_dataset_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Dataset Id"
+        },
+        "current_problem_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Problem Id"
+        }
+      },
+      "required": [
+        "current_dataset_id",
+        "current_problem_id"
+      ],
+      "title": "IntakeInputContext",
+      "type": "object"
+    },
     "SourceAssetMetadata": {
       "additionalProperties": false,
       "properties": {
@@ -486,6 +526,17 @@
     },
     "provenance": {
       "$ref": "#/$defs/ControlledIntakeProvenance"
+    },
+    "input_context": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IntakeInputContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "review_state": {
       "const": "unaccepted",
