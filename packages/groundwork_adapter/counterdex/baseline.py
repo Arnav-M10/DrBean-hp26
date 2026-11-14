@@ -16,14 +16,14 @@ from .resource import ExecutionContext
 BASELINE_PROFILE = "groundwork.baseline-bundle.v1"
 
 
-def conclusion(results: list[dict], *, stopped: str | None = None, review: bool = False) -> dict:
+def conclusion(results: list[dict], *, stopped: str | None = None, review: bool = False, unresolved: bool = False) -> dict:
     """Derive the narrow claim from fresh individual results, never stored flags."""
     valid = [item for item in results if item["verification"] == "valid"]
     outside = [item for item in valid if item["is_counterexample"]]
     return {
-        "scientific_outcome": "certified_counterexample" if outside else "inconclusive" if stopped or review else "no_counterexample_found",
+        "scientific_outcome": "certified_counterexample" if outside else "inconclusive" if stopped or review or unresolved else "no_counterexample_found",
         "reason_code": "compatible_outside_witness" if outside else stopped or (
-            "selected_candidates_checked" if review else "bounded_search_no_outside_witness"),
+            "selected_candidates_checked" if review else "candidate_checks_inconclusive" if unresolved else "bounded_search_no_outside_witness"),
         "pair_available": len(valid) == 2 and len(results) == 2,
         "compatible_candidate_ids": [item["candidate_id"] for item in valid],
         "counterexample_ids": [item["candidate_id"] for item in outside],
@@ -102,7 +102,8 @@ def create_baseline(problem_payload: dict, *, expected_problem_digest: str, scen
         failure, certificate, checked = stop, None, None
     if checked is None:
         selected = []
-    outcome = conclusion(checked["candidate_results"] if checked else [], stopped=failure, review=review)
+    outcome = conclusion(checked["candidate_results"] if checked else [], stopped=failure, review=review,
+                         unresolved=any(trial["verification"] == "inconclusive" for trial in trials))
     body = {"schema_version": BASELINE_PROFILE, "operation": "fixed_candidate_review" if review else "bounded_discovery",
         "problem": problem.to_payload(), "scenario_id": scenario, "workflow": flow,
         "implementation": identity, "limits": {"wall_seconds": policy.wall_seconds, "max_bundle_bytes": maximum},

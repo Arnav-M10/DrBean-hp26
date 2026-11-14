@@ -86,11 +86,12 @@ def replay_baseline(data: bytes, *, expected_problem_digest: str, expected_basel
     elif not isinstance(b["search"], dict) or b["search"].get("problem_digest") != problem.digest:
         raise AdapterError("wrong_specification_binding", "Search diagnostics belong to another problem.")
     from .baseline import conclusion
+    unresolved = any(trial["verification"] == "inconclusive" for trial in b["exact_trials"])
     if b["certificate"] is None:
-        if b["candidates"] or report["checked"] is not None or report["outcome"] != conclusion([], stopped=failure, review=review):
+        if b["candidates"] or report["checked"] is not None or report["outcome"] != conclusion([], stopped=failure, review=review, unresolved=unresolved):
             raise AdapterError("recorded_result_mismatch", "No certificate can support a checked historical claim.")
         return {"replay": "unsupported", "integrity": "passed", "verification": "not_checked",
-                "expected_binding": "matches", "reason_code": failure or "no_selected_evidence",
+                "expected_binding": "matches", "reason_code": failure or ("candidate_checks_inconclusive" if unresolved else "no_selected_evidence"),
                 "baseline_digest": digest, "candidate_results": [], "outcome": report["outcome"],
                 "search_replayed": False}
     if failure is not None:
@@ -102,7 +103,7 @@ def replay_baseline(data: bytes, *, expected_problem_digest: str, expected_basel
                                             max_bytes=min(maximum, 2 * 1024 * 1024))
     if checked != report["checked"]:
         raise AdapterError("recorded_result_mismatch", "Fresh historical computation differs from recorded results.")
-    outcome = conclusion(checked["candidate_results"], review=review)
+    outcome = conclusion(checked["candidate_results"], review=review, unresolved=unresolved)
     if report["outcome"] != outcome:
         raise AdapterError("recorded_result_mismatch", "Stored outcome differs from fresh candidate checks.")
     return {"replay": "passed", "integrity": "passed", "verification": "valid", "expected_binding": "matches",

@@ -10,6 +10,7 @@ import sys
 import unittest
 from unittest.mock import patch
 
+import counterdex
 from counterdex.baseline import create_baseline
 from counterdex.errors import AdapterError
 from counterdex.exact import artifact_digest, canonical_bytes, semantic_digest, strict_json_loads
@@ -106,6 +107,28 @@ class BaselineEvidenceTests(unittest.TestCase):
         self.assertEqual(replay["integrity"], "passed")
         self.assertEqual(replay["verification"], "not_checked")
 
+    def test_unresolved_exact_checks_remain_distinct_from_no_candidate_found(self):
+        payload = self.problem.to_payload()
+        # Numerically near one hour and within source scalar limits, but its
+        # exact denominator exceeds the fixed analytic checker's 256-bit cap.
+        payload["observations"][1]["time"] = f"{2**300 + 1}/{2**300}"
+        problem = normalize_problem(payload)
+        packet = self.create(problem)
+        bundle = strict_json_loads(packet)
+        self.assertGreater(bundle["search"]["feasible_count"], 0)
+        self.assertTrue(bundle["exact_trials"])
+        self.assertTrue(all(trial["verification"] == "inconclusive" and trial["reason_code"] == "construction_range"
+                            for trial in bundle["exact_trials"]))
+        self.assertEqual(bundle["report"]["execution"], "completed")
+        self.assertIsNone(bundle["report"]["failure_reason"])
+        self.assertEqual(bundle["report"]["outcome"]["scientific_outcome"], "inconclusive")
+        self.assertEqual(bundle["report"]["outcome"]["reason_code"], "candidate_checks_inconclusive")
+        self.assertIsNone(bundle["certificate"])
+        fresh = self.replay(packet, problem=problem)
+        self.assertEqual(fresh["verification"], "not_checked")
+        self.assertEqual(fresh["outcome"]["scientific_outcome"], "inconclusive")
+        self.assertEqual(fresh["outcome"]["reason_code"], "candidate_checks_inconclusive")
+
     def test_single_candidate_budget_keeps_one_native_witness_and_disables_pair(self):
         settings = dict(self.settings, max_candidates=1)
         packet = self.create(settings=settings)
@@ -143,6 +166,14 @@ class BaselineEvidenceTests(unittest.TestCase):
         self.assertEqual(replay["verification"], "not_checked")
         self.assertEqual(replay["reason_code"], "cancelled")
         self.assert_code("cancelled", self.replay, context=ExecutionContext(cancelled=lambda: True))
+
+    def test_invalid_execution_context_is_not_replaced_by_a_fresh_budget(self):
+        unverified = self.create(context=ExecutionContext(cancelled=lambda: True))
+        for context in (False, {}, [], object()):
+            with self.subTest(context=type(context).__name__):
+                self.assert_code("invalid_input", self.create, context=context)
+                self.assert_code("invalid_input", self.replay, context=context)
+                self.assert_code("invalid_input", self.replay, unverified, context=context)
 
     def test_independent_problem_scenario_and_complete_bundle_anchors(self):
         self.assert_code("artifact_mismatch", self.replay, digest="0" * 64)
@@ -225,8 +256,8 @@ class BaselineEvidenceTests(unittest.TestCase):
             self.assertEqual(self.replay()["replay"], "passed")
 
     def test_fresh_process_replay_does_not_import_numerical_producers(self):
-        package_root = Path(__file__).resolve().parents[1]
-        env = dict(os.environ, PYTHONPATH=str(package_root))
+        package_root = Path(counterdex.__file__).resolve().parent.parent
+        env = {"PATH": os.defpath, "PYTHONPATH": str(package_root)}
         script = """
 import json
 import sys
@@ -242,7 +273,7 @@ assert 'counterdex.numerical' not in sys.modules
 print(result['replay'])
 """
         completed = subprocess.run([sys.executable, "-c", script], input=self.packet, env=env,
-                                   capture_output=True, timeout=15, check=False)
+                                   cwd="/tmp", capture_output=True, timeout=15, check=False)
         self.assertEqual(completed.returncode, 0, completed.stderr.decode())
         self.assertEqual(completed.stdout, b"passed\n")
 
