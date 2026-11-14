@@ -8,7 +8,7 @@ Nothing here has been published, posted or submitted. Publication, enrolment and
 
 **One line:** Dr. Bean helps a researcher see what their measurements actually constrain and choose a defensible next measurement, with a person reviewing every value and approving every computation.
 
-**Main track (one only):** Science and Discovery (proposed; team to confirm). Overall consideration is automatic; a main-track winner cannot also win Best Overall.
+**Main track (one only):** Science and Discovery (confirmed by the team, 14 November). Overall consideration is automatic; a main-track winner cannot also win Best Overall.
 
 **Team (at most four people; the coding workstreams are not entrants):** [name 1, Discord username] · [name 2, Discord username] · [name 3, Discord username] · [name 4, Discord username]. Rookie eligibility: [per organizer definition].
 
@@ -41,7 +41,7 @@ No judging weights, required models or win probabilities are known or claimed. O
 | Gemini | Production adapter in code, disabled; controlled-model tests of intake, constraints and the tool graph; zero provider requests, verified | A later authorized live run. Until then the entry says "integration prepared, not exercised". |
 | Amazon Practical AI (creativity, usefulness, technical implementation, user experience, equally weighted; no AWS required) | Technical: exact inputs, explicit approval, idempotent runs, restart recovery, one-command launch | A complete useful decision (G1, G2); observed user feedback; the minimal readable flow |
 | LangChain | Installed real deepagents graph with a bounded tool inventory, tested with a controlled model | Real scientific tools behind it (G1); Gemini-driven adaptive behaviour remains untested |
-| Science and Discovery (proposed main track) | Engine standalone: exact fixed-pair check and native replay on a synthetic example | Real counterexample, pair-specific measurement, follow-up and replay through the application |
+| Science and Discovery (main track, confirmed) | Engine standalone: exact fixed-pair check and native replay on a synthetic example | Real counterexample, pair-specific measurement, follow-up and replay through the application |
 | Peri | none | A genuine event-time consultation with a qualifying organization, with permitted evidence |
 | Overall / Rookie | n/a | Actual roster and eligibility per the organizers |
 

@@ -135,7 +135,7 @@ Entries I-001 to I-010 were opened before the backend and engine were merged. Th
 - Gemini account: key, paid or unpaid tier, region and audience eligibility, pinned model, spending allowance: pending. No cohort is open, so the harness refuses live lanes.
 - Team names and Discord usernames for the submission: pending.
 - Peri consultation with a qualifying organization: not held.
-- Main track confirmation (Science and Discovery proposed) and Rookie eligibility: pending.
+- Main track: Science and Discovery, confirmed by the team on 14 November. Rookie eligibility: pending.
 
 ## I-010: conditional objective for C08 and C09 (Owner 02)
 
