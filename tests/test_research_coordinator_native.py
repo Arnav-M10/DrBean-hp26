@@ -107,7 +107,7 @@ class NativeSciencePorts:
         assert name in TOOLS and len(self.admitted_tools) < 6
         self.admitted_tools.append(name)
 
-    def record_plan(self, todos, plan_digest):
+    def record_plan(self, todos, plan_digest, evidence=None):
         assert plan_digest == hashlib.sha256(canonical_bytes(todos)).hexdigest()
         self.plans.append(deepcopy(todos))
 
