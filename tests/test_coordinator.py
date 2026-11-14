@@ -55,7 +55,7 @@ class EvidenceModel(BaseChatModel):
         else:
             last = json.loads(observed[-1].content)
             if self.mode == "loop":
-                name, args = "read_scoped_evidence", {"evidence_id": "evidence-baseline"}
+                name, args = "read_scoped_evidence", {"evidence_id": last["id"]}
             elif len(observed) == 1 and optional and last["scientific_outcome"] == "no_counterexample_found":
                 name, args = "execute_approved_scenario", {"scenario_id": "optional"}
             elif len(observed) == 1 and optional and self.mode != "omit_optional":
@@ -744,33 +744,34 @@ def test_scoped_read_cannot_rewrite_facts_under_an_existing_evidence_identity(ch
     assert result.explanation is None
 
 
-def test_controlled_graph_runs_http_approved_counterdex_and_replays_bound_native_bytes(scientific_client):
-    """Controlled orchestration with real science, never live Gemini reasoning."""
-    import base64
-    import hashlib
-
+def _approved_real_agent_run(client, model, *, optional=False, provider_turns=4):
+    """Create actual inputs, approval and a queued run through ordinary HTTP."""
     from bean_api.contracts import PlanBody
-    from bean_api.main import PREFIX
     from bean_api.worker import Worker
     from test_counterdex_adapter import reviewed_history
     from test_scientific_http import post
 
-    client, history = scientific_client, reviewed_history()
+    history = reviewed_history()
     workspace = post(client, "/workspaces", {"name": "Controlled agent real-science acceptance"}, "workspace")["id"]
     dataset = post(client, f"/workspaces/{workspace}/datasets", history["dataset"]["body"], "dataset")
     problem = post(client, f"/workspaces/{workspace}/problems", {
         **history["problem"]["body"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]}, "problem")
-    model = EvidenceModel()
     disclosure = {"provider": "gemini", "model": model.model_name,
                   "source_asset_ids": [], "context_fields": ["problem", "dataset"]}
     consent = post(client, f"/workspaces/{workspace}/provider-consents", {
         **disclosure, "problem_id": problem["id"], "accepted": True}, "controlled-consent")
+    scenarios = [{"id": "baseline", "kind": "baseline", "label": "Real bounded discovery",
+                  "problem_id": problem["id"], "problem_digest": problem["digest"]}]
+    if optional:
+        scenarios.append({"id": "optional", "kind": "optional", "label": "Separately listed optional comparison",
+                          "problem_id": problem["id"], "problem_digest": problem["digest"],
+                          "purpose": "An explicitly reviewed repeat comparison after checked baseline evidence.",
+                          "eligible_baseline_outcomes": ["certified_counterexample"]})
     body = PlanBody(problem_id=problem["id"], problem_digest=problem["digest"], dataset_id=dataset["id"],
         scientific_profile="counterdex.v1", objective={
             "question": "Which checked outside witness remains compatible with the reviewed synthetic data?",
             "success_criterion": "Retain real native evidence with controlled commentary and zero provider dispatch."},
-        scenarios=[{"id": "baseline", "kind": "baseline", "label": "Real bounded discovery",
-                    "problem_id": problem["id"], "problem_digest": problem["digest"]}],
+        scenarios=scenarios, budget={"provider_turns": provider_turns},
         provider_disclosure={**disclosure, "permission_id": consent["id"]}).model_dump(mode="json")
     plan = post(client, f"/workspaces/{workspace}/plans", {
         "expected_current_revision_id": problem["id"], "plan": body}, "plan")
@@ -783,6 +784,19 @@ def test_controlled_graph_runs_http_approved_counterdex_and_replays_bound_native
                             account_gate_passed=True, account_decision_id="controlled-local-test-policy")
     worker = Worker(client.app.state.workflow, settings=client.app.state.settings,
                     adapter=client.app.state.adapter, provider_config=config, controlled_model=model)
+    return workspace, dataset, problem, plan, approval, run, worker
+
+
+def test_controlled_graph_runs_http_approved_counterdex_and_replays_bound_native_bytes(scientific_client):
+    """Controlled orchestration with real science, never live Gemini reasoning."""
+    import base64
+    import hashlib
+
+    from bean_api.main import PREFIX
+    from test_scientific_http import post
+
+    client = scientific_client
+    workspace, dataset, problem, plan, approval, run, worker = _approved_real_agent_run(client, EvidenceModel())
     assert worker.tick() == 1
     finished = client.get(PREFIX + f"/runs/{run['id']}").json()
     assert finished["state"] == "completed", finished
@@ -841,3 +855,56 @@ def test_controlled_graph_runs_http_approved_counterdex_and_replays_bound_native
     assert any("synthetic examples" in text for text in response["critical_statements"])
     assert client.get(PREFIX + f"/workspaces/{workspace}/provider-attempts").json() == []
     assert worker.tick() == 0
+
+
+def test_real_baseline_survives_exhausted_assistance_with_optional_work_unresolved(scientific_client):
+    """Budget failure preserves real discovery/checking and its portable evidence."""
+    import hashlib
+
+    from bean_api.main import PREFIX
+    from test_scientific_http import post
+
+    client = scientific_client
+    workspace, dataset, problem, plan, approval, run, worker = _approved_real_agent_run(
+        client, EvidenceModel(mode="loop"), optional=True, provider_turns=2)
+    assert worker.tick() == 1
+    finished = client.get(PREFIX + f"/runs/{run['id']}").json()
+    assert finished["state"] == "failed" and finished["error_code"] == "agent_model_budget_exhausted", finished
+    assert finished["provider_turns"] == 2 and finished["scientific_reservations"] == 1
+    scenario, = finished["scenarios"]
+    assert scenario["scenario_id"] == "baseline" and scenario["state"] == "completed"
+    evidence_record = client.get(PREFIX + f"/records/{scenario['result_id']}").json()
+    evidence = evidence_record["body"]["result"]
+    assert evidence_record["body"]["run_id"] == run["id"]
+    assert evidence["scientific_outcome"] == "certified_counterexample"
+    assert evidence["verification"] == "valid" and evidence["expected_binding"] == "matches"
+    assert evidence["replay"] == "passed" and evidence["baseline_search"]["attempted_count"] > 0
+    summary = client.get(PREFIX + f"/records/{finished['result_id']}").json()["body"]
+    assert summary["status"] == "failed" and summary["explanation"] is None
+    baseline, optional = summary["scenario_observations"]
+    assert baseline == {"scenario_id": "baseline", "observation_scope": "coordinator_invocation",
+                        "disposition": "completed", "evidence_id": evidence_record["id"], "reason_code": None}
+    assert optional == {"scenario_id": "optional", "observation_scope": "coordinator_invocation",
+                        "disposition": "unresolved", "evidence_id": None, "reason_code": "agent_model_budget_exhausted"}
+    assert len(summary["evidence"]) == 1 and summary["evidence"][0]["id"] == evidence_record["id"]
+    reference, = evidence["artifacts"]
+    downloaded = client.get(PREFIX + f"/artifacts/{reference['id']}")
+    assert downloaded.status_code == 200
+    assert hashlib.sha256(downloaded.content).hexdigest() == reference["sha256"]
+    anchors = client.get(PREFIX + f"/artifacts/{reference['id']}/anchor?download=true").json()
+    assert anchors["run_id"] == run["id"] and anchors["scenario_id"] == "baseline"
+    assert anchors["dataset_digest"] == dataset["digest"] and anchors["problem_digest"] == problem["digest"]
+    replay = client.app.state.adapter.replay_native(downloaded.content, expected=anchors)
+    assert replay["integrity"] == replay["replay"] == "passed", replay
+    assert replay["verification"] == "valid" and replay["expected_binding"] == "matches"
+    assert replay["search_replayed"] is False
+    assert {row["candidate_id"] for row in replay["candidate_results"]} == {row["id"] for row in evidence["candidates"]}
+    assert post(client, f"/plans/{plan['id']}/runs", {
+        "approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "retry-failed-assistance")["id"] == run["id"]
+    assert worker.tick() == 0
+    assert client.get(PREFIX + f"/runs/{run['id']}").json() == finished
+    assert client.get(PREFIX + f"/records/{evidence_record['id']}").json() == evidence_record
+    assert client.get(PREFIX + f"/artifacts/{reference['id']}").content == downloaded.content
+    assert len(client.get(PREFIX + f"/workspaces/{workspace}/records?kind=evidence").json()) == 1
+    assert len(client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json()) == 2
+    assert client.get(PREFIX + f"/workspaces/{workspace}/provider-attempts").json() == []
