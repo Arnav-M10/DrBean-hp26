@@ -58,6 +58,8 @@ Application code commit `070b697`, observed with harness `c6307df` on macOS 26.7
 | H-REPLAY-CLASS-RECORDED-MISMATCH | P3 | C (harness) | retested | The engine-control replay classifier called a recorded-result mismatch a scientific exclusion when the fresh verdict was itself an exclusion |
 | F-UPLOAD-LIMIT-MESSAGE | P3 | B (upload boundary and general-file admission) | open | An oversized research upload is refused with a generic message that names neither the size limit nor the other limits the file exceeds |
 | F-CI-BROWSER-CHECK-INTERMITTENT | P3 | B (apps/web/check-backend.mjs and CI wiring) | fixed_pending_retest | B's real-browser check timed out once on an unchanged application tree: the 'Accept preview and prepare investigation plan' button did not appear within 30 s |
+| F-RESEARCH-WORKER-UNGUARDED | P2 | B (worker loop and ResearchRunner) | open | An exception outside ResearchRunner's handled types escapes Worker.tick; the unguarded worker loop then exits, and the research action stays 'running' with no error recorded |
+| F-RESEARCH-PLAN-PROGRESS-PENDING | P3 | B (plan projection) with A (planning tool output) | open | After a completed investigation every maintained plan step is shown as pending, including steps the agent marked completed |
 
 ## F-ORPHAN-WORKER-KILL (P0, owner 2, retested)
 
@@ -538,6 +540,22 @@ Application code commit `070b697`, observed with harness `c6307df` on macOS 26.7
 - **Observed:** locator.click: Timeout 30000ms exceeded while waiting for getByRole('button', { name: 'Accept preview and prepare investigation plan', exact: true }) at apps/web/check-backend.mjs:156. The same application tree passed in the other 6 runs: d6d2792 push, be3d18d push and PR, 8580d3e push and PR, and main 299a356 push. That is 1 failure in 7 runs. It also passed locally on bb503a7. The cause is not determined, because no screenshot or page state is captured on failure.
 - **Evidence:** {"failed_run": "43599924443 job 132462300488", "passing_runs_same_application_tree": ["43599921100", "43600308045", "43600313049", "43598913026", "43598918655", "43594992900"]}
 - **Retest at main 070b697:** B added a deterministic wait (button enabled or backend error visible) and failure diagnostics (screenshot, visible status text, last API response, credential redacted) to apps/web/check-backend.mjs. Main's merge CI browser job passed. C closes this after consecutive passing runs on the final merge. (evidence: {})
+
+## F-RESEARCH-WORKER-UNGUARDED (P2, owner B (worker loop and ResearchRunner), open)
+
+- **Input:** after an approved child completes, the coordinator's model raises RuntimeError (any type other than DomainError, CoordinatorFailure, ProviderFailure, LedgerBudgetExceeded, TimeoutError, ValueError, ImportError)
+- **Command:** `in-process create_app + ordinary Worker on A's PR #44 39930b8 (main 070b697 + factory); bean_api.research_controlled.build_controlled_research_model patched to a test double`
+- **Expected:** the action fails or is marked for reconciliation with an error code, and the worker keeps serving other jobs; the completed child evidence is kept
+- **Observed:** Worker.tick raises RuntimeError. Every later tick shows the session and action 'running' with error_code null and nothing executing. worker.main() runs 'while True: worker.tick()' without a guard, so in the launched process the same exception would end the worker and stop all queued science until a restart; the process exit follows from code inspection and was not run. The completed child and its evidence are kept. A ProviderFailure, which is what the metered gateway raises, is handled correctly: the action fails with provider_request_failed_unknown_outcome.
+- **Evidence:** {"reproducer": "C scratch probe at overlay 39ab35f (A 39930b8 + C db7098b); demo check DEMO-09 uses the handled ProviderFailure path"}
+
+## F-RESEARCH-PLAN-PROGRESS-PENDING (P3, owner B (plan projection) with A (planning tool output), open)
+
+- **Input:** any controlled research session that completes with a report (witness or no-witness case)
+- **Command:** `tests/integration/test_langchain_demo.py and langchain_demo_browser.mjs on A's PR #44 39930b8`
+- **Expected:** the plan shows progress honestly: steps with linked completed evidence can show completed; others stay proposals
+- **Observed:** A's policy rewrites its todos with the first two steps 'completed' and the evidence-dependent next step 'pending', but the projected research-plan.v1 shows all three as 'pending' while the session is 'completed' with a report
+- **Evidence:** {}
 
 ## Check-level finding ids (raised only when the check fails)
 
