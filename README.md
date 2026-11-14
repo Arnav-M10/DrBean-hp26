@@ -2,7 +2,7 @@
 
 An authenticated research-workflow API implementing the **GF-2 operational policy** and **DB-SC-1 application contracts** from the backend work order. It preserves exact reviewed inputs, immutable research history, separate provider permission and scientific approval, durable reservations, and honest evidence states.
 
-This repository started empty. This contribution implements Owner02's backend boundary; it does not contain the Groundwork scientific engine or the researcher frontend. The API runs without Gemini credentials. Its default scientific adapter returns `unsupported`; it cannot issue a scientific certificate. Gemini and real deepagents adapters are implemented and tested with explicitly controlled transports/models, but no live Gemini request has been made or qualified here.
+This repository combines Owner02's backend with the researcher draft workspace under `apps/web`. The web workspace currently runs independently and is not yet connected to the backend approval/run routes. The Groundwork scientific engine is not included. The API runs without Gemini credentials. Its default scientific adapter returns `unsupported`; it cannot issue a scientific certificate. Gemini and real deepagents adapters are implemented and tested with explicitly controlled transports/models, but no live Gemini request has been made or qualified here.
 
 ## Start locally
 
@@ -21,6 +21,8 @@ uv run python -m bean_api.worker
 ```
 
 The API documentation is at `http://127.0.0.1:8000/docs`; capabilities are at `/api/bean/v1/capabilities`. The bootstrap creates a private, ignored `var/auth.json`. Read its local researcher bearer token locally and use the documentation's **Authorize** control or an `Authorization: Bearer …` header. Tokens never belong in URLs, examples, source control, or browser bundles. There is no unauthenticated mutation mode. Auth uses bearer headers; the API does not issue cookies and does not enable cross-origin browser access. Keep this local lane on loopback.
+
+To run the separate researcher draft preview, use `node apps/web/serve.mjs` and open `http://127.0.0.1:4173`. See [the web workspace instructions](apps/web/README.md) for its current scope. Run its tests with `npm --prefix apps/web test`.
 
 `uv` cache location can be set to a writable directory if needed, for example `UV_CACHE_DIR=/workspace/.uv-cache uv sync --locked`. Environment examples are in `.env.example`; export the variables in the server shell. The app does not automatically load `.env`.
 
