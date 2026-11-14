@@ -1,6 +1,7 @@
 {
   "evidence_commits": [
-    "d6503da24c302b52ec2a831fe77bc74a6e62ff18"
+    "30ab5f8f2487b3cc8627c7e798a0d3bf1aa4d3cb",
+    "c0e6995070d1f7da73eb8b71d9895a915b4c3396"
   ],
   "evidence_only_paths": [
     "evaluation/results/",
@@ -21,51 +22,51 @@
       "description": "actual HTTP -> science -> separate design -> raw download -> fresh native replay",
       "entries": {
         "RS-HERO-FULL": {
-          "attempt_id": "att_866e469362da42be",
-          "reason": "failed: baseline_completed_with_evidence",
-          "status": "failed"
+          "attempt_id": "att_b9610a6030064d38",
+          "reason": "",
+          "status": "passed"
         }
       },
       "gate": "real_science_http",
-      "status": "failed"
+      "status": "passed"
     },
     {
       "description": "duplicate starts, design authority, cancellation/restart, changed input, follow-up",
       "entries": {
         "RS-CANCEL-RESTART": {
-          "attempt_id": "att_9602d602a3f24550",
-          "reason": "blocked: no_orphan_after_cancel (prerequisite): no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for example; no_orphan_after_worker_kill (prerequisite): the run reached failed before the worker was killed, so there was no in-flight work to interrupt; interrupted_not_redispatched (prerequisite): the run reached failed before the worker wa",
-          "status": "blocked"
+          "attempt_id": "att_a114e020f44547b2",
+          "reason": "",
+          "status": "passed"
         },
         "RS-CHANGED-INPUT": {
-          "attempt_id": "att_08dea46e6a694a72",
-          "reason": "failed: baseline_completed_with_evidence",
-          "status": "failed"
+          "attempt_id": "att_8d00d7e4b47345e3",
+          "reason": "",
+          "status": "passed"
         },
         "RS-DESIGN-AUTHORITY": {
-          "attempt_id": "att_c75dc53c4c3447ba",
-          "reason": "blocked: baseline_approval_cannot_start_design (F-HERO-NO-PAIR): needs a completed baseline with two candidates (see hero entry)",
-          "status": "blocked"
+          "attempt_id": "att_4af16c5b1d674909",
+          "reason": "",
+          "status": "passed"
         },
         "RS-FOLLOWUP": {
-          "attempt_id": "att_e9ba83b68310408b",
-          "reason": "blocked: followup_prerequisites (F-HERO-NO-PAIR): needs the hero baseline run",
-          "status": "blocked"
+          "attempt_id": "att_33baea51713b4574",
+          "reason": "",
+          "status": "passed"
         },
         "RS-RETRY-CONCURRENT": {
-          "attempt_id": "att_a1f778c413974597",
+          "attempt_id": "att_81f61f8cdfe34b7b",
           "reason": "",
           "status": "passed"
         }
       },
       "gate": "essential_negative_controls_http",
-      "status": "failed"
+      "status": "passed"
     },
     {
       "description": "guard active in API and worker; zero external model attempts in the lane",
       "entries": {
         "RS-ZERO-DISPATCH": {
-          "attempt_id": "att_5354ba66334244bf",
+          "attempt_id": "att_a9fe6565cf2943a1",
           "reason": "",
           "status": "passed"
         }
@@ -84,24 +85,20 @@
       "description": "image decoder and scientific worker subprocesses work on this host through the real stack",
       "gate": "supported_machine_subprocesses",
       "observed": {
-        "baseline_completed_with_evidence": "failed",
+        "baseline_completed_with_evidence": "passed",
         "runtime": {
           "machine": "arm64",
           "system": "Darwin"
         },
         "source_image_admitted": "passed"
       },
-      "status": "failed"
+      "status": "passed"
     },
     {
       "description": "evaluation/findings.json lists no open P0",
       "gate": "no_unresolved_p0",
-      "open_p0": [
-        "F-ORPHAN-WORKER-KILL",
-        "F-MAC-NPROC",
-        "F-RESTART-EPERM"
-      ],
-      "status": "failed"
+      "open_p0": [],
+      "status": "passed"
     },
     {
       "description": "NOT a current acceptance gate. Live lanes are disabled; activation needs a new explicit user instruction. Placeholder runs are not Gemini evidence.",
@@ -110,9 +107,9 @@
       "status": "not_run"
     }
   ],
-  "overall": "failed",
+  "overall": "passed",
   "schema": "drbean-release-gates/v1",
   "statement": "Gates read recorded evidence only; they dispatch no provider or scientific work.",
-  "tested_commit": "d6503da24c302b52ec2a831fe77bc74a6e62ff18",
+  "tested_commit": "c0e6995070d1f7da73eb8b71d9895a915b4c3396",
   "worktree_dirty": false
 }

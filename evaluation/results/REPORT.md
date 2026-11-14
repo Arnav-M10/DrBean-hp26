@@ -4,7 +4,7 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 
 - Manifest version 3 (ancestry: v1, v2), contract GF-2 / DB-SC-1
 - Holdouts: prepared and sealed by digest; not used for prompt tuning; ungraded
-- Attempts recorded: 112; history verification: OK
+- Attempts recorded: 119; history verification: OK
 - Live activation: disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared accounted allocation, Owner 3's operator path and independent grading of predeclared cases. The CLI has no switch for it.
 
 ## Lanes
@@ -15,13 +15,13 @@ Generated from `attempts.jsonl` (append-only, hash-chained since harness 0.2.0).
 | live_intake | 1 | NOT_RUN (disabled) | live | any | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | live_agent_controlled_tools | 1 | NOT_RUN (disabled) | live | controlled | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |
 | actual_full_stack | 1 | NOT_RUN (disabled) | live | real | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
-| offline_real_science | 1 | yes | none/controlled | real | 7 | 78 | 34 | 21 | 23 | 0 | 0 | 0 | 0 | 0 |
+| offline_real_science | 1 | yes | none/controlled | real | 7 | 85 | 41 | 21 | 23 | 0 | 0 | 0 | 0 | 0 |
 
 Records with manifest_version 1 / harness 0.1.0 are the pre-merge inventory: 34 entries recorded before the backend and science package were merged, all `unrun` with a stale reason. They are kept byte-for-byte and interpreted as written, never relabelled as current results.
 
 Evidence classes: `executed_acceptance` (the runner executed the subject against a stack it launched and re-verified the evidence), `imported_claim` (recorded observations; never qualification).
 
-Evidence class counts (harness >= 0.2.0): executed_acceptance: 78.
+Evidence class counts (harness >= 0.2.0): executed_acceptance: 85.
 
 ## Latest attempt per scheduled entry
 
@@ -61,25 +61,25 @@ Evidence class counts (harness >= 0.2.0): executed_acceptance: 78.
 | live_intake | C01-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live1 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
 | live_intake | C04-A-live2 | unrun | e21c1670e0 | False | no human-authorized provider cohort is open in the shared budget ledger; live requests are not permitted |
-| offline_real_science | RS-CANCEL-RESTART | passed | 159fd65303 | False |  |
-| offline_real_science | RS-CHANGED-INPUT | passed | 159fd65303 | False |  |
-| offline_real_science | RS-DESIGN-AUTHORITY | passed | 159fd65303 | False |  |
-| offline_real_science | RS-FOLLOWUP | passed | 159fd65303 | False |  |
-| offline_real_science | RS-HERO-FULL | passed | 159fd65303 | False |  |
-| offline_real_science | RS-RETRY-CONCURRENT | passed | 159fd65303 | False |  |
-| offline_real_science | RS-ZERO-DISPATCH | passed | 159fd65303 | False |  |
+| offline_real_science | RS-CANCEL-RESTART | passed | 30ab5f8f24 | False |  |
+| offline_real_science | RS-CHANGED-INPUT | passed | 30ab5f8f24 | False |  |
+| offline_real_science | RS-DESIGN-AUTHORITY | passed | 30ab5f8f24 | False |  |
+| offline_real_science | RS-FOLLOWUP | passed | 30ab5f8f24 | False |  |
+| offline_real_science | RS-HERO-FULL | passed | 30ab5f8f24 | False |  |
+| offline_real_science | RS-RETRY-CONCURRENT | passed | 30ab5f8f24 | False |  |
+| offline_real_science | RS-ZERO-DISPATCH | passed | 30ab5f8f24 | False |  |
 
 ## Scientific jobs and external model requests (separate counts)
 
-- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 91. This accumulated count spans historical attempts; see each attempt for its scientific outcome and the latest-entry table for current results.
-- External model requests: verified zero by the egress guard in 78 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
+- Distinct scientific jobs started through the real API (deduplicated by job id across attempts): 109. This accumulated count spans historical attempts; see each attempt for its scientific outcome and the latest-entry table for current results.
+- External model requests: verified zero by the egress guard in 85 attempt(s); unknown in 0 attempt(s); legacy records reporting requests: 0. Verified zero means zero actual model requests and zero model usage in that run, not 'unknown'.
 - Synthetic budget-ledger reservations in unit tests use temporary stores and are not provider charges.
 - Durations are harness wall time on loopback; they are not provider latency.
 - Harness budget ledger: no cohort opened; none may be opened now.
 
 ## Engine-level native controls (latest run; engine public operations, not HTTP)
 
-Commit 159fd65303, interpreter CPython 3.11.17.
+Commit 30ab5f8f24, interpreter CPython 3.11.17.
 
 | Control | Result | Observed |
 |---|---|---|
@@ -106,17 +106,17 @@ Commit 159fd65303, interpreter CPython 3.11.17.
 | followup:4.57 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "compatible", "reference": "excluded"}, "per_candidate": {"outside": "compatible", "refe |
 | followup:4.0 | passed | {"aggregate": "scientific_exclusion", "independent_oracle": {"outside": "excluded", "reference": "excluded"}, "per_candidate": {"outside": "excluded", "referenc |
 
-## Release gates at 526f15a6f4 (overall: failed)
+## Release gates at c0e6995070 (overall: passed)
 
 | Gate | Status |
 |---|---|
 | harness_integrity | passed |
-| real_science_http | blocked |
-| essential_negative_controls_http | blocked |
-| zero_external_model_dispatch | blocked |
-| native_engine_controls | blocked |
-| supported_machine_subprocesses | blocked |
-| no_unresolved_p0 | failed |
+| real_science_http | passed |
+| essential_negative_controls_http | passed |
+| zero_external_model_dispatch | passed |
+| native_engine_controls | passed |
+| supported_machine_subprocesses | passed |
+| no_unresolved_p0 | passed |
 | live_gemini_qualification | not_run |
 
 ## Findings (evaluation/findings.json)
@@ -136,7 +136,7 @@ Commit 159fd65303, interpreter CPython 3.11.17.
 | F-CONTROLLED-PROVENANCE | P1 | 3 | retested | Controlled-model turns are reserved as provider 'gemini' attempts with no placeholder marker |
 | F-REVIEW-MATERIALIZATION | P1 | 2 | fixed_pending_retest | An accepted intake review creates no dataset association (source values never reach execution) |
 | F-RESTART-UNOBSERVABLE | P1 | 2 (after F-PLATFORM-RLIMIT) | retested | Cancellation and worker-restart orphan checks cannot be observed: no sustained scientific computation exists yet |
-| F-LINT-CHECKLIST | P2 | 4 | open | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
+| F-LINT-CHECKLIST | P2 | 4 | retested | Documented lint command fails on scripts/release/checklist.py (unused import drbean_eval.contract) |
 | F-MAC-NPROC | P0 | 2 | retested | On macOS every scientific job fails: RLIMIT_NPROC is per user, so the bounded child cannot spawn CPython 3.11 |
 | F-COORDINATOR-OPTIONAL-STATUS | P2 | 3 | retested | run_coordinator reports completed while a reviewed optional scenario is unaccounted (enforced downstream by the workflow) |
 | F-COORDINATOR-PROVIDER-LABEL | P2 | 3 | retested | Coordinator attempt metadata names provider gemini for controlled-model turns |
@@ -151,13 +151,13 @@ Commit 159fd65303, interpreter CPython 3.11.17.
 | H-HERO-CONTINUATION | P1 | 5 | retested | hero-v1 packet disallowed continuation, contradicting the shared example (construction/continuation through 8 h) |
 | H-PREVIEW-HARNESS | P1 | 5 | retested | Preview found harness defects: for/else dropped downloads, application-bundle replay unsupported, no-op wrong-anchor control, stale follow-up workspace |
 | H-CI-ENGINE | P1 | 5 | retested | Harness on main does not find Owner 4's prepared .venv-engine, so CI's integration suite runs science without an engine |
-| F-LAUNCHER-HIDDEN-PTH | P1 | 4 | open | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
-| F-LAUNCHER-ENV-READ | P2 | 4 | open | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
+| F-LAUNCHER-HIDDEN-PTH | P1 | 4 | retested | One-command launch fails on the team Mac: iCloud Drive hides the dot-named .venv, CPython skips its editable .pth, so bean_api cannot be imported (doctor still reports the backend ready) |
+| F-LAUNCHER-ENV-READ | P2 | 4 | retested | Launcher reads provider credential values while removing them, and its doctor probes inherit the unscrubbed environment |
 | H-ORPHAN-TEARDOWN | P1 | 5 | retested | Harness teardown let an orphaned scientific computation resume and outlive the run |
 | F-EXPLANATION-QUALIFIER | P2 | 3 | open | An overclaim passes the explanation guard whenever any hedge word appears earlier in its clause |
 | F-EXPLANATION-NUMBER-FORMS | P2 | 3 | open | Invented numbers written as '7hrs', '9mg', '0.05-0.09', words or unicode fractions escape exact grounding |
 | F-EXPLANATION-PARAPHRASE | P2 | 3 | open | Paraphrased overclaims in all four forbidden categories pass the phrase-list guard |
-| F-RESTART-EPERM | P0 | 2 | open | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
+| F-RESTART-EPERM | P0 | 2 | retested | PR #14 (unmerged): on macOS the owned-session cleanup raises PermissionError, so every normally finishing scientific job fails and a cancelled job's lifeline guard can outlive it |
 | H-FOLLOWUP-OPERATION | P2 | 5 | retested | Harness hardcoded the follow-up replay operation 'review'; v2 publishes 'recheck' |
 | F-LEDGER-TOTALS | P2 | 2 | fixed_pending_retest | Provider ledger ignores total_tokens larger than input+output+thought tokens, overstating remaining capacity |
 | F-LEDGER-MALFORMED | P2 | 2 | fixed_pending_retest | Provider ledger stores non-integer usage at reconciliation; every later reservation then fails with a TypeError |
@@ -278,3 +278,10 @@ Commit 159fd65303, interpreter CPython 3.11.17.
 | 110 | RS-FOLLOWUP | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 13066.414 |  |
 | 111 | RS-CANCEL-RESTART | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 7244.179 |  |
 | 112 | RS-ZERO-DISPATCH | offline_real_science | 11 | passed | executed_acceptance | 159fd65303 | False | 132.418 |  |
+| 113 | RS-HERO-FULL | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 2261.989 |  |
+| 114 | RS-CHANGED-INPUT | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 2189.287 |  |
+| 115 | RS-RETRY-CONCURRENT | offline_real_science | 13 | passed | executed_acceptance | 30ab5f8f24 | False | 997.879 |  |
+| 116 | RS-DESIGN-AUTHORITY | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 92.046 |  |
+| 117 | RS-FOLLOWUP | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 12948.325 |  |
+| 118 | RS-CANCEL-RESTART | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 7145.2 |  |
+| 119 | RS-ZERO-DISPATCH | offline_real_science | 12 | passed | executed_acceptance | 30ab5f8f24 | False | 99.897 |  |
