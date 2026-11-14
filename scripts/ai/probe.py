@@ -53,6 +53,7 @@ def preflight() -> dict:
 
         class ControlledModel(BaseChatModel):
             model_name: str = "drbean-offline-preflight-v1"
+            mode: str = "adaptive"
 
             @property
             def _llm_type(self):
@@ -65,6 +66,8 @@ def preflight() -> dict:
                 observed = [json.loads(m.content) for m in messages if isinstance(m, ToolMessage)]
                 if not observed:
                     name, args = "execute_approved_scenario", {"scenario_id": "baseline"}
+                elif self.mode == "loop":
+                    name, args = "read_scoped_evidence", {"evidence_id": observed[0]["id"]}
                 elif len(observed) == 1:
                     if observed[0]["scientific_outcome"] == "no_counterexample_found":
                         name, args = "execute_approved_scenario", {"scenario_id": "optional"}
@@ -122,8 +125,27 @@ def preflight() -> dict:
             expected = ["baseline", "optional"] if outcome == "no_counterexample_found" else ["baseline"]
             if executed != expected or skipped != ([] if len(expected) == 2 else ["optional"]):
                 raise RuntimeError("Controlled graph scenario accounting mismatch")
+            observations = result.scenario_observations
+            expected_dispositions = ["completed", "completed" if len(expected) == 2 else "skipped"]
+            if ([item["scenario_id"] for item in observations] != ["baseline", "optional"]
+                    or [item["disposition"] for item in observations] != expected_dispositions
+                    or any(item["observation_scope"] != "coordinator_invocation" for item in observations)):
+                raise RuntimeError("Controlled graph observations are incomplete")
             report["branches"].append({"controlled_outcome": outcome, "executed": executed,
                 "skipped": skipped, "result": asdict(result)})
+        retained_fact = {"id": "retained-baseline", "problem_id": "local-problem",
+                         "scientific_outcome": "inconclusive", "verification": "not_checked",
+                         "expected_binding": "matches", "controlled_tool_result": True}
+        failed = asyncio.run(run_coordinator(config, LocalLedger(), context,
+            CoordinatorScope("interrupted-run", "local-plan", "local-problem", "baseline", ("optional",)),
+            ScopedCallbacks(lambda: None, lambda _: dict(retained_fact), lambda _: dict(retained_fact), lambda *_: None),
+            chat_model=ControlledModel(mode="loop")))
+        if (failed.status != "failed" or failed.error_code != "agent_model_budget_exhausted"
+                or len(failed.evidence) != 1
+                or [item["disposition"] for item in failed.scenario_observations] != ["completed", "unresolved"]):
+            raise RuntimeError("Interrupted assistance did not preserve scenario observations")
+        report["failure_controls"] = [{"expected_failure": "agent_model_budget_exhausted",
+                                       "result": asdict(failed)}]
         report["offline_preflight_passed"] = not attempts
     except Exception as exc:
         # Fixed public code only; dependency exceptions may contain source data.

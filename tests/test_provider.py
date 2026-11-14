@@ -207,6 +207,13 @@ def test_offline_preflight_runs_from_any_directory_and_accounts_for_both_branche
         (["baseline"], ["optional"]), (["baseline", "optional"], [])]
     assert all(b["result"]["runtime"]["tool_inventory"] for b in branches)
     assert all(b["result"]["explanation"]["authorship"] == "controlled_commentary" for b in branches)
+    failure, = report["failure_controls"]
+    assert failure["result"]["error_code"] == "agent_model_budget_exhausted"
+    observed = failure["result"]["scenario_observations"]
+    assert [item["scenario_id"] for item in observed] == ["baseline", "optional"]
+    assert [item["disposition"] for item in observed] == ["completed", "unresolved"]
+    assert observed[0]["evidence_id"] == "retained-baseline"
+    assert observed[1]["reason_code"] == "agent_model_budget_exhausted"
 
 
 def test_known_hosted_factory_is_rejected_before_construction_or_reservation():

@@ -11,7 +11,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from bean_api.coordinator import CoordinatorScope, ScopedCallbacks, run_coordinator
+from bean_api.coordinator import CoordinatorFailure, CoordinatorScope, ScopedCallbacks, run_coordinator
 from bean_api.contracts import GroundedExplanation
 from bean_api.providers import AttemptContext, ProviderConfig
 import test_scientific_http as scientific_http
@@ -129,6 +129,18 @@ def test_actual_framework_changes_next_action_using_returned_evidence(outcome, e
     assert set(model.offered) == {"execute_approved_scenario", "read_scoped_evidence", "record_allowed_skip", "return_grounded_explanation"}
     assert not set(model.offered) & {"execute", "ls", "read_file", "write_file", "task", "web_search"}
     assert harness.events == result.trace
+    observations = result.scenario_observations
+    assert [item["scenario_id"] for item in observations] == ["baseline", "optional"]
+    assert all(item["observation_scope"] == "coordinator_invocation" for item in observations)
+    assert observations[0]["disposition"] == "completed"
+    assert observations[0]["evidence_id"] == "evidence-baseline"
+    if len(expected) == 2:
+        assert observations[1]["disposition"] == "completed"
+        assert observations[1]["evidence_id"] == "evidence-optional"
+    else:
+        assert observations[1]["disposition"] == "skipped"
+        assert observations[1]["evidence_id"] is None
+        assert observations[1]["reason_code"] == "sufficient_evidence"
 
 
 def test_forbidden_model_tool_is_counted_but_never_dispatched():
@@ -152,12 +164,213 @@ def test_model_loop_stops_at_four_attempts_without_losing_evidence():
     assert result.error_code == "agent_model_budget_exhausted"
     assert len(ledger.attempts) == result.model_turns == 4
     assert len(result.evidence) == 1 and harness.executed == ["baseline"]
+    baseline, optional = result.scenario_observations
+    assert baseline["disposition"] == "completed" and baseline["evidence_id"] == "evidence-baseline"
+    assert optional["scenario_id"] == "optional" and optional["disposition"] == "unresolved"
+    assert optional["evidence_id"] is None and optional["reason_code"] == "agent_model_budget_exhausted"
+    terminal = [event for event in result.trace if event["type"] == "invocation_failed"]
+    assert terminal[-1]["scenario_observations"] == result.scenario_observations
 
 
 def test_lower_approved_tool_budget_is_enforced_before_dispatch():
     result, _, harness, _ = run("no_counterexample_found", max_tool_calls=1)
     assert result.error_code == "agent_tool_budget_exhausted"
     assert harness.executed == ["baseline"]
+
+
+async def observed_invocation(harness, model, scope):
+    config = ProviderConfig(api_key="controlled-no-network", model=model.model_name,
+                            account_gate_passed=True, account_decision_id="controlled-test-policy")
+    return await run_coordinator(config, Ledger(), AttemptContext("actor", "workspace", "op", "consent"),
+                                 scope, harness.callbacks(), chat_model=model)
+
+
+def test_callback_failure_keeps_unobserved_science_unresolved_and_retains_completed_baseline():
+    harness = ToolHarness("no_counterexample_found")
+    execute = harness.execute
+
+    async def fail_optional(scenario_id):
+        if scenario_id == "optional":
+            harness.executed.append(scenario_id)
+            raise CoordinatorFailure("controlled_callback_failed")
+        return await execute(scenario_id)
+
+    harness.execute = fail_optional
+    result = asyncio.run(observed_invocation(harness, EvidenceModel(),
+        CoordinatorScope("run", "plan", "problem", "baseline", ("optional",))))
+    assert result.status == "failed" and result.error_code == "controlled_callback_failed"
+    assert [fact["id"] for fact in result.evidence] == ["evidence-baseline"]
+    baseline, optional = result.scenario_observations
+    assert baseline["disposition"] == "completed" and baseline["evidence_id"] == "evidence-baseline"
+    assert optional["disposition"] == "unresolved" and optional["reason_code"] == "controlled_callback_failed"
+    assert optional["observation_scope"] == "coordinator_invocation"
+    assert harness.skipped == []
+
+
+def test_wall_timeout_preserves_baseline_and_marks_unobserved_optional_work_unresolved():
+    class StalledAfterBaseline(EvidenceModel):
+        async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+            if any(isinstance(message, ToolMessage) for message in messages):
+                await asyncio.Event().wait()
+            return self._generate(messages, stop, run_manager, **kwargs)
+
+    harness = ToolHarness("inconclusive")
+    result = asyncio.run(observed_invocation(harness, StalledAfterBaseline(),
+        CoordinatorScope("run", "plan", "problem", "baseline", ("optional",), wall_seconds=1)))
+    assert result.status == "failed" and result.error_code == "agent_wall_budget_exhausted"
+    baseline, optional = result.scenario_observations
+    assert baseline["disposition"] == "completed" and baseline["evidence_id"] == "evidence-baseline"
+    assert optional["disposition"] == "unresolved" and optional["reason_code"] == "agent_wall_budget_exhausted"
+    assert [fact["id"] for fact in result.evidence] == ["evidence-baseline"]
+    terminal, = [event for event in result.trace if event["type"] == "invocation_failed"]
+    assert terminal["scenario_observations"] == result.scenario_observations
+    assert not any(event["type"] == "invocation_cancelled" for event in result.trace)
+
+
+@pytest.mark.parametrize("stop_during", ["model_after_baseline", "baseline_callback"])
+def test_cancellation_reports_observation_scope_without_claiming_scientific_cancellation(stop_during):
+    async def exercise():
+        entered, never_finishes = asyncio.Event(), asyncio.Event()
+        harness = ToolHarness("inconclusive")
+
+        class InterruptedModel(EvidenceModel):
+            async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+                if stop_during == "model_after_baseline" and any(isinstance(m, ToolMessage) for m in messages):
+                    entered.set()
+                    await never_finishes.wait()
+                return self._generate(messages, stop, run_manager, **kwargs)
+
+        if stop_during == "baseline_callback":
+            async def interrupted_callback(scenario_id):
+                harness.executed.append(scenario_id)
+                entered.set()
+                await never_finishes.wait()
+            harness.execute = interrupted_callback
+        task = asyncio.create_task(observed_invocation(harness, InterruptedModel(),
+            CoordinatorScope("run", "plan", "problem", "baseline", ("optional",))))
+        try:
+            async with asyncio.timeout(5):
+                await entered.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+        terminal, = [event for event in harness.events if event["type"] == "invocation_cancelled"]
+        assert terminal["termination"] == "controlled_orchestrator_cancelled"
+        baseline, optional = terminal["scenario_observations"]
+        assert [baseline["scenario_id"], optional["scenario_id"]] == ["baseline", "optional"]
+        assert all(item["observation_scope"] == "coordinator_invocation" for item in (baseline, optional))
+        assert optional["disposition"] == "unresolved"
+        assert optional["reason_code"] == "controlled_orchestrator_cancelled"
+        if stop_during == "model_after_baseline":
+            assert baseline["disposition"] == "completed" and baseline["evidence_id"] == "evidence-baseline"
+            assert "evidence-baseline" in harness.records
+        else:
+            assert baseline["disposition"] == "unresolved" and baseline["evidence_id"] is None
+        assert not any(item["disposition"] in {"failed", "cancelled"} for item in (baseline, optional))
+        assert harness.executed == ["baseline"] and harness.skipped == []
+    asyncio.run(exercise())
+
+
+def test_cancellation_survives_a_failed_cancellation_event_sink(monkeypatch):
+    import bean_api.coordinator as coordinator
+    captured_invocations = []
+    make_graph = coordinator._make_graph
+
+    def capture_invocation(invocation, model):
+        captured_invocations.append(invocation)
+        return make_graph(invocation, model)
+
+    monkeypatch.setattr(coordinator, "_make_graph", capture_invocation)
+
+    async def exercise():
+        entered, never_finishes = asyncio.Event(), asyncio.Event()
+        harness, sink_attempts, model_calls = ToolHarness("inconclusive"), [], []
+
+        class InterruptedModel(EvidenceModel):
+            async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+                model_calls.append(True)
+                if any(isinstance(message, ToolMessage) for message in messages):
+                    entered.set()
+                    await never_finishes.wait()
+                return self._generate(messages, stop, run_manager, **kwargs)
+
+        def failing_sink(event):
+            harness.events.append(event)
+            if event["type"] == "invocation_cancelled":
+                sink_attempts.append(True)
+                raise RuntimeError("private_source_and_token_must_not_escape")
+
+        callbacks = harness.callbacks()
+        callbacks.record_event = failing_sink
+        harness.callbacks = lambda: callbacks
+        task = asyncio.create_task(observed_invocation(harness, InterruptedModel(),
+            CoordinatorScope("run", "plan", "problem", "baseline", ("optional",))))
+        try:
+            async with asyncio.timeout(5):
+                await entered.wait()
+            task.cancel("requested_stop")
+            with pytest.raises(asyncio.CancelledError) as caught:
+                await task
+            assert caught.value.args == ("requested_stop",)
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+        assert sink_attempts == [True] and len(model_calls) == 2
+        assert harness.executed == ["baseline"] and harness.skipped == []
+        assert "evidence-baseline" in harness.records
+        invocation, = captured_invocations
+        terminal, = [event for event in invocation.trace if event["type"] == "invocation_cancelled"]
+        assert terminal["event_persistence"] == "unconfirmed"
+        assert terminal["event_persistence_code"] == "agent_event_sink_failed"
+        baseline, optional = terminal["scenario_observations"]
+        assert baseline["disposition"] == "completed" and baseline["evidence_id"] == "evidence-baseline"
+        assert optional["disposition"] == "unresolved" and optional["reason_code"] == "controlled_orchestrator_cancelled"
+        assert "private_source_and_token" not in json.dumps(invocation.trace)
+    asyncio.run(exercise())
+
+
+def test_event_callback_and_caller_cannot_mutate_retained_scenario_observations():
+    from bean_api.coordinator import _Invocation
+    harness = ToolHarness("inconclusive")
+    inv = _Invocation(ProviderConfig(), Ledger(), AttemptContext("actor", "workspace", "op", "consent"),
+        CoordinatorScope("run", "plan", "problem", "baseline", ("optional",)), harness.callbacks())
+    observations = inv.scenario_observations("controlled_stop")
+    asyncio.run(inv.event({"type": "invocation_failed", "scenario_observations": observations}))
+    observations[0]["disposition"] = "completed"
+    harness.events[0]["scenario_observations"][1]["disposition"] = "skipped"
+    assert all(item["disposition"] == "unresolved" for item in inv.trace[0]["scenario_observations"])
+    assert all(item["reason_code"] == "controlled_stop" for item in inv.trace[0]["scenario_observations"])
+
+
+def test_separately_approved_design_has_one_completed_callback_observation():
+    class DesignModel(EvidenceModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            observed = [message for message in messages if isinstance(message, ToolMessage)]
+            if not observed:
+                name, args = "execute_approved_design", {}
+            else:
+                name, args = "return_grounded_explanation", {
+                    "fact_ids": ["design-evidence"], "text": "The returned design remains numerical guidance.", "next_action": "stop"}
+            message = AIMessage(content="", tool_calls=[{
+                "id": f"design-call-{len(observed)}", "name": name, "args": args, "type": "tool_call"}])
+            return ChatResult(generations=[ChatGeneration(message=message)])
+
+    harness = ToolHarness("inconclusive")
+    callbacks = harness.callbacks()
+    callbacks.execute_design = lambda: {"id": "design-evidence", "problem_id": "problem", "design_tier": "numerical_guidance"}
+    harness.callbacks = lambda: callbacks
+    result = asyncio.run(observed_invocation(harness, DesignModel(),
+        CoordinatorScope("run", "plan", "problem", "baseline", kind="design", max_scientific_reservations=1, wall_seconds=120)))
+    assert result.status == "completed", result.error_code
+    observation, = result.scenario_observations
+    assert observation["scenario_id"] == "baseline" and observation["disposition"] == "completed"
+    assert observation["evidence_id"] == "design-evidence" and observation["reason_code"] is None
+    assert result.scientific_reservations == 1 and harness.executed == []
 
 
 def test_reviewed_tool_allowlist_is_not_expanded():
