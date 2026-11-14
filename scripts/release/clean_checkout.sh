@@ -38,6 +38,7 @@ run_clean() {
       -u PYTHONPATH -u PYTHONHOME -u PYTHONUSERBASE -u VIRTUAL_ENV -u CONDA_PREFIX -u UV_PROJECT_ENVIRONMENT \
       -u UV_WORKING_DIRECTORY -u UV_PROJECT -u UV_PYTHON -u DRBEAN_BACKEND_PYTHON -u DRBEAN_SCIENCE_PYTHON \
       -u BEAN_COUNTERDEX_PYTHON -u BEAN_COUNTERDEX_REPLAY_PYTHON -u BEAN_TEST_PYTHON \
+      -u BEAN_SOURCE_INTAKE_MODE -u BEAN_CONTROLLED_SOURCE_MANIFEST \
       -u BEAN_DATABASE_PATH -u BEAN_BLOB_DIR -u BEAN_ARTIFACT_DIR -u BEAN_AUTH_FILE -u BEAN_AUTH_TOKENS_JSON \
       -u PLAYWRIGHT_MODULE -u NODE_PATH -u NODE_OPTIONS \
       BEAN_AI_MODE=placeholder "$@"
@@ -61,4 +62,13 @@ else
   run_clean node tests/integration/node_modules/playwright/cli.js install chromium
 fi
 git status --porcelain | grep -q . && { echo "setup modified tracked files or left untracked ones:"; git status --porcelain; exit 1; }
-run_clean python3 scripts/release/checklist.py "$@"
+# Retain a new qualification record outside the disposable clone when requested.
+status=0
+run_clean python3 scripts/release/checklist.py "$@" --record || status=$?
+if [ -n "${DRBEAN_RELEASE_EVIDENCE_DIR:-}" ]; then
+  mkdir -p "$DRBEAN_RELEASE_EVIDENCE_DIR"
+  evidence="$DRBEAN_RELEASE_EVIDENCE_DIR/clean-checkout-$commit-$(date -u +%Y%m%dT%H%M%SZ)-$$.json"
+  cp docs/release-evidence/release-checklist.json "$evidence"
+  echo "Retained qualification: $evidence"
+fi
+exit "$status"

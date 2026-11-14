@@ -1,8 +1,8 @@
 import { setupFollowupWorkflow } from './followup-workflow.mjs'
 import { designCandidates, designRequest, designExplanation } from './design.mjs'
 
-export function setupDesignWorkflow({ context, perform, button, node, exactRecord, save }) {
-  const followup = setupFollowupWorkflow({ context, button, node, exactRecord })
+export function setupDesignWorkflow({ context, perform, button, node, exactRecord, save, openRun }) {
+  const followup = setupFollowupWorkflow({ context, button, node, exactRecord, openRun })
   let sourceRun = '', evidenceId = '', draft, plan, approval, frozen, job, jobPlan, suggestion, jobId = ''
   const blank = () => ({ candidateIds: ['', ''], times: '', allowance: '', horizon: '', allowanceOrigin: 'reviewed_hard_bound', allowanceDescription: '', allowConstruction: false, allowContinuation: false })
   function reset() { followup.reset(); sourceRun = evidenceId = jobId = ''; draft = blank(); plan = approval = frozen = job = jobPlan = suggestion = undefined }

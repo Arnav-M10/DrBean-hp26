@@ -12,6 +12,9 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 
 from bean_api.providers import AttemptContext, GeminiProvider, ProviderConfig, ProviderFailure
+import test_baseline_workflow as native_baseline
+
+replay_python = native_baseline.replay_python
 
 
 class Answer(BaseModel):
@@ -284,7 +287,7 @@ def test_controlled_source_preview_is_labeled_bound_and_has_no_execution_authori
     assert result["external_provider_calls"] == 0 and result["live_qualification"] == "not_run"
     assert result["authorship"] == "controlled_fixture" and "not Gemini transcription" in result["label"]
     assert all(f["method"] == "manual" and f["grounding"] == "unreviewed_visual" for f in result["fields"])
-    assert result["application_review_integration"] == "unavailable_pending_contract"
+    assert result["application_review_integration"] == "requires_intake_service"
     assert not hasattr(proposer, "generate") and "provider_attempt_id" not in result
     assert result["diagnostics"] == []
 
@@ -446,3 +449,178 @@ def test_source_prompt_is_versioned_bounded_and_keeps_instructions_inside_data()
     assert source_proposal_prompt(dict(reversed(list(context_value.items())))) == prompt
     with pytest.raises(ValueError, match="context limit"):
         source_proposal_prompt({"notes": "x" * 64_001})
+
+
+@pytest.fixture
+def controlled_intake_science_client(tmp_path, replay_python, monkeypatch):
+    """Explicit controlled deployment with the qualified real scientific runtime."""
+    import socket
+    from fastapi.testclient import TestClient
+    from bean_api.config import Settings
+    from bean_api.main import PREFIX, create_app
+
+    def deny_connect(*args, **kwargs):
+        pytest.fail("Controlled intake must not dispatch an external request")
+
+    monkeypatch.setattr(socket.socket, "connect", deny_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", deny_connect)
+    root = Path(__file__).resolve().parents[1]
+    settings = Settings(database_path=str(tmp_path / "controlled-intake.sqlite3"), blob_dir=str(tmp_path / "sources"),
+        artifact_dir=str(tmp_path / "artifacts"), counterdex_python=replay_python,
+        source_intake_mode="controlled", controlled_source_manifest_path=str(root / "scripts/ai/fixtures/source-previews.v1.json"),
+        auth_tokens={"alice": "a" * 40})
+    with TestClient(create_app(settings)) as client:
+        client.headers["Authorization"] = "Bearer " + "a" * 40
+        capabilities = client.get(PREFIX + "/capabilities").json()
+        assert capabilities["science"]["available"], capabilities
+        assert capabilities["gemini"]["dispatch_enabled"] is False
+        yield client
+
+
+def test_reviewed_controlled_source_correction_reaches_actual_science_and_unknown_sources_preserve_it(
+        controlled_intake_science_client, replay_python, tmp_path):
+    """Simulated human review, actual API/worker/checker and fresh native replay.
+
+    The deliberate correction is synthetic test input, not evidence that the
+    authored fixture misread the image or that a live model understood it.
+    """
+    from fractions import Fraction
+    from io import BytesIO
+    from PIL import Image, PngImagePlugin
+    from bean_api.contracts import DatasetBody, MaterializedProblemInputs, PlanBody
+    from bean_api.main import PREFIX
+    from bean_api.source_materialization import reviewed_input_values
+    from bean_api.worker import Worker
+    from test_scientific_http import post
+
+    client = controlled_intake_science_client
+    root = Path(__file__).resolve().parents[1]
+    raw = (root / "fixtures/intake/clean.png").read_bytes()
+    workspace = post(client, "/workspaces", {"name": "Reviewed controlled source with actual science"}, "source-workspace")["id"]
+
+    def upload(content, key):
+        response = client.post(PREFIX + f"/workspaces/{workspace}/source-assets?origin=synthetic&retention=retain",
+            content=content, headers={"Content-Type": "image/png", "Idempotency-Key": key})
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    source = upload(raw, "clean-source")
+    assert source["body"]["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert client.get(PREFIX + f"/source-assets/{source['id']}/content").content == raw
+    request_body = {"execution_mode": "controlled", "source_id": source["id"],
+                    "expected_source_digest": source["body"]["sha256"], "notes": "", "existing_values": {}}
+    proposal = post(client, f"/workspaces/{workspace}/intake-proposals", request_body, "controlled-source")
+    body = proposal["body"]
+    assert body["execution_mode"] == "controlled" and body["authorship"] == "controlled_fixture"
+    assert body["status"] == "controlled_example" and body["review_state"] == "unaccepted"
+    assert body["next_action"] == "review_controlled_preview"
+    assert body["diagnostics"] == [] and "provider_attempt_id" not in body
+    assert all(field["method"] == "controlled_fixture" and field["source_asset_id"] == source["id"] for field in body["fields"])
+    assert body["provenance"]["fixture_id"] == "clean"
+    local_attempt = client.get(PREFIX + f"/records/{body['provenance']['local_attempt_id']}")
+    assert local_attempt.status_code == 200, local_attempt.text
+    assert local_attempt.json()["workspace_id"] == workspace
+    assert local_attempt.json()["body"]["external_provider_calls"] == 0
+    local_attempts = client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json()
+    assert post(client, f"/workspaces/{workspace}/intake-proposals", request_body, "controlled-source")["id"] == proposal["id"]
+    assert client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json() == local_attempts
+    assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
+
+    reviewed_fields = []
+    for field in body["fields"]:
+        changed = field["field_path"] == "rows[0].concentration"
+        reviewed_fields.append({"field_path": field["field_path"],
+            "value": "97/20" if changed else field["candidate_exact"],
+            "origin": "corrected_transcription" if changed else "confirmed_transcription",
+            **({"correction_reason": "Deliberate synthetic review correction to verify exact input materialization."} if changed else {})})
+    review = post(client, f"/workspaces/{workspace}/intake-proposals/{proposal['id']}/review", {
+        "expected_proposal_digest": proposal["digest"], "reviewed_fields": reviewed_fields}, "review-controlled-source")
+    accepted = {field["field_path"]: field["normalized_value"] for field in review["body"]["reviewed_fields"]}
+    dataset_body = DatasetBody(experiment_id="controlled_source_experiment", time_origin="Elapsed hours from the declared synthetic start",
+        origin="synthetic", change_reason="Explicitly reviewed correction of a controlled source proposal", rows=[
+            {"id": f"source_row_{index}", "time": accepted[f"rows[{index}].time"],
+             "concentration": accepted[f"rows[{index}].concentration"], "hard_allowance": accepted[f"rows[{index}].hard_allowance"],
+             "included": True} for index in range(5)]).model_dump(mode="json")
+    problem_inputs = MaterializedProblemInputs(domain={"A": {"lower": "1/1000", "upper": "30/1"},
+        "ke": {"lower": "3/200", "upper": "7/20"}, "ka": {"lower": "2/5", "upper": "8/1"}},
+        target={"lower": accepted["target.lower"], "upper": accepted["target.upper"]}).model_dump(mode="json")
+    assumptions = {path: "Explicitly reviewed synthetic model or experiment assumption; not machine-extracted."
+        for path in reviewed_input_values(dataset_body, problem_inputs) if path not in accepted and not path.endswith(".notes")}
+    materialized = post(client, f"/workspaces/{workspace}/intake-reviews/{review['id']}/materialize", {
+        "expected_review_digest": review["digest"], "dataset": dataset_body, "problem": problem_inputs,
+        "human_assumptions": assumptions}, "materialize-controlled-source")
+    dataset, problem = materialized["dataset"], materialized["problem"]
+    assert dataset["body"]["origin"] == "synthetic"
+    assert dataset["body"]["rows"][0]["concentration"] == "97/20"
+    assert dataset["body"]["rows"][0]["original_values"]["concentration"] == "4.80"
+    assert all(row["source_asset_id"] == source["id"] for row in dataset["body"]["rows"])
+    assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0
+
+    plan_body = PlanBody(problem_id=problem["id"], problem_digest=problem["digest"], dataset_id=dataset["id"],
+        scientific_profile="counterdex.v1", objective={"question": "Does the reviewed synthetic correction admit an outside assignment?",
+            "success_criterion": "Retain actual checked scientific evidence bound to accepted source-review values."},
+        scenarios=[{"id": "baseline", "kind": "baseline", "label": "Reviewed source correction", "problem_id": problem["id"],
+                    "problem_digest": problem["digest"]}]).model_dump(mode="json")
+    plan = post(client, f"/workspaces/{workspace}/plans", {"expected_current_revision_id": problem["id"], "plan": plan_body}, "source-plan")
+    approval = post(client, f"/plans/{plan['id']}/approvals", {"expected_current_revision_id": problem["id"],
+        "expected_plan_digest": plan["digest"], "accepted": True}, "source-approval")
+    run = post(client, f"/plans/{plan['id']}/runs", {"approval_id": approval["id"], "expected_plan_digest": plan["digest"]}, "source-run")
+    result, content, anchors, native = native_baseline.execute_and_download(client, run)
+    assert native["problem"]["observations"][0]["value"] == "97/20"
+    assert result["problem_id"] == problem["id"] and result["problem_digest"] == problem["digest"]
+    assert result["scientific_outcome"] == "certified_counterexample" and result["verification"] == "valid"
+    lower, upper = Fraction(problem["body"]["target"]["lower"]), Fraction(problem["body"]["target"]["upper"])
+    assert any(candidate["verification"] == "valid" and not lower <= Fraction(candidate["parameter_vector"]["ke"]) <= upper
+               for candidate in result["candidates"])
+    assert json.loads(content)["binding"]["dataset"]["body"] == dataset["body"]
+    process, fresh = native_baseline.replay_cli(replay_python, tmp_path, content, anchors)
+    assert process.returncode == 0, fresh
+    assert fresh["replay"] == fresh["integrity"] == "passed" and fresh["expected_binding"] == "matches"
+    assert fresh["dataset_origin"] == "synthetic" and fresh["search_replayed"] is False
+    report = post(client, f"/runs/{run['id']}/reports", {}, "source-report")
+    assert any(item["id"] == proposal["id"] and item["body"] == proposal["body"] for item in report["body"]["intake_proposals"])
+    assert any(item["id"] == review["id"] for item in report["body"]["intake_reviews"])
+    assert client.get(PREFIX + f"/records/{proposal['id']}").json() == proposal
+    assert next(field for field in proposal["body"]["fields"] if field["field_path"] == "rows[0].concentration")["candidate_exact"] == "24/5"
+
+    unknown = BytesIO()
+    Image.new("RGB", (17, 19), "white").save(unknown, "PNG")
+    reencoded = BytesIO()
+    with Image.open(BytesIO(raw)) as image:
+        metadata = PngImagePlugin.PngInfo()
+        metadata.add_text("controlled-test", "Visually identical source with new original bytes")
+        image.save(reencoded, "PNG", pnginfo=metadata)
+    for name, uploaded_bytes in (("unknown", unknown.getvalue()), ("reencoded", reencoded.getvalue())):
+        assert uploaded_bytes != raw
+        other = upload(uploaded_bytes, name + "-source")
+        unavailable_request = {"execution_mode": "controlled", "source_id": other["id"],
+            "expected_source_digest": other["body"]["sha256"], "current_revision_id": problem["id"]}
+        unavailable = post(client, f"/workspaces/{workspace}/intake-proposals", unavailable_request, name + "-intake")
+        assert unavailable["body"]["status"] == "unavailable" and unavailable["body"]["fields"] == []
+        assert unavailable["body"]["code"] == "controlled_source_unavailable"
+        assert unavailable["body"]["next_action"] == "manual_review"
+        local_attempts = client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json()
+        assert post(client, f"/workspaces/{workspace}/intake-proposals", unavailable_request, name + "-intake")["id"] == unavailable["id"]
+        assert client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json() == local_attempts
+        for _ in range(2):
+            refused_review = client.post(PREFIX + f"/workspaces/{workspace}/intake-proposals/{unavailable['id']}/review", json={
+                "expected_proposal_digest": unavailable["digest"], "reviewed_fields": [{
+                    "field_path": "rows[0].concentration", "value": "97/20", "origin": "human_assumption",
+                    "correction_reason": "A manual value cannot accept unavailable extraction."}]},
+                headers={"Idempotency-Key": name + "-unavailable-review"})
+            assert refused_review.status_code == 409 and refused_review.json()["code"] == "intake_unavailable", refused_review.text
+        assert client.get(PREFIX + f"/records/{dataset['id']}").json() == dataset
+        assert client.get(PREFIX + f"/records/{problem['id']}").json() == problem
+        assert client.get(PREFIX + f"/artifacts/{result['artifacts'][0]['id']}").content == content
+        current = next(item for item in client.get(PREFIX + "/workspaces").json() if item["id"] == workspace)
+        assert (current["current_dataset_id"], current["current_problem_id"]) == (dataset["id"], problem["id"])
+    before_refusal = client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json()
+    for _ in range(2):
+        refused_digest = client.post(PREFIX + f"/workspaces/{workspace}/intake-proposals", json={
+            **request_body, "expected_source_digest": "0" * 64}, headers={"Idempotency-Key": "wrong-source-digest"})
+        assert refused_digest.status_code == 422 and refused_digest.json()["code"] == "source_binding_mismatch", refused_digest.text
+    assert client.get(PREFIX + f"/workspaces/{workspace}/records?kind=controlled_attempt").json() == before_refusal
+    assert client.get(PREFIX + f"/records/{dataset['id']}").json() == dataset
+    assert client.get(PREFIX + f"/records/{problem['id']}").json() == problem
+    assert client.get(PREFIX + f"/workspaces/{workspace}/provider-attempts").json() == []
+    assert Worker(client.app.state.workflow, settings=client.app.state.settings).tick() == 0

@@ -72,7 +72,10 @@ class Client:
 
 def launcher(command, var_dir):
     env = {**os.environ, "DRBEAN_VAR_DIR": var_dir}
-    done = subprocess.run([sys.executable, LAUNCHER, command], env=env, capture_output=True, text=True, timeout=180)
+    args = [sys.executable, LAUNCHER, command]
+    if command == "start":
+        args.append("--controlled-source-examples")
+    done = subprocess.run(args, env=env, capture_output=True, text=True, timeout=180)
     return done.returncode, done.stdout + done.stderr
 
 
@@ -113,6 +116,10 @@ def main(argv):
 
         _, caps, _ = Client(None).call("GET", PREFIX + "/capabilities")
         science, gemini = caps["science"], caps["gemini"]
+        check("controlled-source-examples-explicitly-enabled",
+              caps["source_intake"]["execution_mode"] == "controlled"
+              and caps["source_intake"]["application_review_integration"] == "available",
+              "packaged manifest only; Gemini remains disabled")
         facts["science_capabilities"] = {k: science.get(k) for k in (
             "implemented", "configured", "available", "verified_in_environment", "adapter", "adapter_version",
             "reason", "baseline_discovery", "design_tiers", "native_replay", "browser_replay")}

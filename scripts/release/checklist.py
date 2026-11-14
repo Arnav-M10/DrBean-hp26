@@ -214,19 +214,21 @@ def _collect(fast):
         "secret_scan": run([sys.executable, "scripts/release/secret_scan.py"]),
         "science_boundary_as_ordinary_user": ordinary_user_science_boundary(),
         "owner5_http_suite": owner5_suite(),
-        "web_source_review_browser_check": {"status": "unrun", "detail": "no source/value review control exists "
-                                                                         "in the web workspace yet"},
-        "web_design_followup_browser_check": {"status": "unrun", "detail": "design is covered by the backend browser check; "
-                                                                           "follow-up browser coverage remains pending"},
+
     }
     skipped = {"status": "unrun", "detail": "skipped by --fast"}
     if fast:
         checks.update({name: skipped for name in ("web_manual_smoke", "web_backend_browser_check",
+                                                  "web_source_review_browser_check", "web_design_followup_browser_check", "web_actual_followup_browser_check",
                                                   "stack_launch_path", "stack_g1_real_science",
                                                   "placeholder_ai_no_provider_attempts")})
     else:
         checks["web_manual_smoke"] = node_check("tests/integration/web_manual_smoke.mjs")
         checks["web_backend_browser_check"] = node_check("apps/web/check-backend.mjs", unrun_code=None)
+        for name in ("web_source_review_browser_check", "web_design_followup_browser_check"):
+            checks[name] = dict(checks["web_backend_browser_check"])
+        checks["web_actual_followup_browser_check"] = node_check("apps/web/check-backend.mjs", unrun_code=None,
+                                                                extra_env={"BEAN_TEST_FOLLOWUP_ORIGIN": "actual"})
         checks.update(stack_smoke())
     for check in checks.values():
         check.pop("output", None)

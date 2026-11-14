@@ -1,3 +1,4 @@
+import { setupSourceWorkflow } from './source-workflow.mjs'
 import { BeanApi, baselineAvailable, baselineExplanation } from './api.mjs'
 import { datasetBody, problemBody, planRequest } from './manual.mjs'
 import { setupDesignWorkflow } from './design-workflow.mjs'
@@ -12,13 +13,17 @@ function save(bytes, name) {
   const a = document.createElement('a'); a.href = url; a.download = name; a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
-export function setupWorkflow(getDraft) {
+export function setupWorkflow(getDraft, applyReviewedFields) {
   let api, capabilities, workspace = '', plan, approval, run, report, frozen, inputs, busy = false, pollTimer
   const fingerprint = () => JSON.stringify(getDraft()) // Edit detection only, never a semantic digest.
   const currentPlan = () => plan && frozen === fingerprint()
   const available = () => baselineAvailable(capabilities)
-  const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save })
-  function reset() { clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
+  const designs = setupDesignWorkflow({ context: () => ({ api, workspace, run, busy, available: designAvailable(capabilities) }), perform, button, node, exactRecord, save, openRun: async id => { await refreshRun(id); location.hash = 'investigations' } })
+  const sources = setupSourceWorkflow({ context: () => ({ api, workspace, busy, capabilities }), applyReviewedFields, getDraft, button, node, exactRecord, useInputs: async materialized => {
+    const prepared = await api.json(`/workspaces/${workspace}/plans`, planRequest(materialized.problem))
+    inputs = materialized; plan = prepared; frozen = fingerprint(); approval = undefined
+  } })
+  function reset() { sources.reset(); clearTimeout(pollTimer); plan = approval = run = report = frozen = inputs = undefined; designs.reset() }
   function button(parent, label, action, disabled = false) {
     const b = node('button', label); b.type = 'button'; b.disabled = disabled || busy
     b.addEventListener('click', () => perform(action)); parent.append(b); return b
@@ -86,7 +91,8 @@ export function setupWorkflow(getDraft) {
     button(investigations, 'Open or refresh run', () => refreshRun(), !api || !workspace)
     investigations.append(node('p', 'Keep the run identifier to reopen authenticated history. Pending runs update automatically. Refresh retrieves status; it never reruns a scenario.'))
     if (run) {
-      investigations.append(node('p', `${run.id} · execution: ${run.state}`), exactRecord('Run and scenario records', run))
+      const execution = node('p', `${run.id} · execution: ${run.state}`); execution.setAttribute('role', 'status')
+      investigations.append(execution, exactRecord('Run and scenario records', run))
       if (run.error_code) investigations.append(node('p', `Execution stopped: ${run.error_code}. Any completed evidence remains below.`))
       for (const evidence of run.evidence ?? []) {
         const result = evidence.body.result
@@ -104,7 +110,7 @@ export function setupWorkflow(getDraft) {
           table.append(head, body); region.append(table); investigations.append(node('p', 'Computed candidate parameters are exact rational values. Each candidate remains bound to this reviewed problem.'), region)
         }
         if (['review', 'recheck'].includes(result.native_replay?.operation)) {
-          investigations.append(node('h4', 'Follow-up candidate checks'), node('p', `Observation origin: ${result.native_replay.dataset_origin ?? 'not supplied'}. This review retains the original candidate identities.`))
+          investigations.append(node('h4', 'Follow-up candidate checks'), node('p', `Dataset origin: ${result.native_replay.dataset_origin ?? 'not supplied'}. This review retains the original candidate identities.`))
           const region = node('div', ''); region.className = 'table-region'; region.tabIndex = 0
           region.setAttribute('role', 'region'); region.setAttribute('aria-label', 'Follow-up candidate checks')
           const table = node('table', ''), head = node('thead', ''), headings = node('tr', ''), body = node('tbody', '')
@@ -149,6 +155,7 @@ export function setupWorkflow(getDraft) {
     }
     designs.render(investigations)
     investigations.append(node('p', 'Adding and checking a follow-up observation is a separate workflow. A design approval does not authorize a new observation or investigation.'))
+    const sourcePanel = byId('backend-source-review'); sourcePanel.replaceChildren(); sources.render(sourcePanel)
     const reports = byId('backend-report'); reports.replaceChildren(node('h3', 'Reviewer snapshot'))
     reports.append(node('p', 'A report freezes the selected run, inputs and evidence inventory at creation. Download native scientific evidence and its separate replay anchors from Investigations. A report JSON byte hash is not scientific replay. Public reviewer sharing is unavailable.'))
     button(reports, 'Create report for selected run', async () => { report = await api.json(`/runs/${run.id}/reports`, {}) }, !api || !run)

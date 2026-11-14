@@ -1,5 +1,8 @@
 # Workstream 4 log: product, integration and release
 
+Current checkpoint: PR #27 supplies ordinary controlled source intake and direct follow-up navigation for both origins. Clean checkout c4d1ad6, tree-identical to published 31a8ed3, passed all 5 offline gates and 12 boundaries; all six CI jobs passed. The sections below preserve chronological observations; earlier unavailable states are historical. Human consultation, observed task and device rehearsal remain pending.
+
+
 Standing brief: master document DB-MASTER-1, section 2. This log is a navigation aid; verify the repository before relying on it. Shared index: [issue ledger](../issue-ledger.md), [integration status](../INTEGRATION_STATUS.md).
 
 ## Current state
@@ -109,3 +112,28 @@ Base `4b5f1f5`. Added a dedicated browser job using the existing pinned integrat
 ## Hypothetical follow-up browser checkpoint
 
 Added a browser path from a checked design to an explicitly hypothetical observation, reviewed dataset revision, new fixed-pair plan, separate approval and queued run. Existing run lookup renders candidate feedback and downloads. Extended the real browser CI check through this path and checks preserved design identity. Thirty existing web tests pass locally; full browser qualification is delegated to the existing clean CI job. Actual acquisition and off-design readings remain unsupported by this flow.
+
+
+## 2026-11-14 — source review integration
+
+PR #27 adds retained-source inspection and explicit controlled proposal review, correction, assumption preview and accepted input materialization. Upload selections survive action rendering; changed drafts require a new source-bound preview. The real local browser/API/worker check passed on the target Mac environment with prepared interpreters and Chromium, including real discovery, separately approved positive/no-separation design, hypothetical follow-up and native replay. All 31 web unit tests passed.
+
+Release automation now consumes that actual browser outcome for source and follow-up gates (fast mode remains unrun). Independent clean-checkout qualification is next. Declared actual acquisition controls are implemented; qualification follows. Consultation, observed task and device rehearsal are explicitly not performed; software comes first per user direction.
+
+
+Clean checkout 366dfe1 passed strict offline qualification on Darwin 25.5 arm64: 5/5 gates, 12/12 boundaries, 588 backend tests, 47 HTTP tests, 31/31 launch checks and real-science counterexample with 2 candidates and native artifact. Retained immutable report: docs/release-evidence/offline-366dfe1-macos.json. All six CI jobs passed for equivalent published integration tree 6a3705a.
+
+The next extension adds declared actual follow-up with separately entered acquisition time, hard allowance and provenance. Tests use synthetic data and do not claim real observation. Dataset origin is labeled as such and preserves synthetic ancestry. Superseded observation parents are still rejected by the server; pending proposals can be revised before acceptance.
+
+
+## Ordinary source and follow-up completion
+
+User requested a usable loop without scripts/database manipulation/hidden identifiers. Consumed Owner 2's SOURCE_HANDOFF.md and source branch through 42f92b1; controlled proposer remains Owner 3's implementation. PR #27 published code 31a8ed3 has the same tree as local c4d1ad6. Removed the release DB producer and proposal-ID input. Added visible packaged-example/request actions, controlled/unavailable labels, explicit reviewed-row transfer, and direct queued follow-up navigation with execution polling. Preserved stale preview rejection and separate approval.
+
+Expanded browser tests exercise ordinary source POST, original/corrected values, changed-byte manual fallback, stale local preview refusal, real discovery on changed inputs, positive/no-separation designs, both follow-up origins and native downloads/fresh replay. Launcher option --controlled-source-examples explicitly configures only the packaged manifest; stack smoke exercises that start/restart path. No independent evaluator assertions were changed.
+
+Fresh combined strict clean checkout and CI are running. Earlier reports remain named for their original commits. Next actions: retain fresh candidate results, supply exact qualification commands to Claude, and complete authorized integration once the checks pass. Human research and rehearsal remain explicitly pending.
+
+Final combined qualification: c4d1ad6 / published 31a8ed3, all 5 gates and 12 boundaries passed. Full immutable report and code/tree mapping are in docs/release-evidence/offline-c4d1ad6-macos.json and product-candidate.json. Exact commands for Claude are in product-qualification-handoff.md. Only evidence/docs change after this code candidate; independent acceptance, consultation, observed task and device rehearsal remain pending.
+
+CI on the documentation follow-up 129408e exposed a Playwright response-body race after automatic navigation. Runner-only correction d55ff94 reads the visible run status instead and preserves every scientific assertion. The actual browser rerun passed locally and in CI. Latest exact qualification commands name d55ff94; earlier reports retain their original identities.

@@ -5,6 +5,7 @@ const host = '127.0.0.1';
 const port = Number(process.argv[2] ?? 4173);
 const apiPort = Number(process.env.BEAN_WEB_API_PORT ?? 8000);
 const routes = new Map([
+  ['/examples/controlled-source.png', ['../../fixtures/intake/clean.png', 'image/png']],
   ['/', ['index.html', 'text/html']],
   ['/index.html', ['index.html', 'text/html']],
   ['/app.mjs', ['app.mjs', 'text/javascript']],
@@ -12,6 +13,7 @@ const routes = new Map([
   ['/question.mjs', ['question.mjs', 'text/javascript']],
   ['/api.mjs', ['api.mjs', 'text/javascript']],
   ['/manual.mjs', ['manual.mjs', 'text/javascript']],
+  ['/source-workflow.mjs', ['source-workflow.mjs', 'text/javascript']],
   ['/workflow.mjs', ['workflow.mjs', 'text/javascript']],
   ['/design.mjs', ['design.mjs', 'text/javascript']],
   ['/followup-workflow.mjs', ['followup-workflow.mjs', 'text/javascript']],

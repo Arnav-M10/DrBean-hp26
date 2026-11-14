@@ -1,18 +1,17 @@
 # Integration status
 
-Current integration base is `80f95a4`. Person 4 release fixes are tracked in [PR #12](https://github.com/Arnav-M10/DrBean-hp26/pull/12). Historical observations remain in the role logs and issue ledger.
+Product candidate: [PR #27](https://github.com/Arnav-M10/DrBean-hp26/pull/27), code `31a8ed3c9b66ed721cf2f37179ab3fe62ebe0d09`, incorporating Owner 2's `42f92b1` controlled-intake handoff. Local clean-checkout equivalent: `c4d1ad63713c9fb00b2baab5aa758f3a4c505952`; both have tree `9ed03fb5bc828117f33ca015ad44a0ec6f9d3703`.
 
-| Area | Current evidence and next acceptance action |
-|---|---|
-| Ordinary launch | Linux CI launcher tests and stack smoke pass on PR #12. Target Mac full-stack qualification remains pending. |
-| Baseline science | Discovery is integrated. The independent HTTP suite now executes with the installed engine interpreter. |
-| Design browser | Separately approved design, result reopening and native downloads are implemented on main. Fresh browser/API qualification remains required for the release candidate. |
-| Follow-up and native evidence | Backend support is integrated. Latest PR #12 HTTP run has 40 passed, 3 failed, 2 expected failures, including export, follow-up and cancellation observations. Owners 2 and 5 must reconcile those failures. |
-| Process cleanup | Ordinary-user descendant-lifetime boundary still fails in CI. Owner 2 holds this implementation. |
-| Source review and follow-up browser | Remaining Person 4 controls, to consume established backend contracts. |
-| Release | Strict offline qualification has not passed. The HTTP suite is delivered, superseding earlier undelivered labels. |
-| Human evidence | Consultation, observed user task and device rehearsal remain pending. |
+- Ordinary browser source flow: upload or select the packaged synthetic image, request controlled values, inspect/correct/accept, copy reviewed rows into the draft, review assumptions, materialize, then separately approve science. No database helper or copied proposal ID.
+- Unknown or changed image bytes preserve existing work and offer manual entry. Controlled output is explicitly not Gemini transcription.
+- Real discovery, separately approved positive/no-separation design, hypothetical and declared actual follow-up, automatic follow-up result navigation, and native evidence downloads are implemented.
+- Declared actual acquisition requires its own time, hard allowance and acquisition provenance. Declaration does not authenticate an instrument; synthetic dataset ancestry remains synthetic.
+- Source selection/origin survive action rendering. Changed drafts invalidate source previews. Owner 2 enforces stale accepted-revision boundaries.
+- Clean setup/start/stop/restart, selected-checkout import and provider-variable filtering are exercised by the release checks. The explicit source-example start option does not enable Gemini.
+- Fresh clean candidate c4d1ad6 (tree-identical to published 31a8ed3) passed all 5 offline gates and 12 boundaries on Darwin arm64. All six CI jobs passed. See release-evidence/offline-c4d1ad6-macos.json and product-candidate.json; prior reports remain historical.
+- Independent evaluator acceptance is Claude's responsibility. Owner 4 consumes unchanged tests without manufacturing findings.
+- Consultation, observed user task and presentation-device rehearsal have not happened. The user requested software completion first.
 
-AI remains placeholder-only. Live Gemini and hosted deployment remain deferred.
+Start after setup: `scripts/dev/start.sh --controlled-source-examples`. See [release runbook](release-runbook.md) and [demo script](demo/demo-script.md). Live Gemini, hosting and visual expansion remain deferred.
 
-Next Person 4 actions are browser source review and follow-up, clean-checkout browser qualification, and a rehearsed release tied to retained evidence. Setup on the target Mac currently lacks `uv` on PATH. The release checklist and role log record environment limits without treating them as product success.
+Runner stabilization: d55ff949b9ca95aa045f1bd2e5c9e17a5da66945 changes only the browser test to inspect visible follow-up status instead of a response body lost during automatic navigation. Local equivalent 3715008 has tree 74c60552cfa778ed283376098fa6aeba844ca721. Use that exact candidate and the qualification handoff commands; final results are retained in the PR conversation. The earlier failed CI run remains visible.

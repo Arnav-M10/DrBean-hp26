@@ -13,6 +13,15 @@ import launcher  # noqa: E402
 
 
 class ChildEnvironment(unittest.TestCase):
+    def test_controlled_examples_require_explicit_start_option(self):
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(launcher, "cmd_start", return_value=0):
+            self.assertEqual(launcher.main(["start", "--controlled-source-examples"]), 0)
+            env = launcher.child_env()
+        self.assertEqual(env["BEAN_SOURCE_INTAKE_MODE"], "controlled")
+        self.assertEqual(env["BEAN_CONTROLLED_SOURCE_MANIFEST"],
+                         os.path.join(launcher.REPO, "scripts", "ai", "fixtures", "source-previews.v1.json"))
+        self.assertEqual(env["BEAN_AI_MODE"], "placeholder")
+
     def test_provider_values_are_never_read_while_filtering_or_probing(self):
         class NamesOnlySecrets(dict):
             def __getitem__(self, name):
