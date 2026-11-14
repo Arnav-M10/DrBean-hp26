@@ -343,7 +343,16 @@ def test_demo_09_model_failure_preserves_completed_evidence(tmp_path, monkeypatc
         final = drive()
         assert final["state"] == "failed", final["state"]                                    # an honest failure
         assert final["action"]["error_code"] == "provider_request_failed_unknown_outcome"
-        assert not final["reports"], "a report was published by a failed coordinator"
+        # Oracle revision R1 (sprint, 2026-11-14): the frozen DEMO-09 predicate requires an honest failure, not
+        # the absence of every report. A deterministic failure report is accepted only if it is honest: no model
+        # commentary, backend authorship without scientific authority, the same failure code and the original outcome.
+        for report_id in final["reports"]:
+            body = json.loads(http.get(PREFIX + f"/reports/{report_id}/download").content)["body"]
+            assert body.get("agent_commentary") is None and body.get("commentary_status") == "unavailable", body.get("commentary_status")
+            summary = body["deterministic_summary"]
+            assert summary["authorship"] == "deterministic_backend" and summary["scientific_authority"] is False
+            assert body["model_failure"]["code"] == final["action"]["error_code"]
+            assert {row["scientific_outcome"] for row in summary["results"]} == {"certified_counterexample"}
         child = final["children"][0]
         assert child["state"] == "completed" and child.get("result_id")
         run = http.get(PREFIX + f"/runs/{child['id']}").json()

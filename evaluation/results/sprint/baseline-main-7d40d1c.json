@@ -1,0 +1,130 @@
+{
+  "schema_version": "coordinator-sprint-observation.v1",
+  "profile": "deepagents-completion-sprint.v1",
+  "profile_canonical_sha256": "8df5078e66da409d0149a179308008f129e517d1d75203a2bdd2c2e2fc9df4f9",
+  "candidate": {
+    "kind": "baseline",
+    "application_commit": "7d40d1c",
+    "note": "main before either owner's sprint changes; harness branch claude/deepagents-qualification adds only tests and evaluation files"
+  },
+  "environment": {
+    "os": "macOS 26.7 arm64",
+    "backend": "CPython 3.13 (uv sync --locked)",
+    "engine": "CPython 3.11, Counterdex 0.3.0",
+    "browser": "Playwright Chromium, isolated launcher on ephemeral ports"
+  },
+  "live": {
+    "physical_requests": 0,
+    "sprint_physical_requests_total": 0,
+    "note": "Live lane held for the combined candidate. Dry run through the browser recorded 0 provider requests."
+  },
+  "items": [
+    {
+      "id": "ACC-01",
+      "status": "NOT_AVAILABLE",
+      "lane": "controlled",
+      "basis": "The preferred workspace-preview on main is a mockup that never calls the API. The older apps/web research panel does drive the actual coordinator (apps/web/check-research.mjs passed: browser-created session, compiled graph plan, approved investigation, separate design approval, replay, 0 provider requests), but it is not the preferred interface.",
+      "evidence": [
+        "apps/web/check-research.mjs (passed on 7d40d1c)"
+      ]
+    },
+    {
+      "id": "ACC-02",
+      "status": "NOT_RUN",
+      "lane": "live_gemini",
+      "basis": "Live calls held until a combined candidate passes the controlled lane."
+    },
+    {
+      "id": "ACC-03",
+      "status": "PASS",
+      "lane": "real_science",
+      "basis": "Sessions differing only in the reviewed claim or allowance take different next actions from the acceptable sets: checked counterexample leads to a separately approved design review; no counterexample or no separation leads to clarification; missing inputs ask without science.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_04_changed_evidence_changes_the_next_action",
+        "tests/test_research_agent_conditions.py (5 conditions)"
+      ]
+    },
+    {
+      "id": "ACC-04",
+      "status": "PASS",
+      "lane": "real_science",
+      "basis": "No child before the canonical decision; the dispatched child binds the approved review; forged, raw-command and actor-selection decisions refused; duplicate decisions create no extra child.",
+      "evidence": [
+        "tests/integration/test_langchain_demo.py::test_demo_02_approval_binds_the_dispatched_operation",
+        "tests/integration/test_langchain_demo.py::test_demo_07_duplicate_decisions_do_not_duplicate_science",
+        "tests/integration/test_research_session_probes.py"
+      ]
+    },
+    {
+      "id": "ACC-05",
+      "status": "PASS",
+      "lane": "real_science",
+      "basis": "Worker killed (uncaught BaseException) right after child dispatch; worker --recover marks needs_reconciliation; explicit reconcile (idempotent; a new key is refused) resumes the same action, which completes with exactly one job and one scientific reservation.",
+      "evidence": [
+        "tests/test_sprint_recovery.py::test_acc05_worker_loss_after_child_dispatch_recovers_one_child",
+        "tests/test_research_pending_continuation.py"
+      ]
+    },
+    {
+      "id": "ACC-06",
+      "status": "FAIL",
+      "lane": "real_science",
+      "basis": "F-SPRINT-REPORT-COMMENTARY: the agent's commentary exists in the publish_research_report acknowledgement but the downloaded report body has no explanation or recommendation field. Reported to A on PR #60.",
+      "evidence": [
+        "tests/test_sprint_quota_and_reports.py::test_acc06_downloaded_report_carries_the_validated_explanation_and_recommendation (strict xfail)"
+      ]
+    },
+    {
+      "id": "ACC-07",
+      "status": "PASS",
+      "lane": "real_science",
+      "basis": "A provider 429 after a completed Counterdex child (live code path, offline SDK) leaves the evidence record, native bytes (SHA-256 matches) and anchor downloadable, records provider_rate_limited and is not retried by later worker passes.",
+      "evidence": [
+        "tests/test_sprint_quota_and_reports.py::test_acc07_acc06_provider_failure_after_real_science_keeps_evidence_and_report_content",
+        "tests/integration/test_langchain_demo.py::test_demo_09_model_failure_preserves_completed_evidence",
+        "tests/integration/test_post_science_failure_independent.py"
+      ]
+    },
+    {
+      "id": "ACC-08",
+      "status": "FAIL",
+      "lane": "controlled",
+      "basis": "Backend behaviour passes: a 429 is one charged attempt with stable code provider_rate_limited, no second request, no controlled-policy fallback, no child; an exhausted allocation is refused before the SDK (provider_budget_exhausted / research_provider_allocation_exhausted). The pass condition also requires plain-language presentation; apps/web renders the raw code ('The last step stopped: provider_rate_limited'), and the preferred workspace does not call the API. Reported to B on PR #61.",
+      "evidence": [
+        "tests/test_sprint_quota_and_reports.py::test_acc08_provider_429_is_one_charged_attempt_with_a_clear_code_and_no_retry_or_fallback",
+        "tests/test_sprint_quota_and_reports.py::test_acc08_exhausted_session_allocation_refuses_before_any_request"
+      ]
+    },
+    {
+      "id": "LIVE-01",
+      "status": "NOT_RUN",
+      "lane": "live_gemini",
+      "basis": "Held for the combined candidate."
+    },
+    {
+      "id": "LIVE-02",
+      "status": "NOT_RUN",
+      "lane": "live_gemini",
+      "basis": "Held for the combined candidate."
+    },
+    {
+      "id": "LIVE-03",
+      "status": "NOT_RUN",
+      "lane": "live_gemini",
+      "basis": "Held for the combined candidate."
+    },
+    {
+      "id": "COMB-01",
+      "status": "NOT_RUN",
+      "lane": "controlled",
+      "basis": "Neither owner's branch had implementation commits when this baseline was recorded."
+    }
+  ],
+  "commands": [
+    "uv sync --locked --python 3.13; uv venv --python 3.11 .venv-engine; uv pip install --python .venv-engine/bin/python --no-deps ./packages/groundwork_adapter",
+    "BEAN_COUNTERDEX_PYTHON=$PWD/.venv-engine/bin/python .venv/bin/python -m pytest -q tests/integration/test_langchain_demo.py tests/integration/test_research_graph_inventory.py tests/integration/test_research_session_probes.py tests/integration/test_post_science_failure_independent.py tests/integration/test_research_gateway_independent.py tests/integration/test_provider_accounting_independent.py tests/test_research_agent_conditions.py tests/test_research_metered_application.py tests/test_research_pending_continuation.py tests/test_research_ledger.py  # 59 passed, 1 skipped",
+    "BEAN_COUNTERDEX_PYTHON=... .venv/bin/python -m pytest -q tests/test_sprint_quota_and_reports.py tests/test_sprint_recovery.py  # 4 passed, 1 xfailed",
+    "NODE_PATH=<playwright> node apps/web/check-research.mjs  # passed",
+    "LIVE_CASE=dry-run LIVE_OPT_IN=<opt-in path> NODE_PATH=<playwright> node evaluation/live/live_research_browser.mjs  # completed, 0 provider requests"
+  ]
+}
