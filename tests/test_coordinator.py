@@ -355,7 +355,9 @@ def test_separately_approved_design_has_one_completed_callback_observation():
                 name, args = "execute_approved_design", {}
             else:
                 name, args = "return_grounded_explanation", {
-                    "fact_ids": ["design-evidence"], "text": "The returned design remains numerical guidance.", "next_action": "stop"}
+                    # This control exercises callback accounting. Scientific
+                    # narration has its own evidence-bound statement tests.
+                    "fact_ids": ["design-evidence"], "text": "The evidence has a conditional scope.", "next_action": "stop"}
             message = AIMessage(content="", tool_calls=[{
                 "id": f"design-call-{len(observed)}", "name": name, "args": args, "type": "tool_call"}])
             return ChatResult(generations=[ChatGeneration(message=message)])
