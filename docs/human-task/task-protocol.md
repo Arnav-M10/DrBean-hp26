@@ -1,17 +1,35 @@
-# Human task observation protocol
+# Consultation and observed-task protocol
 
-Purpose: formative design evidence from one or a few willing people. A convenience sample is not an adoption rate or an impact study.
+Two separate things: a five-minute consultation that can start now, and an observed task that needs the working flow. Both are formative evidence from a convenience sample, not an adoption rate or an impact study.
 
-**Status: not run.** The product cannot yet perform the task. No participant has been approached. The human team handles outreach.
+**Status: neither has been held.** No person has been approached by this workstream. The human team does the outreach; no message has been sent on its behalf. If nobody relevant is available, this stays pending and does not block the build.
 
-## Before the session
+## Five-minute consultation (can happen now)
+
+For a relevant student science organization, methods tutor, researcher or lab group. Listen first; do not pitch. Keep the supported model narrow in your own head: a request for another model is feedback, not evidence that the tool supports it.
+
+1. What measurement decision do you face most often?
+2. When a fitted value falls in an expected range, how do you test whether that range is really justified by the data?
+3. What does one more measurement cost you in time and materials?
+4. What form are your data and methods in: spreadsheet, instrument export, paper sheet, photo?
+5. What would make a tool like this unusable for you?
+
+Then, in one sentence each: what Dr. Bean does today, that the AI part is currently a placeholder, and that all examples are synthetic.
+
+Record in `consultation-record-template.md`: organization, person, role, when it happened, permission for public use, and one supporting item they allow (for example a note they confirm). Pass one actionable observation to the responsible owner the same hour.
+
+## Observed task (after the minimal flow works)
+
+### Before the session
 
 - The participant is an eligible adult researcher or a member of a suitable student organization, and agrees to take part. For a Peri entry the organization must qualify; confirm lab eligibility with the organizers if the categories do not settle it.
 - Ask permission separately for: notes, quoting, naming the person, naming the organization, publication.
 - Use only the synthetic sheet. Do not put the person's identity or private methods into evaluation logs or model inputs.
 - Teammate roleplay is rehearsal and is recorded as rehearsal.
 
-## Task (read aloud, then stop helping)
+### Task (read aloud, then stop helping)
+
+Say first: "The AI in this build is a placeholder; the calculations are real."
 
 1. Import the lab sheet image.
 2. Find one hard allowance and say where it came from.
@@ -22,7 +40,7 @@ Purpose: formative design evidence from one or a few willing people. A convenien
 
 Record for each step: completed, completed with help (what help), abandoned, and any confusion in the person's words. Record time spent reviewing separately from time the system spent working. Do not coach an answer and then report it as independent understanding.
 
-## Comprehension checks (ask, do not lead)
+### Comprehension checks (ask, do not lead)
 
 | Topic | Question | A misconception to record |
 |---|---|---|
@@ -37,6 +55,9 @@ Also ask whether the proposed times are feasible and whether the required precis
 
 If a screen reliably invites a false conclusion, it is unfinished: log it in the issue ledger for Owner 03 and retest when feasible.
 
-## Afterwards
+### Afterwards
+
+Ask the person to explain the pair-specific conclusion in their own words and write that down verbatim. Fix one observed blocker and, if practical, repeat the task. Report the actual sample size.
+
 
 Fill in `consultation-record-template.md`. Keep the private copy out of the repository. Publish only what the person permitted.

@@ -1,0 +1,499 @@
+{
+  "attempt_id": "att_ea42f9e1c5bf4b23",
+  "controlled": null,
+  "entry_id": "RS-CANCEL-RESTART",
+  "input": null,
+  "lane": "offline_real_science",
+  "observation": {
+    "approvals_created": 0,
+    "case_sha256": "696e1809f493d28a764cc0208ad180cf16b564b4eb816899e027887ac7803c10",
+    "checks": [
+      {
+        "detail": "cancel_requested",
+        "id": "queued_cancel_requested",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "state cancelled, 0 scenario reservation(s)",
+        "id": "queued_cancel_acknowledged_without_science",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "state failed",
+        "id": "running_cancel_terminal",
+        "level": "required",
+        "outcome": "passed"
+      },
+      {
+        "detail": "no sustained scientific computation existed at the cancellation point, so the orphan check would be vacuous (for example the child failed immediately)",
+        "id": "no_orphan_after_cancel",
+        "level": "required",
+        "outcome": "not_observed"
+      },
+      {
+        "detail": "the run reached failed before the worker was killed, so there was no in-flight work to interrupt",
+        "id": "no_orphan_after_worker_kill",
+        "level": "required",
+        "outcome": "not_observed"
+      },
+      {
+        "detail": "the run reached failed before the worker was killed, so there was no in-flight work to interrupt",
+        "id": "interrupted_not_redispatched",
+        "level": "required",
+        "outcome": "not_observed"
+      },
+      {
+        "detail": "the run reached failed before the worker was killed, so there was no in-flight work to interrupt",
+        "id": "interrupted_stays_interrupted",
+        "level": "required",
+        "outcome": "not_observed"
+      }
+    ],
+    "details": {
+      "queued_run": "run_e7017f56548149c693771e236d60fdbc",
+      "running_cancel_state": "failed"
+    },
+    "disclosed_text": [],
+    "entry_id": "RS-CANCEL-RESTART",
+    "evidence_index": {},
+    "exchanges": [
+      {
+        "latency_ms": 2.372,
+        "method": "POST",
+        "request_id": "a557997e-2ebe-4407-9373-71a32e1afcbc",
+        "response_bytes": 204,
+        "response_sha256": "f5d0caff542f4cb199f4032bca14409a2be0fad4e91ec01594008468594ea873",
+        "route": "/workspaces",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.004,
+        "method": "POST",
+        "request_id": "3ceeafa5-2b6a-404c-a24a-68bec630e86e",
+        "response_bytes": 1628,
+        "response_sha256": "f6a17faa19bb77d54773cff4f9d600ff161cc06312787701c8c1191a6534f4f3",
+        "route": "/workspaces/{id}/datasets",
+        "status": 201
+      },
+      {
+        "latency_ms": 1.858,
+        "method": "POST",
+        "request_id": "295e04c7-f0f0-4281-a8f3-08b7b7a42507",
+        "response_bytes": 831,
+        "response_sha256": "4c07ae3aa0e4ec77ded9cd7db9eb9397093ab80c3cf07c0bfb08646ad854956f",
+        "route": "/workspaces/{id}/problems",
+        "status": 201
+      },
+      {
+        "latency_ms": 1.848,
+        "method": "POST",
+        "request_id": "3d3e598d-8817-48f9-9b12-42c35a5ceb98",
+        "response_bytes": 1102,
+        "response_sha256": "cfe40a0f567ac1bd8c19f599a9bf9647a1fcb16959bfd08ce2d352fd4cec5e02",
+        "route": "/workspaces/{id}/plans",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.443,
+        "method": "POST",
+        "request_id": "c083bddb-6cd3-4606-a4c7-37ca6dbfafce",
+        "response_bytes": 431,
+        "response_sha256": "e45c8d7c82ebb718d3e29c48ff30b356ad00d003d2bfd2c27cb1f2c054db75cc",
+        "route": "/plans/{id}/approvals",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.429,
+        "method": "POST",
+        "request_id": "14cda198-d5d7-4bd7-9d76-bab712e2be5b",
+        "response_bytes": 469,
+        "response_sha256": "53add378b703b4a9bb579fd06afed41f2d9aadfd93f4d1efa667b61207da68e8",
+        "route": "/plans/{id}/runs",
+        "status": 202
+      },
+      {
+        "latency_ms": 2.585,
+        "method": "POST",
+        "request_id": "5ff347a3-12fe-44ef-b786-b89b049c31ab",
+        "response_bytes": 479,
+        "response_sha256": "ba92463101b79e0f6d5122c4f136b75e4e6b4fd2fa7f6657f606a631c1dacae3",
+        "route": "/runs/{id}/cancel",
+        "status": 202
+      },
+      {
+        "latency_ms": 3.94,
+        "method": "GET",
+        "request_id": "786e7a93-a019-46da-bab2-560c36a429ea",
+        "response_bytes": 479,
+        "response_sha256": "ba92463101b79e0f6d5122c4f136b75e4e6b4fd2fa7f6657f606a631c1dacae3",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.765,
+        "method": "GET",
+        "request_id": "9bb29b10-76f4-4ade-85ea-3c04c89dc474",
+        "response_bytes": 494,
+        "response_sha256": "8506f955c35a021dc7b473da4f55b663b16fbd5a6ff8c1ebdefc30de34469d52",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.243,
+        "method": "POST",
+        "request_id": "053f71db-cc9b-4712-a1cc-fbbc662648f0",
+        "response_bytes": 1629,
+        "response_sha256": "a86c5d0ecc90821c080350eee0509459476f5189498c4f5f6d88aa46348f17ec",
+        "route": "/workspaces/{id}/datasets",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.389,
+        "method": "POST",
+        "request_id": "b5b860cc-1012-47f1-807c-63f309d41b67",
+        "response_bytes": 831,
+        "response_sha256": "c4f9ed5e421d182a60aef2a064ff2e93021ab7e99d4269de0dfd82b0ae022fe7",
+        "route": "/workspaces/{id}/problems",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.185,
+        "method": "POST",
+        "request_id": "6274d54f-fd74-4f38-89e3-ae52eb4b23c0",
+        "response_bytes": 1103,
+        "response_sha256": "aa19f52772e01041cbb4ead4fc4bd018957caa51b391e42d4e65bba27f642a23",
+        "route": "/workspaces/{id}/plans",
+        "status": 201
+      },
+      {
+        "latency_ms": 3.094,
+        "method": "POST",
+        "request_id": "655504b9-c702-42c6-82f0-fdec5af00164",
+        "response_bytes": 431,
+        "response_sha256": "a89f8e8b06968806ebaa87af1c79f3f5039bdcf5f50c991dc70a29f7aef6c488",
+        "route": "/plans/{id}/approvals",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.903,
+        "method": "POST",
+        "request_id": "bdf4963c-8e5f-4216-ac76-56c36dfea317",
+        "response_bytes": 469,
+        "response_sha256": "cf6708614170f9378acd5042f54f48655d535b5bf34bc1d268384612ad0a0e3d",
+        "route": "/plans/{id}/runs",
+        "status": 202
+      },
+      {
+        "latency_ms": 1.684,
+        "method": "GET",
+        "request_id": "a40cc580-06af-4577-9226-a172e38c153a",
+        "response_bytes": 469,
+        "response_sha256": "cf6708614170f9378acd5042f54f48655d535b5bf34bc1d268384612ad0a0e3d",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.848,
+        "method": "GET",
+        "request_id": "08a4dd1f-2fb9-4cda-b246-8e0e997cf27c",
+        "response_bytes": 469,
+        "response_sha256": "cf6708614170f9378acd5042f54f48655d535b5bf34bc1d268384612ad0a0e3d",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.105,
+        "method": "GET",
+        "request_id": "e20c99a0-2da6-48eb-a584-6e79c4796584",
+        "response_bytes": 469,
+        "response_sha256": "cf6708614170f9378acd5042f54f48655d535b5bf34bc1d268384612ad0a0e3d",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.246,
+        "method": "GET",
+        "request_id": "a00b366c-acbe-4b5f-8b16-7b59652961a7",
+        "response_bytes": 765,
+        "response_sha256": "ce9d8201db7a5982889fbbc3a98c97bfc80ab191eb570949f40e7eb6eefe0371",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.412,
+        "method": "GET",
+        "request_id": "2dbd8f59-d41c-4005-9cde-7a0535898984",
+        "response_bytes": 765,
+        "response_sha256": "ce9d8201db7a5982889fbbc3a98c97bfc80ab191eb570949f40e7eb6eefe0371",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.533,
+        "method": "GET",
+        "request_id": "cc3c5cd8-7ebd-45f3-a2c9-0d0353bcdfc1",
+        "response_bytes": 852,
+        "response_sha256": "9f481bf670a9561e6f8d875532b4e90dea2dedf7ee90c410b7a698444ec8402c",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.981,
+        "method": "GET",
+        "request_id": "8a858542-f23f-4810-aa04-adaa174f3c09",
+        "response_bytes": 852,
+        "response_sha256": "9f481bf670a9561e6f8d875532b4e90dea2dedf7ee90c410b7a698444ec8402c",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 3.497,
+        "method": "POST",
+        "request_id": "f1eee4ab-2b3c-4397-b3fb-dcf1eae7dd54",
+        "response_bytes": 852,
+        "response_sha256": "9f481bf670a9561e6f8d875532b4e90dea2dedf7ee90c410b7a698444ec8402c",
+        "route": "/runs/{id}/cancel",
+        "status": 202
+      },
+      {
+        "latency_ms": 1.429,
+        "method": "GET",
+        "request_id": "de9eb6ff-f776-46f9-9b45-de6578510a70",
+        "response_bytes": 852,
+        "response_sha256": "9f481bf670a9561e6f8d875532b4e90dea2dedf7ee90c410b7a698444ec8402c",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 3.186,
+        "method": "POST",
+        "request_id": "1d0a8926-6c73-4f33-930a-cb959829d91a",
+        "response_bytes": 1629,
+        "response_sha256": "3afb031ec483de70df9d6b8a5a06b11586c1618958071cf4e0ed62312c4850b3",
+        "route": "/workspaces/{id}/datasets",
+        "status": 201
+      },
+      {
+        "latency_ms": 1.913,
+        "method": "POST",
+        "request_id": "fbd704cc-be94-4fe9-8259-a02e152024b7",
+        "response_bytes": 831,
+        "response_sha256": "0dd21b960f8c26c30c5c4d8e1205618665bfad2aed3590b91f62d6c661a7996f",
+        "route": "/workspaces/{id}/problems",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.507,
+        "method": "POST",
+        "request_id": "781d78ed-7882-4de1-b50e-993d2567dad0",
+        "response_bytes": 1103,
+        "response_sha256": "a9ab78bb05c9de20e78be727036c85227a0c7bccc649e1992b94c1f393037198",
+        "route": "/workspaces/{id}/plans",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.749,
+        "method": "POST",
+        "request_id": "32e536d3-a8f2-4465-a133-c50dc21d367c",
+        "response_bytes": 431,
+        "response_sha256": "f1f039d95205a19fb5d44da8f7cccbf44f35be60138278bf73587381092abb6d",
+        "route": "/plans/{id}/approvals",
+        "status": 201
+      },
+      {
+        "latency_ms": 2.619,
+        "method": "POST",
+        "request_id": "ca031e30-2119-46f9-b7d4-0817322dc2c3",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/plans/{id}/runs",
+        "status": 202
+      },
+      {
+        "latency_ms": 1.405,
+        "method": "GET",
+        "request_id": "80bb3fdd-17b4-4c24-9650-fa881c4214e9",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.705,
+        "method": "GET",
+        "request_id": "3036301b-ae39-4f78-9400-bd97fbb9c560",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 2.549,
+        "method": "GET",
+        "request_id": "79ed3876-099c-4c0e-a9f7-17e36ee94b6f",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.669,
+        "method": "GET",
+        "request_id": "aab7e081-672d-4a29-a950-5e0a0b47ba43",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.986,
+        "method": "GET",
+        "request_id": "89a3c99f-c974-48e9-9cd8-5f4a2a38f074",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.575,
+        "method": "GET",
+        "request_id": "c7b8328f-c4ef-436e-98a6-d45bca82d3dc",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.624,
+        "method": "GET",
+        "request_id": "4be3f02d-53a6-4210-b155-fe2e8c103cbc",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.608,
+        "method": "GET",
+        "request_id": "3aa92bf4-743b-42d4-9597-caa90c356e3a",
+        "response_bytes": 469,
+        "response_sha256": "3c5285727a1a7ed16bdb2f7668044f0307a9ed8ddaee768ec2368c4eedee14a4",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.762,
+        "method": "GET",
+        "request_id": "4fdb67fb-2363-4bd4-aded-cb8969d16822",
+        "response_bytes": 765,
+        "response_sha256": "3f250aff2bc0ee2deb68048a90e658237af297cabb2a8f9dfe02b3c84bf8f13b",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.715,
+        "method": "GET",
+        "request_id": "b1c4956a-7b5f-4bab-97ff-f36c13208d11",
+        "response_bytes": 765,
+        "response_sha256": "3f250aff2bc0ee2deb68048a90e658237af297cabb2a8f9dfe02b3c84bf8f13b",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.69,
+        "method": "GET",
+        "request_id": "30640e98-57f7-403a-b95c-28b37122ee13",
+        "response_bytes": 852,
+        "response_sha256": "767802b664856192905bf5508baa70c4e64dd4eec97ea02b28a30ae3e14d6c18",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.879,
+        "method": "GET",
+        "request_id": "17247d3e-1be9-43c7-8bf2-c9c330a97c61",
+        "response_bytes": 852,
+        "response_sha256": "767802b664856192905bf5508baa70c4e64dd4eec97ea02b28a30ae3e14d6c18",
+        "route": "/runs/{id}",
+        "status": 200
+      },
+      {
+        "latency_ms": 1.778,
+        "method": "GET",
+        "request_id": "f8278bf3-bb74-419d-836f-5a97ed2d1000",
+        "response_bytes": 852,
+        "response_sha256": "767802b664856192905bf5508baa70c4e64dd4eec97ea02b28a30ae3e14d6c18",
+        "route": "/runs/{id}",
+        "status": 200
+      }
+    ],
+    "external_dispatch": {
+      "attempt_sites": [],
+      "client_constructions": 0,
+      "credential_names_present": [],
+      "egress_attempts": 0,
+      "guarded_processes": 11,
+      "verified": true
+    },
+    "job_ids": [
+      "run_4773be3ad2e14fb395b6316bb20a10b9",
+      "run_7e2e123fa9fc46398e7e12277e0bab87",
+      "run_e7017f56548149c693771e236d60fdbc"
+    ],
+    "lane": "offline_real_science",
+    "lane_version": 1,
+    "native_artifacts": [],
+    "operation": "science",
+    "provider": {
+      "note": "manual plans; no model, controlled or live, was invoked by these scenarios",
+      "placeholder_identity": null,
+      "transport": "none"
+    },
+    "provider_requests": 0,
+    "readiness": {
+      "api": {
+        "health": {
+          "contract_version": "DB-SC-1",
+          "service": "dr-bean",
+          "status": "ready"
+        },
+        "ready": true
+      },
+      "science": {
+        "ready": false,
+        "reported": {
+          "browser_replay": false,
+          "claim_families": [],
+          "configured": false,
+          "design_tiers": [],
+          "implemented": false,
+          "native_replay": false,
+          "reason": "groundwork_adapter_not_installed",
+          "verified_in_environment": false
+        }
+      },
+      "worker": {
+        "holds_sqlite_worker_lock": true,
+        "process_alive": true,
+        "ready": true
+      }
+    },
+    "records": null,
+    "reviewer_approvals": 3,
+    "schema": "eval-observation/v1",
+    "scientific_jobs": 3,
+    "state": "blocked",
+    "tested_commit": "da5ecdc3f6add4689bf52129d2f00978884840c1",
+    "timings": {
+      "basis": "local loopback wall time measured by the harness; not provider latency",
+      "http_exchanges": 41,
+      "http_latency_ms_max": 3.94,
+      "http_latency_ms_total": 89.712
+    },
+    "tools": {
+      "transport": "real"
+    }
+  }
+}

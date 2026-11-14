@@ -11,13 +11,50 @@ from .assertions import validate_assertion
 from .budget import DEFAULT_CAPS, INVOCATION_LIMITS
 
 CASE_IDS = [f"C{n:02d}" for n in range(1, 13)]
-LANES = ("fixture_contract", "live_intake", "live_agent_controlled_tools", "actual_full_stack")
+LANES = ("fixture_contract", "live_intake", "live_agent_controlled_tools", "actual_full_stack",
+         "offline_real_science")
 MODES = {
     "fixture_contract": "fixture_contract",
     "live_intake": "live_model_controlled_tools",
     "live_agent_controlled_tools": "live_model_controlled_tools",
     "actual_full_stack": "actual_full_stack",
+    "offline_real_science": "actual_local_science_no_model",
 }
+# Per-lane evidence rules (manifest v2). Old lanes keep their v1 meaning; the live
+# lanes are retained but disabled. offline_real_science is new: real API, worker
+# and scientific tools, absent or controlled AI, verified zero model dispatch and
+# no provider cohort.
+LANE_RULES = {
+    "fixture_contract": {"version": 1, "provider": ["controlled", "none"], "tools": None, "live_provider": False,
+                         "cohort": False, "enabled": True, "zero_dispatch_required": False,
+                         "meaning": "offline controlled model/application boundary; never evidence about Gemini or science"},
+    "live_intake": {"version": 1, "provider": ["live"], "tools": None, "live_provider": True, "cohort": True,
+                    "enabled": False, "zero_dispatch_required": False,
+                    "meaning": "future live Gemini intake; NOT_RUN until a new explicit user instruction"},
+    "live_agent_controlled_tools": {"version": 1, "provider": ["live"], "tools": "controlled", "live_provider": True,
+                                    "cohort": True, "enabled": False, "zero_dispatch_required": False,
+                                    "meaning": "future live Gemini agent decisions; NOT_RUN"},
+    "actual_full_stack": {"version": 1, "provider": ["live"], "tools": "real", "live_provider": True, "cohort": True,
+                          "enabled": False, "zero_dispatch_required": False,
+                          "meaning": "v1 lane coupling real science to a live provider; retained, disabled, NOT_RUN"},
+    "offline_real_science": {"version": 1, "provider": ["none", "controlled"], "tools": "real",
+                             "live_provider": False, "cohort": False, "enabled": True, "zero_dispatch_required": True,
+                             "meaning": "actual local API, worker and science through HTTP; zero external model dispatch"},
+}
+LIVE_ACTIVATION = ("disabled: live lanes are NOT_RUN. Activation requires a new explicit user instruction, one shared "
+                   "accounted allocation, Owner 3's operator path and independent grading of predeclared cases. "
+                   "The CLI has no switch for it.")
+SCIENCE_PACKETS = ("hero-v1", "changed-input-v1", "fixed-pair-regression-v1")
+OFFLINE_SCIENCE_ENTRIES = (
+    ("RS-HERO-FULL", "hero-v1", "real baseline, separate design approval, raw artifact download, fresh native replay"),
+    ("RS-CHANGED-INPUT", "changed-input-v1", "changed scientific input: fresh identities and computation, "
+                                             "original result unchanged"),
+    ("RS-RETRY-CONCURRENT", "hero-v1", "concurrent and retried starts: one accepted run, no duplicate science"),
+    ("RS-DESIGN-AUTHORITY", "hero-v1", "baseline approval cannot authorize design; pair, allowance and grid bound"),
+    ("RS-FOLLOWUP", "hero-v1", "hypothetical readings: new lineage, new approval, per-candidate outcomes"),
+    ("RS-CANCEL-RESTART", "hero-v1", "queued and running cancellation, worker restart: no orphan, no redispatch"),
+    ("RS-ZERO-DISPATCH", "hero-v1", "whole lane: guard active in API and worker, zero external model dispatch"),
+)
 # Proposed pre-request maxima (tokens). Ceilings to enforce, not measurements:
 # 8*3000 + 24*1600 = 62,400 input and 8*700 + 24*400 = 15,200 output.
 REQUEST_ALLOCATION = {
@@ -49,7 +86,9 @@ def _schedule() -> dict:
         {"entry_id": "FS-DESIGN", "lane": "actual_full_stack", "operation": "agent",
          "note": "distinct design agent invocation after separate human review and approval"},
     ]
-    return {"fixture_contract": fixture, "live": live, "actual_full_stack": full}
+    science = [{"entry_id": entry_id, "lane": "offline_real_science", "operation": "science", "packet": packet,
+                "note": note} for entry_id, packet, note in OFFLINE_SCIENCE_ENTRIES]
+    return {"fixture_contract": fixture, "live": live, "actual_full_stack": full, "offline_real_science": science}
 
 
 def build(root: str) -> dict:
@@ -81,6 +120,12 @@ def build(root: str) -> dict:
         "schedule": _schedule(),
         "caps": {"cohort": DEFAULT_CAPS, "invocation": INVOCATION_LIMITS, "request_allocation": REQUEST_ALLOCATION,
                  "max_scientific_jobs_in_portfolio": 2},
+        "lanes": LANE_RULES,
+        "live_activation": LIVE_ACTIVATION,
+        "science_packets": {packet: {"file": f"cases/science/{packet}.json",
+                                     "sha256": sha256_file(os.path.join(root, "cases", "science", packet + ".json"))}
+                            for packet in SCIENCE_PACKETS},
+        "ancestry_archive": "manifests/manifest-v<N>.json holds every superseded manifest byte-for-byte",
     }
 
 
@@ -96,7 +141,13 @@ def freeze(root: str) -> dict:
             return previous
         manifest["manifest_version"] = previous["manifest_version"] + 1
         manifest["supersedes"] = previous.get("supersedes", []) + [
-            {"manifest_version": previous["manifest_version"], "sha256": sha256_file(path)}]
+            {"manifest_version": previous["manifest_version"], "sha256": sha256_file(path),
+             "archived": f"manifests/manifest-v{previous['manifest_version']}.json"}]
+        archive = os.path.join(root, "manifests", f"manifest-v{previous['manifest_version']}.json")
+        os.makedirs(os.path.dirname(archive), exist_ok=True)
+        if not os.path.exists(archive):  # keep ancestors byte-identical so old attempts stay interpretable
+            with open(path, "rb") as source, open(archive, "wb") as target:
+                target.write(source.read())
     manifest["frozen_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2, sort_keys=True)
@@ -171,4 +222,37 @@ def verify(root: str) -> list[str]:
             or tokens_out > cohort["output_tokens"]):
         problems.append(f"scheduled live maxima exceed cohort caps: {requests} requests, "
                         f"{tokens_in} in, {tokens_out} out")
+    problems += _verify_v2(root, manifest)
+    return problems
+
+
+def _verify_v2(root: str, manifest: dict) -> list[str]:
+    """Ancestry, science packets and lane rules (manifest version 2 and later)."""
+    problems = []
+    for ancestor in manifest.get("supersedes", []):
+        archived = ancestor.get("archived")
+        path = os.path.join(root, archived) if archived else None
+        if not path or not os.path.exists(path):
+            problems.append(f"superseded manifest v{ancestor['manifest_version']} is not archived")
+        elif sha256_file(path) != ancestor["sha256"]:
+            problems.append(f"archived manifest v{ancestor['manifest_version']} does not match its recorded digest")
+    if manifest["manifest_version"] < 2:
+        return problems
+    for packet, item in manifest.get("science_packets", {}).items():
+        path = os.path.join(root, item["file"])
+        if not os.path.exists(path):
+            problems.append(f"missing science packet {item['file']}")
+        elif sha256_file(path) != item["sha256"]:
+            problems.append(f"science packet changed without a manifest version: {item['file']}")
+    lanes = manifest.get("lanes", {})
+    if sorted(lanes) != sorted(LANES):
+        problems.append("lane rules do not cover exactly the declared lanes")
+    for lane, rule in lanes.items():
+        if rule.get("live_provider") and rule.get("enabled"):
+            problems.append(f"live lane {lane} is enabled; live lanes stay NOT_RUN without a new user instruction")
+        if not rule.get("live_provider") and "live" in rule.get("provider", []):
+            problems.append(f"offline lane {lane} admits a live provider")
+    for entry in manifest["schedule"].get("offline_real_science", []):
+        if entry.get("packet") not in manifest.get("science_packets", {}):
+            problems.append(f"{entry['entry_id']}: unknown science packet {entry.get('packet')}")
     return problems

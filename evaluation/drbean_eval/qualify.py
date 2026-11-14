@@ -1,0 +1,199 @@
+"""Qualification of real-science observations. A claim of success is never enough.
+
+The runner calls :func:`qualify` for every entry of a lane that carries no frozen
+case assertions (``offline_real_science`` and the retained ``actual_full_stack``).
+``state: completed``, ``status: passed`` or a nonempty reference string cannot
+qualify an entry on their own. Qualification needs, independently re-checked here:
+
+1. evidence class ``executed_acceptance``: the observation came from a subject the
+   runner executed in this process against a stack it launched. Recorded or
+   imported observations are ``imported_claim`` and never qualify;
+2. every evidence file listed in the observation exists and has its recorded digest;
+3. the saved authenticated records link up: plan -> problem -> dataset digests,
+   approval scope/digest, run plan/approval, evidence run/problem, design request
+   historical run, candidate ids and exact vectors, design approval and job;
+4. each saved native packet still hashes to its reference and passes a fresh
+   native replay run here, with anchors re-extracted from the saved authenticated
+   record files (never from the bundle);
+5. external model dispatch verified zero by the guard in the API and worker;
+6. no required check failed. Blocked or unobserved checks make the entry ``unrun``
+   with the blocking reason, never ``passed``.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+
+from . import native
+
+EVIDENCE_CLASSES = ("executed_acceptance", "validated_trace", "imported_claim")
+
+
+def _load(evidence_dir: str, rel: str):
+    with open(os.path.join(evidence_dir, rel), "rb") as handle:
+        data = handle.read()
+    return data, json.loads(data.decode("utf-8")) if rel.endswith(".json") else None
+
+
+def _file_checks(observation: dict, evidence_dir: str) -> list[dict]:
+    out = []
+    index = observation.get("evidence_index") or {}
+    for name, item in sorted(index.items()):
+        path = os.path.join(evidence_dir, item.get("path", ""))
+        if not item.get("path") or not os.path.isfile(path):
+            out.append({"id": f"file:{name}", "passed": False, "detail": "listed evidence file is missing"})
+            continue
+        with open(path, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        out.append({"id": f"file:{name}", "passed": digest == item.get("sha256"),
+                    "detail": "digest matches" if digest == item.get("sha256") else "digest differs from record"})
+    return out
+
+
+def _records(observation: dict, evidence_dir: str) -> dict:
+    loaded = {}
+    for name, item in (observation.get("evidence_index") or {}).items():
+        if item.get("path", "").startswith("records/"):
+            try:
+                loaded[name] = _load(evidence_dir, item["path"])[1]
+            except (OSError, ValueError):
+                pass
+    return loaded
+
+
+def _link_checks(records: dict) -> list[dict]:
+    """Cross-record identity links among saved authenticated responses."""
+    out = []
+
+    def check(check_id, condition, detail=""):
+        out.append({"id": check_id, "passed": bool(condition), "detail": detail})
+
+    labels = sorted({name.rsplit("-", 1)[0] for name in records if name.endswith("-plan")
+                     and not name.endswith("design-plan")})
+    for label in labels:
+        dataset, problem, plan = records.get(f"{label}-dataset"), records.get(f"{label}-problem"), records.get(
+            f"{label}-plan")
+        approval, run = records.get(f"{label}-approval"), records.get(f"{label}-run")
+        if not all((dataset, problem, plan, approval, run)):
+            check(f"links:{label}:complete", False, "a baseline record is missing from the saved evidence")
+            continue
+        check(f"links:{label}:problem_dataset", problem["body"]["dataset_id"] == dataset["id"]
+              and problem["body"]["dataset_digest"] == dataset["digest"])
+        check(f"links:{label}:plan_problem", plan["body"]["problem_id"] == problem["id"]
+              and plan["body"]["problem_digest"] == problem["digest"] and plan["body"]["dataset_id"] == dataset["id"])
+        check(f"links:{label}:approval_plan", approval.get("plan_id") == plan["id"]
+              and approval.get("plan_digest") == plan["digest"] and approval.get("scope") == "investigation"
+              and approval.get("expected_revision_id") == problem["id"])
+        check(f"links:{label}:run_plan_approval", run.get("plan_id") == plan["id"]
+              and run.get("approval_id") == approval["id"] and run.get("kind") == "run")
+        evidence = records.get(f"{label}-evidence-baseline")
+        if evidence:
+            body = evidence.get("body") or {}
+            check(f"links:{label}:evidence_run", body.get("run_id") == run["id"]
+                  and body.get("problem_id") == problem["id"] and body.get("expected_problem_digest") == problem["digest"])
+            child = next((s for s in run.get("scenarios", []) if s.get("scenario_id") == "baseline"), {})
+            check(f"links:{label}:run_result_is_evidence", child.get("result_id") == evidence["id"])
+        design_plan = records.get(f"{label}-design-plan")
+        if design_plan:
+            request = design_plan["body"]["request"]
+            check(f"links:{label}:design_historical_run", request["historical_run_id"] == run["id"]
+                  and request["problem_id"] == problem["id"] and request["problem_digest"] == problem["digest"])
+            candidates = {c["id"]: c for c in ((evidence or {}).get("body") or {}).get("result", {}).get(
+                "candidates", [])}
+            check(f"links:{label}:design_pair_from_evidence",
+                  all(cid in candidates and candidates[cid]["parameter_vector"] == vector
+                      for cid, vector in zip(request["candidate_ids"], request["candidate_vectors"])),
+                  "design candidates are exactly the run's frozen candidates")
+            design_approval, job = records.get(f"{label}-design-approval"), records.get(f"{label}-design-job")
+            if design_approval and job:
+                check(f"links:{label}:design_approval", design_approval.get("plan_id") == design_plan["id"]
+                      and design_approval.get("scope") == "design"
+                      and design_approval.get("plan_digest") == design_plan["digest"]
+                      and design_approval.get("id") != approval.get("id"))
+                check(f"links:{label}:design_job", job.get("plan_id") == design_plan["id"]
+                      and job.get("approval_id") == design_approval["id"] and job.get("kind") == "design_job")
+                suggestion = records.get(f"{label}-suggestion")
+                if suggestion:
+                    check(f"links:{label}:suggestion_is_job_result", job.get("result_id") == suggestion["id"])
+    return out
+
+
+def _replay_checks(observation: dict, evidence_dir: str, records: dict, science_python: str | None,
+                   package_dir: str | None) -> list[dict]:
+    out = []
+    for item in observation.get("native_artifacts") or []:
+        try:
+            data, _ = _load(evidence_dir, item["path"])
+        except OSError:
+            out.append({"id": f"replay:{item.get('artifact_id')}", "passed": False, "detail": "packet file missing"})
+            continue
+        digest = hashlib.sha256(data).hexdigest()
+        reference = item.get("reference") or {}
+        out.append({"id": f"bytes:{item.get('artifact_id')}", "passed": digest == reference.get("sha256")
+                    and len(data) == reference.get("byte_size"), "detail": "saved packet matches its reference"})
+        anchor_records = [records[name] for name in item.get("anchor_records", []) if name in records]
+        anchors = native.anchors_from_record(*anchor_records)
+        if not science_python or not package_dir:
+            out.append({"id": f"replay:{item.get('artifact_id')}", "passed": False,
+                        "detail": "no replay interpreter available to the qualifier"})
+            continue
+        if not anchors.get("problem_digest") or not anchors.get("suggestion_digest"):
+            out.append({"id": f"replay:{item.get('artifact_id')}", "passed": False,
+                        "detail": "anchors are not present in the saved authenticated records"})
+            continue
+        report = native.replay(science_python, package_dir, data, anchors)
+        body = report.get("report") or {}
+        out.append({"id": f"replay:{item.get('artifact_id')}", "passed": report["status"] == "passed"
+                    and body.get("integrity") == "passed" and body.get("expected_binding") == "matches",
+                    "detail": f"fresh replay {report['status']}"})
+    return out
+
+
+def zero_dispatch(observation: dict) -> tuple[bool, str]:
+    dispatch = observation.get("external_dispatch") or {}
+    if dispatch.get("verified") is not True:
+        return False, "external model dispatch was not verified by the guard (unknown is not zero)"
+    if dispatch.get("egress_attempts") != 0 or dispatch.get("client_constructions") != 0:
+        return False, (f"external model attempt: {dispatch.get('egress_attempts')} egress, "
+                       f"{dispatch.get('client_constructions')} client construction(s)")
+    if observation.get("provider_requests") not in (0,):
+        return False, f"provider_requests {observation.get('provider_requests')!r} is not a verified zero"
+    return True, "guard active in API and worker; zero external model attempts"
+
+
+def qualify(observation: dict, *, evidence_dir: str | None, evidence_class: str, science_python: str | None,
+            package_dir: str | None) -> dict:
+    if evidence_class not in EVIDENCE_CLASSES:
+        raise ValueError(f"unknown evidence class {evidence_class!r}")
+    result = {"evidence_class": evidence_class, "qualifier_checks": []}
+    if evidence_class != "executed_acceptance":
+        return {**result, "status": "failed",
+                "reason": "imported observation: claims are never qualification; rerun the lane with --subject "
+                          "http-launch so the runner executes and corroborates the acceptance itself"}
+    if not evidence_dir or not os.path.isdir(evidence_dir):
+        return {**result, "status": "failed", "reason": "no evidence directory was produced"}
+    ok, detail = zero_dispatch(observation)
+    qualifier = [{"id": "zero_external_model_dispatch", "passed": ok, "detail": detail}]
+    qualifier += _file_checks(observation, evidence_dir)
+    records = _records(observation, evidence_dir)
+    qualifier += _link_checks(records)
+    qualifier += _replay_checks(observation, evidence_dir, records, science_python, package_dir)
+    result["qualifier_checks"] = qualifier
+    failed_q = [c for c in qualifier if not c["passed"]]
+    checks = observation.get("checks")
+    if not isinstance(checks, list) or not checks:
+        return {**result, "status": "failed", "reason": "observation carries no executed checks"}
+    required = [c for c in checks if isinstance(c, dict) and c.get("level", "required") == "required"]
+    failed = [c for c in required if c.get("outcome") == "failed"]
+    blocked = [c for c in required if c.get("outcome") in ("blocked", "not_observed")]
+    if failed_q or failed:
+        names = [c["id"] for c in failed_q] + [c["id"] for c in failed]
+        return {**result, "status": "failed", "reason": "failed: " + ", ".join(names[:12])}
+    if blocked:
+        reasons = "; ".join(f"{c['id']} ({c.get('finding') or 'prerequisite'}): {c.get('detail', '')[:120]}"
+                            for c in blocked[:4])
+        return {**result, "status": "unrun", "reason": "blocked: " + reasons}
+    if not required:
+        return {**result, "status": "unrun", "reason": "blocked: no required check could be evaluated"}
+    return {**result, "status": "passed", "reason": None}

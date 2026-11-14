@@ -11,7 +11,9 @@ import { createServer } from 'node:net'
 import { randomBytes, createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
 
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
+import { createRequire } from 'node:module'
+// require() honours NODE_PATH and CommonJS builds; PLAYWRIGHT_MODULE may name an explicit entry file.
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const temp = await mkdtemp(join(tmpdir(), 'drbean-web-baseline-'))
 const token = randomBytes(40).toString('hex')
@@ -62,7 +64,7 @@ try {
   assert.equal(capabilities.science.baseline_discovery, true, JSON.stringify(capabilities.science))
   assert.equal(capabilities.gemini.dispatch_enabled, false)
   start(python, ['-m', 'bean_api.worker'])
-  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] })
+  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] })
   const context = await browser.newContext({ acceptDownloads: true })
   const page = await context.newPage(), errors = [], external = []
   page.on('pageerror', error => errors.push(error.message))
