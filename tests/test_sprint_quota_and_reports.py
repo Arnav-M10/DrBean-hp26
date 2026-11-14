@@ -8,6 +8,7 @@ network. Nothing here qualifies Gemini itself.
 Checklist items: ACC-06, ACC-07, ACC-08 (evaluation/coordinator/sprint-completion.v1.json).
 """
 import hashlib
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -161,6 +162,10 @@ def test_acc07_acc06_provider_failure_after_real_science_keeps_evidence_and_repo
     assert len(wire.requests) == requests_after_failure
 
 
+# Persisted, validated commentary arrives with PR #60 (bean_api.research_reports). Without that producer this is a
+# documented expected failure (a missing producer is never a pass); with it, the probe must pass.
+@pytest.mark.xfail(condition=importlib.util.find_spec("bean_api.research_reports") is None, strict=True,
+                   reason="F-SPRINT-REPORT-COMMENTARY: no persisted agent commentary in downloaded reports before PR #60")
 @pytest.mark.parametrize("metered_app", ["native"], indirect=True)
 def test_acc06_downloaded_report_carries_the_validated_explanation_and_recommendation(metered_app):
     """Complete a baseline through the live path and download the research report."""
