@@ -12,13 +12,13 @@ function assumptionValues(dataset, problem) {
   return values
 }
 
-export function setupSourceWorkflow({ context, getDraft, button, node, exactRecord, useInputs }) {
-  let source, imageUrl, proposal, review, fields = [], resolved = new Set(), proposalId = '', explanation = '', prepared, materialized, selectedFile, selectedOrigin = '', previewDraft
+export function setupSourceWorkflow({ context, getDraft, button, node, exactRecord, useInputs, applyReviewedFields }) {
+  let source, imageUrl, proposal, review, fields = [], resolved = new Set(), explanation = '', prepared, materialized, selectedFile, selectedOrigin = '', previewDraft
   function reset() {
     if (imageUrl) URL.revokeObjectURL(imageUrl)
     source = imageUrl = proposal = review = prepared = materialized = undefined
     selectedFile = previewDraft = undefined; selectedOrigin = ''
-    fields = []; resolved = new Set(); proposalId = explanation = ''
+    fields = []; resolved = new Set(); explanation = ''
   }
   async function showSource(record) {
     const { api, workspace } = context()
@@ -29,7 +29,7 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
     source = record
   }
   function render(parent) {
-    const { api, workspace, busy } = context()
+    const { api, workspace, busy, capabilities } = context()
     const section = node('section', ''); section.id = 'source-review'; parent.append(section)
     section.append(node('h3', 'Source and value review'), node('p', 'Gemini is a disabled placeholder. Upload retains a source locally without extraction or scientific approval. Enter measurements manually when no reviewed proposal is available.'))
     const fileLabel = node('label', 'Public or synthetic source image'); fileLabel.className = 'stack'
@@ -53,21 +53,32 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
       section.append(node('p', `Retained source ${source.id}. Origin: ${source.body.origin}.`))
       const image = node('img', ''); image.src = imageUrl; image.alt = 'Retained source for transcription review'; image.style.maxWidth = '100%'; section.append(image)
     }
-    const label = node('label', 'Existing intake proposal identifier'); label.className = 'stack'
-    const input = node('input', ''); input.id = 'source-proposal-id'; input.value = proposalId; input.disabled = busy
-    input.addEventListener('input', () => { proposalId = input.value }); label.append(input); section.append(label)
-    button(section, 'Open source proposal', async () => {
-      const loaded = await api.json(`/records/${encodeURIComponent(proposalId.trim())}`)
-      if (loaded.kind !== 'intake_proposal' || loaded.workspace_id !== workspace) throw new Error('Choose an intake proposal from this workspace.')
-      const record = await api.json(`/source-assets/${encodeURIComponent(loaded.body.source_asset_id)}`)
-      if (record.body.sha256 !== loaded.body.source_digest) throw new Error('Proposal and source identities differ.')
-      await showSource(record); proposal = loaded; review = prepared = materialized = undefined; resolved = new Set()
+    const controlled = capabilities?.source_intake?.execution_mode === 'controlled' && capabilities.source_intake.application_review_integration === 'available'
+    section.append(node('p', controlled ? 'Controlled examples are enabled for exact supported synthetic images only. These authored values are not image understanding or Gemini transcription. Unknown or changed images require manual entry.' : 'Controlled proposals are unavailable in this server configuration. Manual entry remains available.'))
+    button(section, 'Use controlled example image', async () => {
+      const response = await fetch('/examples/controlled-source.png')
+      if (!response.ok) throw new Error('The controlled example image is unavailable. Upload a source or enter measurements manually.')
+      const bytes = await response.blob()
+      const record = await api.uploadSource(workspace, new File([bytes], 'controlled-source.png', { type: 'image/png' }), 'synthetic')
+      reset(); await showSource(record)
+    }, !api || !workspace || !controlled)
+    button(section, 'Prepare controlled source proposal', async () => {
+      const loaded = await api.json(`/workspaces/${workspace}/intake-proposals`, { execution_mode: 'controlled', source_id: source.id, expected_source_digest: source.body.sha256 })
+      if (loaded.kind !== 'intake_proposal' || loaded.workspace_id !== workspace || loaded.body.source_asset_id !== source.id || loaded.body.source_digest !== source.body.sha256) throw new Error('Proposal and selected source identities differ.')
+      proposal = loaded; review = prepared = materialized = undefined; resolved = new Set()
       fields = loaded.body.fields.map(field => ({ field_path: field.field_path, value: field.original_value ?? field.candidate_exact ?? '', origin: 'confirmed_transcription', correction_reason: '' }))
-    }, !api || !workspace)
+    }, !controlled || !source || source.body.origin !== 'synthetic')
+    const manual = node('a', 'Continue with manual measurements'); manual.href = '#inputs'; section.append(manual)
     if (!proposal) return
+    section.append(node('p', proposal.body.label || 'Controlled example; not Gemini transcription.'))
+    if (proposal.body.status === 'unavailable' || fields.length === 0) {
+      section.append(node('p', 'Extraction unavailable for these image bytes. No values were accepted or added. Use manual measurements.'))
+      return
+    }
     section.append(node('p', 'Review every proposed value against the retained image. Controlled proposals are test output; no live Gemini qualification is claimed.'), exactRecord('Proposal and source locators', proposal))
     fields.forEach((field, index) => {
       const original = proposal.body.fields[index]
+      if (!field.value || original.ambiguity) section.append(node('p', `Needs review: ${field.field_path} — ${original.ambiguity || 'No proposed value; enter a reviewed value or assumption.'}`))
       section.append(node('p', `${field.field_path} · original ${original.original_value ?? 'unreadable'} · proposed exact ${original.candidate_exact ?? 'unavailable'} · ${original.locator.label}: ${original.locator.excerpt}`))
       for (const [key, title] of [['value', 'Reviewed value'], ['correction_reason', 'Correction or assumption reason']]) {
         const label = node('label', `${field.field_path} ${title}`); label.className = 'stack'
@@ -90,7 +101,8 @@ export function setupSourceWorkflow({ context, getDraft, button, node, exactReco
     }, Boolean(review))
     if (!review) return
     button(section, 'Revise source review', () => { review = prepared = materialized = undefined })
-    section.append(exactRecord('Source review receipt', review), node('p', 'Complete Measurements and Question with these reviewed values. Explain the remaining assumptions before creating executable inputs. The server checks exact agreement with this review.'))
+    button(section, 'Use reviewed values in measurement draft', () => applyReviewedFields(review, source))
+    section.append(exactRecord('Source review receipt', review), node('p', 'Use the reviewed values in the measurement draft (replacing its rows), then complete Measurements and Question. Explain the remaining assumptions before creating executable inputs. The server checks exact agreement with this review.'))
     const assumptionLabel = node('label', 'Explanation for the remaining manually reviewed inputs and assumptions'); assumptionLabel.className = 'stack'
     const assumption = node('textarea', ''); assumption.value = explanation; assumption.disabled = busy || Boolean(prepared); assumption.maxLength = 2000
     assumption.addEventListener('input', () => { explanation = assumption.value }); assumptionLabel.append(assumption); section.append(assumptionLabel)

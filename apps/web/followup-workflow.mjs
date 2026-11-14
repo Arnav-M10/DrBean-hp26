@@ -1,7 +1,7 @@
 import { parseExact } from './exact.mjs'
 import { planRequest } from './manual.mjs'
 
-export function setupFollowupWorkflow({ context, button, node, exactRecord }) {
+export function setupFollowupWorkflow({ context, button, node, exactRecord, openRun }) {
   let rowId = '', origin = 'hypothetical', observedTime = '', observedAllowance = ''
   let source = '', value = '', reason = '', proposal, dataset, problem, plan, approval, run
   function reset() { origin = 'hypothetical'; observedTime = observedAllowance = ''; rowId = `observation_${crypto.randomUUID().replaceAll('-', '')}`; source = value = reason = ''; proposal = dataset = problem = plan = approval = run = undefined }
@@ -75,8 +75,9 @@ export function setupFollowupWorkflow({ context, button, node, exactRecord }) {
     check.addEventListener('change', () => { approve.disabled = busy || Boolean(approval) || !check.checked })
     button(section, 'Queue approved follow-up', async () => {
       run = await api.json(`/plans/${plan.id}/runs`, { approval_id: approval.id, expected_plan_digest: plan.digest })
+      await openRun(run.id)
     }, !approval || Boolean(run))
-    if (run) section.append(node('p', `Follow-up run ${run.id}. Open this identifier in Persisted investigation to retrieve status, candidate feedback and native evidence.`))
+    if (run) button(section, 'Open follow-up results', () => openRun(run.id))
   }
   return { render, reset }
 }
