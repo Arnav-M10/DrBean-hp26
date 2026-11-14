@@ -2,7 +2,84 @@
 
 Owner: Person 1 / Counterdex.
 
-## Current continuation — cross-branch compatibility and replay controls
+## Current continuation — proposed native design and evaluator compatibility
+
+Baseline: clean `bad5e9f` on `codex/science-next`, then current `main` `9cc90e0`
+was merged as `0543a0d`, preserving teammate changes. No applicable `AGENTS.md`
+was found. The standing master brief and ownership boundary remain unchanged.
+Counterdex remains **0.3.0**, prepared CPython **3.11.17**, source
+`90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
+Scientific source, package metadata and fixtures were not changed.
+
+Next checkpoint selected: qualify newly proposed native design consumers against
+the existing explicit v2 scientific contract; retain useful owned acceptance
+controls and a concrete handoff if another owner still blocks integration.
+No new model family, proof rule, provider, evaluator or browser feature was added.
+
+Read-only audit of `backend/browser-design` at `8451c1f` (PR #9) used its real
+modules/tests extracted from Git, the installed 0.3 engine, and the pinned backend
+CPython **3.13.18** / Pydantic **2.13.4** environment. Its existing computed-pair
+design test **failed once** in 0.46 seconds with `unsupported_artifact_reuse` at
+`request/source_artifact_ids`: that consumer forces mandatory baseline history
+into the optional prospective reuse list. A separately reviewed empty-reuse
+request instead returns adapter `incomplete_export`. Passing that same complete
+history/request directly through the actual transport produces checked `8/1`
+separation, `valid` verification and fresh replay `passed`. The output preserves
+reviewed hypothetical allowance provenance and horizon `10/1`; the consumer
+reconstructs `reviewed_hard_bound` and `8/1`, then rejects correct v2 evidence
+as `binding_mismatch`. These are consumer-contract failures, not observed
+scientific arithmetic failures or a qualified HTTP run.
+
+Two new owned bridge regressions pass in **0.455 seconds**: checked explicit
+v2 round-trip/replay retains the complete larger horizon, allowance provenance,
+grid order and historical bytes; the genuine anchor and a deliberately resealed
+diagnostic anchor separately reject legacy-policy relabelling. The other control
+rejects a baseline ID as prospective reuse before construction. The complete
+changed bridge module passes **29 tests** in **4.718 seconds**:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=packages/groundwork_adapter:packages/groundwork_adapter/tests \
+  python3.11 -m unittest -q test_bridge
+```
+
+No broad package/build qualification was repeated: the production source bytes
+are unchanged and prior release evidence remains historical qualification of
+that source. `docs/OWNER2_BRIDGE_ADOPTION.md` records exact versions, failure
+reproduction, positive/invalid examples, mapping/approval effects, limits and
+the smallest correction. The actual-observation extension requested in the
+backend log already exists as additive **`recheck`**; adopt that operation rather
+than widen legacy `review` or create a replacement checker.
+
+The evaluator now has two materially different states. Merged main `9cc90e0`
+still has legacy native classification/replay/anchor handling, though its old
+string-shaped allowance-origin defect is fixed. Proposed evaluator `219dc0c`
+already implements application classification, `replay-native`, all eight
+external anchor fields, numerical integrity and a separately reviewed
+`hero-v2` continuation control. A fresh read-only consumer review replayed all
+**five** supplied baseline/design/negative-design/recheck/both-excluded packets
+successfully through that actual proposed consumer, retaining candidate-specific
+outcomes. This retires the native adoption request on that branch; integrate
+and retest it instead of recreating the work. This establishes replay
+compatibility only; HTTP/download acceptance is pending.
+
+The Mac process-limit defect remains unchanged in main and proposed backend:
+`RLIMIT_NPROC` is still forced to 256 per user. A fresh reviewer diagnostic found
+651 account processes; inherited `(4000,6000)` launches the prepared interpreter,
+whereas the production policy causes errno 35 `EAGAIN`. All changes occurred in
+an owned diagnostic child, killed/reaped afterward. This corroborates the earlier
+633-process reproduction; it is not a relaxed-guard application pass. The
+unchanged known-failing worker-route suite was not repeated.
+
+Owned package checkpoint: ready for review/publication. Integrated G1/G2 and
+release acceptance remain blocked. Next triggers: Owner 2 corrects mandatory
+history versus prospective reuse, adopts v2 reconstruction and fixes the
+platform-aware process guard; the implemented evaluator consumer is integrated.
+Then rerun actual adapter/binding/publication and worker/download/replay controls
+with independent anchors. Stop expansion while those seams need stabilization.
+No external model calls, credential reads, dependency installation, backend edits
+or resource-limit bypasses occurred.
+
+## Earlier continuation — cross-branch compatibility and replay controls
 
 Resumed November 13, 2026 at 22:50 Eastern from clean `b955780` on
 `codex/science-next`. The governing master brief is unchanged (same retained

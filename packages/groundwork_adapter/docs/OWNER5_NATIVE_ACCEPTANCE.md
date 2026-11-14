@@ -1,46 +1,89 @@
 # Owner 5: native acceptance handoff
 
-Science: `b955780bd4e5d95d19a6ffeed6ad2a7723b4822d` (`codex/science-next`, Counterdex 0.3.0).
-Integration: `origin/main` advanced from audited `adac945` to `1f75bdc` during this continuation, merging backend PR #6 (`cc779bf`).
-Evaluator: `origin/claude/adversarial-validation` at `96aa7df780303868d93da192333dfea7dd1be02b`; it is not main.
-Its reports describe application `586fb9b` / harness `da5ecdc`: historical evidence, not observed package 0.3 failures.
-No ordinary HTTP acceptance gate was executed or passed by this handoff.
+Current science base: `0543a0d` on `codex/science-next`, incorporating `main`
+`9cc90e0` and its merged evaluator PR #8. Counterdex remains **0.3.0**,
+CPython **3.11.17**, source
+`90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
+The newer evaluator at **`219dc0c`** on
+`origin/claude/adversarial-validation` is **not yet merged into that main**.
+Keep these consumer states distinct. No ordinary HTTP acceptance gate was
+executed or passed by this handoff.
 
 Read [Owner 2 adoption](OWNER2_BRIDGE_ADOPTION.md), the
 [result truth table](RESULT_SEMANTICS.md), [bridge contract](BRIDGE.md), and the
 [portable packet](../fixtures/repro/README.md). The portable packet includes
 source identity, separate anchors and its prepared CPython 3.11 command.
 
-## Concrete evaluator changes
+## Implemented proposed consumer: integrate and retest
+
+The newer `219dc0c` already implements application packet classification,
+`replay-native`, complete separately supplied application anchors, numerical-only
+integrity handling and a new `hero-v2` with separately reviewed continuation
+permission. It retains `hero-v1`. These changes retire the earlier native
+adoption request **on the proposed branch**; do not recreate them.
+
+A fresh read-only consumer audit used that branch's actual `native.py` against
+the unchanged baseline, positive design, negative design, own-time recheck and
+both-excluded review packets below. **All five** classified as
+`application_bundle` and replayed `passed` / `valid` with all **eight** external
+anchor fields. Recheck retained the individual `valid`/`invalid` outcomes;
+both-excluded review retained `invalid`/`invalid`. This is package-to-evaluator
+replay compatibility, not HTTP acceptance or an independent mathematical
+implementation. The whole application still needs the proposed consumer
+integrated and tested against its own downloaded run bytes/anchor records.
+
+Current `main` still classifies these application packets as `unrecognized_json`,
+calls legacy `replay`, and drops most anchor fields. Its baseline/design probes
+return `invalid_input` at `bundle`; that lag does not establish a defect in the
+newer proposed consumer or current scientific source. Main's old string-shaped
+allowance-origin error is already fixed: it now sends the object shape, tier
+and horizon. The source-artifact selection semantics remain a separate consumer
+issue documented in [the current Owner 2 handoff](OWNER2_BRIDGE_ADOPTION.md).
+
+Remaining trigger: integrate the implemented consumer and rerun ordinary
+HTTP/download/replay acceptance after Owner 2 fixes the Mac process-limit
+boundary and native v2 design/history mapping. The proposed follow-up flow still
+launches ordinary discovery on the revised dataset; dedicated adoption of
+proposal-bound **`recheck`** remains an Owner 2 seam. The existing operation
+supports actual/transcription/hypothetical declarations and a reading's own
+time/allowance without replacing the original fixed vectors. No new science
+producer or evaluator rewrite is needed.
+
+## Earlier findings, retained with their original scope
+
+The earlier audit used evaluator `96aa7df` and science `b955780`, after backend
+PR #6 (`cc779bf`) merged as `1f75bdc`. Its concrete requests below are historical;
+items 1–3 and the continuation control are now implemented by proposed `219dc0c`.
 
 1. In `drbean_eval/native.py`, recognize the exact application profile
-   `counterdex.application-bundle.v1`. Current `classify()` accepts only
+   `counterdex.application-bundle.v1`. The audited `classify()` accepted only
    `groundwork.*`; all three audited application packets are consequently
    `unrecognized_json`. Classifying a profile does not validate its evidence.
 2. Dispatch that profile to `counterdex replay-native PACKET --anchors ANCHORS`.
-   Current `replay()` invokes the supplied-pair `replay` command, which rejects
+   The audited `replay()` invoked the supplied-pair `replay` command, which rejects
    the current hero design packet with `invalid_input`, field path `bundle`.
    Retain the existing command for its original inner suggestion profile.
 3. Obtain the complete expected application anchor from an authenticated record
    bound to the expected artifact/run. Do not recursively select the first
    digest from nested history. Do not strip the anchor down to problem and
-   suggestion digests. `qualify._replay_checks` currently requires a suggestion
+   suggestion digests. The audited `qualify._replay_checks` required a suggestion
    digest even for baseline/recheck, where that identity does not exist.
-4. In `science_flow.Flow.design`, send the current normalized request shape:
+4. In `science_flow.Flow.design`, send the normalized request shape:
    `scientific_profile: "counterdex.v1"`, the reviewed `requested_tier`,
    `maximum_horizon`, and `allowance_origin: {"kind": "hypothetical",
    "description": REVIEWED_DESCRIPTION}` for the current hypothetical control.
-   Preserve the reviewed budget and source-artifact selection. The current
-   string `allowance_origin: "hypothetical"` fails `DesignRequestBody` validation.
+   Preserve the reviewed budget and source-artifact selection. The previously
+   audited string `allowance_origin: "hypothetical"` fails `DesignRequestBody` validation;
+   this shape is already corrected on current main.
    Passing DTO validation alone does not qualify the narrower engine admission.
-5. The evaluator hero currently has `allow_continuation: false`, while requesting
+5. The original evaluator hero has `allow_continuation: false`, while requesting
    6/8 hours beyond its four-hour history. With that permission unchanged, 0.3
    returns `numerical_guidance`, `not_checked`, replay `unsupported`, and exact
    reason `unavailable_horizon`. Checked extension requires a separately reviewed
    `allow_continuation: true`; do not flip it merely to make a positive case pass.
 
-These findings reproduce using the evaluator's fetched source and the current
-packet files without switching branches. Owner 2 still owns ordinary HTTP
+The earlier findings reproduced using the then-fetched evaluator source and
+current packet files without switching branches. Owner 2 still owns ordinary HTTP
 startup, byte persistence/download and expected-anchor records. The earlier
 `adac945` baseline dispatch blocker is resolved by the newly merged backend
 `cc779bf`; its actual adapter has passed package 0.3 compatibility checks. Native

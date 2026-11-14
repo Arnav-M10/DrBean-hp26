@@ -1,5 +1,120 @@
 # Owner 2: adopt the application bridge in the existing worker
 
+## Current continuation: native design consumer needs the 0.3 mapping
+
+Request **SCI-OWNER2-NATIVE-DESIGN-03**, science to Owner 2, blocking G2.
+This continuation inspected merged `main` at `9cc90e0`, incorporated in the
+science branch as `0543a0d`, and the unmerged `backend/browser-design` at
+`8451c1f55a5cdbae4a8a97975086e2dff2482776` (PR #9). Counterdex remains **0.3.0**,
+qualified source
+`90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`,
+prepared CPython **3.11.17**. The backend audit used its pinned CPython
+**3.13.18** / Pydantic **2.13.4** environment, sanitized child environments,
+and actual computation. No backend source or resource guard was changed.
+
+The proposed branch implements native design and retains baseline bytes. Its
+current consumer reconstructs the older design mapping and requires a historical
+baseline ID in `source_artifact_ids`. Those choices conflict with the existing
+explicit 0.3 contract:
+
+| Fresh check of the actual branch | Observed result |
+|---|---|
+| Existing `test_computed_pair_design_preserves_approved_grid_history_and_fresh_replay`, using installed 0.3 | **1 failed** in 0.46 s: `unsupported_artifact_reuse`, `request/source_artifact_ids` |
+| Separately reviewed request with `source_artifact_ids: []`, same full historical packet | Adapter returns `incomplete_export` before dispatch because it requires `[historical_artifact.id]` |
+| That empty-reuse request sent through the branch's actual `_run`, retaining history, with reviewed horizon `10/1` | `checked_pair_separation`, `valid`, fresh replay `passed`, selected `8/1`; historical packet unchanged |
+| Correct response passed to the branch's existing `_native_design_output` | `binding_mismatch`: consumer reconstructs v1 instead of the declared v2 mapping |
+
+The last control does not bypass a production guard or qualify HTTP. It calls
+the existing scientific transport directly to isolate the mapping defect. Its
+new exact request has its own recomputed review digest; it does not alter an
+already approved request. Actual output preserves
+`allowance_origin: {kind: "hypothetical", description: "Explicit synthetic precision for a separately reviewed design"}`
+and `maximum_horizon: "10/1"`. The consumer substitutes `reviewed_hard_bound`,
+a generated description, and horizon `8/1`. It also expects binding policy
+`DB-SC-1-to-groundwork-v1`, where explicit design uses
+`DB-SC-1-design-to-groundwork-v2`. The enclosing application-record mapping
+remains `DB-SC-1-to-groundwork-v1`.
+
+### Smallest consumer correction and acceptance
+
+Owner 2 owns `counterdex_adapter.py`, `design_evidence.py` and workflow admission;
+coordinate related browser review with Owner 4. Keep the current package contract:
+
+1. Resolve mandatory historical baseline bytes and their independently stored
+   anchors from the selected run/candidates, separately from prospective reuse.
+   A fresh-construction review uses `source_artifact_ids: []`, construction
+   permission and budget. Existing nonempty reuse requests must fail or receive
+   a newly reviewed replacement; never silently remove their approved fields.
+2. For explicit `counterdex.v1`, independently reconstruct the **v2** design
+   mapping and binding policy. Preserve the complete allowance origin, exact
+   maximum horizon, requested tier, approved grid order, vectors and budget.
+   Retain the legacy rule only for genuine legacy requests. Do not replace
+   fail-closed output validation with trust in producer digests.
+3. Check the same normalized projection at admission, dispatch, qualification
+   and publication. The raw packet hash, application request digest, scientific
+   design digest and inner suggestion digest remain distinct. Changed reviewed
+   fields need new approval; the schema/profile/version and source identities
+   do not need relabelling.
+
+Acceptance: rerun the branch's existing actual design adapter/binding/publication
+tests against installed **0.3.0**. Include an exact `10/1` reviewed horizon over
+the `[8/1,6/1]` grid, hypothetical allowance provenance, and the empty prospective
+reuse list with complete history. Expect checked `8/1` with a positive exact
+margin; wider allowance must give no separation. Wrong history/request/anchors,
+legacy-policy relabelling, unauthorized construction and insufficient budget
+remain rejected. Wall/output limits, owned process cleanup and cancellation
+semantics stay in effect. Ordinary worker/download/replay acceptance remains
+blocked on the separate Mac process-limit defect below.
+
+Reproduce the first failure without editing or switching either checkout;
+`BACKEND_PYTHON` and `ENGINE_PYTHON` name already prepared trusted executables:
+
+```sh
+audit_dir="$(mktemp -d)"
+git archive 8451c1f55a5cdbae4a8a97975086e2dff2482776 apps/api tests | tar -x -C "$audit_dir"
+(
+  cd "$audit_dir"
+  env -i PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH="$audit_dir/apps/api" BEAN_COUNTERDEX_PYTHON="$ENGINE_PYTHON" \
+    "$BACKEND_PYTHON" -m pytest -q -p no:cacheprovider \
+    tests/test_native_design_adapter.py::test_computed_pair_design_preserves_approved_grid_history_and_fresh_replay
+)
+```
+
+Owned acceptance controls now cover the checked explicit packet through fresh
+bridge replay, larger reviewed horizon, retained hypothetical allowance and
+historical bytes, policy-relabel rejection with both genuine and diagnostic
+anchors, and rejection of the baseline ID as prospective reuse before pair
+construction. They passed **2 tests** in **0.455 s**. Run from the repo root:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=packages/groundwork_adapter:packages/groundwork_adapter/tests \
+  python3.11 -m unittest -q \
+  test_bridge.BridgeTests.test_explicit_checked_design_replays_reviewed_scope_without_legacy_relabelling \
+  test_bridge.BridgeTests.test_explicit_design_history_does_not_authorize_prospective_artifact_reuse
+```
+
+### Follow-up is an existing operation
+
+The proposed backend log says actual observation admission still needs an engine
+extension. That limitation applies to legacy `review`, not **`recheck`**, shipped
+in 0.3.0. `recheck` accepts the complete normalized observation proposal, revised
+dataset/problem, original baseline or design packet/anchors, and new run/scenario
+scope. It supports declared actual, transcription or hypothetical origin and
+retains the reading's own exact time/allowance. Existing examples and tests are
+in [BRIDGE.md](BRIDGE.md), [the proposal-bound tests](../tests/test_followup.py),
+and `test_recheck_preserves_actual_proposal_at_different_time_and_allowance`.
+Owner 2 should adopt that path rather than widen legacy review or add another
+scientific checker. Input carries no external command/path selection, extra
+provider activity or new discovery permission. The original one or two exact
+vectors are rechecked; exclusions remain candidate-specific.
+
+Next trigger: Owner 2's v2 mapping/history correction and platform-aware process
+policy, then actual consumer and worker-route retests. No new scientific feature,
+version bump or fixture regeneration is warranted for these consumer defects.
+
+## Earlier adoption history
+
 This is a concrete integration request, not a replacement backend. The audit
 used integrated `main` commit `adac94540c5572fdbe08be3dc8323c61e91b264f`
 and science worktree `bc928550926588e6e3e1d1b54112bffb28dab590` on November 13,

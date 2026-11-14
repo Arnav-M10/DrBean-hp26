@@ -560,6 +560,52 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(native["report"]["checked"]["pair_verification_passes"], 0)
         self.assertEqual(native["artifacts"], [])
 
+    def test_explicit_checked_design_replays_reviewed_scope_without_legacy_relabelling(self):
+        from counterdex.application import DESIGN_MAPPING_POLICY
+        original_baseline = deepcopy(self.baseline)
+        request = deepcopy(self.design_input)
+        request["request"].update(scientific_profile="counterdex.v1", requested_tier="checked_pair_separation",
+            allowance_origin={"kind": "hypothetical", "description": "Separately reviewed future precision"},
+            maximum_horizon="10/1", source_artifact_ids=[])
+        request["expected_request_digest"] = semantic_digest("design-request", request["request"])
+        response = self.dispatch(request)
+        _, fresh = self.assert_native(response)
+        packet, native = scientific_from(response)
+        self.assertEqual(response["result"]["design_tier"], "checked_pair_separation")
+        self.assertEqual(response["result"]["selected_time"], "8/1")
+        self.assertEqual(fresh["verification"], "valid")
+        self.assertEqual(packet["binding"]["mapping_policy"], DESIGN_MAPPING_POLICY)
+        self.assertEqual(packet["binding"]["request"], request["request"])
+        self.assertEqual(packet["history"], artifact_from(self.baseline))
+        self.assertEqual(native["design"]["horizon_policy"]["maximum_horizon"], "10/1")
+        self.assertEqual(native["design"]["allowance_origin"], request["request"]["allowance_origin"])
+        self.assertEqual([option["time"] for option in response["result"]["options"]], ["8/1", "6/1"])
+        self.assertTrue(all(candidate["source_artifact_digest"] is None for candidate in native["design"]["candidates"]))
+        self.assertEqual(self.baseline, original_baseline)
+
+        # Legacy policy is a different projection, even with internally intact
+        # native mathematics. The genuine anchor must reject changed bytes.
+        packet["binding"]["mapping_policy"] = "DB-SC-1-to-groundwork-v1"
+        changed = canonical_bytes(packet)
+        with self.assertRaises(AdapterError) as original:
+            replay_packet(changed, expected=response["anchors"])
+        self.assertEqual(original.exception.code, "artifact_mismatch")
+        with self.assertRaises(AdapterError) as diagnostic:
+            replay_packet(changed, expected=packet_anchors(changed))
+        self.assertEqual(diagnostic.exception.code, "wrong_specification_binding")
+
+    def test_explicit_design_history_does_not_authorize_prospective_artifact_reuse(self):
+        request = deepcopy(self.design_input)
+        request["request"].update(scientific_profile="counterdex.v1", requested_tier="checked_pair_separation",
+            allowance_origin={"kind": "hypothetical", "description": "Separately reviewed future precision"},
+            maximum_horizon="10/1", source_artifact_ids=[request["historical_artifact"]["id"]])
+        request["expected_request_digest"] = semantic_digest("design-request", request["request"])
+        with patch("counterdex.pipeline.create_suggestion", side_effect=AssertionError("Reuse must fail before construction")):
+            with self.assertRaises(AdapterError) as rejected:
+                self.dispatch(request)
+        self.assertEqual(rejected.exception.code, "unsupported_artifact_reuse")
+        self.assertEqual(rejected.exception.field_paths, ("request/source_artifact_ids",))
+
     def test_handshake_distinguishes_available_and_unqualified_runtime(self):
         response = self.dispatch({"protocol": PROTOCOL, "operation": "handshake"})
         self.assertTrue(response["available"])

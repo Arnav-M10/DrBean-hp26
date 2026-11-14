@@ -10,6 +10,44 @@ are isolated development tools, not scientific runtime dependencies.
 The user confirmed permission for the work and requested an independent
 implementation; all supplied example measurements are newly constructed fixtures.
 
+## Current native consumer checkpoint
+
+Science base `0543a0d` incorporates `main` `9cc90e0`. The production package
+remains **0.3.0**, CPython **3.11.17**, source
+`90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
+This continuation changes tests and documentation only; no current or archived
+fixture bytes, package metadata or scientific implementation changed.
+
+Two new actual bridge/replay controls passed in **0.455 s**. They establish
+checked v2 retention of reviewed hypothetical allowance, horizon `10/1`, complete
+baseline history and approved grid order; rejection of legacy-policy relabelling
+under both the genuine anchor and an explicitly altered diagnostic anchor; and
+rejection of prospective reuse before construction even when valid baseline
+history is present. The full changed bridge module passed **29 tests** in
+**4.718 s** using source CPython 3.11.17 with a clean environment and bytecode
+writes disabled. Prior full-suite/build evidence below retains its own scope;
+unchanged production code did not require a new version or fixture generation.
+
+The actual proposed backend `8451c1f` failed its existing computed-pair design
+test against installed 0.3.0: **1 failed** in **0.46 s**,
+`unsupported_artifact_reuse`. Its independently reviewed empty-reuse control
+instead returns `incomplete_export`. The same full-history request sent through
+its actual scientific transport returns checked separation at `8/1`, `valid`,
+fresh replay `passed`. The consumer's old mapping then rejects correct v2 bytes
+with `binding_mismatch`, substituting allowance provenance and a smaller horizon.
+The [Owner 2 handoff](OWNER2_BRIDGE_ADOPTION.md) supplies exact reproduction and
+required admission/dispatch/publication changes. The source correctly retains
+the reviewed scope; no scientific implementation fix was identified.
+
+The newer unmerged evaluator `219dc0c` successfully classified and freshly
+replayed **five** unchanged application packets using all **eight** external
+anchor fields, preserving exclusions. Main's legacy consumer still lags, and
+its old allowance-string defect is already fixed. The [Owner 5 handoff](OWNER5_NATIVE_ACCEPTANCE.md)
+distinguishes current main from implemented proposed changes. No ordinary HTTP
+gate passed in this continuation. The separate Mac per-user process-limit
+blocker remains; no backend limits were changed or bypassed. No provider calls
+or credential inspection occurred.
+
 ## Subsequent cross-branch compatibility checks
 
 With the same qualified 0.3.0 source bytes, the actual proposed backend adapter
