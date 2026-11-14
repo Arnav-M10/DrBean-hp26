@@ -193,6 +193,19 @@ def test_cancellation_preserves_late_evidence_until_worker_acknowledges(flow):
     assert workflow.read_evidence("alice", run["id"], evidence["id"])["id"] == evidence["id"]
 
 
+def test_completion_race_honors_cancel_and_retains_result(flow):
+    workflow, _ = flow
+    _, problem, plan, approval = prepared(flow, optional=True)
+    run = workflow.start_run("alice", plan["id"], approval["id"], "start")
+    workflow.reserve_scenario("alice", run["id"], "baseline")
+    evidence = workflow.complete_scenario("alice", run["id"], "baseline", unsupported(problem))
+    workflow.cancel_run("alice", run["id"], "cancel-after-evidence")
+    finished = workflow.finish_run("alice", run["id"], "completed", {"explanation": "Preserved controlled result"})
+    assert finished["state"] == "cancelled"
+    assert workflow.get("alice", finished["result_id"], "run_summary")["body"]["explanation"] == "Preserved controlled result"
+    assert workflow.read_evidence("alice", run["id"], evidence["id"])["id"] == evidence["id"]
+
+
 def test_restart_never_redispatches_running_child(flow):
     workflow, _ = flow
     _, _, plan, approval = prepared(flow)
@@ -249,6 +262,19 @@ def test_design_rejects_changed_vectors_and_unapproved_grid(flow):
     result["options"].append({"time": "8/1", "state": "unavailable", "reason_code": "fixture_only"})
     finished = workflow.finish_run("alice", job["id"], result=result)
     assert workflow.get("alice", finished["result_id"], "suggestion")["body"]["design_tier"] == "unavailable"
+
+
+def test_design_rejects_candidate_from_unbound_problem_digest(flow):
+    workflow, _ = flow
+    _, problem, plan, approval = prepared(flow)
+    run = workflow.start_run("alice", plan["id"], approval["id"], "start")
+    workflow.reserve_scenario("alice", run["id"], "baseline")
+    evidence = numerical_pair(problem)
+    evidence.update(problem_digest=None, expected_binding="not_supplied")
+    for candidate in evidence["candidates"]:
+        candidate["problem_digest"] = "a" * 64
+    workflow.complete_scenario("alice", run["id"], "baseline", evidence)
+    assert_code("binding_mismatch", lambda: workflow.create_design_plan("alice", run["id"], design_body(run, problem), "design"))
 
 
 def test_observation_review_creates_immutable_hypothetical_fork(flow):
@@ -327,19 +353,39 @@ def test_report_snapshot_retains_all_approved_scenarios_and_source_byte_digest(f
     source = workflow.create_record("alice", workspace, "source_asset", {"sha256": "f" * 64, "blob_key": "private-storage-locator", "origin": "synthetic"}, "source")
     data_body = dataset_body()
     data_body["rows"][0]["source_asset_id"] = source["id"]
-    first_dataset = workflow.create_dataset("alice", workspace, data_body, "first-dataset")
+    # Seed a historical reviewed source record to isolate report snapshotting.
+    # New source-derived API values must use the separately tested materializer.
+    with workflow.store.transaction() as conn:
+        first_dataset = workflow._insert(conn, "alice", workspace, "dataset", data_body)
+        conn.execute("UPDATE workspaces SET current_dataset_id=? WHERE id=?", (first_dataset["id"], workspace))
     first_problem = create_problem(workflow, workspace, first_dataset, "first-problem")
-    second_dataset = workflow.create_dataset("alice", workspace, dataset_body(first_dataset["id"]), "second-dataset")
+    proposal = workflow.create_record("alice", workspace, "intake_proposal", {"source_asset_id": source["id"], "source_digest": "f" * 64}, "intake-proposal")
+    review = workflow.create_record("alice", workspace, "intake_review", {"proposal_id": proposal["id"], "source_asset_id": source["id"],
+        "reviewed_fields": [{"field_path": "rows[0].concentration", "normalized_value": "1/1", "correction_reason": "Reviewed source transcription"}]}, "intake-review")
+    materialization = workflow.create_record("alice", workspace, "intake_materialization", {"dataset_id": first_dataset["id"], "problem_id": first_problem["id"],
+        "review_id": review["id"], "source_asset_id": source["id"], "field_provenance": [{"origin": "human_corrected", "reviewed_value": "1/1"}]}, "intake-materialization")
+    workflow.create_record("alice", workspace, "intake_materialization", {"dataset_id": "unrelated_dataset", "problem_id": "unrelated_problem"}, "unrelated-materialization")
+    second_dataset = workflow.create_dataset("alice", workspace, {**first_dataset["body"], "parent_id": first_dataset["id"]}, "second-dataset")
     second_problem = create_problem(workflow, workspace, second_dataset, "second-problem")
     plan = workflow.create_plan("alice", workspace, PlanBody(problem_id=second_problem["id"], problem_digest=second_problem["digest"], dataset_id=second_dataset["id"],
         scenarios=[{"id": "baseline", "kind": "baseline", "label": "Latest", "problem_id": second_problem["id"], "problem_digest": second_problem["digest"]},
                    {"id": "optional", "kind": "optional", "label": "Historical comparison", "problem_id": first_problem["id"], "problem_digest": first_problem["digest"]}]).model_dump(mode="json"), "plan")
     approval = workflow.approve_plan("alice", plan["id"], second_problem["id"], plan["digest"], "approve")
     run = workflow.start_run("alice", plan["id"], approval["id"], "start")
+    artifact = workflow.create_record("alice", workspace, "native_artifact", {"sha256": "a" * 64, "byte_size": 12, "media_type": "application/json",
+        "blob_key": "private-native-locator", "anchor": {"application_problem_id": second_problem["id"], "scientific_problem_digest": "b" * 64}}, "native-artifact")
+    workflow.reserve_scenario("alice", run["id"], "baseline")
+    workflow.complete_scenario("alice", run["id"], "baseline", {**unsupported(second_problem), "artifacts": [
+        {"id": artifact["id"], "sha256": "a" * 64, "byte_size": 12, "media_type": "application/json"}]})
     report = workflow.create_report("alice", run["id"], "report")
     assert {item["dataset"]["id"] for item in report["body"]["scenario_inputs"]} == {first_dataset["id"], second_dataset["id"]}
     assert report["body"]["source_assets"][0]["metadata"]["sha256"] == "f" * 64
     assert "blob_key" not in report["body"]["source_assets"][0]["metadata"]
+    assert [item["id"] for item in report["body"]["intake_materializations"]] == [materialization["id"]]
+    assert report["body"]["intake_reviews"][0]["body"]["reviewed_fields"][0]["correction_reason"] == "Reviewed source transcription"
+    assert report["body"]["intake_proposals"][0]["id"] == proposal["id"]
+    assert report["body"]["native_artifacts"][0]["metadata"]["anchor"]["scientific_problem_digest"] == "b" * 64
+    assert "blob_key" not in report["body"]["native_artifacts"][0]["metadata"]
 
 
 def test_expired_accepted_approval_stops_new_work_without_rewriting_scope(flow, monkeypatch):
@@ -357,3 +403,80 @@ def test_intentional_rerun_requires_reviewed_plan_ancestry(flow):
     assert_code("plan_ancestry_required", lambda: workflow.create_plan("alice", workspace, plan["body"], "new-plan"))
     new_plan = workflow.create_plan("alice", workspace, {**plan["body"], "parent_plan_id": plan["id"]}, "new-plan-with-ancestry")
     assert new_plan["body"]["parent_plan_id"] == plan["id"] and new_plan["digest"] != plan["digest"]
+
+
+def test_optional_condition_and_complete_accounting_are_authoritative(flow):
+    workflow, workspace = flow
+    dataset, problem, original, _ = prepared(flow)
+    body = {**original["body"], "parent_plan_id": original["id"], "scientific_profile": "counterdex.v1",
+        "objective": {"question": "Does an allowed explanation challenge this interval?", "success_criterion": "Return checked evidence or an honest unresolved result."},
+        "scenarios": [original["body"]["scenarios"][0], {
+            "id": "optional", "kind": "optional", "label": "Allowed comparison", "problem_id": problem["id"],
+            "problem_digest": problem["digest"], "purpose": "Investigate an unresolved baseline",
+            "eligible_baseline_outcomes": ["inconclusive"]}]}
+    plan = workflow.create_plan("alice", workspace, body, "conditional")
+    approval = workflow.approve_plan("alice", plan["id"], problem["id"], plan["digest"], "approve-conditional")
+    run = workflow.start_run("alice", plan["id"], approval["id"], "conditional-start")
+    workflow.reserve_scenario("alice", run["id"], "baseline")
+    workflow.complete_scenario("alice", run["id"], "baseline", unsupported(problem))
+    assert_code("scenario_condition_ineligible", lambda: workflow.reserve_scenario("alice", run["id"], "optional"))
+    assert_code("scenario_accounting_incomplete", lambda: workflow.finish_run("alice", run["id"]))
+    workflow.skip_scenario("alice", run["id"], "optional", "capability_unavailable")
+    assert workflow.finish_run("alice", run["id"])["state"] == "completed"
+
+
+def test_source_derived_dataset_requires_review_materialization(flow):
+    workflow, workspace = flow
+    source = workflow.create_record("alice", workspace, "source_asset", {"sha256": "f" * 64}, "source")
+    body = dataset_body()
+    body["rows"][0]["source_asset_id"] = source["id"]
+    assert_code("source_review_required", lambda: workflow.create_dataset("alice", workspace, body, "unreviewed"))
+    assert workflow.workspace("alice", workspace)["current_dataset_id"] is None
+    # Existing reviewed material is immutable; a later unchanged copy is allowed.
+    with workflow.store.transaction() as conn:
+        parent = workflow._insert(conn, "alice", workspace, "dataset", body)
+    revised = workflow.create_dataset("alice", workspace, {**body, "parent_id": parent["id"]}, "unchanged-source")
+    changed = {**revised["body"], "rows": [dict(row) for row in revised["body"]["rows"]], "parent_id": revised["id"]}
+    changed["rows"][0]["concentration"] = "7/1"
+    assert_code("source_review_required", lambda: workflow.create_dataset("alice", workspace, changed, "changed-source"))
+    changed["rows"][0]["source_asset_id"] = None
+    assert_code("source_review_required", lambda: workflow.create_dataset("alice", workspace, changed, "stripped-source"))
+
+
+def test_scientific_design_retains_reviewed_grid_and_limits_horizon(flow):
+    import json
+    from pathlib import Path
+    workflow, workspace = flow
+    fixture = json.loads((Path(__file__).resolve().parents[1] / "shared/contracts/DB-SC-1/fixtures/counterdex-reviewed-scope.json").read_text())
+    dataset = workflow.create_dataset("alice", workspace, fixture["dataset"], "scientific-dataset")
+    problem = workflow.create_problem("alice", workspace, {**fixture["problem"], "dataset_id": dataset["id"], "dataset_digest": dataset["digest"]}, "scientific-problem")
+    plan = workflow.create_plan("alice", workspace, {**fixture["plan"], "problem_id": problem["id"], "problem_digest": problem["digest"], "dataset_id": dataset["id"],
+        "scenarios": [{"id": "baseline", "kind": "baseline", "label": "Synthetic authority control", "problem_id": problem["id"], "problem_digest": problem["digest"]}]}, "scientific-plan")
+    approval = workflow.approve_plan("alice", plan["id"], problem["id"], plan["digest"], "scientific-approval")
+    run = workflow.start_run("alice", plan["id"], approval["id"], "scientific-run")
+    workflow.reserve_scenario("alice", run["id"], "baseline")
+    workflow.complete_scenario("alice", run["id"], "baseline", numerical_pair(problem))
+    workflow.finish_run("alice", run["id"])
+    request = {**design_body(run, problem), "scientific_profile": "counterdex.v1", "requested_tier": "checked_pair_separation",
+        "allowance_origin": {"kind": "hypothetical", "description": "Explicit synthetic future hard bound"},
+        "maximum_horizon": "8/1", "allow_construction": True, "allow_continuation": True,
+        "feasible_times": ["8/1", "6/1"]}
+    plan = workflow.create_design_plan("alice", run["id"], request, "scientific-design")
+    assert plan["body"]["request"]["feasible_times"] == ["8/1", "6/1"]
+    assert plan["body"]["request"]["maximum_horizon"] == "8/1"
+    assert_code("artifact_not_in_scope", lambda: workflow.create_design_plan("alice", run["id"], {**request, "source_artifact_ids": ["unrelated"]}, "wrong-source"))
+    assert_code("scientific_admission", lambda: workflow.create_design_plan("alice", run["id"], {**request, "budget": {"pair_verifications": 1}}, "insufficient-checks"))
+
+
+def test_source_derived_observation_cannot_bypass_intake_review(flow):
+    workflow, workspace = flow
+    dataset, _, _, _ = prepared(flow)
+    source = workflow.create_record("alice", workspace, "source_asset", {"sha256": "f" * 64}, "source")
+    body = {"dataset_id": dataset["id"], "experiment_id": dataset["body"]["experiment_id"], "origin": "actual", "source_description": "Synthetic source control",
+        "change_reason": "New observation", "row": {"id": "new", "time": "8/1", "concentration": "17/5", "hard_allowance": "1/5", "included": True,
+            "source_asset_id": source["id"]}}
+    assert_code("source_review_required", lambda: workflow.create_observation_proposal("alice", workspace, body, "bypass"))
+    # A proposal persisted by an earlier version cannot bypass the new boundary.
+    old_proposal = workflow.create_record("alice", workspace, "observation_proposal", body, "historical-proposal")
+    assert_code("source_review_required", lambda: workflow.review_observation("alice", old_proposal["id"], {
+        "proposal_digest": old_proposal["digest"], "parent_dataset_id": dataset["id"], "accepted": True}, "bypass-review"))

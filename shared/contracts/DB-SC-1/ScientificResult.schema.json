@@ -116,6 +116,83 @@
       "title": "CandidateReference",
       "type": "object"
     },
+    "CandidateResult": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "verification": {
+          "enum": [
+            "not_checked",
+            "valid",
+            "invalid",
+            "inconclusive",
+            "unsupported",
+            "failed"
+          ],
+          "title": "Verification",
+          "type": "string"
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
+        },
+        "violating_observation_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 128,
+          "title": "Violating Observation Ids",
+          "type": "array"
+        },
+        "unresolved_observation_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 128,
+          "title": "Unresolved Observation Ids",
+          "type": "array"
+        },
+        "outside_closed_claim": {
+          "title": "Outside Closed Claim",
+          "type": "boolean"
+        },
+        "is_counterexample": {
+          "title": "Is Counterexample",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "verification",
+        "outside_closed_claim",
+        "is_counterexample"
+      ],
+      "title": "CandidateResult",
+      "type": "object"
+    },
     "CandidateVector": {
       "additionalProperties": false,
       "properties": {
@@ -218,6 +295,32 @@
           ],
           "default": null,
           "title": "Observed Problem Digest"
+        },
+        "expected_scientific_problem_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Scientific Problem Digest"
+        },
+        "observed_scientific_problem_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Scientific Problem Digest"
         }
       },
       "required": [
@@ -333,6 +436,72 @@
         }
       ],
       "default": null
+    },
+    "projection_version": {
+      "anyOf": [
+        {
+          "const": "bean-to-counterdex.v1",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Projection Version"
+    },
+    "scientific_problem_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scientific Problem Digest"
+    },
+    "scientific_design_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scientific Design Digest"
+    },
+    "native_suggestion_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Native Suggestion Digest"
+    },
+    "candidate_results": {
+      "items": {
+        "$ref": "#/$defs/CandidateResult"
+      },
+      "maxItems": 16,
+      "title": "Candidate Results",
+      "type": "array"
+    },
+    "native_replay": {
+      "additionalProperties": true,
+      "maxProperties": 64,
+      "title": "Native Replay",
+      "type": "object"
     }
   },
   "required": [

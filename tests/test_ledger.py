@@ -43,3 +43,22 @@ def test_actual_overrun_exhausts_shared_budget(tmp_path):
     ledger.finish_attempt(attempt, {"status": "failed", "usage": {"output_tokens": 40, "thought_tokens": 70}})
     with pytest.raises(LedgerBudgetExceeded):
         ledger.begin_attempt(context, {"reserved_input_tokens": 1, "reserved_output_tokens": 1})
+
+
+def test_diagnostics_agree_with_conservative_alias_accounting(tmp_path):
+    store = Store(tmp_path / "isolated-budget.sqlite3")
+    workflow = Workflow(store)
+    workspace = workflow.create_workspace("alice", "Offline accounting control")
+    operation = workflow.begin_operation("alice", workspace["id"], "intake", "one", {})
+    ledger = ProviderLedger(store, input_token_cap=100, output_token_cap=100)
+    context = {"actor_id": "alice", "workspace_id": workspace["id"],
+               "operation_id": operation["id"], "consent_id": "controlled"}
+    attempt = ledger.begin_attempt(context, {"reserved_input_tokens": 10, "reserved_output_tokens": 20})
+    ledger.finish_attempt(attempt, {"status": "unknown_outcome", "usage": {
+        "prompt_token_count": 30, "candidates_token_count": 40, "thought_tokens": 10}})
+    diagnostic = ledger.diagnostics()
+    assert diagnostic["dispatch_enabled"] is False
+    assert diagnostic["remaining"]["input_tokens"] == 70
+    assert diagnostic["remaining"]["output_tokens"] == 50
+    assert diagnostic["unknown_outcome_reservations"] == 1
+    assert len(ledger.list_attempts("alice", workspace["id"])) == 1

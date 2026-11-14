@@ -20,4 +20,4 @@ Shared rules:
 
 Runtime layout created by `scripts/dev/setup.sh` (all ignored by git): `.venv/` backend, `.venv-engine/` engine, `var/` store, sources, private auth file, and `var/run/` pid files and logs.
 
-Branches: the integrated default branch is `codex/researcher-reviewer-web` (there is no `main`). Workstream 4 works on `claude/dreamy-lamport-dsttgm`, restarted from the default branch after PR #2 merged.
+Default integration branch: `main`. Start new workstream branches from the current `origin/main`, and keep each workstream's changes on its own branch. Workstream 4 works on `claude/dreamy-lamport-dsttgm`.

@@ -94,3 +94,27 @@ class ProviderLedger:
         return [{**dict(row), "metadata": json.loads(row["metadata"]),
                  "response_metadata": json.loads(row["response_metadata"]) if row["response_metadata"] else None}
                 for row in rows]
+
+    def diagnostics(self) -> dict[str, Any]:
+        """Global capacity only, never disclose another workspace's attempt data."""
+        with self.store.read() as conn:
+            rows = conn.execute("SELECT metadata,response_metadata,state FROM provider_attempts").fetchall()
+        reserved_in = reserved_out = 0
+        unknown = 0
+        for row in rows:
+            reservation = json.loads(row["metadata"])
+            response = json.loads(row["response_metadata"] or "{}")
+            usage = response.get("usage") or {}
+            reserved_in += max(reservation.get("reserved_input_tokens", 0),
+                               usage.get("input_tokens") or usage.get("prompt_token_count") or 0)
+            reserved_out += max(reservation.get("reserved_output_tokens", 0),
+                                (usage.get("output_tokens") or usage.get("candidates_token_count") or 0)
+                                + (usage.get("thought_tokens") or 0))
+            unknown += int(row["state"] in {"reserved", "unknown_outcome"})
+        return {"dispatch_enabled": False, "current_mode": "disabled_placeholder",
+                "accounting_policy": "conservative_no_refund.v1", "historical_attempts": len(rows),
+                "unknown_outcome_reservations": unknown,
+                "remaining": {"requests": max(0, self.request_cap-len(rows)),
+                              "input_tokens": max(0, self.input_token_cap-reserved_in),
+                              "output_tokens": max(0, self.output_token_cap-reserved_out)},
+                "controlled_placeholder_records": "separate; zero external requests and actual model tokens"}

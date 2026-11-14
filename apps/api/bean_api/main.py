@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, Query, Request
@@ -18,13 +17,18 @@ from .contracts import (
     AgentProviderConsent, ApprovalRequest, AssistantTurnRequest, CreatePlanRequest, DatasetBody,
     DecimalInputRequest, DesignRequestBody, IntakeRequest, IntakeReviewRequest, ObservationProposalBody,
     ObservationReviewRequest, ProblemBody, StartRunRequest, WorkspaceCreateRequest,
+    MaterializeIntakeRequest,
 )
 from .conversation import ConversationService
 from .http import RequestBoundary, error_body
 from .intake import IntakeService, SourceService
 from .ledger import LedgerBudgetExceeded, ProviderLedger
 from .providers import GeminiProvider, ProviderConfig, ProviderFailure
-from .science import UnavailableAdapter
+from .counterdex_adapter import CounterdexAdapter, create_science_adapter
+from .artifacts import ArtifactService
+from .source_materialization import SourceMaterializationService
+from .resource_policy import describe_policy
+from .runtime_status import read_status
 from .store import Store
 from .workflow import DomainError, Workflow
 
@@ -34,14 +38,9 @@ OperationKey = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_
 
 
 def provider_config_from_env() -> ProviderConfig:
-    return ProviderConfig(
-        api_key=os.getenv("GEMINI_API_KEY"), model=os.getenv("GEMINI_MODEL"),
-        account_gate_passed=os.getenv("BEAN_GEMINI_ACCOUNT_GATE") == "approved",
-        account_decision_id=os.getenv("BEAN_GEMINI_ACCOUNT_DECISION_ID"),
-        image_token_upper_bound=int(os.environ["BEAN_GEMINI_IMAGE_TOKEN_BOUND"]) if os.getenv("BEAN_GEMINI_IMAGE_TOKEN_BOUND") else None,
-        max_input_tokens=int(os.getenv("BEAN_GEMINI_MAX_INPUT_TOKENS", "16000")),
-        max_output_tokens=int(os.getenv("BEAN_GEMINI_MAX_OUTPUT_TOKENS", "2048")),
-    )
+    # Current work order forbids live dispatch. Do not even read existing secrets.
+    # Future activation needs an explicit user instruction AND a reviewed code/config change.
+    return ProviderConfig()
 
 
 def create_app(settings: Settings | None = None, *, provider=None, adapter=None) -> FastAPI:
@@ -50,10 +49,12 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
     workflow = Workflow(store)
     ledger = ProviderLedger(store)
     provider = provider or GeminiProvider(provider_config_from_env(), ledger)
-    adapter = adapter or UnavailableAdapter()
+    adapter = adapter or create_science_adapter(settings.counterdex_python, settings.science_adapter)
     sources = SourceService(workflow, settings.blob_dir)
     intake = IntakeService(workflow, sources, provider)
     conversation = ConversationService(workflow, provider, sources)
+    artifacts = ArtifactService(workflow, settings.artifact_dir)
+    materialization = SourceMaterializationService(workflow, sources)
     app = FastAPI(title="Dr. Bean research API", version="DB-SC-1", description="GF-2 policy. Explicit local SQLite lane. Scientific capabilities are reported at /capabilities.")
     app.state.settings, app.state.workflow, app.state.ledger = settings, workflow, ledger
     app.state.provider, app.state.adapter = provider, adapter
@@ -89,7 +90,8 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
 
     @app.get("/healthz")
     def health():
-        return {"service": "dr-bean", "status": "ready", "contract_version": "DB-SC-1"}
+        return {"service": "dr-bean", "status": "api_reachable", "contract_version": "DB-SC-1",
+                "worker": read_status(store.path), "science": adapter.capabilities(), "resource_policy": describe_policy()}
 
     @app.get(PREFIX + "/capabilities")
     def capabilities():
@@ -102,7 +104,8 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
                                      "scientific_adapter_qualified": bool(adapter.capabilities().get("verified_in_environment")),
                                      "units": {"time": "h", "concentration": "mg/L", "rates": "1/h"},
                                      "initial_concentration": "0/1", "rate_order": "ke_lt_ka", "target_interval": "closed"}],
-                "science": adapter.capabilities(), "gemini": provider.capabilities(),
+                "science": adapter.capabilities(), "ai_mode": "disabled_placeholder",
+                "gemini": {**provider.capabilities(), "dispatch_enabled": False, "live_qualification": "not_run"},
                 "deepagents": {"implemented": True, "configured": bool(provider.capabilities().get("configured")),
                                "reachable": None, "verified_in_environment": False},
                 "transport": {"web": True, "photon": False}}
@@ -141,8 +144,18 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
 
     @app.post(PREFIX + "/workspaces/{workspace_id}/plans", status_code=201)
     def create_plan(workspace_id: str, body: CreatePlanRequest, actor: Actor, key: OperationKey):
+        if isinstance(adapter, CounterdexAdapter) and body.plan.scientific_profile != "counterdex.v1":
+            raise DomainError("scientific_profile_required", "New Counterdex plans require the reviewed scientific profile and objective.",
+                              422, ["plan.scientific_profile"])
         if body.expected_current_revision_id != body.plan.problem_id:
             raise DomainError("stale_revision", "The preview must name the reviewed problem revision.")
+        if hasattr(adapter, "admit"):
+            for scenario in body.plan.scenarios:
+                problem = workflow.get(actor, scenario.problem_id, "problem")
+                if problem["workspace_id"] != workspace_id:
+                    raise DomainError("not_found", "Problem was not found.", 404)
+                dataset = workflow.get(actor, problem["body"]["dataset_id"], "dataset")
+                adapter.admit(problem, dataset)
         return workflow.create_plan(actor, workspace_id, body.plan, key)
 
     @app.post(PREFIX + "/plans/{plan_id}/approvals", status_code=201)
@@ -167,6 +180,9 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
 
     @app.post(PREFIX + "/runs/{run_id}/design-proposals", status_code=201)
     def design_proposal(run_id: str, body: DesignRequestBody, actor: Actor, key: OperationKey):
+        if isinstance(adapter, CounterdexAdapter) and body.scientific_profile != "counterdex.v1":
+            raise DomainError("scientific_profile_required", "New Counterdex designs require the reviewed scientific profile, tier, allowance origin and horizon.",
+                              422, ["scientific_profile"])
         return workflow.create_design_plan(actor, run_id, body, key)
 
     @app.post(PREFIX + "/design-plans/{plan_id}/approvals", status_code=201)
@@ -223,6 +239,10 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
     def intake_review(workspace_id: str, proposal_id: str, body: IntakeReviewRequest, actor: Actor, key: OperationKey):
         return intake.review(actor, workspace_id, proposal_id, body, key)
 
+    @app.post(PREFIX + "/workspaces/{workspace_id}/intake-reviews/{review_id}/materialize", status_code=201)
+    def materialize_review(workspace_id: str, review_id: str, body: MaterializeIntakeRequest, actor: Actor, key: OperationKey):
+        return materialization.materialize(actor, workspace_id, review_id, body, key)
+
     @app.post(PREFIX + "/workspaces/{workspace_id}/assistant-turns", status_code=201)
     async def assistant_turn(workspace_id: str, body: AssistantTurnRequest, actor: Actor, key: OperationKey):
         if key != body.client_operation_id:
@@ -231,18 +251,23 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
 
     @app.get(PREFIX + "/workspaces/{workspace_id}/records")
     def records(workspace_id: str, actor: Actor, kind: str = Query(..., max_length=64)):
-        return [sources.public_record(record) if record["kind"] == "source_asset" else record
+        return [sources.public_record(record) if record["kind"] == "source_asset" else artifacts.public_record(record) if record["kind"] == "native_artifact" else record
                 for record in workflow.list_records(actor, workspace_id, kind)]
 
     @app.get(PREFIX + "/records/{record_id}")
     def record(record_id: str, actor: Actor):
         result = workflow.get(actor, record_id)
-        return sources.public_record(result) if result["kind"] == "source_asset" else result
+        return sources.public_record(result) if result["kind"] == "source_asset" else artifacts.public_record(result) if result["kind"] == "native_artifact" else result
 
     @app.get(PREFIX + "/workspaces/{workspace_id}/provider-attempts")
     def provider_attempts(workspace_id: str, actor: Actor):
         workflow.authorize(actor, workspace_id)
         return ledger.list_attempts(actor, workspace_id)
+
+    @app.get(PREFIX + "/workspaces/{workspace_id}/provider-budget")
+    def provider_budget(workspace_id: str, actor: Actor):
+        workflow.authorize(actor, workspace_id)
+        return ledger.diagnostics()
 
     @app.get(PREFIX + "/workspaces/{workspace_id}/activity")
     def activity(workspace_id: str, actor: Actor):
@@ -267,11 +292,21 @@ def create_app(settings: Settings | None = None, *, provider=None, adapter=None)
     @app.get(PREFIX + "/artifacts/{artifact_id}")
     def artifact(artifact_id: str, actor: Actor):
         record = workflow.get(actor, artifact_id)
+        if record["kind"] == "native_artifact":
+            record, content = artifacts.read(actor, artifact_id)
+            return Response(content, media_type=record["body"]["media_type"], headers={
+                "Content-Disposition": f'attachment; filename="dr-bean-{artifact_id}.json"',
+                "X-Artifact-SHA256": record["body"]["sha256"]})
         if record["kind"] not in {"evidence", "suggestion", "report"}:
             raise DomainError("not_found", "Artifact was not found.", 404)
         content = canonical_bytes(record)
         return Response(content, media_type="application/json", headers={
             "Content-Disposition": f'attachment; filename="dr-bean-{artifact_id}.json"',
             "X-Artifact-SHA256": hashlib.sha256(content).hexdigest()})
+
+    @app.get(PREFIX + "/artifacts/{artifact_id}/anchor")
+    def artifact_anchor(artifact_id: str, actor: Actor):
+        record, _ = artifacts.read(actor, artifact_id)
+        return {"artifact_id": artifact_id, "sha256": record["body"]["sha256"], "anchor": record["body"]["anchor"]}
 
     return app

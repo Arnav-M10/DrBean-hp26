@@ -1,0 +1,68 @@
+{
+  "version": "db-sc-1-admission.v1",
+  "limits": {
+    "canonical_json_bytes": 1048576,
+    "http_json_bytes_default": 262144,
+    "nested_levels": 32,
+    "rational_digits_per_component": 256,
+    "counter_maximum": 9007199254740991
+  },
+  "rational_cases": [
+    {
+      "value": "1/1",
+      "accepted": true
+    },
+    {
+      "value": "1/1\n",
+      "accepted": false
+    },
+    {
+      "value": "-0/1",
+      "accepted": false
+    },
+    {
+      "value": "0/1",
+      "accepted": true
+    },
+    {
+      "value": "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111/1",
+      "accepted": true
+    },
+    {
+      "value": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111/1",
+      "accepted": false
+    }
+  ],
+  "json_cases": [
+    {
+      "raw": "{\"counter\":-0}",
+      "accepted": false
+    },
+    {
+      "raw": "{\"counter\":0}",
+      "accepted": true
+    },
+    {
+      "raw": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "accepted": true
+    },
+    {
+      "raw": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "accepted": false
+    }
+  ],
+  "byte_cases": [
+    {
+      "raw": "{\"x\":\"é\"}",
+      "max_bytes": 10,
+      "accepted": true
+    },
+    {
+      "raw": "{\"x\":\"é\"}",
+      "max_bytes": 9,
+      "accepted": false
+    }
+  ],
+  "byte_note": "Limits count encoded UTF-8 bytes, not characters. The compact byte controls use an explicit test limit; production default limits above are independently enforced by canonical parsing and HTTP admission.",
+  "engine_note": "Counterdex projection adds stricter exact rational bit, row and domain admission; application admission does not claim engine qualification."
+}
