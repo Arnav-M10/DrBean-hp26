@@ -74,6 +74,14 @@ def running(pid):
             return False
     except (FileNotFoundError, ProcessLookupError):
         pass
+    if sys.platform == "darwin":
+        # With the worker deliberately stopped, an exited direct child remains
+        # its zombie until the worker resumes/reaps it. Observe only this owned
+        # PID; kill(pid, 0) alone cannot distinguish that from running work.
+        state = subprocess.run(["/bin/ps", "-o", "stat=", "-p", str(pid)], capture_output=True,
+                               text=True, timeout=2, env={"PATH": os.defpath, "LANG": "C"})
+        if state.stdout.lstrip().startswith("Z"):
+            return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

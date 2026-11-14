@@ -114,11 +114,19 @@ def alive(pid: int) -> bool:
     except ProcessLookupError:
         return False
     except PermissionError:
-        return True
+        pass  # a readable zombie state still means no live computation
     try:  # a zombie of ours still answers kill(0); reap it if it is our child
         reaped, _ = os.waitpid(pid, os.WNOHANG)
         return reaped == 0
     except ChildProcessError:
+        try:
+            state = subprocess.run(["ps", "-p", str(pid), "-o", "stat="], capture_output=True,
+                                   text=True, timeout=2).stdout.strip()
+            if state.startswith("Z"):
+                return False
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        # Unknown state remains live for containment/acceptance purposes.
         return True
 
 

@@ -66,11 +66,15 @@ def test_cross_workspace_records_are_invisible_and_unusable(module_stack):
 
 
 @pytest.mark.real_stack
-def test_queued_cancel_restart_recovery_and_no_orphans(stack_factory, tmp_path):
-    """Uses the harness's deterministic diagnostic barrier inside the scientific child (after setsid and limits),
-    so cancellation and worker death hit a computation that is genuinely in flight. The product's own cancel,
-    kill and recovery code is what runs; the barrier only holds the child until the harness releases it."""
-    stack = stack_factory(diagnostic_overrides=("science_barrier",))
+@pytest.mark.parametrize("diagnostics", [(), ("science_barrier",)], ids=["actual_workload", "diagnostic_barrier"])
+def test_queued_cancel_restart_recovery_and_no_orphans(stack_factory, tmp_path, diagnostics):
+    """Observe actual sustained work and, separately, the declared diagnostic barrier.
+
+    The normal case uses admitted synthetic replicates without overriding any guard.
+    The diagnostic holds a child after setsid/limits and never counts as an ordinary lane run.
+    Both retain the same live-child observation and product cancel/kill/recovery assertions.
+    """
+    stack = stack_factory(diagnostic_overrides=diagnostics)
     try:
         python = launcher.science_python()
     except launcher.StackError:

@@ -131,6 +131,32 @@ def _child(connection: Any, lifeline: Any, adapter: ScienceAdapter, operation: s
                 pass
 
 
+def _kill_owned_session(process: Any) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        # Darwin reports EPERM while a self-killed session contains only
+        # unreaped zombies. Reap our leader and give the OS reaper a bounded
+        # chance to remove its descendants. Live or persistently denied groups
+        # still fail explicitly; EPERM alone never means cleanup succeeded.
+        process.join(timeout=2)
+        if process.exitcode is None:
+            raise
+        deadline = time.monotonic() + 2
+        while True:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+                return
+            except ProcessLookupError:
+                return
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
+
+
 def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], *, wall_seconds: int,
                 cancelled: Callable[[], bool] = lambda: False, memory_bytes: int = 1024 * 1024 * 1024,
                 result_cap: int = 4 * 1024 * 1024) -> dict[str, Any]:
@@ -176,20 +202,19 @@ def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], 
     finally:
         # Clean the owned process group even when its leader returned or exited:
         # descendants may still hold resources after an adapter spawns a child.
+        # Closing the sole writer also lets the guard clean up if signalling
+        # from this parent fails unexpectedly.
+        parent_lifeline.close()
         if owned_session:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            _kill_owned_session(process)
         elif process.is_alive():
             try:
                 if os.getpgid(process.pid) == process.pid:
-                    os.killpg(process.pid, signal.SIGKILL)
+                    _kill_owned_session(process)
                 else:
                     process.kill()
             except ProcessLookupError:
                 pass
         process.join(timeout=2)
         receiver.close()
-        parent_lifeline.close()
         process.close()
