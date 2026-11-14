@@ -1,4 +1,4 @@
-"""Optional real HTTP/worker control for the reachable both-compatible outcome.
+"""Optional real HTTP/worker controls for both-compatible and unresolved outcomes.
 
 Run with the backend environment, repository apps/api and tests on PYTHONPATH,
 and explicit installed BEAN_COUNTERDEX_PYTHON/BEAN_COUNTERDEX_REPLAY_PYTHON.
@@ -37,9 +37,15 @@ class PaperHttpTests(unittest.TestCase):
         cls.followup = importlib.import_module("test_native_followup_workflow")
 
     def test_both_compatible_retains_original_outside_witness_and_replays(self):
+        self._exercise_followup(unresolved=False)
+
+    def test_unresolved_reference_stays_inconclusive_despite_valid_replay(self):
+        self._exercise_followup(unresolved=True)
+
+    def _exercise_followup(self, *, unresolved):
         http, baseline, design = self.http, self.baseline, self.design
         post, prefix, worker = http.post, http.PREFIX, http.Worker
-        with tempfile.TemporaryDirectory(prefix="counterdex-both-compatible-") as directory:
+        with tempfile.TemporaryDirectory(prefix="counterdex-paper-followup-") as directory:
             scratch = Path(directory)
             settings = http.Settings(database_path=str(scratch / "science.sqlite3"),
                 blob_dir=str(scratch / "sources"), artifact_dir=str(scratch / "artifacts"),
@@ -57,9 +63,9 @@ class PaperHttpTests(unittest.TestCase):
                 evidence = client.get(prefix + f"/records/{finished['scenarios'][0]['result_id']}").json()
                 history = dict(client=client, workspace=workspace, dataset=dataset, problem=problem,
                     approval=approval, run=run, result=result, content=content, anchors=anchors, evidence=evidence)
-                plan = design.propose(history, design.design_request(history), "both-compatible-design")
+                plan = design.propose(history, design.design_request(history), "paper-followup-design")
                 job, design_approval, suggestion, design_bytes, design_anchors = design.approve_start_and_download(
-                    history, plan, "both-compatible-design")
+                    history, plan, "paper-followup-design")
                 self.assertEqual(suggestion["design_tier"], "checked_pair_separation")
                 job = client.get(prefix + f"/design-jobs/{job['id']}").json()
                 record = client.get(prefix + f"/records/{job['result_id']}").json()
@@ -67,18 +73,30 @@ class PaperHttpTests(unittest.TestCase):
                     design_result=suggestion, design_record=record, design_content=design_bytes,
                     design_anchors=design_anchors)
 
-                # Use the actual checked prediction centers/errors to choose a
-                # reading whose separately reviewed allowance contains BOTH
-                # enclosures. Do not freeze an old pair or successful reading.
+                # Derive each reading/allowance from actual checked predictions,
+                # not a frozen pair, copied answer or extreme incompatible value.
                 row = next(r for r in suggestion["native_replay"]["fresh_checked"]["rows"]
                            if r["time"] == suggestion["selected_time"])
                 ids = suggestion["candidate_ids"]
                 self.assertEqual(len(set(ids)), 2)
                 centers = {cid: Fraction(row["centers"][cid]) for cid in ids}
-                reading = sum(centers.values()) / 2
-                allowance = max(abs(centers[cid] + sign * Fraction(row["errors"][cid]) - reading)
-                                for cid in ids for sign in (-1, 1)) + Fraction(1, 100)
-                self.assertGreater(allowance, Fraction(suggestion["future_hard_allowance"]))
+                outside = {r["candidate_id"] for r in history["result"]["candidate_results"] if r["outside_closed_claim"]}
+                self.assertEqual(len(outside), 1)
+                inside, = set(ids) - outside
+                if unresolved:
+                    error = Fraction(row["errors"][inside])
+                    self.assertGreater(error, 0)
+                    reading, allowance = centers[inside], error / 2
+                    self.assertLess(allowance, error)
+                    expected_status = {cid: "inconclusive" if cid == inside else "invalid" for cid in ids}
+                    expected_outcome, expected_witnesses = "inconclusive", set()
+                else:
+                    reading = sum(centers.values()) / 2
+                    allowance = max(abs(centers[cid] + sign * Fraction(row["errors"][cid]) - reading)
+                                    for cid in ids for sign in (-1, 1)) + Fraction(1, 100)
+                    self.assertGreater(allowance, Fraction(suggestion["future_hard_allowance"]))
+                    expected_status = dict.fromkeys(ids, "valid")
+                    expected_outcome, expected_witnesses = "certified_counterexample", outside
                 def text(value):
                     return f"{value.numerator}/{value.denominator}"
                 proposal, revised, revised_problem, body = self.followup.revised_inputs(history,
@@ -87,7 +105,7 @@ class PaperHttpTests(unittest.TestCase):
                 self.assertEqual(revised["body"]["origin"], "synthetic")
                 self.assertEqual(revised["body"]["rows"][:-1], dataset["body"]["rows"])
                 followup = post(client, f"/workspaces/{workspace}/plans", {
-                    "expected_current_revision_id": revised_problem["id"], "plan": body}, "both-compatible-plan")
+                    "expected_current_revision_id": revised_problem["id"], "plan": body}, "paper-followup-plan")
                 for old in (approval, design_approval):
                     rejected = client.post(prefix + f"/plans/{followup['id']}/runs", json={
                         "approval_id": old["id"], "expected_plan_digest": followup["digest"]},
@@ -97,18 +115,16 @@ class PaperHttpTests(unittest.TestCase):
                 self.assertEqual(worker(client.app.state.workflow, settings=settings).tick(), 0)
                 fresh_approval = post(client, f"/plans/{followup['id']}/approvals", {
                     "expected_current_revision_id": revised_problem["id"],
-                    "expected_plan_digest": followup["digest"], "accepted": True}, "both-compatible-approval")
+                    "expected_plan_digest": followup["digest"], "accepted": True}, "paper-followup-approval")
                 start = {"approval_id": fresh_approval["id"], "expected_plan_digest": followup["digest"]}
-                recheck = post(client, f"/plans/{followup['id']}/runs", start, "both-compatible-start")
+                recheck = post(client, f"/plans/{followup['id']}/runs", start, "paper-followup-start")
                 self.assertEqual(worker(client.app.state.workflow, settings=settings).tick(), 1)
                 finished = client.get(prefix + f"/runs/{recheck['id']}").json()
                 self.assertEqual(finished["state"], "completed", finished)
                 result = client.get(prefix + f"/records/{finished['scenarios'][0]['result_id']}").json()["body"]["result"]
                 vectors = dict(zip(ids, plan["body"]["request"]["candidate_vectors"], strict=True))
-                outside = {r["candidate_id"] for r in history["result"]["candidate_results"] if r["outside_closed_claim"]}
-                self.assertEqual(len(outside), 1)
                 self.assertEqual({c["id"]: c["parameter_vector"] for c in result["candidates"]}, vectors)
-                self.assertEqual(result["scientific_outcome"], "certified_counterexample")
+                self.assertEqual(result["scientific_outcome"], expected_outcome)
                 self.assertEqual(result["verification"], "valid")
                 self.assertEqual(result["expected_binding"], "matches")
                 self.assertEqual(result["replay"], "passed")
@@ -144,17 +160,23 @@ class PaperHttpTests(unittest.TestCase):
                 self.assertEqual(fresh["verification"], "valid")
                 self.assertEqual(fresh["operation"], "recheck")
                 self.assertEqual(fresh["dataset_origin"], "synthetic")
-                self.assertEqual(fresh["outcome"]["scientific_outcome"], "certified_counterexample")
+                self.assertEqual(fresh["outcome"]["scientific_outcome"], expected_outcome)
                 for checked in (result["candidate_results"], fresh["candidate_results"]):
-                    self.assertEqual({c["candidate_id"]: c["verification"] for c in checked}, dict.fromkeys(ids, "valid"))
+                    self.assertEqual({c["candidate_id"]: c["verification"] for c in checked}, expected_status)
                     self.assertEqual({c["candidate_id"] for c in checked if c["outside_closed_claim"]}, outside)
-                    self.assertEqual({c["candidate_id"] for c in checked if c["is_counterexample"]}, outside)
-                    self.assertTrue(all(not c["violating_observation_ids"] and not c["unresolved_observation_ids"] for c in checked))
+                    self.assertEqual({c["candidate_id"] for c in checked if c["is_counterexample"]}, expected_witnesses)
+                    for candidate in checked:
+                        status = expected_status[candidate["candidate_id"]]
+                        row_id = proposal["body"]["row"]["id"]
+                        self.assertEqual(candidate["violating_observation_ids"], [row_id] if status == "invalid" else [])
+                        self.assertEqual(candidate["unresolved_observation_ids"], [row_id] if status == "inconclusive" else [])
+                        if status == "inconclusive":
+                            self.assertEqual(candidate["reason_code"], "insufficient_enclosure")
                 process, failure = baseline.replay_cli(self.replay, scratch, download.content,
                     {**expected, "problem_digest": problem["digest"]})
                 self.assertEqual(process.returncode, 2, failure)
                 self.assertEqual(failure["error"]["code"], "wrong_specification_binding")
-                self.assertEqual(post(client, f"/plans/{followup['id']}/runs", start, "both-compatible-retry")["id"], recheck["id"])
+                self.assertEqual(post(client, f"/plans/{followup['id']}/runs", start, "paper-followup-retry")["id"], recheck["id"])
                 self.assertEqual(worker(client.app.state.workflow, settings=settings).tick(), 0)
                 design.assert_preserved_history(history)
                 for old in (dataset, problem, record, proposal):

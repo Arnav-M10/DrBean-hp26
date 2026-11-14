@@ -60,6 +60,25 @@ reported in the PR; the receipts are never relabelled with a different SHA.
 Backend tests used a parent-process socket guard; that is narrower than the
 ordinary HTTP harness's recorded subprocess egress guard.
 
+The clean follow-up candidate **`1193a2f18ed108f53d4cbce942b2fa1dc3d6eef6`**
+then passed the expanded engine runner (**306 tests**, two skip entries), the
+separate authoritative DTO and both-compatible HTTP test, and again all seven
+ordinary HTTP cases, 22 native controls and the offline scientific gate. The
+optional HTTP class requires backend dependencies and was executed there rather
+than skipped from qualification. [Exact committed-candidate receipts](review-evidence/paper-1193a2f/README.md)
+include the original vectors, wider allowance and downloaded bytes for the
+both-compatible case. Current standalone and portable example replay also pass.
+The initial PR CI engine job failed on those examples' old source identity;
+regeneration corrected that defect. Other initial CI jobs passed.
+
+A further targeted regression now covers genuine unresolved feedback through
+the ordinary HTTP/worker path: the separately reviewed reading is the reference
+candidate's computed center, with an allowance narrower than its checked
+enclosure. The reference remains `inconclusive/insufficient_enclosure`, the
+outside candidate is excluded, and successful packet verification/replay leaves
+the outcome inconclusive. Both HTTP tests passed before committing; final
+committed execution is reported separately rather than attributed to `1193a2f`.
+
 After the clean acceptance, the two fixture-semantic regressions passed with
 the existing mapping controls (**11 tests**), and the new both-compatible HTTP
 test passed under the prepared backend (**1 test**, no skip). The existing

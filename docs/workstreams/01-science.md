@@ -55,6 +55,16 @@ acceptance. Current example packets were regenerated and freshly replayed to
 match the changed implementation manifest; prior archived evidence is unchanged
 and previous current-example bytes remain at immutable main `cbfa5ef`.
 
+Clean **`1193a2f18ed108f53d4cbce942b2fa1dc3d6eef6`** then passed the expanded
+engine runner (306 tests, two skip entries), separately executed DTO and HTTP
+dependencies, all seven ordinary HTTP cases, all 22 native controls and the
+offline scientific gate. Retained clean both-compatible bytes and anchors are
+distinct from the development capture. Initial PR CI passed its other five jobs
+but rejected the old example packets' source identity; regenerated examples now
+replay successfully. Added the remaining genuine unresolved HTTP regression:
+two focused HTTP tests pass, with original reference unresolved/outside excluded,
+valid replay and unchanged inconclusive outcome. No engine or API fix was needed.
+
 [Exact qualification, limitations, owner handoffs and two-minute explanation](../../packages/groundwork_adapter/docs/PAPER_SCIENCE_QUALIFICATION.md)
 separate these Owner 1 checks from Claude's historical independent acceptance.
 This source is ready for paper-interface/browser assembly, not final paper
