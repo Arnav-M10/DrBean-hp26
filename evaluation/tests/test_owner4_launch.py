@@ -113,3 +113,41 @@ class OrphanDetection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EvidenceOnlyDescendants(unittest.TestCase):
+    """Committing evidence moves HEAD; the gate still reads it, but never across a code change."""
+
+    def git(self, *args):
+        env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@example.invalid", "PATH": os.environ.get("PATH", ""), "HOME": self.repo}
+        out = subprocess.run(["git", "-C", self.repo, *args], capture_output=True, text=True, env=env, check=True)
+        return out.stdout.strip()
+
+    def commit(self, path, text):
+        full = os.path.join(self.repo, path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        self.git("add", path)
+        self.git("commit", "-q", "-m", path)
+        return self.git("rev-parse", "HEAD")
+
+    def setUp(self):
+        self.repo = tempfile.mkdtemp(prefix="drbean-gate-git-")
+        self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
+        self.git("init", "-q")
+        self.code = self.commit("evaluation/drbean_eval/x.py", "a = 1\n")
+
+    def test_evidence_and_log_commits_keep_the_tested_code(self):
+        from drbean_eval import gates
+        evidence = self.commit("evaluation/results/attempts.jsonl", "{}\n")
+        log = self.commit("docs/workstreams/05-validation.md", "log\n")
+        self.assertEqual(gates.equivalent_commits(self.repo, log, {self.code, evidence}), {self.code, evidence, log})
+
+    def test_a_code_change_or_an_unrelated_commit_is_never_equivalent(self):
+        from drbean_eval import gates
+        evidence = self.commit("evaluation/results/attempts.jsonl", "{}\n")
+        changed = self.commit("evaluation/drbean_eval/x.py", "a = 2\n")
+        self.assertEqual(gates.equivalent_commits(self.repo, changed, {self.code, evidence}), {changed})
+        self.assertEqual(gates.equivalent_commits(self.repo, changed, {"0" * 40}), {changed})
