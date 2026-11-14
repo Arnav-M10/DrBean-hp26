@@ -9,6 +9,7 @@ Checklist items: ACC-06, ACC-07, ACC-08 (evaluation/coordinator/sprint-completio
 """
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from google.genai import errors
@@ -160,8 +161,6 @@ def test_acc07_acc06_provider_failure_after_real_science_keeps_evidence_and_repo
     assert len(wire.requests) == requests_after_failure
 
 
-@pytest.mark.xfail(strict=True, reason="F-SPRINT-REPORT-COMMENTARY (A, PR #60): the downloaded research report omits the "
-                   "agent's validated explanation and recommendation; remove this marker when it passes")
 @pytest.mark.parametrize("metered_app", ["native"], indirect=True)
 def test_acc06_downloaded_report_carries_the_validated_explanation_and_recommendation(metered_app):
     """Complete a baseline through the live path and download the research report."""
@@ -205,11 +204,14 @@ def test_acc06_downloaded_report_carries_the_validated_explanation_and_recommend
     assert download.status_code == 200
     body = json.loads(download.content)["body"]
     evidence_ids = {item["id"] for item in body["evidence"]}
-    text = json.dumps(body)
-    # ACC-06: the agent's validated explanation and recommendation must be in the downloaded report,
-    # bound to evidence the report contains, and never presented as scientific authority.
-    commentary = body.get("agent_commentary") or body.get("explanation") or body.get("recommendations")
+    # ACC-06: the agent's validated explanation and recommendation are in the downloaded report,
+    # bound to evidence the report contains, and never presented as scientific authority or proof.
+    commentary = body.get("agent_commentary")
     assert commentary, f"Downloaded report has no agent explanation or recommendation; fields: {sorted(body)}"
-    cited = set(json.dumps(commentary).split('"')) & evidence_ids
-    assert cited, "The explanation cites no evidence contained in the report"
-    assert "proof" not in text.lower().replace("not proof", "").replace("no proof", "")
+    assert body.get("commentary_status") == "validated"
+    assert commentary["scientific_authority"] is False
+    assert commentary["authorship"] in {"model_commentary", "controlled_commentary"}
+    assert commentary["fact_ids"] and set(commentary["fact_ids"]) <= evidence_ids
+    assert {item["evidence_id"] for item in body["commentary_support"]} == set(commentary["fact_ids"])
+    assert commentary["next_action"] in {"review_design", "clarify", "review_observation", "stop"}
+    assert not re.search(r"\b(proves?|proven|proof that|establish(es)? the true)\b", commentary["text"], re.I), commentary["text"]
