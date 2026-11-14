@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#121315">
-<meta name="description" content="Check whether your concentration readings settle a claimed elimination rate, and plan the reading that would.">
+<meta name="description" content="Bring your readings, get a checked answer, and plan the next measurement that would settle the question.">
 <title>Your data: Dr. Bean</title>
 <link rel="preload" href="fonts/atkinson-next-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
@@ -50,8 +50,8 @@
 
 <nav class="steps" aria-label="Study steps">
   <ol>
-    <li><a href="#data" data-step="data"><span class="num" aria-hidden="true"><b>1</b><svg><use href="#i-check"/></svg></span><span class="label">Data and claim</span></a></li>
-    <li><a href="#check" data-step="check"><span class="num" aria-hidden="true"><b>2</b><svg><use href="#i-check"/></svg></span><span class="label">Check</span></a></li>
+    <li><a href="#data" data-step="data"><span class="num" aria-hidden="true"><b>1</b><svg><use href="#i-check"/></svg></span><span class="label" data-label="data">Data and claim</span></a></li>
+    <li><a href="#check" data-step="check"><span class="num" aria-hidden="true"><b>2</b><svg><use href="#i-check"/></svg></span><span class="label" data-label="check">Check</span></a></li>
     <li><a href="#result" data-step="result"><span class="num" aria-hidden="true"><b>3</b><svg><use href="#i-check"/></svg></span><span class="label">Result</span></a></li>
     <li><a href="#next" data-step="next"><span class="num" aria-hidden="true"><b>4</b><svg><use href="#i-check"/></svg></span><span class="label">Next measurement</span></a></li>
   </ol>
@@ -68,7 +68,11 @@
   <section id="data" aria-labelledby="data-title">
     <div id="start" class="start">
       <h1 id="data-title">Bring your readings</h1>
-      <p class="lead">Concentration over time, from any file. Dr. Bean finds the numbers, you confirm them, and the checker tests your claim about the elimination rate.</p>
+      <div class="kinds" role="radiogroup" aria-label="What your readings are">
+        <label><input type="radio" name="study-kind" value="concentration" checked>Drug concentration over time</label>
+        <label><input type="radio" name="study-kind" value="currents">Electron currents at a collector</label>
+      </div>
+      <p id="start-lead" class="lead">Concentration over time, from any file. Dr. Bean finds the numbers, you confirm them, and the checker tests your claim about the elimination rate.</p>
       <label id="drop" class="drop">
         <input id="file" type="file" accept=".csv,.tsv,.tab,.txt,.json,.md,.pdf,text/csv,text/tab-separated-values,application/json,text/plain,text/markdown,application/pdf,image/png,image/jpeg">
         <svg aria-hidden="true"><use href="#i-upload"/></svg>
@@ -80,6 +84,7 @@
         <button type="button" class="secondary" data-action="type"><svg aria-hidden="true"><use href="#i-plus"/></svg>Type readings</button>
         <button type="button" class="quiet-button" data-action="sample">Try the sample readings</button>
       </div>
+      <p id="start-note" class="hint" hidden></p>
       <p id="start-problem" class="problem" hidden></p>
       <p id="start-status" class="status" role="status" hidden></p>
     </div>
@@ -143,9 +148,74 @@
         </div>
       </div>
     </div>
+
+    <div id="cmp-editor" hidden>
+      <h1 class="claim">Which electron distribution fits these currents?</h1>
+      <p id="cmp-source" class="lead"></p>
+      <div id="cmp-mapping" class="mapping" hidden></div>
+      <fieldset class="about-data cmp-about">
+        <legend class="sr-only">About these currents</legend>
+        <div class="field"><span>These currents are</span><label class="check-line"><input type="checkbox" id="cmp-synthetic" data-cfield="synthetic">Made up, not measured</label></div>
+        <label class="field">How they were made<input id="cmp-description" data-cfield="description" maxlength="500" autocomplete="off" placeholder="For example, forward currents from a chosen distribution"></label>
+        <label class="field">Collector area (m²)<input id="cmp-area" data-cfield="area" inputmode="decimal" autocomplete="off" spellcheck="false"></label>
+        <label class="field">Efficiency<input id="cmp-efficiency" data-cfield="efficiency" inputmode="decimal" autocomplete="off" spellcheck="false"></label>
+      </fieldset>
+      <p id="cmp-problems-about" class="problem" hidden></p>
+      <div class="work cmp-work">
+        <div class="table-area">
+          <table class="readings">
+            <thead><tr><th scope="col"><span class="sr-only">Use</span></th><th scope="col">Angle <span class="unit">degrees</span></th><th scope="col">From <span class="unit">eV</span></th><th scope="col">To <span class="unit">eV</span></th><th scope="col">Current <span class="unit">µA</span></th><th scope="col">σ <span class="unit">µA</span></th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+            <tbody id="cmp-rows"></tbody>
+          </table>
+          <div class="table-actions">
+            <button type="button" class="secondary small" data-action="cmp-add"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add a current</button>
+            <span id="cmp-used" class="meta"></span>
+          </div>
+          <p id="cmp-problems-rows" class="problem" hidden></p>
+          <p class="hint">σ is the standard deviation of each current's noise. An empty "To" means no upper limit.</p>
+        </div>
+        <div class="chart-col">
+          <figure class="chart-area">
+            <div id="cmp-data-chart"></div>
+          </figure>
+          <details id="cmp-settings">
+            <summary>Fit, noise and next settings</summary>
+            <div class="limits-body">
+              <div class="equation" id="cmp-equation"></div>
+              <div class="settings-grid">
+                <label class="field">Lowest density <span class="unit">m⁻³</span><input data-cfield="densityMin" inputmode="decimal" spellcheck="false"></label>
+                <label class="field">Highest density <span class="unit">m⁻³</span><input data-cfield="densityMax" inputmode="decimal" spellcheck="false"></label>
+                <label class="field wide">Temperatures to try <span class="unit">eV, separated by commas</span><input data-cfield="temperatures" spellcheck="false"></label>
+                <label class="field">A fit passes when <span class="m-chi"></span> is at most<input data-cfield="maxChi" inputmode="decimal" spellcheck="false"></label>
+                <label class="field">Fit evaluations allowed<input data-cfield="maxEvaluations" inputmode="numeric" spellcheck="false"></label>
+                <label class="field wide">Noise levels to test <span class="unit">σ in µA, separated by commas</span><input data-cfield="noise" spellcheck="false"></label>
+                <label class="field">Band width <span class="unit">± this many σ</span><input data-cfield="z" spellcheck="false"></label>
+                <label class="field">Simulated readings<input data-cfield="samples" inputmode="numeric" spellcheck="false"></label>
+                <label class="field">Seed<input data-cfield="seed" inputmode="numeric" spellcheck="false"></label>
+              </div>
+              <table class="readings settings-table">
+                <caption>Settings you could measure next</caption>
+                <thead><tr><th scope="col">Angle <span class="unit">degrees</span></th><th scope="col">From <span class="unit">eV</span></th><th scope="col">To <span class="unit">eV</span></th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+                <tbody id="cmp-next-rows"></tbody>
+              </table>
+              <div class="table-actions"><button type="button" class="secondary small" data-action="cmp-add-setting"><svg aria-hidden="true"><use href="#i-plus"/></svg>Add a setting</button></div>
+              <p id="cmp-problems-settings" class="problem" hidden></p>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="quiet-button" data-action="start-over">Use different data</button>
+        <div class="go">
+          <p id="cmp-prepare-status" class="status" role="status" hidden></p>
+          <button id="cmp-prepare" type="button" class="primary" data-action="cmp-prepare">Review the comparison</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section id="check" aria-labelledby="check-title" hidden>
+   <div id="pk-check" class="pane">
     <h1 id="check-title">Approve the check</h1>
     <p class="lead">The assistant prepared exactly one check. Nothing runs until you approve it.</p>
     <table class="facts"><tbody id="check-facts"></tbody></table>
@@ -158,9 +228,25 @@
         <button id="approve-check" type="button" class="primary" data-action="approve-check">Approve and run the check</button>
       </div>
     </div>
+   </div>
+   <div id="cmp-check" class="pane" hidden>
+    <h1>Approve the comparison</h1>
+    <p class="lead">Nothing runs until you approve it. This is a numerical fit, not an exact Counterdex proof.</p>
+    <table class="facts"><tbody id="cmp-check-facts"></tbody></table>
+    <details class="technical"><summary>Exact request, sent when you approve</summary><pre id="cmp-check-exact" class="command"></pre></details>
+    <p id="cmp-check-problem" class="problem" hidden></p>
+    <div class="actions">
+      <a href="#data" class="back">Change the currents</a>
+      <div class="go">
+        <p id="cmp-check-status" class="status" role="status" hidden></p>
+        <button id="cmp-approve" type="button" class="primary" data-action="cmp-approve">Approve and run the comparison</button>
+      </div>
+    </div>
+   </div>
   </section>
 
   <section id="result" aria-labelledby="result-title" hidden>
+   <div id="pk-result" class="pane">
     <div class="result-head">
       <p id="result-note" class="meta"></p>
       <nav class="views" aria-label="Result views"><a href="#result" data-view>Answer</a><a href="#result-readings" data-view>Reading by reading</a><a href="#result-files" data-view>Files</a></nav>
@@ -200,9 +286,57 @@
       <a href="#data" class="back">Change data or claim</a>
       <div class="go"><p id="next-unavailable" class="meta" hidden></p><button id="to-next" type="button" class="primary" data-action="go-next">Plan the next measurement</button></div>
     </div>
+   </div>
+   <div id="cmp-result" class="pane" hidden>
+    <div class="result-head">
+      <p id="cmp-result-note" class="meta"></p>
+      <nav class="views" aria-label="Result views"><a href="#result" data-view>Answer</a><a href="#result-readings" data-view>Current by current</a><a href="#result-files" data-view>Files</a></nav>
+    </div>
+    <p id="cmp-stale" class="notice-line" hidden></p>
+    <div id="cmp-answer">
+      <h1 id="cmp-title"></h1>
+      <p id="cmp-lead" class="lead"></p>
+      <div class="work result-work">
+        <figure class="chart-area">
+          <div id="cmp-result-chart"></div>
+          <figcaption class="key"><span class="k-iso">Isotropic Maxwellian</span><span class="k-bi">Bi-Maxwellian</span><span class="k-reading">Current with ±σ</span></figcaption>
+        </figure>
+        <div class="curves">
+          <table class="data">
+            <caption class="sr-only">The two fits</caption>
+            <thead><tr><th scope="col">Model</th><th scope="col">Fitted values</th><th scope="col"><span class="m-chi"></span></th><th scope="col">Passes</th></tr></thead>
+            <tbody id="cmp-fits"></tbody>
+          </table>
+          <p id="cmp-limit" class="hint"></p>
+          <p class="hint">Numerical fits on your temperature grid. Nothing here is an exact proof.</p>
+        </div>
+      </div>
+    </div>
+    <div id="cmp-readings" hidden>
+      <h1>Current by current</h1>
+      <p class="lead">Each current next to both fitted predictions. Below each prediction: how many σ it is from the current.</p>
+      <div id="cmp-readings-table"></div>
+    </div>
+    <div id="cmp-files" hidden>
+      <h1>Files from this comparison</h1>
+      <p class="lead">The server keeps this comparison as one record. Its export holds the exact request, both fits, the noise sweep and the limits below.</p>
+      <ul class="files">
+        <li><div><h3>Numerical export</h3><p id="cmp-file-about"></p></div>
+          <div class="file-actions"><button type="button" class="secondary small" data-action="cmp-view">View</button><button type="button" class="secondary small" data-action="cmp-download" data-status="cmp-file-status">Download</button></div></li>
+      </ul>
+      <p id="cmp-file-status" class="status left" role="status" hidden></p>
+      <h2 class="sub">What this result does not show</h2>
+      <ul id="cmp-limitations" class="limit-list"></ul>
+    </div>
+    <div class="actions">
+      <a href="#data" class="back">Change the currents</a>
+      <div class="go"><p id="cmp-next-unavailable" class="meta" hidden></p><button id="cmp-to-next" type="button" class="primary" data-action="cmp-go-next">See the next measurement</button></div>
+    </div>
+   </div>
   </section>
 
   <section id="next" aria-labelledby="next-heading" hidden>
+   <div id="pk-next" class="pane">
     <div id="next-settings">
       <h1 id="next-heading">When could you take one more reading?</h1>
       <p class="lead">Dr. Bean compares the two curves at those times and tells you which one reading can decide between them.</p>
@@ -254,6 +388,30 @@
         <button type="button" class="primary" data-action="report"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download the readable report</span></button>
       </div>
     </div>
+   </div>
+   <div id="cmp-next" class="pane" hidden>
+    <div class="result-head">
+      <p class="meta">Noise level</p>
+      <div id="cmp-cases" class="views" role="group" aria-label="Noise level"></div>
+    </div>
+    <h1 id="cmp-next-title"></h1>
+    <p id="cmp-next-lead" class="lead"></p>
+    <div class="work result-work">
+      <figure class="chart-area">
+        <div id="cmp-next-chart"></div>
+        <figcaption class="key"><span class="k-iso">Isotropic band</span><span class="k-bi">Bi-Maxwellian band</span></figcaption>
+      </figure>
+      <div id="cmp-next-table" class="curves"></div>
+    </div>
+    <div id="cmp-simulation"></div>
+    <div class="actions">
+      <a href="#result" class="back">Back to the result</a>
+      <div class="go">
+        <p id="cmp-next-status" class="status" role="status" hidden></p>
+        <button type="button" class="primary" data-action="cmp-download" data-status="cmp-next-status"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download the numerical export</span></button>
+      </div>
+    </div>
+   </div>
   </section>
 </main>
 
@@ -269,6 +427,13 @@
   <div class="dialog-head"><h2 id="file-title"></h2><button type="button" class="icon" data-action="close" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
   <div id="file-body" class="file-body"></div>
   <div class="dialog-actions"><button type="button" class="secondary" data-action="save-file"><svg aria-hidden="true"><use href="#i-download"/></svg>Download this JSON file</button><button type="button" class="primary" data-action="close">Done</button></div>
+</dialog>
+
+<dialog id="cmp-dialog" aria-labelledby="cmp-dialog-title" class="wide">
+  <div class="dialog-head"><h2 id="cmp-dialog-title">Numerical export</h2><button type="button" class="icon" data-action="close" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+  <div class="file-body"><pre id="cmp-dialog-body" class="raw-json"></pre></div>
+  <p id="cmp-dialog-status" class="status left" role="status" hidden></p>
+  <div class="dialog-actions"><button type="button" class="secondary" data-action="cmp-download" data-status="cmp-dialog-status"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download this JSON file</span></button><button type="button" class="primary" data-action="close">Done</button></div>
 </dialog>
 
 <div id="announce" class="sr-only" role="status" aria-live="polite"></div>

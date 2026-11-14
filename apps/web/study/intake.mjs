@@ -26,17 +26,19 @@ function csvLine(line, delimiter) {
 export function cellsOf(line) {
   const text = line.replace(/ /g, ' ').trim()
   if (!text) return []
-  let cells
+  // In a delimited line an empty cell keeps its column (an optional value left blank); in
+  // space-separated text there are no empty cells, only extra spaces.
+  let cells, delimited = true
   if (text.includes('\t')) cells = text.split('\t').map(c => c.trim())
   else if (/^\|.*\|$/.test(text)) cells = text.slice(1, -1).split('|').map(c => c.trim())
   else if (text.includes(';') && !text.includes(',')) cells = csvLine(text, ';')
   else if (text.includes(',') && !/\d,\d{1,2}(\s|$)/.test(text)) cells = csvLine(text, ',')
-  else cells = text.replace(/\s*(?:±|\+\/-|\+-)\s*/g, '  ').split(/\s{2,}|\s+(?=[-+.\d])|(?<=[\d)])\s+/).map(c => c.trim())
+  else { delimited = false; cells = text.replace(/\s*(?:±|\+\/-|\+-)\s*/g, '  ').split(/\s{2,}|\s+(?=[-+.\d])|(?<=[\d)])\s+/).map(c => c.trim()) }
   // "4.80 ± 0.50" in one cell becomes a value and its allowance.
   return cells.flatMap(cell => {
     const pm = PLUS_MINUS.exec(cell)
     return pm ? [pm[1], pm[2]] : [cell]
-  }).filter(cell => cell !== '' && !/^:?-{3,}:?$/.test(cell))
+  }).filter(cell => (delimited || cell !== '') && !/^:?-{3,}:?$/.test(cell))
 }
 
 // Consecutive lines with the same count of numeric cells form a table; the line just
@@ -48,9 +50,10 @@ export function tablesFromText(text, where = {}) {
   const flush = () => { if (current && current.rows.length >= 2) tables.push(current); current = null }
   lines.forEach((line, index) => {
     const cells = cellsOf(line)
-    const numeric = cells.filter(isNumber).length
-    if (numeric >= 2 && numeric >= cells.length - 1) {
-      const values = cells.filter(isNumber)
+    // A data line: two or more numbers, at most one label (such as a subject id); blanks allowed.
+    const words = cells.filter(c => c !== '' && !isNumber(c)).length
+    if (cells.filter(isNumber).length >= 2 && words <= 1) {
+      const values = cells.filter(c => c === '' || isNumber(c))
       if (current && current.width === values.length) {
         current.rows.push(values); current.lines.push(index + 1)
       } else {

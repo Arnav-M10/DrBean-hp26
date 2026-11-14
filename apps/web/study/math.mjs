@@ -18,6 +18,10 @@ export function symbols(output = 'htmlAndMathml') {
     model: t('C(t) = A\\left(e^{-k_e t} - e^{-k_a t}\\right)', true),
     modelInline: t('C(t) = A\\left(e^{-k_e t} - e^{-k_a t}\\right)'),
     order: t('k_e < k_a'),
+    // Electron currents (docs/science/MODEL_COMPARISON_PHYSICS.md)
+    n: t('n'), T: t('T'), Tpar: t('T_\\parallel'), Tperp: t('T_\\perp'), chi: t('\\chi^2_\\nu'),
+    current: t('|I| = e\\,A\\,\\eta\\,n\\sqrt{\\frac{e\\,\\tau_n}{2\\pi m_e}}\\left(e^{-E_{\\mathrm{from}}/\\tau_n} - e^{-E_{\\mathrm{to}}/\\tau_n}\\right)', true),
+    tauNormal: t('\\tau_n = T_\\parallel\\cos^2\\theta + T_\\perp\\sin^2\\theta'),
     exact(text) {
       const [n, d] = String(text).split('/')
       if (!/^-?\d+$/.test(n) || (d !== undefined && !/^\d+$/.test(d))) return escape(text)

@@ -1,14 +1,17 @@
 // Dr. Bean study page: your data in, a checked answer out. Every scientific step runs on
-// the server (research agent + Counterdex); this page saves inputs, asks for your two
-// approvals, waits for real results and makes the downloaded files readable.
+// the server; this page saves inputs, asks for each approval, waits for real results and
+// makes the downloaded files readable. Two kinds of study share the four steps:
+// concentration over time (research agent + Counterdex exact check) and electron currents
+// (the numerical model comparison service, compare-app.mjs).
 import { bootstrapSharedSession, readConnection } from '../session.mjs'
 import { parseExact } from '../exact.mjs'
 import { chartSVG } from './chart.mjs'
 import { convert, guessColumns, readingsFrom, tablesFromJSON, tablesFromText } from './intake.mjs'
 import { page as sym } from './math.mjs'
+import { $, countStatus, failure, readable, saveText, size, status } from './ui.mjs'
+import { createComparison } from './compare-app.mjs'
 import { curvesFor, escapeHTML, fileView, finding, formatBound, formatRate, fromTexts, nextFinding, nextTable, readableReport, readingTable, summarize } from './results.mjs'
 
-const $ = id => document.getElementById(id)
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
 const STORE = 'dr-bean.study.v1'
 const LIMITS = { aLow: '0.001', aHigh: '30', keLow: '0.015', keHigh: '0.35', kaLow: '0.4', kaHigh: '8' }
@@ -28,6 +31,21 @@ let busy = false
 // A problem shows once its field has been left with a value or the person pressed the button,
 // never while someone is still filling the form in for the first time.
 let shown = { tried: false, touched: {} }, nextShown = { tried: false, touched: {} }
+
+// Which kind of study the start screen offers; a viewer convenience, kept in this browser.
+const KIND = 'dr-bean.study.kind'
+let mode = (() => { try { return localStorage.getItem(KIND) === 'currents' ? 'currents' : 'concentration' } catch { return 'concentration' } })()
+function setMode(next) {
+  mode = next === 'currents' ? 'currents' : 'concentration'
+  try { localStorage.setItem(KIND, mode) } catch { /* the choice just is not remembered */ }
+}
+const comparisonAvailable = () => capabilities ? capabilities.model_comparison?.available === true : null
+const cmp = createComparison({
+  route: () => route(), workspace: () => workspace, available: comparisonAvailable,
+  seconds: () => capabilities?.model_comparison?.max_compute_seconds ?? 10,
+  onConnectionFailure: error => connectionFailure(error),
+  save: entry => { study = entry ?? {}; writeStore() },
+})
 
 function blankDraft() {
   return { kind: null, name: '', asset: null, tables: [], table: 0, columns: null, allowanceForAll: '', rows: [],
@@ -88,18 +106,14 @@ async function connect(startNew = false) {
     const opened = await bootstrapSharedSession(undefined, { startNew })
     // A different workspace shares nothing with the old one, so its study starts empty.
     if (workspace && workspace !== opened.session.workspace_id) {
-      draft = blankDraft(); snapshot = null; results = null; $('study-name').textContent = ''; location.hash = 'data'
+      draft = blankDraft(); snapshot = null; results = null; cmp.reset(); $('study-name').textContent = ''; location.hash = 'data'
     }
     api = opened.api; workspace = opened.session.workspace_id
     api.setConnectionFailureHandler(error => { if (api === opened.api && !connecting) connectionFailure(error) })
     startStatus('')
     study = readStore()
     capabilities = await readConnection(api, '/capabilities')
-    const research = capabilities.deepagents
-    if (!capabilities.science?.available) setConnection('The checker is not running on this server', 'bad')
-    else if (!research?.dispatch_enabled) setConnection('Checks are turned off on this server', 'bad')
-    else if (research.execution_mode === 'live') setConnection('This server uses a live model, which needs consent in the classic view', 'bad')
-    else setConnection('Private workspace')
+    connectionLabel()
     await reopen()
     route()
   } catch (error) {
@@ -112,11 +126,33 @@ async function connect(startNew = false) {
 
 const canRun = () => capabilities?.science?.available && capabilities.deepagents?.dispatch_enabled && capabilities.deepagents.execution_mode !== 'live'
 
+function connectionLabel() {
+  if (!api || !capabilities) return
+  const research = capabilities.deepagents
+  if (mode === 'currents') setConnection(comparisonAvailable() ? 'Private workspace' : 'Comparisons are not available on this server', comparisonAvailable() ? '' : 'bad')
+  else if (!capabilities.science?.available) setConnection('The checker is not running on this server', 'bad')
+  else if (!research?.dispatch_enabled) setConnection('Checks are turned off on this server', 'bad')
+  else if (research.execution_mode === 'live') setConnection('This server uses a live model, which needs consent in the classic view', 'bad')
+  else setConnection('Private workspace')
+}
+
 async function reopen() {
+  if (study.kind === 'currents' && study.comparisonId) {
+    try {
+      await cmp.reopen(study.comparisonId)
+      setMode('currents'); connectionLabel()
+      $('study-name').textContent = 'Electron currents'
+      if (!location.hash) location.replace('#result')
+    } catch (error) {
+      if (error.status === 404) { study = {}; writeStore() }
+    }
+    return
+  }
   if (!study.sessionId) return
   try {
     snapshot = await api.json(`/research-sessions/${encodeURIComponent(study.sessionId)}`)
     draftFromSnapshot(snapshot)
+    setMode('concentration'); connectionLabel()
     if (snapshot.reports.length) await loadResults()
     if (!location.hash) location.replace('#' + (results ? (results.m.next ? 'next' : 'result') : snapshot.pending_review?.kind === 'plan' ? 'check' : 'data'))
   } catch (error) {
@@ -169,7 +205,8 @@ async function useFile(file) {
     }
     if (!tables.length) return startStatus(`No table of numbers was found in ${asset.filename || file.name}. Paste or type the readings instead.`, true)
     startStatus('')
-    useTables(tables, { kind: 'file', name: (asset.filename || file.name).replace(/\.[^.]+$/, ''), asset })
+    const base = { kind: 'file', name: (asset.filename || file.name).replace(/\.[^.]+$/, ''), asset }
+    if (mode === 'currents') { $('study-name').textContent = base.name; cmp.useTables(tables, base) } else useTables(tables, base)
   } catch (error) {
     startStatus(readable(error), true)
   }
@@ -241,27 +278,6 @@ function problems() {
 }
 
 // --- Saving and running ------------------------------------------------------------------------
-function status(id, text, tone = 'busy') {
-  const el = $(id)
-  delete el.dataset.count
-  el.hidden = !text
-  el.textContent = text || ''
-  el.className = `status ${tone}`
-}
-// After a press with problems left: how many remain, gone once they are fixed.
-function countStatus(id, count) {
-  if (count) { status(id, count === 1 ? 'One thing needs fixing first.' : `${count} things need fixing first.`, 'bad'); $(id).dataset.count = '' }
-  else if ($(id).dataset.count !== undefined) status(id, '')
-}
-// Server refusals arrive as "code: message Request: id." Keep the message and the request id
-// (it matches the server log); a lost session is explained once, by the notice at the top.
-function readable(error) {
-  if (error?.status === 401) return 'Your private session ended. Reconnect at the top of the page, then try again.'
-  return String(error?.message || 'Something went wrong.').replace(/^[a-z0-9_]+: /, '')
-}
-function failure(id, error) {
-  status(id, readable(error), 'bad')
-}
 
 const slug = text => (text || 'study').normalize('NFKD').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'study'
 
@@ -435,17 +451,23 @@ const STEPS = ['data', 'check', 'result', 'next']
 // Any other fragment (the skip link's #main) keeps the step on screen.
 let lastView = 'data'
 const view = () => { const hash = location.hash.slice(1); if (hash in VIEWS || !hash) lastView = hash || 'data'; return lastView }
-const reached = {
+const pkReached = {
   data: () => true,
   check: () => Boolean(snapshot && (snapshot.pending_review?.kind === 'plan' || snapshot.children.length)),
   result: () => Boolean(results),
   next: () => Boolean(results && results.m.outcome === 'certified_counterexample' && results.m.candidates.length === 2),
 }
 
+const reached = new Proxy({}, { get: (_, step) => (mode === 'currents' ? cmp.reached : pkReached)[step] })
+
 function route() {
   let v = view()
   if (!reached[VIEWS[v]]()) v = 'data'
   const section = VIEWS[v]
+  const currents = mode === 'currents'
+  for (const step of ['check', 'result', 'next']) { $(`pk-${step}`).hidden = currents; $(`cmp-${step}`).hidden = !currents }
+  document.querySelector('[data-label="data"]').textContent = currents ? 'Data and models' : 'Data and claim'
+  document.querySelector('[data-label="check"]').textContent = currents ? 'Comparison' : 'Check'
   document.querySelectorAll('main > section').forEach(s => { s.hidden = s.id !== section })
   const index = STEPS.indexOf(section)
   document.querySelectorAll('[data-step]').forEach((link, i) => {
@@ -454,25 +476,41 @@ function route() {
     link.classList.toggle('done', i < index && reached[STEPS[i + 1]]())
     if (reached[step]()) link.removeAttribute('aria-disabled'); else link.setAttribute('aria-disabled', 'true')
   })
-  if (section === 'data') renderData()
-  if (section === 'check') renderCheck()
-  if (section === 'result') renderResult(v)
-  if (section === 'next') renderNext()
-  const titles = { data: 'Your data', check: 'Approve the check', result: 'Result', next: 'Next measurement' }
+  if (section === 'data') renderDataStep()
+  if (section === 'check') currents ? cmp.renderCheck() : renderCheck()
+  if (section === 'result') currents ? cmp.renderResult(v) : renderResult(v)
+  if (section === 'next') currents ? cmp.renderNext() : renderNext()
+  const titles = { data: 'Your data', check: currents ? 'Approve the comparison' : 'Approve the check', result: 'Result', next: 'Next measurement' }
   document.title = `${titles[section]}: Dr. Bean`
   $('announce').textContent = titles[section]
 }
 
-function size(id, cap = 380) {
-  const width = Math.round($(id).getBoundingClientRect().width) || 720
-  return { width, height: Math.round(Math.max(220, Math.min(cap, window.innerHeight - 470, width * 0.62))) }
+// Step 1 shows the start screen until there is a draft of the kind on screen.
+const START = {
+  concentration: { lead: 'Concentration over time, from any file. Dr. Bean finds the numbers, you confirm them, and the checker tests your claim about the elimination rate.', note: '' },
+  currents: { lead: 'Electron currents from a planar collector at several angles and energy windows, from any file. Dr. Bean fits an isotropic and a bi-Maxwellian distribution to the same currents and finds the setting that could tell them apart.',
+    note: 'This version compares made-up currents only. The fits are numerical, not exact proofs.' },
+}
+function renderDataStep() {
+  const currents = mode === 'currents', editing = currents ? cmp.editing() : Boolean(draft.kind)
+  $('start').hidden = editing
+  $('editor').hidden = currents || !draft.kind
+  $('cmp-editor').hidden = !currents || !cmp.editing()
+  if (!editing) return renderStart()
+  if (currents) cmp.renderData(); else renderData()
+}
+function renderStart() {
+  document.querySelectorAll('[name="study-kind"]').forEach(input => {
+    input.checked = input.value === mode
+    input.disabled = input.value === 'currents' && comparisonAvailable() === false
+  })
+  $('start-lead').textContent = START[mode].lead
+  $('start-note').hidden = !START[mode].note
+  $('start-note').textContent = START[mode].note
 }
 
 function renderData() {
-  const editing = Boolean(draft.kind)
-  $('start').hidden = editing
-  $('editor').hidden = !editing
-  if (!editing) return
+  if (!draft.kind) return
   for (const id of ['claim-low', 'claim-high']) if (document.activeElement !== $(id)) $(id).value = draft[id === 'claim-low' ? 'low' : 'high']
   if (document.activeElement !== $('time-origin')) $('time-origin').value = draft.timeOrigin
   if (document.activeElement !== $('allowance-source')) $('allowance-source').value = draft.source
@@ -668,29 +706,37 @@ document.addEventListener('click', event => {
   if (!target) return
   if (target.dataset.step && target.getAttribute('aria-disabled') === 'true') { event.preventDefault(); return }
   const action = target.dataset.action
-  if (action === 'sample') useSample()
+  if (action === 'sample' && mode === 'currents') { $('study-name').textContent = 'Sample currents'; cmp.sample() }
+  else if (action === 'type' && mode === 'currents') { $('study-name').textContent = 'My currents'; cmp.type() }
+  else if (action === 'sample') useSample()
   else if (action === 'type') { draft = { ...blankDraft(), kind: 'typed', name: 'My readings', rows: [0, 1, 2].map(() => ({ time: '', value: '', allowance: '', included: true })) }; $('study-name').textContent = draft.name; showEditor() }
   else if (action === 'paste') { $('paste-text').value = ''; $('paste-problem').hidden = true; $('paste-dialog').showModal() }
   else if (action === 'use-paste') {
     const tables = [...tablesFromJSON($('paste-text').value), ...tablesFromText($('paste-text').value, { file: 'the pasted table' })]
     if (!tables.length) { $('paste-problem').hidden = false; $('paste-problem').textContent = 'No table of numbers was found. Put one reading per line, with its time and concentration.'; return }
     $('paste-dialog').close()
-    useTables(tables, { kind: 'paste', name: 'Pasted readings' })
+    if (mode === 'currents') { $('study-name').textContent = 'Pasted currents'; cmp.useTables(tables, { kind: 'paste', name: 'Pasted currents' }) }
+    else useTables(tables, { kind: 'paste', name: 'Pasted readings' })
   }
   else if (action === 'close') target.closest('dialog').close()
   else if (action === 'add') { draft.rows.push({ time: '', value: '', allowance: draft.allowanceForAll || '', included: true }); renderRows(); renderData(); $('rows').lastElementChild?.querySelector('[data-key="time"]')?.focus() }
   else if (action === 'remove') { draft.rows.splice(Number(target.dataset.row), 1); renderRows(); renderData() }
   else if (action === 'retry-connection') connect()
   else if (action === 'start-new-workspace') connect(true)
-  else if (action === 'start-over' || action === 'new-study') { draft = blankDraft(); study = {}; snapshot = null; results = null; writeStore(); $('study-name').textContent = ''; location.hash = 'data'; route() }
+  else if (action === 'start-over' || action === 'new-study') { draft = blankDraft(); cmp.reset(); study = {}; snapshot = null; results = null; writeStore(); $('study-name').textContent = ''; location.hash = 'data'; route() }
   else if (action === 'prepare') prepare()
   else if (action === 'approve-check') approve('check-status', 'approve-check', () => { location.hash = 'result' })
   else if (action === 'go-next') { if (draft.kind === 'sample' && !next.times) next = { ...SAMPLE.next }; location.hash = 'next' }
   else if (action === 'prepare-next') prepareNext()
   else if (action === 'approve-next') approve('next-run-status', 'approve-next', () => renderNext())
   else if (action === 'view-file') openFile(results.m.files[Number(target.dataset.file)])
-  else if (action === 'save-file') saveText(viewing.name, results.data.texts[viewing.name], 'application/json')
+  else if (action === 'save-file' && viewing) saveText(viewing.name, results.data.texts[viewing.name], 'application/json')
   else if (action === 'report') downloadReport(target)
+})
+
+document.addEventListener('change', event => {
+  if (event.target.name !== 'study-kind') return
+  setMode(event.target.value); startStatus(''); connectionLabel(); route()
 })
 
 // Clearing the input lets the same file be chosen again after a failed upload.
@@ -706,13 +752,6 @@ function openFile(file) {
   $('file-title').textContent = file.title
   $('file-body').innerHTML = fileView(results.data, results.m, file)
   $('file-dialog').showModal()
-}
-
-function saveText(name, text, type) {
-  const url = URL.createObjectURL(new Blob([text], { type }))
-  const link = Object.assign(document.createElement('a'), { href: url, download: name })
-  document.body.append(link); link.click(); link.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
 async function downloadReport(button) {
@@ -746,6 +785,8 @@ window.addEventListener('hashchange', route)
 document.querySelectorAll('.m-ke').forEach(el => { el.innerHTML = sym.ke })
 document.querySelectorAll('.m-ka').forEach(el => { el.innerHTML = sym.ka })
 document.querySelectorAll('.m-A').forEach(el => { el.innerHTML = sym.A })
+document.querySelectorAll('.m-chi').forEach(el => { el.innerHTML = sym.chi })
+$('cmp-equation').innerHTML = `${sym.current}<p class="meta">with ${sym.tauNormal}. Both models predict each current this way; the bi-Maxwellian has separate ${sym.Tpar} and ${sym.Tperp}, the isotropic one a single ${sym.T}.</p>`
 $('model-equation').innerHTML = `${sym.model}<p class="meta">Concentration starts at 0 mg/L, and ${sym.order}.</p>`
 route()
 connect()
