@@ -280,6 +280,7 @@ class ApplicationResearchPorts:
                     "objective": self.workflow._get(conn, self.runtime.actor_id, session["id"])["body"]["objective"],
                     "root_inputs": self.service.root_context(conn, session), "research_plan_revision_id": current["plan_revision_id"],
                     "decisions": decisions, "children": jobs, "evidence": evidence, "run_reports": snapshots,
+                    "scientific_approvals": [dict(conn.execute("SELECT * FROM approvals WHERE id=?", (job["approval_id"],)).fetchone()) for job in jobs],
                     "included_operations": [{"job_id": job["id"], "kind": job["kind"], "state": job["state"]} for job in jobs],
                     "native_evidence": native_evidence,
                     "limitations": ["Verification is adapter-specific and conditional on reviewed meanings and assumptions.",

@@ -116,6 +116,14 @@ def test_real_children_separate_reviews_new_reading_snapshot_updates_and_replay(
     assert report["report_profile"] == "research-report.v2"
     assert {item["evidence_id"] for item in report["native_evidence"]} == {baseline_record["id"], design_record["id"]}
     assert {item["kind"] for item in report["included_operations"]} == {"run", "design_job"}
+    assert {item["id"] for item in report["scientific_approvals"]} == {baseline_job["approval_id"], design_job["approval_id"]}
+    for child in (baseline_job, design_job):
+        receipt = client.get(PREFIX + "/approvals/" + child["approval_id"])
+        assert receipt.status_code == 200
+        assert receipt.json()["plan_id"] == child["scope"]["plan_id"]
+        assert receipt.json() in report["scientific_approvals"]
+        private = client.get(PREFIX + "/approvals/" + child["approval_id"], headers={"Authorization": "Bearer " + "b" * 40})
+        assert private.status_code == 404
     for packet in report["native_evidence"]:
         downloaded = client.get(packet["download_path"])
         anchors = client.get(packet["anchor_path"])

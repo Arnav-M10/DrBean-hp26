@@ -195,9 +195,17 @@ def test_live_api_source_consent_idempotency_accounting_and_separate_scientific_
         client.headers["Authorization"] = "Bearer " + "a" * 40
         caps = client.get(PREFIX + "/capabilities").json()
         assert caps["gemini"]["dispatch_enabled"] and caps["source_intake"]["execution_mode"] == "live"
-        assert caps["ai_mode"] == "live_opt_in" and caps["deepagents"]["dispatch_enabled"] is False
+        assert caps["ai_mode"] == "live_opt_in"
+        # A direct-provider opt-in does not activate live research. The newly
+        # available offline policy still uses the separately configured lane.
+        assert caps["deepagents"]["execution_mode"] == "controlled"
+        assert caps["deepagents"]["default_live_allocation"] == 0
         assert caps["gemini"]["billing_verified"] is False
         workspace = client.post(PREFIX + "/workspaces", json={"name": "Live path controlled SDK"}).json()["id"]
+        refused = client.post(PREFIX + f"/workspaces/{workspace}/research-sessions", json={
+            "objective": "Direct image opt-in cannot grant live coordinator access", "mode": "live"},
+            headers={"Idempotency-Key": "no-implicit-live-research"})
+        assert refused.status_code == 409 and refused.json()["code"] == "research_mode_mismatch"
         endpoint = PREFIX + f"/workspaces/{workspace}"
         source = client.post(endpoint + "/source-assets?origin=synthetic&retention=retain", content=png(),
             headers={"Content-Type": "image/png", "Idempotency-Key": "source"}).json()

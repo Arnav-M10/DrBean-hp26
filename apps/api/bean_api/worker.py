@@ -512,7 +512,15 @@ def main():
         from .main import provider_config_from_env
         worker = Worker(workflow, provider_config=provider_config_from_env(), settings=settings)
         while True:
-            worker.tick()
+            try:
+                worker.tick()
+            except Exception as error:
+                # Keep the dispatcher available. Canonical running jobs/actions
+                # are never requeued here; unknown reservations stay reserved.
+                # Class/code only: provider exception text can contain secrets.
+                print(json.dumps({"event": "worker_tick_failed", "error_type": type(error).__name__}, sort_keys=True), flush=True)
+                if args.once:
+                    raise SystemExit(1) from None
             if args.once:
                 break
             time.sleep(0.5)
