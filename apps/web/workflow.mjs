@@ -216,6 +216,9 @@ export function setupWorkflow(getDraft, applyReviewedFields, { onConnectionChang
       if (!shared) return // The local owner boundary alone returns 404.
     } catch (error) {
       connectionMode = 'session_error'; byId('connect-form').hidden = true
+      byId('connection-panel').open = true
+      byId('connection-panel').querySelector('summary').textContent = 'Private workspace connection'
+      byId('connection-panel').querySelector('p').textContent = 'The private browser session is unavailable. No owner credentials are requested here. Reload after the server is available.'
       byId('connection-status').textContent = 'The private browser session could not be established. Reload after the server is available.'
       byId('backend-error').textContent = error.message; byId('backend-error').hidden = false
       render(); return

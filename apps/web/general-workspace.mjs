@@ -108,6 +108,7 @@ export function generalService(api, workspaceId) {
     analyze: body => api.researchAnalysis(workspaceId, body),
     asset: id => api.json(`/research-assets/${encodeURIComponent(id)}`),
     analysis: id => api.json(`/research-analyses/${encodeURIComponent(id)}`),
+    capabilities: () => api.json('/capabilities'),
   }
 }
 
@@ -122,7 +123,7 @@ export class GeneralResearchWorkspace {
   key() { return `drbean-general-v1:${this.identityId}:${this.connection.workspaceId}` }
   persist() {
     if (!this.connection.workspaceId) return
-    try { this.storage?.setItem(this.key(), JSON.stringify({ version: 1, assets: this.state.assets.map(({ id, sha256 }) => ({ id, sha256 })), question: this.state.question, pending: this.state.pending, pendingUploads: this.state.pendingUploads, history: this.state.history })) } catch { this.state.notice = 'Browser storage is unavailable. Keep this tab open to retain pending request identities.' }
+    try { this.storage?.setItem('drbean-general-active-identity', this.identityId); this.storage?.setItem(this.key(), JSON.stringify({ version: 1, assets: this.state.assets.map(({ id, sha256 }) => ({ id, sha256 })), question: this.state.question, pending: this.state.pending, pendingUploads: this.state.pendingUploads, history: this.state.history })) } catch { this.state.notice = 'Browser storage is unavailable. Keep this tab open to retain pending request identities.' }
   }
   async connect(connection) {
     const same = connection.api === this.connection.api && connection.workspaceId === this.connection.workspaceId && connection.mode === this.connection.mode
@@ -143,27 +144,34 @@ export class GeneralResearchWorkspace {
       if (previousIdentity && previousIdentity !== identityId) {
         for (let index = this.storage.length - 1; index >= 0; index--) { const key = this.storage.key(index); if (key?.startsWith('drbean-general-v1:')) this.storage.removeItem(key) }
       }
-      this.storage?.setItem('drbean-general-active-identity', identityId)
       saved = JSON.parse(this.storage?.getItem(this.key()) ?? 'null')
     } catch { /* No guessed server lookups or analysis on storage failure. */ }
     const generation = this.generation
     if (saved?.version === 1) {
       try {
-        const references = list(saved.assets, this.limits.maxFiles, 'saved source references')
-        const assets = await Promise.all(references.map(async ref => {
-          if (!ID.test(ref.id) || !SHA.test(ref.sha256)) throw new Error('Invalid saved source reference.')
-          return validateResearchAsset(await service.asset(ref.id), { id: ref.id, sha256: ref.sha256, workspaceId: connection.workspaceId })
-        }))
-        if (generation !== this.generation) return
-        this.state.assets = assets; this.state.question = bounded(saved.question, 8000, 'saved question')
+        // Missing sources must not erase an already-sent request's identity.
         this.state.pending = list(saved.pending, 10, 'pending operations').map(operation => this.restoreOperation(operation))
+        this.state.history = list(saved.history, 20, 'saved analyses').map(item => {
+          if (!ID.test(item.id)) throw new Error('Invalid saved analysis identity.')
+          bounded(item.question, 8000, 'saved analysis question')
+          const assets = list(item.assets, 5, 'saved analysis sources')
+          if (!assets.length || assets.some(asset => !ID.test(asset.id) || !SHA.test(asset.sha256))) throw new Error('Invalid saved analysis source binding.')
+          return item
+        })
         this.state.pendingUploads = list(saved.pendingUploads ?? [], 5, 'pending uploads').map(operation => {
           if (!ID.test(operation.id) || !SHA.test(operation.sha256) || !Object.values(TYPES).includes(operation.media_type)
               || !Number.isSafeInteger(operation.byte_size) || operation.byte_size < 1 || operation.byte_size > GENERAL_LIMITS.fileBytes) throw new Error('Invalid saved upload identity.')
           bounded(operation.filename, 240, 'saved upload filename')
           return { ...operation, status: 'uncertain' }
         })
-        this.state.history = list(saved.history, 20, 'saved analyses').filter(item => ID.test(item.id))
+        this.state.question = bounded(saved.question, 8000, 'saved question')
+        const references = list(saved.assets, this.limits.maxFiles, 'saved source references')
+        const assets = await Promise.all(references.map(async ref => {
+          if (!ID.test(ref.id) || !SHA.test(ref.sha256)) throw new Error('Invalid saved source reference.')
+          return validateResearchAsset(await service.asset(ref.id), { id: ref.id, sha256: ref.sha256, workspaceId: connection.workspaceId })
+        }))
+        if (generation !== this.generation) return
+        this.state.assets = assets
         this.state.notice = this.state.pending.length ? 'A request may have completed before this page closed. Inspect its frozen disclosure and deliberately retry the same request; no analysis runs automatically.' : 'Retained sources restored. Reopen a saved analysis without another model call.'
       } catch (error) { if (generation === this.generation) this.state.error = `Saved workspace could not be reopened: ${error.message}` }
     }
@@ -176,7 +184,7 @@ export class GeneralResearchWorkspace {
     const assets = list(body.assets, 5, 'saved request files')
     if (!assets.length || assets.some(asset => !ID.test(asset.id) || !SHA.test(asset.sha256))
         || JSON.stringify(body.consent.asset_ids) !== JSON.stringify(assets.map(asset => asset.id))) throw new Error('A saved request has inconsistent source disclosure.')
-    return { body: freeze(clone(body)), status: 'uncertain' }
+    return { body: freeze(clone(body)), status: operation.status === 'refused' ? 'refused' : 'uncertain' }
   }
   editQuestion(question) {
     if (this.state.busy) return
@@ -217,7 +225,12 @@ export class GeneralResearchWorkspace {
         try {
           retained = validateResearchAsset(await service.upload(wrapped, operation.id), { sha256: digest, byte_size: file.size, workspaceId })
         } catch (error) {
-          if (generation === this.generation) { operation.status = 'uncertain'; this.persist() }
+          if (generation === this.generation) {
+            if (error.kind === 'rejected' && [400, 401, 403, 404, 413, 415, 422].includes(error.status)) {
+              this.state.pendingUploads = this.state.pendingUploads.filter(item => item !== operation); this.uploadFiles.delete(operation.id)
+            } else operation.status = 'uncertain'
+            this.persist()
+          }
           throw error
         }
         if (generation !== this.generation) return
@@ -235,8 +248,17 @@ export class GeneralResearchWorkspace {
     if (file) return this.upload([file])
     this.state.notice = 'Reselect the original file to retry this upload. Its exact filename, bytes and media hint must match; the saved operation ID will be reused.'; this.emit()
   }
-  prepareReview() {
+  async prepareReview() {
+    if (this.state.busy) return
+    const generation = this.generation
+    this.state.busy = true
     try {
+      if (this.service?.capabilities) {
+        this.emit()
+        const capabilities = await this.service.capabilities()
+        if (generation !== this.generation) return
+        this.connection.capabilities = capabilities; this.limits = generalCapabilities(capabilities)
+      }
       if (!this.service || !this.state.assets.length) throw new Error('Add at least one admitted file to a private workspace first.')
       const question = this.state.question.trim()
       if (!question || question.length > 8000) throw new Error('Enter a question of 1–8,000 characters about your files.')
@@ -247,8 +269,8 @@ export class GeneralResearchWorkspace {
       this.state.review = freeze({ client_operation_id: this.randomId(), question, assets,
         consent: { accepted: true, provider: 'gemini', model: this.limits.model, asset_ids: assets.map(asset => asset.id), include_question: true } })
       this.state.accepted = false; this.state.error = ''
-    } catch (error) { this.state.error = error.message }
-    this.emit()
+    } catch (error) { if (generation === this.generation) this.state.error = error.message }
+    finally { if (generation === this.generation) { this.state.busy = false; this.emit() } }
   }
   accept(value) { this.state.accepted = value === true }
   async analyze(pendingBody = null) {
@@ -305,6 +327,7 @@ export function setupGeneralWorkspace({ root, serviceFactory = generalService, s
     return value
   }
   const controller = new GeneralResearchWorkspace({ serviceFactory, storage, changed: render })
+  let displayedResultId
   const click = (parent, text, action, disabled = false, id) => {
     const button = element('button', text, { type: 'button', ...(id ? { id } : {}) }); button.disabled = disabled
     button.addEventListener('click', () => { Promise.resolve().then(action).catch(error => { controller.state.error = error.message; render() }) })
@@ -334,7 +357,9 @@ export function setupGeneralWorkspace({ root, serviceFactory = generalService, s
     root.append(status)
     if (state.error) root.append(element('p', state.error, { id: 'general-error', role: 'alert', class: 'errors' }))
     if (!connected) {
-      root.append(element('p', 'Connecting to your private workspace. If this is a local owner instance, use Advanced server connection below. A shared demo identity cannot receive private research files.'))
+      root.append(element('p', controller.connection.mode === 'session_error'
+        ? 'The private browser session is unavailable. Inspect the connection error below; no files or question were sent.'
+        : 'Connecting to your private workspace. If this is a local owner instance, use Advanced server connection below. A shared demo identity cannot receive private research files.'))
     }
     const upload = element('div', '', { class: 'card' })
     upload.append(element('h3', '1. Add your data or paper'), element('p', 'Choose your own CSV, TSV, JSON, text, Markdown, PNG, JPEG or PDF files when this server supports them. Uploading stores the files for your review; it does not send them to Gemini.'))
@@ -384,7 +409,7 @@ export function setupGeneralWorkspace({ root, serviceFactory = generalService, s
     questionLabel.append(input); question.append(questionLabel)
     const model = limits.model || 'not configured'
     question.append(element('p', `Configured server model: ${model}. ${limits.analysisAvailable ? 'Available for explicitly approved analysis.' : limits.reason || 'Analysis is currently unavailable.'}`))
-    if (limits.remaining) question.append(element('p', `Shared application allowance remaining: ${limits.remaining.requests ?? 'unknown'} requests; ${limits.remaining.input_tokens ?? 'unknown'} input tokens; ${limits.remaining.output_tokens ?? 'unknown'} output tokens. Server preflight determines whether the complete selected scope fits.`))
+    if (limits.remaining) question.append(element('p', `Last reported shared application allowance: ${limits.remaining.requests ?? 'unknown'} requests; ${limits.remaining.input_tokens ?? 'unknown'} input tokens; ${limits.remaining.output_tokens ?? 'unknown'} output tokens. Availability is refreshed at review; server preflight rechecks the complete selected scope before dispatch.`))
     question.append(element('p', 'The server owner’s free-tier configuration and shared limits apply. There is no paid fallback or separate allowance per workspace.', { class: 'hint' }))
     click(question, 'Review files and question to send', () => controller.prepareReview(), disabled || !state.assets.length, 'general-review-button')
     if (state.review) {
@@ -423,7 +448,7 @@ export function setupGeneralWorkspace({ root, serviceFactory = generalService, s
   function renderResult(state) {
     const record = state.result, body = record.body
     const result = element('article', '', { class: 'card', id: 'general-result', 'aria-labelledby': 'general-result-title' })
-    result.append(element('h3', 'AI analysis — not mathematically verified', { id: 'general-result-title' }), element('p', `Question: ${state.resultQuestion}`), element('p', body.summary))
+    result.append(element('h3', 'AI analysis — not mathematically verified', { id: 'general-result-title', tabindex: '-1' }), element('p', `Question: ${state.resultQuestion}`), element('p', body.summary))
     if (body.execution_mode === 'controlled' || body.provenance?.execution_mode === 'controlled') result.append(element('p', 'Controlled test response — this is not a live Gemini result.', { class: 'general-control-label' }))
     result.append(element('h4', 'Extracted tables'))
     if (!body.extracted_tables.length) result.append(element('p', 'No table was extracted.'))
@@ -458,7 +483,8 @@ export function setupGeneralWorkspace({ root, serviceFactory = generalService, s
     }
     const supported = body.verification.supported_adapter
     const templates = controller.connection.capabilities?.model_templates ?? []
-    if (supported && (supported === 'counterdex.v1' || templates.some(template => template.id === supported))) {
+    if (supported && controller.connection.capabilities?.science?.available === true
+        && (supported === 'counterdex.v1' || templates.some(template => template.id === supported && template.schema_implemented === true))) {
       const mapping = element('section', '', { class: 'general-mapping-review' })
       mapping.append(element('h4', 'Review a supported scientific question'), element('p', 'The engine supports the two-rate concentration model. Review column meanings, units, deterministic hard allowances and model assumptions in the scientific workspace. General AI output has not accepted these inputs or approved computation.'))
       const link = element('a', 'Open the measurement and model review', { href: '#inputs' }); mapping.append(link); result.append(mapping)
@@ -469,6 +495,10 @@ export function setupGeneralWorkspace({ root, serviceFactory = generalService, s
     }).className = 'secondary'
     details(result, 'Analysis identity, provenance and provider attempt', { id: record.id, digest: record.digest, verification: body.verification, provider_attempt_id: body.provider_attempt_id, execution_mode: body.execution_mode })
     root.append(result)
+    if (displayedResultId !== record.id) {
+      displayedResultId = record.id
+      requestAnimationFrame(() => document.getElementById('general-result-title')?.focus())
+    }
   }
   render()
   return { controller, connectionChanged: connection => controller.connect(connection) }

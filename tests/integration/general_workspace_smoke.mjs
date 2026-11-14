@@ -113,6 +113,8 @@ try {
   await page.click('#general-review-button'); await page.check('#general-consent'); badCitation = true
   await page.click('#general-analyze'); await page.waitForFunction(() => document.getElementById('general-error')?.textContent.includes('citation'))
   check('invalid citation preserves prior evidence', (await page.locator('#general-result').innerText()).includes('Which missing measurements need clarification?'))
+  await page.setViewportSize({ width: 390, height: 844 })
+  check('bounded general evidence fits a mobile viewport', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
   check('no unsolicited external requests or page exceptions', !external.length && !errors.length)
   console.log(JSON.stringify({ status: 'passed', lane: 'controlled_http_ui', checks: checks.length, names: checks, public_source: manifest.source_url, source_sha256: manifest.excerpt_sha256, live_model_calls: 0, actual_session_isolation: 'not_run_in_this_lane' }, null, 2))
 } finally {

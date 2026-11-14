@@ -195,3 +195,38 @@ test('reopen rejects a same-workspace wrong result or wrong metadata identity wi
   await f.ui.reopen(f.ui.state.history[0])
   assert.match(f.ui.state.error, /selected bytes or workspace/); assert.deepEqual(f.ui.state.result, original)
 })
+
+test('definitive malformed upload refusal preserves prior data without trapping an uncertain operation', async () => {
+  const f = await fixture(); await reviewed(f); await f.ui.analyze()
+  const previous = f.ui.state.result
+  f.service.upload = async () => { throw Object.assign(new Error('malformed_json: use valid JSON'), { kind: 'rejected', status: 422 }) }
+  await f.ui.upload([new File(['{broken'], 'bad.json', { type: 'application/json' })])
+  assert.match(f.ui.state.error, /malformed_json/)
+  assert.equal(f.ui.state.assets.length, 1); assert.equal(f.ui.state.pendingUploads.length, 0)
+  assert.deepEqual(f.ui.state.result, previous)
+})
+
+test('review refreshes shared availability and refuses exhausted budget before a model mutation', async () => {
+  const f = await fixture(); await f.ui.upload([f.file]); f.ui.editQuestion('Can this whole file fit?')
+  let reads = 0
+  f.service.capabilities = async () => { reads++; const caps = structuredClone(capabilities); caps.general_research.budget.remaining.input_tokens = 0; return caps }
+  await f.ui.prepareReview()
+  assert.equal(reads, 1); assert.equal(f.ui.state.review, null)
+  assert.match(f.ui.state.error, /exhausted/); assert.equal(f.calls.analyses.length, 0)
+})
+
+test('missing source on reload does not discard an uncertain request or saved evidence reference', async () => {
+  const f = await fixture(); await reviewed(f); await f.ui.analyze()
+  f.ui.editQuestion('Another question'); await f.ui.prepareReview(); f.ui.accept(true)
+  f.service.analyze = async () => { throw new Error('Response lost') }
+  await f.ui.analyze()
+  const operationId = f.ui.state.pending[0].body.client_operation_id
+  f.service.asset = async () => { throw new Error('Source is unavailable') }
+  const restored = new GeneralResearchWorkspace({ storage: f.storage, serviceFactory: () => f.service })
+  await restored.connect(f.connection)
+  assert.match(restored.state.error, /Source is unavailable/)
+  assert.equal(restored.state.pending[0].body.client_operation_id, operationId)
+  assert.equal(restored.state.history[0].id, f.result.id)
+  restored.editQuestion('A smaller scope')
+  assert.match(f.storage.getItem(restored.key()), new RegExp(operationId))
+})

@@ -74,7 +74,8 @@ try {
     if (!url.startsWith(base + '/') && !/^(blob|data):/.test(url)) { external.push(url); return route.abort() }
     return route.continue()
   })
-  await page.goto(base)
+  // This lane explicitly exercises the supported scientific workflow.
+  await page.goto(base + '#inputs')
   await page.locator('#connection-panel summary').click()
   await page.fill('#bearer', token)
   await page.getByRole('button', { name: 'Connect', exact: true }).click()
