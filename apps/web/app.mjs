@@ -1,5 +1,6 @@
 import { parseMeasurementsCsv, validateMeasurements } from './exact.mjs'
 import { validateQuestion } from './question.mjs'
+import { setupWorkflow } from './workflow.mjs'
 
 const byId = id => document.getElementById(id)
 const sections = ['inputs', 'question', 'review', 'investigations', 'report']
@@ -46,6 +47,7 @@ function addRow(values = {}, sourceId = null) {
 }
 
 function renderRows() {
+  renderWorkflow?.()
   const body = byId('rows')
   body.replaceChildren()
   for (const [index, row] of rows.entries()) {
@@ -81,6 +83,7 @@ function renderRows() {
 }
 
 function measurementsChanged() {
+  renderWorkflow?.()
   renderSources()
   if (rowsReviewed) showRowErrors()
 }
@@ -150,6 +153,12 @@ function createBounds() {
   }
 }
 
+function currentDraft() {
+  return { rows, sources, question: currentQuestion(), context: {
+    experiment: byId('experiment-id').value, timeOrigin: byId('time-origin').value, origin: byId('dataset-origin').value,
+  } }
+}
+
 function currentQuestion() {
   const fields = bounds.flatMap(([, , , lower, upper]) => [lower, upper])
   return Object.fromEntries([...fields, 'allowanceOrigin', 'methods', 'goal'].map(field => [field, byId(field).value]))
@@ -197,6 +206,7 @@ function route(focusHeading = true) {
     else link.removeAttribute('aria-current')
   }
   if (selected === 'review') renderReview()
+  renderWorkflow?.()
   if (focusHeading) byId(`${selected}-title`).focus()
 }
 
@@ -287,6 +297,7 @@ byId('measurements').addEventListener('submit', event => {
 })
 
 byId('question-form').addEventListener('input', () => {
+  renderWorkflow?.()
   if (questionReviewed) showQuestionErrors()
 })
 
@@ -298,14 +309,16 @@ byId('question-form').addEventListener('submit', event => {
 })
 
 byId('export-draft').addEventListener('click', () => {
-  const draft = { format: 'dr-bean-local-draft', version: 1, rows, sources, question: currentQuestion() }
+  const draft = { format: 'dr-bean-local-draft', version: 1, ...currentDraft() }
   const url = URL.createObjectURL(new Blob([JSON.stringify(draft, null, 2)], { type: 'application/json' }))
   element('a', '', { href: url, download: 'dr-bean-draft.json' }).click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
   announce('Draft downloaded.')
 })
 
+let renderWorkflow
 createBounds()
+renderWorkflow = setupWorkflow(currentDraft)
 addRow()
 renderRows()
 route(false)

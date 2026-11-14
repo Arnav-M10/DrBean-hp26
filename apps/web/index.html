@@ -30,6 +30,19 @@
       <a href="#report">Report</a>
     </nav>
     <main id="main" tabindex="-1">
+      <details class="card" id="connection-panel"><summary>Local backend connection</summary>
+          <p>Connect to the API on port 8000. Your bearer token stays in memory until you disconnect or close this tab.</p>
+          <form id="connect-form">
+            <label class="stack">Local researcher bearer token<input id="bearer" type="password" autocomplete="off" required></label>
+            <button type="submit">Connect</button><button id="disconnect" type="button" class="secondary">Disconnect</button>
+          </form>
+          <p id="connection-status" role="status">Disconnected. Investigation planning is unavailable.</p>
+          <div id="workspace-controls" hidden>
+            <label class="stack">Workspace<select id="workspace-select" aria-label="Workspace"></select></label>
+            <form id="new-workspace"><label class="stack">New workspace name<input id="workspace-name" type="text" maxlength="120" required></label><button>Create workspace</button></form>
+          </div>
+          <div id="backend-error" class="errors" role="alert" hidden></div>
+        </details>
       <section id="inputs" aria-labelledby="inputs-title">
         <div class="section-heading">
           <h2 id="inputs-title" tabindex="-1">Measurements</h2>
@@ -74,6 +87,9 @@
           <h3>Two-rate concentration model</h3>
           <p>Concentration starts at zero. The absorption rate <var>ka</var> is greater than the elimination rate <var>ke</var>.</p>
           <details><summary>Model equation</summary><p><code>C(t) = A × (exp(−ke × t) − exp(−ka × t))</code></p></details>
+          <label class="stack">Experiment identifier<input id="experiment-id" type="text" required></label>
+          <label class="stack">Elapsed-time origin<input id="time-origin" type="text" required placeholder="Describe the experiment’s t=0"></label>
+          <label class="stack">Dataset origin<select id="dataset-origin"><option value="">Choose origin</option><option value="actual">Actual measurements</option><option value="hypothetical">Hypothetical</option><option value="synthetic">Synthetic</option></select></label>
           <div id="bounds"></div>
           <label class="stack">Origin of historical hard allowances <textarea id="allowanceOrigin" rows="2" required></textarea></label>
           <label class="stack">Methods or source notes <span class="optional">Optional</span><textarea id="methods" rows="3"></textarea></label>
@@ -84,15 +100,15 @@
       <section id="review" aria-labelledby="review-title" hidden>
         <div class="section-heading"><h2 id="review-title" tabindex="-1">Review draft</h2><p>Check the measurements, allowances, and model bounds before preparing an investigation plan.</p></div>
         <div class="card" id="review-summary"></div>
-        <div class="notice"><h3>Investigation planning is unavailable</h3><p>The shared backend and plan schema are pending. You can edit or download your local draft.</p></div>
+        <div id="backend-review" class="card"></div>
       </section>
       <section id="investigations" aria-labelledby="investigations-title" hidden>
         <div class="section-heading"><h2 id="investigations-title" tabindex="-1">Investigations</h2></div>
-        <div class="notice"><h3>No investigations yet</h3><p>Investigation history and next-measurement suggestions become available when the shared backend can run approved plans.</p><a href="#review">Review your draft</a></div>
+        <div id="backend-investigations" class="card"></div>
       </section>
       <section id="report" aria-labelledby="report-title" hidden>
         <div class="section-heading"><h2 id="report-title" tabindex="-1">Reviewer report</h2></div>
-        <div class="notice"><h3>No evidence to share yet</h3><p>A reviewer report requires results and artifacts from an investigation. Download the local draft to save a copy of your current inputs.</p></div>
+        <div id="backend-report" class="card"></div>
       </section>
       <aside class="workspace-status" aria-label="Workspace storage">This draft is held in this tab. Download a copy before reloading or closing it.</aside>
       <div id="status" class="sr-only" role="status"></div>

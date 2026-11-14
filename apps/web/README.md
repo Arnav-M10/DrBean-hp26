@@ -1,15 +1,39 @@
-# Dr. Bean web workspace
+# Dr. Bean researcher and reviewer workspace
 
-This local frontend is the first slice of the researcher workflow. It supports CSV and manual measurement entry, exact rational validation, review of a two-rate model question, and JSON draft download.
+The dependency-free editor supports CSV/manual measurements, exact rational entry, question review, and tab-local draft download. It now connects to Owner 02’s real DB-SC-1 / GF-2 API for manual dataset/problem creation, immutable plan review, explicit approval, run retrieval, report snapshots and authenticated evidence/report downloads. The browser never creates authoritative identities or checks scientific certificates.
 
 ## Run locally
 
-From `apps/web`, run `node serve.mjs` and open `http://127.0.0.1:4173`. Run `node --test` for parser, measurement, and question validation tests. The preview has no install step.
+From the repository root, follow the backend setup in `README.md` and start the API on `127.0.0.1:8000` and its durable worker. Start this frontend with `node apps/web/serve.mjs`, or run `node serve.mjs` from `apps/web`. Open `http://127.0.0.1:4173`. No frontend installation is required. Run `node --test` from `apps/web` (15 tests).
 
-To exercise the draft workflow, load the synthetic example, review the measurements, then enter the bounds and origin of the hard allowances. For a local UI exercise, use scale `[1, 12]` mg/L, elimination rate `[1/10, 0.3]` h⁻¹, absorption rate `[1/2, 2]` h⁻¹, and target interval `[0.10, 17/100]` h⁻¹. The example uses a team-chosen hard allowance of `0.1` mg/L. Open the exact values disclosure in Review and download the draft if you want to keep the input strings and source provenance. Draft editing is tab-local. The JSON download is a record of the inputs and the editor currently has no JSON reopen action.
+Open **Local backend connection**, enter the local researcher bearer token from the private backend auth file, and connect. Choose or create a workspace. Tokens stay only in memory; they are cleared from the password field after submission, never put in URLs, exports, browser storage or cookies. Disconnect clears the client and selected records. Reload requires reconnecting.
 
-## Integration handoff
+The frontend server proxies only `/api/bean/v1/` to the fixed loopback port 8000. It forwards bearer authorization and operation keys, rejects foreign origins/hosts, and does not forward cookies or browser origin headers. This is a loopback development lane, not hosted authentication or deployment. The backend continues to enforce authentication, ownership and all semantic validation.
 
-The verified `Arnav-M10/DrBean-hp26` remote had no branches or tags when cloned. The frontend is dependency-free and lives entirely under `apps/web`. The supplied work order included the shared GF-2 and DB-SC-1 contract. The separate planning documents and inspected source baselines were unavailable locally.
+For an editor exercise, load the explicitly synthetic example. Enter an experiment identifier, describe t=0, and select **Synthetic** origin. Use scale `[1,12]`, ke `[1/10,0.3]`, ka `[1/2,2]`, target `[0.10,17/100]`, and describe the team-chosen historical hard allowance of `0.1` mg/L. Review the inputs and choose **Save inputs and prepare plan**. This writes an immutable dataset/problem/plan; it does not execute science or contact Gemini. Review the exact frozen dataset, problem and plan, then check the approval box and explicitly approve. Editing the draft requires a new plan. Queueing is a separate action and rechecks server capabilities.
 
-Owner 02 can unblock the first end-to-end slice by making the selected backend and runtime-validated client available for capabilities, manual input, plan, approval, and run retrieval. Owner 01 can then supply a real scenario artifact for the provider-free end-to-end test. This preview creates no approval, run, evidence, design job, or report records. Once those interfaces exist, the separate design approval and Gemini integration can bind to the actual investigation identities.
+Imported CSV spellings, duplicate times, included/excluded flags, source digest/description and pre-edit imported values are preserved in the submitted dataset. CSV file bytes are not uploaded or represented as server source assets. All manual wire fields follow the authoritative generated schemas under `shared/contracts/DB-SC-1`, derived from `apps/api/bean_api/contracts.py`; the API runtime validates them. Server errors retain field paths, current revision and request identifiers. Uncertain mutation retries reuse a tab-local operation key; they are never automatically resent.
+
+In **Investigations**, enter a saved run identifier and refresh to retrieve authenticated history for the selected workspace. Execution state, scientific outcome, verification, expected binding and replay are separate. Evidence downloads use the actual authenticated artifact endpoint. In **Report**, create an immutable snapshot for the selected run and download the exact server JSON. Both downloads hash the received bytes against `X-Artifact-SHA256` before saving. This establishes byte integrity only. Native scientific bundles, browser replay and public reviewer sharing are unavailable.
+
+Drafts remain tab-local. Download draft saves inputs, provenance and experiment context; JSON reopen remains unavailable. Backend records are durable. Keep a run identifier to reopen history after reconnecting.
+
+## Current integration boundary
+
+Latest refs were fetched before implementation; baseline `9c39080` includes Owner 02’s backend, generated schemas, Owner 01’s Counterdex package and Owner 04’s harness. The old statement that the repository/backend are missing is obsolete.
+
+**The real scientific milestone remains blocked.** `apps/api/bean_api/main.py` and the worker still default to `UnavailableAdapter`. Counterdex’s `packages/groundwork_adapter/docs/INTEGRATION.md` explicitly leaves scientific projection/DTO mapping and backend interpreter qualification pending. Owner 02 must adopt Owner 01’s scientific fields, bind scenario/problem/artifact identities, install and select the adapter in both API and worker, and publish qualified capabilities. Owner 01 must supply the matching prepared scenario and artifact for that adopted mapping. The frontend keeps queueing unavailable until the API reports a qualified adapter for this template. It never imports package-local fixtures as live results.
+
+Next-measurement execution stays unavailable pending that adopted design mapping and usable historical evidence; its scientific plan and approval must remain separate. Gemini source intake and follow-up remain visibly unavailable in this frontend: live account/model/network/budget qualification and exact per-payload consent are still needed from Owners 02/04 before a live claim. No provider call was made here. No conversation text grants approval.
+
+The Windows-only `03_Researcher_Reviewer_Web.md` was not supplied in this cloud workspace. This continuation follows the user’s stated milestone and repository GF-2 / DB-SC-1 documentation; full work-order conformance remains unconfirmed until the file is supplied.
+
+## Browser/backend verification
+
+`check-backend.mjs` launches the actual API and worker with an isolated temporary SQLite database and synthetic in-process credentials, then drives Chromium. It requires an installed backend Python environment and Playwright, and ports 8000/4173 must be free. It removes its temporary data and stops its processes.
+
+```sh
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node apps/web/check-backend.mjs
+```
+
+Set `BEAN_TEST_PYTHON` and `CHROMIUM_PATH` to override the default `.venv/bin/python` and `/usr/bin/chromium`. Playwright is a test-only dependency, not shipped in the frontend. Observed validation: all 15 Node tests passed; the real browser/API check passed plan preparation, approval, blocked unqualified UI dispatch, explicit unsupported worker lifecycle via HTTP, persisted run retrieval, exact evidence/report download, stale-edit controls, 390px layout, memory-only credentials and proxy origin rejection. The worker check deliberately tests its honest unsupported result; it is not a real scientific scenario, fixture replay, Gemini or live-evidence success.
