@@ -26,7 +26,7 @@ import threading
 import time
 from fractions import Fraction
 
-from . import kinetics, native
+from . import engine_controls, kinetics, native
 from .http_client import ApiClient, ApiFailure
 
 TERMINAL = {"completed", "cancelled", "failed", "interrupted"}
@@ -597,6 +597,12 @@ def check_design(checks: Checks, design: dict, pair: list[dict], base: dict, *, 
         checks.expect(f"{prefix}_selected_checked_margin_strictly_positive", bool(ok),
                       f"selected {result.get('selected_time')} margin {selected and selected.get('exact_margin')}",
                       finding=None if ok else "F-FALSE-CHECKED")
+        if result.get("selected_time") is not None:
+            oracle = kinetics.separation_margin([c["parameter_vector"] for c in pair], result["selected_time"],
+                                                request["future_hard_allowance"])
+            checks.expect(f"{prefix}_independent_oracle_confirms_separation", oracle > kinetics.EDGE,
+                          f"decimal oracle margin at {result['selected_time']} h: {float(oracle):.6g}",
+                          finding=None if oracle > kinetics.EDGE else "F-FALSE-CHECKED")
     elif tier == "no_separation_established":
         checks.add(f"{prefix}_selected_checked_margin_strictly_positive", "not_applicable",
                    "no separation established on the reviewed grid; nothing was selected", level=INFO)
@@ -648,8 +654,26 @@ def upload_source(flow: Flow, checks: Checks, workspace_id: str, path: str, expe
     return record.get("id")
 
 
+def check_engine_matches_repository(flow: Flow, checks: Checks) -> dict:
+    """The engine the application actually runs (its own capability report) is the repository's source, file by file.
+
+    A stale installed copy with the same version string would otherwise be tested instead of the code under review.
+    """
+    runtime = ((flow.capabilities().get("science") or {}).get("runtime") or {})
+    running = {item.get("file"): item.get("sha256") for item in runtime.get("source_manifest") or []}
+    repository = engine_controls.engine_source_files(flow.package_dir)
+    differing = sorted(name for name in set(running) | set(repository) if running.get(name) != repository.get(name))
+    checks.expect("engine_runtime_matches_repository_source", bool(running) and not differing,
+                  f"application runtime {runtime.get('adapter_version')} on {runtime.get('runtime')} "
+                  f"{runtime.get('python')}: {len(running)} files reported, differing from the repository: "
+                  f"{differing[:6] or 'none'}", finding=None if running and not differing else "H-ENGINE-STALE")
+    return {"version": runtime.get("adapter_version"), "python": runtime.get("python"), "files": len(running),
+            "matches_repository": bool(running) and not differing}
+
+
 def scenario_hero(flow: Flow, packet: dict) -> dict:
     checks = Checks()
+    engine = check_engine_matches_repository(flow, checks)
     workspace = flow.client.post("/workspaces", {"name": "Dr. Bean evaluation hero"}, label="hero-workspace")
     flow.workspaces.append(workspace["id"])
     repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -669,7 +693,7 @@ def scenario_hero(flow: Flow, packet: dict) -> dict:
     flow.cache["hero"] = base
     info = check_baseline(checks, base, packet, known_positive=packet["designation"]["known_positive"])
     flow.cache["hero_info"] = info
-    observation = {"records": _ids(base), "baseline": _summary(info)}
+    observation = {"records": _ids(base), "baseline": _summary(info), "engine": engine}
     evidence = base.get("evidence") or []
     downloads = [flow.download(ref, "hero-baseline") for ref in (result_of(evidence[0]).get("artifacts") or [])] \
         if evidence else []
@@ -972,7 +996,32 @@ def scenario_design_authority(flow: Flow, packet: dict) -> dict:
             checks.add(f"refuses_{label}", "failed", "design plan created", finding="F-DESIGN-AUTHORITY")
         except ApiFailure as error:
             checks.expect(f"refuses_{label}", error.code in codes, f"{error.status} {error.code}")
-    return {"checks": checks, "observation": {"design_plan_id": plan["id"], "approval_id": approval_a["id"]}}
+    # 5. No separation, executed: the same reviewed pair and grid with a wide allowance, separately proposed, approved
+    # and run. The decimal oracle predicts the tier from exact margins; a checked no-separation result selects nothing
+    # and its native packet downloads, replays fresh and resists tampering like a positive one.
+    wide_allowance = "3/5"
+    margins = {t: kinetics.separation_margin([c["parameter_vector"] for c in pair], t, wide_allowance)
+               for t in review["feasible_times"]}
+    predicted = ("no_separation_established" if all(m < -kinetics.EDGE for m in margins.values()) else
+                 "checked_pair_separation" if any(m > kinetics.EDGE for m in margins.values()) else None)
+    wide = flow.design(base, pair, feasible_times=review["feasible_times"], allowance=wide_allowance,
+                       label="authority-wide", review=review)
+    wide_info = check_design(checks, wide, pair, base, prefix="no_separation_design")
+    checks.expect("no_separation_design_tier_matches_oracle", predicted is not None and wide_info.get("tier") == predicted,
+                  f"application {wide_info.get('tier')}, independent oracle {predicted} (margins "
+                  f"{ {t: round(float(m), 6) for t, m in margins.items()} } at allowance {wide_allowance})")
+    wide_replay = []
+    if wide.get("suggestion"):
+        refs = (wide["suggestion"].get("body") or {}).get("artifacts") or []
+        downloads = [flow.download(ref, "authority-wide-design") for ref in refs]
+        wide_replay = flow.replay_checks(checks, downloads,
+                                         native.anchors_from_record(wide["suggestion"], wide.get("plan") or {}),
+                                         "no_separation_packet",
+                                         ["authority-wide-suggestion", "authority-wide-design-plan"], expect_checked=True)
+    return {"checks": checks, "observation": {"design_plan_id": plan["id"], "approval_id": approval_a["id"],
+                                              "no_separation": {"tier": wide_info.get("tier"), "predicted": predicted,
+                                                                "selected_time": wide_info.get("selected_time"),
+                                                                "replay": wide_replay}}}
 
 
 def _nudge(rational: str) -> str:
@@ -1007,6 +1056,12 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
         # A distinct reviewed declaration, not a change to the frozen hero or an acquired-data claim.
         followups.append({"branch": "actual-own-time", "origin": "actual", "time": "79/10", "allowance": "7/20",
                           "reading": "100/1", "reading_spelling": "100"})
+        unresolved = _unresolved_branch(flow, hero_design, packet["problem"]["target"])
+        if unresolved:
+            followups.append(unresolved)
+        else:
+            checks.add("unresolved_followup_constructed", "blocked", "needs own-time rechecks, a checked hero design "
+                       "with an inside-claim candidate and the engine interpreter to read its enclosure", level=INFO)
     for index, branch in enumerate(followups):
         name = branch["branch"]
         label = f"fu-{name}"
@@ -1051,6 +1106,11 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
                       f"origin {revised['body']['origin']}, parent {revised.get('parent_id')}")
         # Independent expectation over the WHOLE revised dataset (every included row), not just the new reading.
         expected = {cid: kinetics.history_verdict(vec, revised["body"]["rows"]) for cid, vec in vectors.items()}
+        unresolved_ids = [cid for cid, vec in vectors.items() if vec == branch.get("unresolved_vector")]
+        if branch.get("unresolved_vector"):
+            _check_unresolved_construction(checks, name, branch, time_value)
+            for cid in unresolved_ids:  # the checker's honest uncertainty is the expected answer, whatever the oracle says
+                expected[cid] = "inconclusive"
         problem = flow.client.post(f"/workspaces/{base['workspace_id']}/problems",
                                    {**packet["problem"], "dataset_id": revised["id"], "dataset_digest": revised["digest"]},
                                    label=f"fu-problem-{name}")
@@ -1124,6 +1184,19 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
                     "dataset_id": revised["id"], "run_id": run["id"], "run_state": finished.get("state"),
                     "design_bound": bool(scope), "observation_origin": origin, "oracle_expectation": expected,
                     "application_per_candidate": per_candidate}
+        if unresolved_ids and evidence:
+            results = {c.get("candidate_id"): c for c in result_of(evidence[0]).get("candidate_results") or []}
+            for cid in unresolved_ids:
+                item = results.get(cid) or {}
+                checks.expect(f"{name}_unresolved_candidate_keeps_checker_uncertainty",
+                              item.get("verification") == "inconclusive"
+                              and item.get("reason_code") == "insufficient_enclosure"
+                              and item.get("unresolved_observation_ids") == [row["id"]]
+                              and not item.get("is_counterexample") and not item.get("violating_observation_ids"),
+                              f"{cid}: verification {item.get('verification')}, reason {item.get('reason_code')}, "
+                              f"unresolved {item.get('unresolved_observation_ids')}, counterexample "
+                              f"{item.get('is_counterexample')}")
+            observed["unresolved"] = {"enclosure": branch.get("enclosure"), "candidates": unresolved_ids}
         if scope and evidence:
             observed.update(_check_native_followup(flow, checks, name, label, evidence[0], design, scope, vectors,
                                                    row, expected, run["id"], packet["problem"]["target"],
@@ -1132,6 +1205,36 @@ def scenario_followup(flow: Flow, packet: dict) -> dict:
     check_original_unchanged(checks, flow, hero, "original_evidence_unchanged_after_followups")
     return {"checks": checks, "observation": {"branches": branches, "design_was_isolation_probe": isolation,
                                               "design_bound_scope_offered": native_scope}}
+
+
+def _unresolved_branch(flow: Flow, hero_design: dict | None, target: dict) -> dict | None:
+    """An own-time reading built from the engine's own enclosure: band = middle half of [lo, hi] for the inside-claim
+    (reference) candidate, so the fixed proof profile can establish neither compatibility nor separation."""
+    followup = (flow.capabilities().get("science") or {}).get("native_followup") or {}
+    request = (hero_design or {}).get("request") or {}
+    inside = [vec for vec in request.get("candidate_vectors") or []
+              if not kinetics.outside_closed_claim(vec[target["parameter"]], target["lower"], target["upper"])]
+    if followup.get("selected_time_and_allowance_only") is not False or not inside or not flow.science_python:
+        return None
+    lo, hi = engine_controls.engine_enclosure(flow.science_python, flow.package_dir, inside[0], "79/10")
+    middle, quarter = (F(lo) + F(hi)) / 2, (F(hi) - F(lo)) / 4
+    return {"branch": "unresolved-reference", "time": "79/10", "reading": f"{middle.numerator}/{middle.denominator}",
+            "allowance": f"{quarter.numerator}/{quarter.denominator}", "reading_spelling": "engine enclosure midpoint",
+            "unresolved_vector": inside[0], "enclosure": [lo, hi]}
+
+
+def _check_unresolved_construction(checks: Checks, name: str, branch: dict, time_value: str) -> None:
+    """Independent soundness: the 80-digit oracle value lies inside the engine's enclosure (exact comparison), and the
+    reviewed band lies strictly inside it, so 'unresolved' is the honest answer for this proof profile."""
+    lo, hi = (F(v) for v in branch["enclosure"])
+    value = Fraction(kinetics.concentration(branch["unresolved_vector"], time_value))  # exact Decimal -> Fraction
+    reading, allowance = F(branch["reading"]), F(branch["allowance"])
+    checks.expect(f"{name}_engine_enclosure_contains_independent_value", lo <= value <= hi,
+                  f"enclosure width {float(hi - lo):.3g}; oracle value offset from centre "
+                  f"{float((value - (lo + hi) / 2) / ((hi - lo) / 2)):.3g} half-widths",
+                  finding=None if lo <= value <= hi else "F-ENGINE-ENCLOSURE")
+    checks.expect(f"{name}_band_strictly_inside_enclosure", lo < reading - allowance and reading + allowance < hi,
+                  "reviewed band is the middle half of the engine enclosure")
 
 
 def _followup_scope(design: dict | None, proposal: dict) -> dict | None:

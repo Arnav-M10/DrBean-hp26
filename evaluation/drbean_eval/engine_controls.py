@@ -158,16 +158,22 @@ def _replay(*args, **kwargs):
     return native.replay(*args, guard_log=GUARD_LOG, **kwargs)
 
 
+def engine_source_files(package_dir: str) -> dict:
+    """{file: sha256} for counterdex/*.py in a checkout (the shape the engine reports as its source manifest)."""
+    root = os.path.join(os.path.abspath(package_dir), "counterdex")
+    files = {}
+    for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
+        if name.endswith(".py"):
+            with open(os.path.join(root, name), "rb") as handle:
+                files[name] = hashlib.sha256(handle.read()).hexdigest()
+    return files
+
+
 def engine_source_identity(package_dir: str) -> dict:
     """Digest of the Counterdex source a run must exercise: sorted (file, sha256) of counterdex/*.py."""
-    root = os.path.join(os.path.abspath(package_dir), "counterdex")
-    files = sorted(name for name in os.listdir(root) if name.endswith(".py")) if os.path.isdir(root) else []
-    manifest = []
-    for name in files:
-        with open(os.path.join(root, name), "rb") as handle:
-            manifest.append([name, hashlib.sha256(handle.read()).hexdigest()])
-    digest = hashlib.sha256(json.dumps(manifest, separators=(",", ":")).encode()).hexdigest() if files else None
-    return {"source_sha256": digest, "files": len(files)}
+    manifest = [[name, digest] for name, digest in sorted(engine_source_files(package_dir).items())]
+    digest = hashlib.sha256(json.dumps(manifest, separators=(",", ":")).encode()).hexdigest() if manifest else None
+    return {"source_sha256": digest, "files": len(manifest)}
 
 
 _ENGINE_PROBE = (
@@ -176,6 +182,30 @@ _ENGINE_PROBE = (
     "import counterdex\n"
     "print(json.dumps({'version': getattr(counterdex, '__version__', None),\n"
     "                  'module_dir': os.path.dirname(os.path.abspath(counterdex.__file__))}))\n")
+
+
+_ENCLOSURE = (
+    "import json, os, sys\n"
+    "from fractions import Fraction\n"
+    "sys.path.insert(0, os.environ['DRBEAN_COUNTERDEX_DIR'])\n"
+    "from counterdex.analytical import concentration_interval\n"
+    "from counterdex.exact import rational_text\n"
+    "job = json.loads(sys.stdin.read())\n"
+    "v = job['vector']\n"
+    "lo, hi = concentration_interval(Fraction(v['A']), Fraction(v['ke']), Fraction(v['ka']), Fraction(job['time']))\n"
+    "print(json.dumps([rational_text(lo), rational_text(hi)]))\n")
+
+
+def engine_enclosure(science_python: str, package_dir: str, vector: dict, time: str) -> tuple[str, str]:
+    """The engine's own exact concentration enclosure [lo, hi] for a vector at a time (its fixed proof profile)."""
+    done = subprocess.run([science_python, "-I", "-c", _ENCLOSURE], input=json.dumps({"vector": vector, "time": time}),
+                          capture_output=True, text=True, timeout=60,
+                          env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8",
+                               "DRBEAN_COUNTERDEX_DIR": os.path.abspath(package_dir)})
+    if done.returncode:
+        raise RuntimeError(f"engine enclosure probe failed: {done.stderr.strip().splitlines()[-1:]}")
+    lo, hi = json.loads(done.stdout.strip().splitlines()[-1])
+    return lo, hi
 
 
 def engine_identity(science_python: str, package_dir: str) -> dict:

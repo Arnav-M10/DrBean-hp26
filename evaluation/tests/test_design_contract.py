@@ -52,3 +52,30 @@ class DesignContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnresolvedConstruction(unittest.TestCase):
+    """Engine-free part of the unresolved follow-up: the oracle must sit inside the engine enclosure (exact)."""
+
+    VECTOR = {"A": "913800036733/100000000000", "ka": "446/127", "ke": "1631/12700"}
+
+    def checks_for(self, offset_halfwidths):
+        from fractions import Fraction
+        from drbean_eval import kinetics
+        value = Fraction(kinetics.concentration(self.VECTOR, "79/10"))
+        half = Fraction(1, 10**37)
+        centre = value - Fraction(offset_halfwidths) * half
+        lo, hi = centre - half, centre + half
+        branch = {"unresolved_vector": self.VECTOR, "enclosure": [f"{lo.numerator}/{lo.denominator}",
+                                                                   f"{hi.numerator}/{hi.denominator}"],
+                  "reading": f"{centre.numerator}/{centre.denominator}",
+                  "allowance": f"{(half / 2).numerator}/{(half / 2).denominator}"}
+        checks = sf.Checks()
+        sf._check_unresolved_construction(checks, "u", branch, "79/10")
+        return {c["id"]: c["outcome"] for c in checks.items}
+
+    def test_a_sound_enclosure_and_a_band_inside_it_pass(self):
+        self.assertEqual(set(self.checks_for("1/2").values()), {"passed"})
+
+    def test_an_enclosure_that_misses_the_independent_value_fails(self):
+        self.assertEqual(self.checks_for(3)["u_engine_enclosure_contains_independent_value"], "failed")
