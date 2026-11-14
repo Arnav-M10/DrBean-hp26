@@ -24,6 +24,25 @@ suggestion profile/projection; its checked mathematics passed, while complete
 application-native baseline lineage and `recheck` dispatch remain to be joined.
 Backend capability metadata also needs to report the observed runtime version.
 
+During the continuation, backend PR #6 merged into `main` as `1f75bdc`.
+The owner branch incorporated that exact main through merge `7c09c59`, preserving
+all teammate commits. On the combined tree, the actual pinned backend environment
+(CPython 3.13.18, Pydantic 2.13.4) accepted eight package requests/results.
+A sanitized, provider-disabled run of the existing baseline adapter, binding and
+worker-route tests produced **23 passed, 3 failed** in 15.68 seconds. All failures
+are the worker-route tests reporting `scientific_runtime_unavailable`; direct
+adapter and binding cases pass. This is an observed Mac worker/runtime boundary
+failure, not an established engine arithmetic failure or a passed application
+gate. An isolated owned-child probe identified the cause: the Darwin account
+had 633 processes, while production policy lowered inherited `RLIMIT_NPROC`
+from `(4000,6000)` to `(256,256)`. Launching the prepared interpreter then raised
+`BlockingIOError`, errno 35 (`EAGAIN`). Keeping the inherited process limit while
+retaining the same CPU/file guards allowed that interpreter to start. Address
+space was already correctly omitted on Darwin. Owner 2 needs a platform-aware
+per-user guard and a precise process-limit error, not another arbitrary fixed
+cap. No backend behavior was patched or limits relaxed to manufacture an HTTP
+pass. The concrete isolated reproducer is in the Owner 2 package-side handoff.
+
 The validation branch still classifies application-native packets as unknown,
 uses the legacy replay command/anchor subset, and constructs a design request
 with the wrong allowance-origin shape and insufficient extension scope for its
@@ -40,9 +59,10 @@ regressions retain these distinct integrity/binding/resource defenses. Source
 and original evidence bytes remain unchanged; no scientific version bump or
 fixture regeneration is appropriate for test/documentation-only changes.
 
-Next owned trigger: once Owner 2's full native design/recheck seam or Owner 5's
-replay consumer lands, rerun that changed boundary using the real current
-consumer. Current delivery has no demonstrated package defect requiring a new
+Next owned trigger: Owner 2 fixes the demonstrated Darwin worker process-limit
+boundary; rerun the existing route/download/replay and cleanup controls first.
+Then verify the full native design/recheck seam or Owner 5's replay consumer when
+those land, using the real current consumer. Current delivery has no demonstrated package defect requiring a new
 proof rule, model family or solver feature. Keep this branch ready and preserve
 teammate attribution; do not silently merge their proposed branches. No provider
 calls, secret reads or hosted-service activation occurred.
@@ -96,8 +116,8 @@ linkage. `docs/RESULT_SEMANTICS.md` supplies the downstream truth table;
 `fixtures/repro/` supplies a minimal portable reproduction packet. These are
 handoffs, not assertions that the backend/public HTTP gate passes. Owner 5's
 independent HTTP acceptance remains pending that integration. No additional
-scientific family or provider capability was started. Latest fetch still has
-`origin/main` at `adac945`; teammate branches were left untouched.
+scientific family or provider capability was started. At that earlier completion,
+`origin/main` was `adac945`; teammate branches were left untouched.
 
 ## Governing reference
 
@@ -187,8 +207,9 @@ that it is unavailable or claiming the new application gate passes.
    update this log, commit coherently and publish the owner branch. A push or
    package-only pass does not establish integrated release acceptance.
 
-Next owned milestone: verify the changed native design/recheck or evaluator
-consumer when its owner publishes it, using current source and separate anchors.
+Next owned milestone: verify Owner 2's Darwin process-limit correction with the
+existing worker-route controls; then verify changed native design/recheck or
+evaluator consumers using current source and separate anchors.
 The package's actual/differently timed recheck, result truth table and portable
 reproduction packet are complete. Do not recreate them or expand scientific
 scope while the remaining consumer joins need stabilization.

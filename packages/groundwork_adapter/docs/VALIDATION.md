@@ -21,6 +21,23 @@ The proposed design retains its legacy suggestion profile; the full native
 application lineage and recheck dispatch are separate remaining integration work.
 See [the updated Owner 2 handoff](OWNER2_BRIDGE_ADOPTION.md).
 
+Backend PR #6 then merged as `1f75bdc`; owner-branch merge `7c09c59` retains it.
+The combined-tree backend controls on macOS ran **23 passed and 3 failed** in
+15.68 seconds. All three `test_baseline_workflow.py` cases failed at the real
+worker with `scientific_runtime_unavailable`, while adapter/binding tests passed.
+The environment was CPython 3.13.18 with repository-pinned dependencies and a
+prepared installed Counterdex 3.11.17 runtime, sanitized environment variables,
+temporary storage and model dispatch disabled. No backend limits were bypassed.
+This failure blocks a local worker-route success claim and is assigned to Owner
+2. Isolated owned-child controls identified the Darwin per-user process cap:
+633 existing account processes exceeded the forced `RLIMIT_NPROC=(256,256)`;
+interpreter launch raised errno 35 (`EAGAIN`). With the inherited `(4000,6000)`
+process guard and the same CPU/file guards, launch succeeded. Address-space
+limiting was already omitted on Darwin. These are diagnostic controls, not a
+relaxed application pass. The merged authoritative schemas still accept all
+eight package fixture requests/results. These results supersede any inference that direct adapter
+compatibility alone qualifies the integrated execution boundary.
+
 Two new focused recheck regressions passed in 0.653 seconds: the original anchor
 rejects modified bytes, while intentionally resealed diagnostic anchors reveal
 a wrong scientific scenario and a bundle budget that omits outer lineage bytes.

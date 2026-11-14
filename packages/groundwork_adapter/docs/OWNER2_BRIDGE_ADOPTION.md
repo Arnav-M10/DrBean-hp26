@@ -58,6 +58,86 @@ run. PR #6 records its own branch acceptance; the read-only audit does not
 qualify the combined source's HTTP behavior or the complete
 discovery/design/recheck loop.
 
+## Mac worker launch failure on the combined source
+
+At combined commit `7c09c59ec77cff0b49634bb7d2ae2c9c294dd6f4`, the backend
+Python 3.13.18 checks passed 23 adapter/binding tests but failed three actual
+baseline workflow tests with `scientific_runtime_unavailable`. The prepared
+engine was CPython 3.11.17. An isolated launch diagnostic identified the exact
+cause: this Mac's UID 501 owned 633 processes while its inherited
+`RLIMIT_NPROC` was `(4000, 6000)`. The scientific worker installed `(256, 256)`,
+a user-wide ceiling already below the active account load.
+
+The same prepared engine launched successfully in an owned diagnostic child
+with CPU and open-file guards installed and the inherited process limit intact.
+Adding only the production process-count limit caused `BlockingIOError`, errno
+35 (`EAGAIN`, resource temporarily unavailable). The adapter's generic `OSError`
+handler converted that failure to `scientific_runtime_unavailable`. Darwin's
+resource policy already omits `RLIMIT_AS`, so address-space enforcement was not
+the cause. No parent limits or backend files were changed, and these diagnostic
+controls do not qualify a workflow under reduced guards.
+
+To reproduce with a server-chosen prepared engine, run from a backend Python
+environment. All limit changes below happen inside a newly owned child; the
+parent always kills/reaps that child's process group. The result depends on
+current account load. Do not create extra processes merely to force the error.
+
+```sh
+/path/to/backend/python - /path/to/prepared/python3.11 <<'PY'
+import json, os, signal, subprocess, sys
+
+program = r'''
+import json, os, resource, subprocess, sys
+def lower_limit(kind, requested):
+    _, hard = resource.getrlimit(kind)
+    bound = requested if hard == resource.RLIM_INFINITY else min(requested, hard)
+    resource.setrlimit(kind, (bound, bound))
+lower_limit(resource.RLIMIT_CPU, 10)
+lower_limit(resource.RLIMIT_NOFILE, 64)
+for stage in ("inherited_user_limit", "production_user_limit"):
+    if stage == "production_user_limit":
+        lower_limit(resource.RLIMIT_NPROC, 256)
+    row = {"stage": stage, "nproc": resource.getrlimit(resource.RLIMIT_NPROC)}
+    try:
+        child = subprocess.run([sys.argv[1], "-I", "-c", "print('launched')"],
+            input=b"", capture_output=True, timeout=5,
+            env={"PATH": os.defpath, "LANG": "C.UTF-8"})
+        row["returncode"] = child.returncode
+    except OSError as error:
+        row.update(errno=error.errno, exception=type(error).__name__)
+    print(json.dumps(row))
+'''
+child = subprocess.Popen([sys.executable, "-I", "-c", program, sys.argv[1]],
+    stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
+    env={"PATH": os.defpath, "LANG": "C.UTF-8"})
+try:
+    out, err = child.communicate(timeout=15)
+    sys.stdout.buffer.write(out)
+    sys.stderr.buffer.write(err)
+finally:
+    try:
+        os.killpg(child.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    child.wait(timeout=2)
+PY
+```
+
+Owner 2's smallest next fix is a platform-aware process-count policy that does
+not install a per-user cap below existing account load. Preserve inherited hard
+limits and report whether the user-wide guard is inherited or explicitly
+configured; it is not a job quota. Keep the fixed server launcher, owned-session
+cleanup, CPU/file limits, bounded output and wall deadlines. Another arbitrary
+larger fixed cap would leave the same failure mode. Distinguish a launch-time
+`EAGAIN` process-limit diagnostic from a missing or incompatible engine.
+
+Before qualifying the Mac workflow, rerun the actual unprivileged reviewed
+route, worker, artifact download and independent replay checks, including wrong
+bytes/anchors, changed-input, no-candidate, access-scope and cancellation
+controls. The direct-adapter successes do not replace those failed workflow
+checks. This handoff describes an Owner 2 change; it does not modify or bypass
+the backend resource policy.
+
 ## Recorded 0.2.0 baseline and first blocking seam
 
 The audited prepared CPython 3.11.17 package reported Counterdex 0.2.0 and source digest
