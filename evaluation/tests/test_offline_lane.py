@@ -25,9 +25,10 @@ from drbean_eval.subject import NoSubject, RecordedSubject  # noqa: E402
 def fabricated(entry_id="RS-HERO-FULL", **changes):
     """An observation that *claims* success, with nothing behind it."""
     m = manifest.load(ROOT)
+    packet = next(e["packet"] for e in m["schedule"]["offline_real_science"] if e["entry_id"] == entry_id)
     obs = {"schema": "eval-observation/v1", "lane": "offline_real_science", "operation": "science",
            "tested_commit": runner.git_state(REPO)["commit"],
-           "case_sha256": m["science_packets"]["hero-v1"]["sha256"],
+           "case_sha256": m["science_packets"][packet]["sha256"],
            "provider": {"transport": "none"}, "tools": {"transport": "real"}, "provider_requests": 0,
            "state": "completed", "status": "passed",
            "external_dispatch": {"verified": True, "egress_attempts": 0, "client_constructions": 0},
@@ -141,8 +142,7 @@ class OfflineLaneRunner(Base):
         directory = tempfile.mkdtemp()
         try:
             with open(os.path.join(directory, "RS-HERO-FULL.observation.json"), "w", encoding="utf-8") as handle:
-                m = manifest.load(ROOT)
-                json.dump(fabricated(case_sha256=m["science_packets"]["hero-v1"]["sha256"]), handle)
+                json.dump(fabricated(), handle)
             record = self.run_lane(RecordedSubject(directory), ["RS-HERO-FULL"])[0]
             self.assertEqual(record["status"], "failed")
             self.assertEqual(record["evidence_class"], "imported_claim")
@@ -443,3 +443,97 @@ class Projection(unittest.TestCase):
         self.assertEqual(out["source_ref"]["region_xywh_px"], [100, 200, 60, 30])
         self.assertEqual(out["source_ref"]["asset_sha256"], "a" * 64)
         self.assertEqual(out["source_ref"]["source_label"], "needs_human_verification")
+
+
+class PreviewAndDiagnosticSeparation(unittest.TestCase):
+    def test_previews_and_diagnostics_never_satisfy_a_release_gate(self):
+        base = {"entry_id": "RS-HERO-FULL", "lane": "offline_real_science", "tested_commit": "c" * 40,
+                "status": "passed", "attempt_id": "att_x", "reason": None, "worktree_dirty": False}
+        for change in ({"evidence_class": "preview"}, {"evidence_class": "diagnostic"},
+                       {"evidence_class": "executed_acceptance", "app_under_test": {"commit": "d" * 40, "dirty": False}},
+                       {"evidence_class": "executed_acceptance", "app_under_test": {"commit": "c" * 40, "dirty": True}}):
+            gate = gates._entry_gate("real_science_http", {"RS-HERO-FULL": {**base, **change}}, ("RS-HERO-FULL",), "")
+            self.assertEqual(gate["status"], "blocked", change)
+        own = {**base, "evidence_class": "executed_acceptance", "app_under_test": {"commit": "c" * 40, "dirty": False}}
+        self.assertEqual(gates._entry_gate("g", {"RS-HERO-FULL": own}, ("RS-HERO-FULL",), "")["status"], "passed")
+
+    def test_cli_refuses_previews_or_diagnostics_in_the_acceptance_results(self):
+        self.assertEqual(cli.main(["run", "--lane", "offline_real_science", "--subject", "http-launch",
+                                   "--diagnostic", "relax_nproc"]), 1)
+        self.assertEqual(cli.main(["run", "--lane", "offline_real_science", "--subject", "http-launch",
+                                   "--app-repo", REPO]), 1)
+
+    def test_unknown_diagnostic_override_is_refused(self):
+        with self.assertRaises(launcher.StackError):
+            launcher.LocalStack(REPO, diagnostic_overrides=("disable_all_guards",))
+
+
+class LedgerAndHistoryIntegrity(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.path = os.path.join(self.dir, "b.jsonl")
+        self.ledger = BudgetLedger(self.path)
+        self.ledger.open_cohort("t", "A. Human", "synthetic test allowance")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir)
+
+    def test_corrupt_ledger_fails_closed_and_is_preserved(self):
+        self.ledger.reserve("t", "p", "C01", 100, 10, "unit")
+        with open(self.path, "a", encoding="utf-8") as handle:
+            handle.write("{not json\n")
+        with open(self.path, encoding="utf-8") as handle:
+            before = handle.read()
+        from drbean_eval.budget import BudgetStop
+        with self.assertRaises(BudgetStop):
+            self.ledger.reserve("t", "p", "C01", 100, 10, "unit")
+        with self.assertRaises(BudgetStop):
+            self.ledger.state()
+        with open(self.path, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), before)
+
+    def test_crash_after_reservation_keeps_the_maximum_committed(self):
+        self.ledger.reserve("t", "p", "C01", 3000, 700, "unit")  # process dies here: never reconciled
+        state = BudgetLedger(self.path).state()
+        self.assertEqual(state["committed"], {"provider_requests": 1, "input_tokens": 3000, "output_tokens": 700})
+        self.assertEqual(len(state["unreconciled"]), 1)
+
+    def test_concurrent_reservations_never_exceed_caps(self):
+        import threading
+        ledger = BudgetLedger(os.path.join(self.dir, "c.jsonl"))
+        ledger.open_cohort("t", "A. Human", "synthetic", {"provider_requests": 5})
+        results = []
+
+        def reserve():
+            try:
+                results.append(ledger.reserve("t", "p", "C01", 10, 1, "unit"))
+            except Exception as error:  # BudgetStop for the ones that do not fit
+                results.append(type(error).__name__)
+
+        threads = [threading.Thread(target=reserve) for _ in range(20)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(sum(1 for r in results if str(r).startswith("rsv_")), 5)
+        self.assertEqual(ledger.state()["committed"]["provider_requests"], 5)
+
+    def test_conflicting_provider_request_ids_are_flagged(self):
+        a = self.ledger.reserve("t", "p", "C01", 100, 10, "unit")
+        b = self.ledger.reserve("t", "p", "C01", 100, 10, "unit")
+        self.ledger.reconcile(a, 10, 1, "completed", "req-same")
+        self.ledger.reconcile(b, 10, 1, "completed", "req-same")
+        self.assertEqual(self.ledger.state()["conflicting_request_ids"], ["req-same"])
+
+    def test_malformed_history_line_is_surfaced_not_dropped(self):
+        results = os.path.join(self.dir, "results")
+        os.makedirs(results)
+        with open(os.path.join(results, "attempts.jsonl"), "w", encoding="utf-8") as handle:
+            handle.write(json.dumps({"attempt_id": "a1", "entry_id": "X", "lane": "l", "status": "passed"}) + "\n")
+            handle.write("{broken\n")
+            handle.write(json.dumps({"attempt_id": "a1", "entry_id": "X", "lane": "l", "status": "failed"}) + "\n")
+        records = runner.read_attempts(results)
+        self.assertEqual([r["status"] for r in records], ["passed", "error", "failed"])
+        problems = " ".join(history.verify(results))
+        self.assertIn("not valid JSON", problems)
+        self.assertIn("duplicate attempt_id a1", problems)

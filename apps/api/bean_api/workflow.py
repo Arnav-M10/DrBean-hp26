@@ -319,35 +319,38 @@ class Workflow:
         if result["digest"] != scope["design_result_digest"]:
             raise DomainError("binding_mismatch", "The follow-up plan must bind the exact retained design result.", 422)
         if (facts.get("projection_version") != "DB-SC-1-to-groundwork-v1"
-                or facts.get("design_tier") != "checked_pair_separation"
+                or facts.get("design_tier") not in {"checked_pair_separation", "no_separation_established"}
                 or facts.get("verification") != "valid" or facts.get("replay") != "passed"
-                or facts.get("selected_time") is None
+                or (facts.get("native_replay") or {}).get("expected_binding") != "matches"
+                or (facts.get("verification_record") or {}).get("expected_binding") != "matches"
                 or facts.get("candidate_ids") != request["candidate_ids"]
                 or facts.get("future_hard_allowance") != request["future_hard_allowance"]):
-            raise DomainError("followup_design_required", "A checked selected time for the original pair is required.", 422)
+            raise DomainError("followup_design_required", "A matching freshly checked design for the original pair is required.", 422)
         problem = self._get(conn, actor, request["problem_id"], "problem")
         dataset = self._get(conn, actor, problem["body"]["dataset_id"], "dataset")
         proposal = self._get(conn, actor, scope["observation_proposal_id"], "observation_proposal")
         artifact = self._get(conn, actor, scope["source_artifact_id"], "native_artifact")
         for record in (revised_dataset, result, plan, problem, dataset, proposal, artifact):
             self._same_workspace(workspace_id, record)
-        if proposal["body"]["origin"] != "hypothetical":
-            raise DomainError("followup_origin_unsupported", "The native follow-up checker currently admits an explicitly hypothetical reading only.", 422, ["followup.observation_proposal_id"])
         old, new, observation = dataset["body"], revised_dataset["body"], proposal["body"]
+        if _digest("observation_proposal", observation) != proposal["digest"]:
+            raise DomainError("binding_mismatch", "The retained observation body differs from its reviewed digest.", 422)
         row = observation["row"]
+        expected_origin = "hypothetical" if "hypothetical" in (old["origin"], observation["origin"]) else old["origin"]
+        expected_dataset = {**old, "parent_id": dataset["id"], "rows": [*old["rows"], row],
+                            "origin": expected_origin, "change_reason": observation["change_reason"]}
         def unchanged_problem(value):
             return {key: item for key, item in value.items() if key not in {"dataset_id", "dataset_digest"}}
         if (body["problem_digest"] != revised_problem["digest"] or body["dataset_id"] != revised_dataset["id"]
                 or revised_problem["body"]["dataset_digest"] != revised_dataset["digest"]
                 or revised_problem["id"] == problem["id"] or request["problem_digest"] != problem["digest"]
+                or revised_dataset["id"] == dataset["id"]
                 or new.get("parent_id") != dataset["id"] or revised_dataset["parent_id"] != dataset["id"]
-                or new["origin"] != "hypothetical" or new["experiment_id"] != old["experiment_id"]
-                or new["time_origin"] != old["time_origin"] or new["rows"] != [*old["rows"], row]
+                or new != expected_dataset
                 or unchanged_problem(revised_problem["body"]) != unchanged_problem(problem["body"])
                 or observation["dataset_id"] != dataset["id"] or observation["experiment_id"] != old["experiment_id"]
-                or row["time"] != facts["selected_time"] or row["hard_allowance"] != request["future_hard_allowance"]
                 or row["included"] is not True or row.get("source_asset_id") is not None):
-            raise DomainError("followup_lineage_mismatch", "Follow-up must preserve the original inputs and append exactly the reviewed hypothetical reading at the selected time and allowance.", 422)
+            raise DomainError("followup_lineage_mismatch", "Follow-up must preserve the original inputs and append exactly the accepted observation with its own declared origin, time and allowance.", 422)
         reviews = [_record(record) for record in conn.execute(
             "SELECT * FROM entities WHERE workspace_id=? AND kind='observation_review' AND parent_id=?", (workspace_id, proposal["id"]))]
         review = next((item for item in reviews if item["body"] == {
@@ -683,11 +686,17 @@ class Workflow:
         """
         with self.store.transaction() as conn:
             now = utc_now()
+            # No child was ever started for these jobs. A restart must still
+            # acknowledge the user's cancellation instead of inventing an
+            # interrupted scientific attempt.
+            cancelled = conn.execute("UPDATE jobs SET state='cancelled',finished_at=? "
+                "WHERE state='cancel_requested' AND started_at IS NULL", (now,)).rowcount
             jobs = conn.execute("UPDATE jobs SET state='interrupted',finished_at=?,error_code='worker_restart' WHERE state IN ('running','cancel_requested')", (now,)).rowcount
             children = conn.execute("UPDATE scenario_reservations SET state='interrupted',finished_at=?,reason_code='worker_restart' WHERE state IN ('reserved','running') AND run_id IN (SELECT id FROM jobs WHERE state='interrupted')", (now,)).rowcount
             attempts = conn.execute("UPDATE provider_attempts SET state='unknown_outcome',finished_at=? WHERE state='reserved'", (now,)).rowcount
             operations = conn.execute("UPDATE operations SET state='interrupted',finished_at=?,error_code='worker_restart' WHERE state='reserved'", (now,)).rowcount
-            return {"jobs": jobs, "scenarios": children, "provider_attempts": attempts, "operations": operations}
+            return {"jobs": jobs + cancelled, "queued_cancellations": cancelled,
+                    "scenarios": children, "provider_attempts": attempts, "operations": operations}
 
     def queued_jobs(self, limit: int = 20) -> list[dict]:
         """Internal dispatcher inventory, never expose without workspace filtering."""
@@ -725,26 +734,29 @@ class Workflow:
             if evidence.get("expected_binding") == "mismatch":
                 raise DomainError("binding_mismatch", "Mismatched evidence cannot support a design proposal.", 422)
             if native_design:
-                if request.get("scientific_profile") != "counterdex.v1" or request.get("requested_tier") != "checked_pair_separation":
-                    raise DomainError("unsupported_design_tier", "Native baseline design supports a reviewed request for checked pair separation.",
+                if request.get("scientific_profile") != "counterdex.v1" or request.get("requested_tier") not in {"checked_pair_separation", "numerical_guidance"}:
+                    raise DomainError("unsupported_design_tier", "Native baseline design requires an explicit reviewed numerical or checked request.",
                                       422, ["requested_tier"])
                 if (evidence.get("verification") != "valid" or evidence.get("replay") != "passed"
                         or evidence.get("expected_binding") != "matches"):
                     raise DomainError("historical_evidence_required", "Design requires matching freshly checked historical evidence.", 422)
                 refs = evidence.get("artifacts", [])
-                if len(refs) != 1 or request["source_artifact_ids"] != [refs[0]["id"]]:
-                    raise DomainError("historical_artifact_required", "Select the original native baseline artifact for this pair.",
+                if request.get("source_artifact_ids"):
+                    raise DomainError("unsupported_artifact_reuse", "Prospective certificate reuse is not supported; the original baseline is retained separately.",
                                       422, ["source_artifact_ids"])
+                if len(refs) != 1:
+                    raise DomainError("historical_artifact_required", "The selected baseline must retain one original native artifact.", 422)
             if request.get("scientific_profile") == "counterdex.v1":
                 from fractions import Fraction
-                from .scientific_projection import _exact, project_design, project_problem
+                from .scientific_projection import project_design, project_native_design, project_problem
                 problem = self._get(conn, actor, request["problem_id"], "problem")
                 dataset = self._get(conn, actor, problem["body"]["dataset_id"], "dataset")
                 historical_horizon = max(Fraction(row["time"]) for row in dataset["body"]["rows"] if row["included"])
                 if Fraction(request["maximum_horizon"]) < historical_horizon:
                     raise DomainError("unavailable_horizon", "The reviewed horizon must cover the included historical observations.", 422, ["maximum_horizon"])
                 historical_artifacts = {artifact["id"]: artifact for artifact in evidence.get("artifacts", [])}
-                for artifact_id in request.get("source_artifact_ids", []):
+                artifact_ids = list(historical_artifacts) if native_design else request.get("source_artifact_ids", [])
+                for artifact_id in artifact_ids:
                     if artifact_id not in historical_artifacts:
                         raise DomainError("artifact_not_in_scope", "A source artifact must belong to the selected historical scenario.", 422, ["source_artifact_ids"])
                     artifact = self._get(conn, actor, artifact_id, "native_artifact")
@@ -757,17 +769,10 @@ class Workflow:
                             "plan_id": current["plan_id"], "approval_id": current["approval_id"]}:
                         raise DomainError("artifact_binding_mismatch", "Native baseline provenance differs from the selected approved run.", 422)
                 if native_design:
-                    # The new engine mapping consumes the complete native baseline;
-                    # do not reinterpret it through the legacy fixed-pair projection.
-                    for index, time_value in enumerate(request["feasible_times"]):
-                        _exact(time_value, f"feasible_times[{index}]")
-                    _exact(request["future_hard_allowance"], "future_hard_allowance")
-                    _exact(request["maximum_horizon"], "maximum_horizon")
-                    if request["budget"]["pair_verifications"] < 2:
-                        raise DomainError("scientific_admission", "Checking and fresh replay require two approved pair verifications.",
-                                          422, ["budget.pair_verifications"])
-                    if request["candidate_vectors"][0] == request["candidate_vectors"][1]:
-                        raise DomainError("candidate_vector_mismatch", "Select two distinct historical vectors.", 422, ["candidate_vectors"])
+                    # Reuse dispatch/publication's exact reviewed-scope admission;
+                    # baseline lineage never becomes prospective certificate reuse.
+                    from .canonical import semantic_digest
+                    project_native_design(request, project_problem(problem, dataset), semantic_digest("design-request", request))
                 else:
                     project_design(request, project_problem(problem, dataset), [None, None])
             candidates = {item.get("id"): item for item in evidence.get("candidates", []) if isinstance(item, dict)}

@@ -1,6 +1,7 @@
 """Versioned lossless application-to-Counterdex mapping, never a scientific checker."""
 from __future__ import annotations
 
+from copy import deepcopy
 from fractions import Fraction
 import json
 
@@ -8,6 +9,8 @@ from .canonical import semantic_digest, validate_rational
 from .workflow import DomainError
 
 PROJECTION_VERSION = "bean-to-counterdex.v1"
+NATIVE_APPLICATION_MAPPING = "DB-SC-1-to-groundwork-v1"
+NATIVE_DESIGN_MAPPING = "DB-SC-1-design-to-groundwork-v2"
 
 
 def _fail(message: str, path: str) -> None:
@@ -154,3 +157,48 @@ def project_design(request: dict, projection: dict, source_digests: list[str | N
         "limits": {"wall_seconds": budget["wall_seconds"], "max_times": len(request["feasible_times"]),
             "max_constructions": budget["fixed_vector_constructions"], "max_pair_verifications": budget["pair_verifications"],
             "max_bundle_bytes": budget["bundle_bytes"], "max_certificate_bytes": 2 * 1024 * 1024}}
+
+
+def native_design_mapping_policy(request: dict) -> str:
+    """An explicit review selects v2; only genuine historical requests use v1."""
+    if request.get("scientific_profile") == "counterdex.v1":
+        return NATIVE_DESIGN_MAPPING
+    if request.get("scientific_profile") is None and all(
+            request.get(name) is None for name in ("requested_tier", "allowance_origin", "maximum_horizon")):
+        return NATIVE_APPLICATION_MAPPING
+    _fail("Explicit scientific design choices require the counterdex.v1 profile.", "scientific_profile")
+
+
+def project_native_design(request: dict, projection: dict, request_digest: str) -> dict:
+    """Reconstruct the native projection from reviewed input, never child output.
+
+    Historical baseline bytes travel separately. A source ID in the request is
+    prospective certificate reuse, which the current native bridge cannot admit.
+    """
+    if semantic_digest("design-request", request) != request_digest:
+        raise DomainError("binding_mismatch", "The design request differs from its approved digest.", 422)
+    sources = request.get("source_artifact_ids", [])
+    if not isinstance(sources, list):
+        _fail("Supply a list of prospective source artifact identifiers.", "source_artifact_ids")
+    if sources:
+        raise DomainError("unsupported_artifact_reuse", "Prospective certificate reuse is not supported; retain mandatory baseline history separately.",
+                          422, ["source_artifact_ids"])
+    mapping = native_design_mapping_policy(request)
+    reviewed = deepcopy(request)
+    if mapping == NATIVE_APPLICATION_MAPPING:
+        horizon = max([Fraction(row["time"]) for row in projection["observations"] if row["included"]]
+                      + [Fraction(time) for time in request["feasible_times"]])
+        reviewed.update(requested_tier="checked_pair_separation", maximum_horizon=f"{horizon.numerator}/{horizon.denominator}",
+            allowance_origin={"kind": "reviewed_hard_bound",
+                "description": f"Approved DB-SC-1 design request {request_digest}; future_hard_allowance"})
+    elif reviewed.get("requested_tier") not in {"numerical_guidance", "checked_pair_separation"}:
+        raise DomainError("unsupported_design_tier", "Select numerical guidance or checked pair separation.", 422, ["requested_tier"])
+    design = project_design(reviewed, projection, [None, None])
+    # Numerical requests retain the same reviewed horizon boundary as checked
+    # ones. No implicit permission to enlarge the finite grid is introduced.
+    if any(Fraction(time) > Fraction(reviewed["maximum_horizon"]) for time in reviewed["feasible_times"]):
+        _fail("Every future time must fit the reviewed maximum horizon.", "maximum_horizon")
+    design["grid"] = [{"time": time, "feasible": True, "reason": "Reviewed application feasible time"}
+                      for time in sorted(reviewed["feasible_times"], key=Fraction)]
+    design["limits"]["max_certificate_bytes"] = min(2 * 1024 * 1024, reviewed["budget"]["bundle_bytes"])
+    return design

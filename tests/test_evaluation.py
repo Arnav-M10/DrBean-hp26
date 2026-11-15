@@ -153,3 +153,58 @@ def test_inventory_reads_harness_gates_and_never_dispatches():
     assert gates['overall'] in {'passed', 'failed', 'blocked', 'unavailable'}
     if gates['overall'] != 'unavailable':
         assert gates['gates']['live_gemini_qualification'] == 'not_run'
+
+
+# --- Oracle and endpoint agreement with Owner 2's authoritative admission golden ----------------
+
+GOLDEN = json.loads((ROOT / 'shared' / 'contracts' / 'DB-SC-1' / 'fixtures' / 'admission-golden.json').read_text())
+
+
+def _oracle():
+    import sys
+    sys.path.insert(0, str(ROOT / 'evaluation'))
+    from drbean_eval import contract
+    return contract
+
+
+def test_evaluation_oracle_agrees_with_admission_golden():
+    contract = _oracle()
+    for case in GOLDEN['rational_cases']:
+        assert contract.is_canonical_rational(case['value']) is case['accepted'], repr(case['value'][:20])
+    for case in GOLDEN['json_cases']:
+        try:
+            contract.parse_strict(case['raw'].encode())
+            accepted = True
+        except contract.ContractError:
+            accepted = False
+        assert accepted is case['accepted'], case['raw'][:40]
+    for case in GOLDEN['byte_cases']:
+        try:
+            contract.parse_strict(case['raw'].encode(), max_bytes=case['max_bytes'])
+            accepted = True
+        except contract.ContractError:
+            accepted = False
+        assert accepted is case['accepted'], (case['raw'], case['max_bytes'])
+
+
+def test_api_endpoints_agree_with_admission_golden(tmp_path):
+    from fastapi.testclient import TestClient
+    from bean_api.config import Settings
+    from bean_api.main import PREFIX, create_app
+    settings = Settings(database_path=str(tmp_path / 'db.sqlite3'), blob_dir=str(tmp_path / 'blobs'),
+                        artifact_dir=str(tmp_path / 'artifacts'), auth_tokens={'alice': 'a' * 40})
+    with TestClient(create_app(settings)) as client:
+        client.headers['Authorization'] = 'Bearer ' + 'a' * 40
+        for case in GOLDEN['json_cases']:  # the strict wire parser runs before any schema validation
+            response = client.post(PREFIX + '/exact/decimal', content=case['raw'].encode(),
+                                   headers={'Content-Type': 'application/json', 'Idempotency-Key': 'k'})
+            wire_rejected = response.status_code == 422 and response.json()['code'] == 'invalid_json'
+            assert wire_rejected is (not case['accepted']), (case['raw'][:40], response.status_code)
+        workspace = client.post(PREFIX + '/workspaces', json={'name': 'golden'}).json()['id']
+        hero = json.loads((ROOT / 'evaluation' / 'cases' / 'science' / 'hero-v2.json').read_text())
+        for index, case in enumerate(GOLDEN['rational_cases']):  # a nonnegative time field admits any legal rational
+            rows = [dict(row) for row in hero['dataset']['rows']]
+            rows[0] = {**rows[0], 'time': case['value']}
+            response = client.post(PREFIX + f'/workspaces/{workspace}/datasets', json={**hero['dataset'], 'rows': rows},
+                                   headers={'Idempotency-Key': f'golden-{index}'})
+            assert (response.status_code == 201) is case['accepted'], (repr(case['value'][:20]), response.status_code)

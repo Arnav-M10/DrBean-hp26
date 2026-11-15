@@ -2,6 +2,165 @@
 
 Owner: Person 1 / Counterdex.
 
+## Current milestone 6 — independent acceptance and clean reproduction
+
+The user explicitly authorized the next checkpoint: integrate latest main,
+adopt the independent evaluator's current design/recheck contracts, integrate
+teammate worker-loss recovery, and reproduce the complete offline loop from a
+clean checkout. This extends the earlier consumer-fix scope to the necessary
+evaluator and release integration work. Provider activation, public deployment,
+new scientific families and unrelated frontend features remain outside this slice.
+
+Fresh baseline: clean `9a6db61` in an isolated `codex/science-acceptance` worktree.
+Merged main `55403ab` as `77c7d7f` and evaluator `0931246` as `7784c50`, preserving
+their authored history and historical evidence. Recovery `c231be4` is adopted
+as attributed cherry-pick `edc08fa`: its lifeline guard is combined with the
+current recheck operation and inherited process-limit policy. The backend
+owner's status log is preserved; only the applicable recovery section is added
+to the shared handoff, without importing claims for unrelated unmerged work.
+
+Scientific package source and archived native fixtures remain unchanged.
+Focused checks use the existing pinned backend Python 3.13.18 and installed
+Counterdex 0.3.0 / CPython 3.11.17 in sanitized environments. Fresh setup,
+ordinary HTTP/download/replay, sustained interruption and release reproduction
+will be recorded separately from those component checks. No real credentials
+are inspected and no application model-provider calls are authorized.
+
+Implementation qualification before clean reproduction:
+
+- Recovery/policy/boundary suite: **53 passed in 7.16 s**. Darwin cleanup now
+  reaps an already-dead owned leader before retrying zombie-group EPERM;
+  persistent denial stays an error. The observer distinguishes zombies from
+  executing processes. Lifeline cleanup remains armed if parent signaling fails.
+- Independent HTTP suite: **46 passed in 46.57 s**. The separately added normal
+  cancellation/restart case passed in **8.83 s** without diagnostic overrides,
+  using 128 declared synthetic replicates and the unchanged sustained-live-work
+  criterion. The diagnostic barrier remains separately labelled.
+- Harness suite: **120 tests, one skipped**; final follow-up/credential-guard
+  controls: **20 passed** with warnings treated as errors. Both obsolete AI
+  expected failures were first verified against their original assertions and
+  are now ordinary tests. Proposal provenance, accepted review, original design
+  parent, exact candidate outcomes and own-time actual-origin declarations are
+  checked independently; synthetic dataset ancestry is retained.
+- Launcher tests: **12 passed**. Manual Chrome smoke: **17/17 passed** using
+  the existing operator-selected Playwright 1.65 and Chrome 157. Those results
+  do not substitute for the fresh install of pinned Playwright 1.63 below.
+- Ruff across application, tests, scripts and evaluator; whitespace/syntax
+  checks; and tracked/new-lock secret scans pass. Scientific source, native
+  archives and frozen evaluator cases remain unchanged.
+
+Launcher partial-start cleanup was adopted as attributed `f547cf3` from
+`7ba79a0`. Applicable release/browser changes from `23e1f1d` were retained;
+unrelated old milestone claims were not imported. Launcher/guard credential
+inventories now filter names before reading retained values. Explicit local
+application import paths fix hidden editable-install discovery without letting
+another checkout shadow the application. Clean reproduction clears inherited
+source/runtime overrides, installs the existing pinned browser dependencies
+from a new lock, and installs matching Chromium unless an executable browser
+is explicitly selected. A missing favicon is fixed without suppressing browser
+console assertions.
+
+Final acceptance records and clean-checkout output are retained beneath
+`evaluation/results/`; `evaluation/README.md` and the PR report their tested
+commit and final gate verdict. Full product G4 still requires browser source
+review and follow-up controls; those required checks remain enforced. This
+milestone supplies independent scientific acceptance and release reproduction,
+not a claim that those missing UI capabilities exist.
+
+Final reproduction at committed source `d821202`:
+
+- `evaluation/cli.py run --lane offline_real_science --subject http-launch`:
+  all **7 entries passed**, on a clean tree with the egress guard, ordinary
+  computation and exact downloads/replays. `evaluation/cli.py controls`:
+  **22/22 passed**. All earlier attempts and native artifacts are retained.
+- `scripts/release/clean_checkout.sh --strict-offline --record` installed the
+  locked backend and Counterdex runtime plus pinned Playwright **1.63** and
+  matching Chromium **153** in a fresh clone. Backend **559 passed**; independent
+  HTTP **47 passed**; engine, harness, launcher, schema, lint, secret, web and
+  both implemented browser checks passed. Startup/restart smoke **31/31**;
+  ordinary-user boundary **10 passed** with **662 existing processes**.
+- Strict release exit **1** is intentional evidence of the remaining scope:
+  **G0–G3 passed**, **G4 partial**, solely because browser source-review and
+  follow-up controls are absent. Full output is retained at
+  `evaluation/results/integration/d821202-clean-checkout.log`.
+- A final read-only review found no additional recovery defect. Historical
+  checklist captions and the generated report's unconditional failure sentence
+  were corrected after this run; gate requirements and executable application
+  behavior are unchanged. A fresh recorded HTTP lane/control run follows that
+  explanatory-text commit so the independent gate can qualify its exact source.
+
+Milestone 6's scientific acceptance and clean reproduction are demonstrated.
+The useful next trigger is Owner 4's source-review/follow-up browser delivery,
+then its G4 browser checks and full strict release qualification. Do not start
+new scientific families or expand search while that product gate is pending.
+Counterdex source is unchanged, so no new package version or PyPI upload is
+needed. Publication remains an owner-branch/stacked PR handoff, with teammates'
+history intact and no model-provider calls or public deployment.
+
+## Current integration repair — user-directed scope extension
+
+After the next checkpoint was identified as backend mapping, recheck routing
+and runtime fixes, the user instructed: "sure do that". This slice explicitly
+extends the earlier science-only edit boundary to those consumer fixes and the
+minimal browser request correction they require. Work is isolated on
+`codex/science-integration-fixes`, based on `54cc9f1` / main `80f95a4`;
+teammate checkouts and progress logs remain untouched. Scientific source and
+archived evidence stay unchanged. No live provider activation is authorized.
+
+Adopted the already authored ESRCH observer and CI runtime-wiring fixes as
+attributed cherry-picks `8b8529c` and `f0b90ba`. The backend now preserves the
+exact reviewed v2 design, resolves mandatory history separately from prospective
+reuse, and routes accepted observation proposals to existing `recheck`. Both
+design tiers retain their reviewed meaning, horizon and allowance provenance;
+nonempty unsupported reuse fails before approval. The browser sends the same
+empty reuse scope while the server independently resolves baseline bytes.
+
+Rechecks carry the complete normalized accepted proposal and original design
+history. Actual, transcription and hypothetical declarations retain their own
+time/allowance and conservative dataset provenance. Freshly checked separation
+and no-separation parents are supported; numerical-only parents, changed prior
+rows/models, wrong proposal lineage and reused approvals remain rejected.
+Archived `review` semantics are unchanged. Independent review exposed three
+publication gaps: report vectors could disagree with the declared pair, row
+statuses could disagree with candidate summaries, and numerical approval could
+be presented as checked output. Narrow binding/declared-fact checks and resealed
+mutation regressions close those gaps without adding another mathematical checker.
+
+`process-guards-v3` preserves inherited account-wide process ceilings on both
+Linux and Darwin and explicitly reports that no per-job process-count quota is
+enforced. CPU/open-file limits, Linux address-space controls and owned-session
+wall/output supervision remain. Actual Mac nested backend/engine launch and
+baseline HTTP/download/installed replay pass; Linux inheritance is covered by
+injected policy tests. Worker-loss recovery is a separate teammate change.
+
+The actual Chrome browser check passed review/approval/dispatch, two baseline
+inputs, positive and no-separation design, exact native/anchor downloads,
+installed replay, retained earlier evidence and reopened history. All 29 web
+tests passed; 39 schema exports have no drift; eight current request/result
+examples validate; the tracked-file secret scan reports zero findings.
+
+Final combined backend suite: **424 passed in 57.34 s**, with no skips, using
+sanitized pinned backend Python **3.13.18** and installed Counterdex **0.3.0** /
+CPython **3.11.17**. This includes the real Mac worker and installed CLI replay,
+both design tiers, genuine legacy review, proposal-bound rechecks, cancellation,
+expiry and resealed mutation controls. The final focused follow-up suite passed
+53 tests in 21.91 s; design adapter/binding passed 44 in 3.04 s and design
+HTTP/publication passed 7 in 8.46 s. Ruff across `apps tests scripts` and
+whitespace checks pass. The complete science package is unchanged from
+`54cc9f1`, so no new scientific package build/version or PyPI upload is needed.
+
+Independent `tests/integration` on this branch: **39 passed, 4 failed, 2 xfailed
+in 20.87 s**. Three tests still submit baseline IDs as prospective reuse and
+correctly receive `unsupported_artifact_reuse`. The cancellation/restart test
+reports its required interruption checks **not observed** because computation
+finished before interruption. Neither condition was skipped or reclassified as
+passed. Evaluator code/records and other owners' logs remain untouched. Remote
+`c231be4` now supplies teammate worker-loss recovery; evaluator `bff9cfa` and
+release `23e1f1d` remain separate branches. Their integration and qualification
+are the next checkpoint, including `FollowupScope`/`recheck` adoption and exact
+inconclusive assertions for excluded fixed candidates. No release acceptance,
+live-provider qualification, deployment or PyPI upload is claimed.
+
 ## Current continuation — controlled fact consumer qualification
 
 Resumed clean `f6a647d`; integrated main remains `80f95a4`. Proposed backend

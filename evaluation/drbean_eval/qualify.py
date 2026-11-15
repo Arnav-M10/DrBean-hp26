@@ -25,9 +25,10 @@ import hashlib
 import json
 import os
 
-from . import native
+from . import contract, kinetics, native
 
-EVIDENCE_CLASSES = ("executed_acceptance", "validated_trace", "imported_claim")
+EVIDENCE_CLASSES = ("executed_acceptance", "preview", "diagnostic", "validated_trace", "imported_claim")
+EXECUTED = ("executed_acceptance", "preview", "diagnostic")  # executed and re-checked by this runner
 
 
 def _load(evidence_dir: str, rel: str):
@@ -78,6 +79,11 @@ def _link_checks(records: dict) -> list[dict]:
         if not all((dataset, problem, plan, approval, run)):
             check(f"links:{label}:complete", False, "a baseline record is missing from the saved evidence")
             continue
+        workspaces = {r.get("workspace_id") for r in (dataset, problem, plan, approval, run) if isinstance(r, dict)}
+        workspaces |= {records[name].get("workspace_id") for name in records if name.startswith(label + "-")
+                       and isinstance(records[name], dict) and records[name].get("workspace_id")}
+        check(f"links:{label}:same_workspace", len(workspaces - {None}) == 1,
+              f"records span workspaces {sorted(w for w in workspaces if w)}")
         check(f"links:{label}:problem_dataset", problem["body"]["dataset_id"] == dataset["id"]
               and problem["body"]["dataset_digest"] == dataset["digest"])
         check(f"links:{label}:plan_problem", plan["body"]["problem_id"] == problem["id"]
@@ -116,7 +122,118 @@ def _link_checks(records: dict) -> list[dict]:
                 suggestion = records.get(f"{label}-suggestion")
                 if suggestion:
                     check(f"links:{label}:suggestion_is_job_result", job.get("result_id") == suggestion["id"])
+        scope = (plan.get("body") or {}).get("followup")
+        if scope:
+            out += _followup_links(label, scope, records)
     return out
+
+
+def _followup_links(label: str, scope: dict, records: dict) -> list[dict]:
+    """A design-bound follow-up: re-derive its binding and per-candidate verdicts from the saved records alone."""
+    out = []
+
+    def check(check_id, condition, detail=""):
+        out.append({"id": f"links:{label}:{check_id}", "passed": bool(condition), "detail": detail})
+
+    names = ("bound-design-job", "bound-suggestion", "bound-design-plan", "proposal", "parent-dataset", "dataset",
+             "evidence-baseline", "report")
+    job, suggestion, design_plan, proposal, parent, revised, evidence, report = (records.get(f"{label}-{n}") for n in names)
+    missing = [n for n, r in zip(names, (job, suggestion, design_plan, proposal, parent, revised, evidence, report)) if not r]
+    if missing:
+        check("followup_complete", False, f"follow-up records missing from the saved evidence: {missing}")
+        return out
+    facts, request = suggestion.get("body") or {}, (design_plan.get("body") or {}).get("request") or {}
+    refs = facts.get("artifacts") or []
+    check("followup_binds_its_design", job.get("id") == scope.get("design_job_id")
+          and job.get("result_id") == suggestion.get("id") == scope.get("design_result_id")
+          and suggestion.get("digest") == scope.get("design_result_digest") and job.get("plan_id") == design_plan["id"]
+          and len(refs) == 1 and refs[0].get("id") == scope.get("source_artifact_id"),
+          "plan scope names the saved design job, its result digest and its single native artifact")
+    observation = proposal.get("body") or {}
+    row = observation.get("row") or {}
+    before, after = parent.get("body") or {}, revised.get("body") or {}
+    origin = "hypothetical" if "hypothetical" in (before.get("origin"), observation.get("origin")) else before.get("origin")
+    result = (evidence.get("body") or {}).get("result") or {}
+    operation = (result.get("native_replay") or {}).get("operation")
+    expected_dataset = {**before, "parent_id": parent["id"], "rows": [*(before.get("rows") or []), row],
+                        "origin": origin, "change_reason": observation.get("change_reason")}
+    legacy_scope = (operation != "review" or (observation.get("origin") == "hypothetical"
+                    and row.get("time") == facts.get("selected_time")
+                    and row.get("hard_allowance") == request.get("future_hard_allowance")))
+    check("followup_appends_exactly_the_reviewed_row", proposal.get("id") == scope.get("observation_proposal_id")
+          and revised.get("parent_id") == parent["id"]
+          and after == expected_dataset and observation.get("dataset_id") == parent["id"]
+          and observation.get("experiment_id") == before.get("experiment_id")
+          and row.get("included") is True and row.get("source_asset_id") is None
+          and operation in ("review", "recheck") and legacy_scope,
+          f"{operation}: reviewed row at {row.get('time')}, allowance {row.get('hard_allowance')}, origin {observation.get('origin')}")
+    lineage = (report.get("body") or {}).get("followup") or {}
+    review = (lineage.get("observation_review") or {}).get("body") or {}
+    check("followup_review_binds_proposal", proposal.get("digest") == hashlib.sha256(contract.canonical_json(observation)).hexdigest()
+          and lineage.get("observation_proposal") == proposal and lineage.get("dataset") == parent
+          and lineage.get("revised_dataset") == revised
+          and review == {"proposal_id": proposal["id"], "proposal_digest": proposal.get("digest"),
+                         "dataset_id": revised["id"], "dataset_digest": revised.get("digest"), "accepted": True},
+          "the accepted review binds the complete proposal body and this exact materialized revision")
+    vectors = dict(zip(request.get("candidate_ids") or [], request.get("candidate_vectors") or []))
+    candidates = {c.get("id"): c.get("parameter_vector") for c in result.get("candidates") or []}
+    check("followup_rechecks_the_design_pair", bool(vectors) and candidates == vectors
+          and result.get("baseline_search") is None, "exact original vectors; no new discovery")
+    # Independent decimal oracle over every included row of the revised dataset.
+    expected = {cid: kinetics.history_verdict(vec, (revised.get("body") or {}).get("rows") or [])
+                for cid, vec in vectors.items()}
+    observed = {c.get("candidate_id"): ("compatible" if c.get("verification") == "valid" else
+                                        "excluded" if c.get("verification") == "invalid" else c.get("verification"))
+                for c in result.get("candidate_results") or [] if c.get("candidate_id") in vectors}
+    check("followup_verdicts_match_oracle", set(observed) == set(vectors) and all(
+        expected[c] == "indeterminate" or observed[c] == expected[c] for c in vectors),
+        f"application {observed}, independent oracle {expected}")
+    target = ((records.get(f"{label}-problem") or {}).get("body") or {}).get("target") or {}
+    if target and all(v != "indeterminate" for v in expected.values()):
+        outside = [c for c in vectors if expected[c] == "compatible" and kinetics.outside_closed_claim(
+            vectors[c][target["parameter"]], target["lower"], target["upper"])]
+        expected_outcome = "certified_counterexample" if outside else "inconclusive"
+        check("followup_outcome_follows_from_survivors", result.get("scientific_outcome") == expected_outcome,
+              f"outcome {result.get('scientific_outcome')}; oracle survivors outside the closed claim {outside}")
+    return out
+
+
+def followup_native_binding(label: str, packet: dict, records: dict) -> dict:
+    """Bind replayable bytes to independently saved proposal, revision and design records."""
+    passed = False
+    try:
+        proposal, parent, revised, problem, plan, run, design, job, suggestion = (
+            records[f"{label}-{name}"] for name in ("proposal", "parent-dataset", "dataset", "problem", "plan", "run",
+                                                   "bound-design-plan", "bound-design-job", "bound-suggestion"))
+        scope, request, facts = plan["body"]["followup"], design["body"]["request"], suggestion["body"]
+        ref = facts["artifacts"][0]
+        binding = packet["binding"]
+        app = binding["application"] if packet["operation"] == "recheck" else binding
+        expected_proposal = {key: proposal[key] for key in ("id", "digest", "body")}
+        expected_parent = {"operation": "design", "run_id": job["id"], "scenario_id": request["scenario_id"],
+            "problem_id": request["problem_id"], "problem_digest": request["problem_digest"],
+            "dataset_id": parent["id"], "dataset_digest": parent["digest"], "projection_digest": facts["scientific_problem_digest"]}
+        expected_anchor = {"artifact_sha256": ref["sha256"], "dataset_digest": parent["digest"],
+            "problem_digest": request["problem_digest"], "projection_digest": facts["scientific_problem_digest"],
+            "app_request_digest": design["body"]["request_digest"], "design_digest": facts["scientific_design_digest"],
+            "run_id": job["id"], "scenario_id": request["scenario_id"]}
+        operation = records[f"{label}-evidence-baseline"]["body"]["result"]["native_replay"]["operation"]
+        scope_matches = (binding == {"schema_version": "counterdex.followup-binding.v1", "application": app,
+                                     "observation_proposal": expected_proposal, "parent": expected_parent}
+                         if operation == "recheck" else operation == "review")
+        passed = (packet["operation"] == operation and scope_matches and packet["run_id"] == run["id"]
+            and packet["scenario_id"] == records[f"{label}-evidence-baseline"]["body"]["scenario_id"]
+            and app["schema_version"] == "counterdex.application-binding.v1"
+            and app["mapping_policy"] == "DB-SC-1-to-groundwork-v1"
+            and app["dataset"] == {key: revised[key] for key in ("id", "digest", "body")}
+            and app["problem"] == {key: problem[key] for key in ("id", "digest", "body")}
+            and app["dataset_origin"] == revised["body"]["origin"]
+            and packet["history"]["id"] == scope["source_artifact_id"] == ref["id"]
+            and packet["history"]["sha256"] == ref["sha256"] and packet["history"]["anchors"] == expected_anchor)
+    except (KeyError, IndexError, TypeError, ValueError):
+        pass
+    return {"id": f"links:{label}:native_followup_binding", "passed": bool(passed),
+            "detail": "native operation, full proposal, materialized revision and original design scope match saved authenticated records"}
 
 
 def _replay_checks(observation: dict, evidence_dir: str, records: dict, science_python: str | None,
@@ -134,19 +251,41 @@ def _replay_checks(observation: dict, evidence_dir: str, records: dict, science_
                     and len(data) == reference.get("byte_size"), "detail": "saved packet matches its reference"})
         anchor_records = [records[name] for name in item.get("anchor_records", []) if name in records]
         anchors = native.anchors_from_record(*anchor_records)
+        application = native.classify(data).get("profile") == "application_bundle"
+        full = next((r.get("anchor") for r in anchor_records if isinstance(r.get("anchor"), dict)), None)
         if not science_python or not package_dir:
             out.append({"id": f"replay:{item.get('artifact_id')}", "passed": False,
                         "detail": "no replay interpreter available to the qualifier"})
             continue
-        if not anchors.get("problem_digest") or not anchors.get("suggestion_digest"):
+        if (application and not full) or (not application and (not anchors.get("problem_digest")
+                                                                or not anchors.get("suggestion_digest"))):
             out.append({"id": f"replay:{item.get('artifact_id')}", "passed": False,
                         "detail": "anchors are not present in the saved authenticated records"})
             continue
-        report = native.replay(science_python, package_dir, data, anchors)
+        report = native.replay(science_python, package_dir, data, anchors,
+                               application_anchor=full if application else None)
         body = report.get("report") or {}
-        out.append({"id": f"replay:{item.get('artifact_id')}", "passed": report["status"] == "passed"
-                    and body.get("integrity") == "passed" and body.get("expected_binding") == "matches",
-                    "detail": f"fresh replay {report['status']}"})
+        for name, evidence in records.items():
+            if not name.endswith("-evidence-baseline"):
+                continue
+            result = (evidence.get("body") or {}).get("result") or {}
+            if not any(ref.get("id") == item.get("artifact_id") for ref in result.get("artifacts") or []):
+                continue
+            label = name.removesuffix("-evidence-baseline")
+            if not ((records.get(f"{label}-plan") or {}).get("body") or {}).get("followup"):
+                continue
+            out.append(followup_native_binding(label, json.loads(data), records))
+            out.append({"id": f"replay:{item.get('artifact_id')}:published_followup_matches", "passed":
+                (body.get("outcome") or {}).get("scientific_outcome") == result.get("scientific_outcome")
+                and {row.get("candidate_id"): row.get("parameters") for row in body.get("candidate_results") or []}
+                    == {row.get("id"): row.get("parameter_vector") for row in result.get("candidates") or []},
+                "detail": "fresh replay outcome and exact vectors match the published fixed-candidate result"})
+        bound = body.get("integrity") == "passed" and body.get("expected_binding") == "matches"
+        if item.get("expect_checked", True):
+            ok, what = report["status"] == "passed" and bound, f"fresh replay {report['status']}"
+        else:  # numerical-only packet: no checked evidence exists to replay; bytes must still bind
+            ok, what = bound, f"integrity/binding of a numerical-only packet ({body.get('reason_code')})"
+        out.append({"id": f"replay:{item.get('artifact_id')}", "passed": ok, "detail": what})
     return out
 
 
@@ -167,7 +306,7 @@ def qualify(observation: dict, *, evidence_dir: str | None, evidence_class: str,
     if evidence_class not in EVIDENCE_CLASSES:
         raise ValueError(f"unknown evidence class {evidence_class!r}")
     result = {"evidence_class": evidence_class, "qualifier_checks": []}
-    if evidence_class != "executed_acceptance":
+    if evidence_class not in EXECUTED:
         return {**result, "status": "failed",
                 "reason": "imported observation: claims are never qualification; rerun the lane with --subject "
                           "http-launch so the runner executes and corroborates the acceptance itself"}

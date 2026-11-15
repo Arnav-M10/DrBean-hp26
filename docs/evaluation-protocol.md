@@ -41,9 +41,12 @@ Three defenses stay distinct: a wrong expected identity fails **binding**; a cha
 
 - Every launched process loads `evaluation/drbean_eval/guard/sitecustomize.py`: an audit hook refuses non-loopback DNS and connections, and a spy refuses construction of `google.genai.Client` (which LangChain's Gemini model also builds). SDK imports, types and schemas stay allowed. Every refusal is logged; an attempt is a **P0 finding even though nothing left the machine**.
 - The launcher builds environments from an allowlist. Provider credential variables are never inherited; tests may pass only `DRBEAN-DUMMY-...` values to prove configuration alone cannot dispatch. No real key is read, copied or tested.
+- Through Owner 4's launcher (`--subject http-owner4-launcher`) the harness cannot allowlist the product environment, so it checks Owner 4's own removal instead: dummy `GEMINI_API_KEY`, `GOOGLE_API_KEY` and `LANGSMITH_API_KEY` are placed in the launcher's environment and the guard in the API and worker must report none of them. Guard events from the launcher process and its probes are reported separately and never count as product evidence.
 - The pytest session for `tests/integration` runs under the same guard.
 - `RS-ZERO-DISPATCH` checks the guard was active in the API and the worker, zero attempts, no credential names in the launched environment, empty provider-attempt ledgers for every harness workspace and no live-qualification claim in capabilities.
 - **Verified zero** means zero actual model requests and zero model usage in that run. An unverified count is reported `unknown`, never zero.
+- The guard also records **reads of present provider-credential variables** (names only, never values); placeholder-mode processes must read none.
+- **What the guard covers:** every Python process that loads it — launched API and worker, every multiprocessing scientific child that inherits the environment, the pytest session for `tests/integration`, the evaluation CLI process itself, engine-control workers and replay subprocesses — for DNS lookups and socket connects/sends via Python's socket module (audit hooks), Gemini client construction, and `os.environ` reads. **What it does not cover:** non-Python processes (Node, shell tools), native extensions that open sockets or call `getenv(3)` without Python's socket/environ layers, and processes started with `-I`/`-E` that do not load it explicitly. The launcher's allowlisted environment (no credential variables, `NO_PROXY`, tracing off) is the primary control; the guard is the instrumentation that turns an attempt into a recorded P0.
 
 ## Two budget implementations, one future authority
 
@@ -77,6 +80,13 @@ Template rows for the human task live with Owner 4's consultation documents (`do
 Severity: **P0** — any external-model attempt, false checked success, wrong binding, unauthorized/duplicate computation, lost provenance or hypothetical labelling, unavailable real scientific hero path, missing replay bytes, credential exposure, orphan computation after cancellation. **P1** — simulated provider failure destroys the workflow, incorrect source-review handling, misleading status, controlled orchestration failing its declared behaviour, clean-machine recovery failing. **P2** — polish and coverage outside the minimum loop.
 
 Every finding in `evaluation/findings.json` carries the exact commit, minimal input, command, expected predicate, observed output and a failing test or attempt id. Production fixes belong to the owner. After a fix lands: reproduce the original failure where practical, run the regression on the fixed commit and the nearest neighbouring checks, then set `retested`. A promised fix is not a closed finding. Harness defects found in this workstream's own code are fixed immediately and listed with the attempts they affected; affected attempts stay in the history.
+
+## Diagnostics and previews (never acceptance)
+
+- `--app-repo <checkout>` runs this harness against another checkout (for example a teammate branch) and records evidence class `preview`.
+- `--diagnostic relax_nproc` lifts only the per-user `RLIMIT_NPROC` cap inside scientific children so downstream behaviour can be observed on the Mac while F-MAC-NPROC is open.
+- `--diagnostic science_barrier` holds each scientific child inside the adapter (after `setsid` and limits) until the harness releases a barrier file, making "cancel while running" and "kill the worker while running" deterministic.
+- All three require a separate `--results` directory, are logged by the guard, and never count toward release gates. A diagnostic relaxes one named guard to isolate a question; it is never a workaround for a product defect.
 
 ## Release gates
 

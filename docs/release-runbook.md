@@ -1,15 +1,15 @@
 # Release runbook
 
-Every command here was run on this branch (Linux x86_64). Run them from the repository root. AI is in placeholder mode throughout: nothing here contacts a model provider, and nothing here should.
+Run these commands from the repository root. Executed qualification belongs to the commit and environment named in retained release evidence; the commands alone are not a passing gate. AI stays in placeholder mode, with zero model-provider calls.
 
 ## Tested versions
 
 | Component | Version |
 |---|---|
-| OS and architecture | Linux x86_64. The target Mac has not been rechecked (issue I-015). |
+| OS and architecture | Earlier qualification used Linux x86_64. Full target-Mac release qualification remains pending; retain its separate command results. |
 | uv | 0.11.32 |
 | Backend runtime `.venv` | Python 3.13.18; fastapi 0.141.1, uvicorn 0.52.1, pydantic 2.13.4, deepagents 0.7.38, langchain 1.5.0, langchain-google-genai 4.5.0, google-genai 3.3.0 (from `uv.lock`) |
-| Engine runtime `.venv-engine` | CPython 3.11.15; counterdex 0.1.0, no dependencies |
+| Engine runtime `.venv-engine` | Qualified CPython 3.11; current Counterdex 0.3.0, no dependencies. Doctor reports the installed patch version. |
 | Node | 22.23.4 |
 | Playwright (tests only) | 1.63.0 |
 
@@ -61,7 +61,7 @@ The launcher starts each process in its own session and records its pid and star
 | Lost the token | It is in `var/auth.json`. Deleting that file and rerunning setup creates a new identity and orphans access to nothing but your own session; do not delete the database. |
 | Want a clean trial without touching real data | `DRBEAN_VAR_DIR=/some/empty/dir scripts/dev/setup.sh`, then the same variable for start and stop. |
 
-Backup: stop the stack, copy `var/bean.sqlite3` and `var/sources/` together. Never point the stack at an empty store while presenting earlier approvals.
+Backup: stop the stack and preserve `var/bean.sqlite3`, `var/sources/`, `var/artifacts/` and the private local identity together. Never point the stack at an empty store while presenting earlier approvals.
 
 ## Checks
 
@@ -81,7 +81,24 @@ The offline release gate. Nonzero unless G0 to G4 all have passing evidence. Mis
 scripts/release/clean_checkout.sh --strict-offline
 ```
 
-The same from a clean clone with freshly installed runtimes and its own empty store.
+The same from a clean clone of committed HEAD, with freshly installed runtimes and its own empty store. Inherited Python import paths, active virtual environments and backend/science runtime overrides are cleared. The launcher explicitly resolves this checkout's application source, including when a filesystem hides editable-install `.pth` files.
+
+The clone installs the browser test dependencies with `npm ci` from
+`tests/integration/package-lock.json` (Playwright **1.63.0**) using a public
+registry and isolated npm configuration/cache. It installs the matching
+Playwright Chromium unless an executable browser is explicitly selected:
+
+```sh
+CHROMIUM_PATH=/absolute/path/to/chromium scripts/release/clean_checkout.sh --strict-offline
+```
+
+That browser binary is a declared external dependency; record its version with
+the check results. Focused local browser checks also accept `PLAYWRIGHT_MODULE`
+and `CHROMIUM_PATH`, but an independently selected Playwright version does not
+qualify the locked clean-checkout environment. The clean check clears that module
+override and uses its own pinned installation. Source-review and follow-up
+browser controls remain explicit unrun G4 requirements; strict mode keeps failing
+until their real acceptance checks exist.
 
 ```sh
 python3 scripts/release/stack_smoke.py --require-science
@@ -91,7 +108,7 @@ The single command baseline discovery must make pass (gate G1). Without `--requi
 
 Add `--fast` to the checklist to skip checks that need ports 8000 and 4173. Stop a running stack before the full checklist: the smoke refuses to share ports and never stops your processes.
 
-Browser checks need Playwright: `npm install` in `tests/integration`, then `npx playwright install chromium`. Without it they report unrun.
+For browser checks in an existing checkout, run `npm ci --ignore-scripts --no-audit --no-fund` in `tests/integration`, then `node node_modules/playwright/cli.js install chromium`, or explicitly supply `CHROMIUM_PATH`. Without the package they report unrun.
 
 ## Native replay (engine CLI)
 
@@ -99,7 +116,13 @@ Browser checks need Playwright: `npm install` in `tests/integration`, then `npx 
 .venv-engine/bin/python -m counterdex replay packages/groundwork_adapter/fixtures/checked_success.bundle.json --anchors packages/groundwork_adapter/fixtures/checked_success.anchors.json
 ```
 
-Freshly replays the engine's prepared synthetic bundle against separately supplied anchors. This is the tested native replay command to give a reviewer once the API exports bundles from real runs. Today no application run produces a bundle. Browser replay is unsupported.
+This replays the standalone prepared fixture against its separate anchors. Actual application baseline, design and follow-up downloads use `counterdex.application-bundle.v1` and their complete eight-field authenticated anchor record:
+
+```sh
+.venv-engine/bin/python -I -m counterdex replay-native downloaded.native.json --anchors downloaded.anchors.json
+```
+
+The packet and expected anchors must come from the same approved run. Fresh replay checks the recorded fixed-vector facts and lineage; it does not rerun discovery or establish physical truth. Browser replay remains unsupported.
 
 ## AI mode
 

@@ -132,6 +132,16 @@ def test_dummy_key_alone_cannot_activate_dispatch(stack_factory):
 
 
 @pytest.mark.real_stack
+def test_present_dummy_credentials_are_never_read_in_placeholder_mode(stack_factory):
+    """Placeholder mode has no reason to load a credential: the guard records reads of present credential names."""
+    stack = stack_factory(stack_env=LEGACY_LIVE_SWITCH, allow_dummy_provider_config=True)
+    exercise_model_paths(stack)
+    reads = stack.credential_reads()
+    assert not reads, ("live credential loading in placeholder mode (finding F-CREDENTIAL-READ): "
+                       + "; ".join(f"{r['name']} via {r['stack'][-3:]}" for r in reads[:3]))
+
+
+@pytest.mark.real_stack
 def test_legacy_documented_live_switch_with_dummy_values_still_cannot_dispatch(stack_factory):
     """The pre-placeholder runbook switch (.env.example gate variables) must not activate a live provider.
 
