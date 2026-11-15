@@ -248,7 +248,7 @@ try {
       const settled = async (timeout) => {
         await page.waitForFunction(() => {
           const text = document.querySelector('#durable-research').textContent
-          return /Review the investigation operation|Review the separate|The assistant needs more information|State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped/.test(text)
+          return /Review the investigation operation|Review the separate|The assistant needs more information|State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped|Why the assistant stopped/.test(text)
         }, null, { timeout })
         return api(`/research-sessions/${session.id}`)
       }
@@ -262,7 +262,7 @@ try {
         check('live-plan-stops-for-approval-with-no-child')
         await panel.getByLabel('I approve only this frozen scientific scope and its limits.', { exact: true }).check()
         await approve.click()
-        await page.waitForFunction(() => /State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped|Review the separate/.test(
+        await page.waitForFunction(() => /State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped|Why the assistant stopped|Review the separate/.test(
           document.querySelector('#durable-research').textContent), null, { timeout: 300000 })
         session = await api(`/research-sessions/${session.id}`)
       }
