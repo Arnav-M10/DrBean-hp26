@@ -45,20 +45,69 @@ class UnavailableAdapter:
                             for t in request["feasible_times"]]}
 
 
-def _child(connection: Any, adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], wall: int, memory: int, result_cap: int) -> None:
+def _watch_parent(lifeline: Any, ready: Any, process_group: int) -> None:
+    """The parent's sole writer closes on death, including an uncatchable kill.
+
+    This guard shares the scientific session but is independent of its leader.
+    It therefore still cleans descendants if that leader exits unexpectedly.
+    Neither a PID lookup nor a durable PID from an earlier run is trusted here.
+    """
+    try:
+        if process_group <= 1 or os.getpgrp() != process_group:
+            raise ResourceSetupError("parent_guard_session_mismatch")
+        if lifeline.poll():
+            # Readability before readiness means the sole parent writer already
+            # vanished (or sent unexpected data). Never acknowledge this setup.
+            return
+        ready.send_bytes(b"ready")
+        ready.close()
+        # No payload is ever sent. EOF, a broken pipe, or unexpected bytes all
+        # end the authority to execute this scientific session.
+        lifeline.recv_bytes(maxlength=1)
+    except (EOFError, OSError):
+        pass
+    finally:
+        ready.close()
+        lifeline.close()
+        if process_group > 1 and os.getpgrp() == process_group:
+            try:
+                os.killpg(process_group, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+def _child(connection: Any, lifeline: Any, adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], wall: int, memory: int, result_cap: int) -> None:
+    owned_session = False
     try:
         try:
             os.setsid()
+            owned_session = True
         except (AttributeError, OSError) as exc:
             raise ResourceSetupError("process_session_setup_failed") from exc
         connection.send_bytes(b'{"_worker_control":"session_started"}')
-        # The scientific process needs neither provider nor application credentials.
+        # The scientific process and its guard need neither provider nor
+        # application credentials. Install limits before creating the guard so
+        # it inherits the same effective resource policy as the science session.
         os.environ.clear()
         # RLIMIT_NPROC counts every process/thread owned by this user, including
         # the local browser, API and worker. 32 prevents the prepared engine from
-        # starting alongside Chromium. This is a per-user guard, not a job quota;
-        # the owned session and parent wall limit still bound the entire job tree.
+        # starting alongside Chromium. This is a per-user guard, not a job quota.
         apply_limits(memory_bytes=memory, cpu_seconds=wall + 1, processes=256)
+        context = multiprocessing.get_context("spawn")
+        ready, ready_sender = context.Pipe(duplex=False)
+        guard = context.Process(target=_watch_parent,
+            args=(lifeline, ready_sender, os.getpid()), daemon=True)
+        try:
+            guard.start()
+            ready_sender.close()
+            if not ready.poll(5) or ready.recv_bytes(maxlength=5) != b"ready":
+                raise ResourceSetupError("parent_guard_setup_failed")
+        except (EOFError, OSError, RuntimeError) as exc:
+            raise ResourceSetupError("parent_guard_setup_failed") from exc
+        finally:
+            ready.close()
+            ready_sender.close()
+            lifeline.close()
         result = getattr(adapter, operation)(*args)
         encoded = json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
         if len(encoded) > result_cap:
@@ -71,6 +120,14 @@ def _child(connection: Any, adapter: ScienceAdapter, operation: str, args: tuple
         connection.send_bytes(b'{"worker_error":"scientific_worker_failed"}')
     finally:
         connection.close()
+        lifeline.close()
+        if owned_session:
+            # send_bytes completed synchronously before this point. Clean even
+            # when the worker disappears between the final send and its cleanup.
+            try:
+                os.killpg(os.getpid(), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], *, wall_seconds: int,
@@ -80,10 +137,20 @@ def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], 
         raise ValueError("Unsupported scientific worker operation or limit")
     context = multiprocessing.get_context("spawn")
     receiver, sender = context.Pipe(duplex=False)
-    process = context.Process(target=_child, args=(sender, adapter, operation, args, wall_seconds, memory_bytes, result_cap))
+    lifeline, parent_lifeline = context.Pipe(duplex=False)
+    process = context.Process(target=_child, args=(sender, lifeline, adapter, operation, args, wall_seconds, memory_bytes, result_cap))
     started = time.monotonic()
-    process.start()
+    try:
+        process.start()
+    except BaseException:
+        receiver.close()
+        sender.close()
+        lifeline.close()
+        parent_lifeline.close()
+        process.close()
+        raise
     sender.close()
+    lifeline.close()
     owned_session = False
     try:
         while time.monotonic() - started < wall_seconds:
@@ -100,7 +167,9 @@ def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], 
                     owned_session = True
                     continue
                 return result
-            if not process.is_alive():
+            if not process.is_alive() and not receiver.poll():
+                # A child may exit immediately after the first poll while its
+                # final synchronous write is already queued. Drain it first.
                 return {"worker_error": "scientific_worker_failed"}
         return {"worker_error": "scientific_wall_limit"}
     finally:
@@ -121,4 +190,5 @@ def run_bounded(adapter: ScienceAdapter, operation: str, args: tuple[Any, ...], 
                 pass
         process.join(timeout=2)
         receiver.close()
+        parent_lifeline.close()
         process.close()

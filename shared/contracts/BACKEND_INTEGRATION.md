@@ -272,6 +272,44 @@ conversion. Use `admission-golden.json` for trailing-newline rationals, JSON
 negative zero, depth, digit and byte caps; do not relax server admission to
 match a different evaluator oracle.
 
+## Worker loss and explicit restart recovery
+
+Scientific execution owns a distinct process group. A separate bounded-lifetime
+guard watches a pipe held only by the supervising worker: losing the worker
+closes the pipe and terminates that scientific group, including its native
+runtime descendants. The guard is ready before adapter dispatch. The existing
+parent deadline/cancellation cleanup still applies, and child exit cleans its
+own group. Recovery does not discover or kill unrelated processes.
+
+After stopping the API and confirming the old worker is gone, run the existing
+worker CLI against the same configured SQLite and artifact directories:
+
+```sh
+.venv/bin/python -m bean_api.worker --recover
+.venv/bin/python -m bean_api.worker
+```
+
+The worker lock prevents another worker from owning the same lane. Recovery is
+explicit and idempotent. Its JSON `jobs` count includes all reconciled jobs;
+`queued_cancellations` counts never-started cancellations acknowledged as
+`cancelled`. Started work becomes `interrupted` / `worker_restart`; unfinished
+scenario reservations become interrupted. Untouched queued jobs remain queued.
+Reserved provider attempts remain conservatively `unknown_outcome`; reservations
+are not refunded. No in-flight scientific or provider request is redispatched.
+
+Reopen the existing `/runs/{id}` or `/design-jobs/{id}`. Retrying start with its
+accepted approval returns that original job, including interrupted/cancelled
+state. Existing completed scenario evidence, native downloads and separately
+retained replay anchors stay available even if no parent summary was committed.
+To intentionally compute again, create a new reviewed plan (with appropriate
+`parent_plan_id`) and obtain fresh approval. Recovery grants no new authority.
+
+Backend acceptance: `tests/test_science_parent_loss.py` kills live supervisors
+and verifies the owned group stops; `tests/test_restart_evidence.py` kills a
+worker after actual evidence publication, runs CLI recovery, reopens the API and
+independently replays unchanged downloaded bytes. These observations distinguish
+terminated zombie entries from executing scientific computation.
+
 ## Controlled coordinator facts and future accounting
 
 The backend passes `agent-evidence.v1` fact cards to the existing restricted Deep

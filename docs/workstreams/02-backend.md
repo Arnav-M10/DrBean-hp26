@@ -1,10 +1,11 @@
 # Backend milestone progress
 
-Current task: master §2.13 milestone 6 — controlled AI with actual scientific
-evidence and strict future-provider accounting. Implementation and regression
-complete; ready for integration review.
+Current task: master §2.13 milestone 7 — worker-loss cleanup and restart
+reconciliation implemented and verified. Integration handoff is ready; remaining
+full-section acceptance depends on the workstreams listed below.
 
-Branch: `backend/controlled-acceptance`; base `main` at `80f95a4`.
+Branch: `backend/restart-recovery`; stacked on PR #13 at `731afdc`.
+PR #13 remains open; `main` is `80f95a4`.
 Linux, backend Python 3.12.14, scientific CPython 3.11.18.
 Interfaces: DB-SC-1 / GF-2, `counterdex.bridge.v1`,
 `DB-SC-1-to-groundwork-v1`, `counterdex.application-bundle.v1`.
@@ -20,9 +21,22 @@ Zero model-provider calls or credential checks; live dispatch remains disabled.
 | 4. Source review and immutable objective/optional scope | Implemented; regression covered |
 | 5. Design and follow-up | Design PR #9 and hypothetical follow-up PR #11 merged; actual readings blocked on engine |
 | 6. Controlled callbacks and accounting | Backend implemented; real-science controlled acceptance passed; full independent sign-off pending |
-| 7. Release stabilization and handoff | Remaining; cross-owner dependencies below |
+| 7. Release stabilization and handoff | Backend restart work verified; full release qualification remains dependency-bound |
 
 ## Verified in this change
+
+- Fixed: parent `finally` cleanup could not run after SIGKILL; a live scientific
+  child survived. An independent parent-lifeline guard now stops
+  the complete scientific process group without scanning unrelated processes.
+- Recovery now acknowledges never-started cancelled jobs as cancelled. Started
+  jobs remain interrupted; queued work is preserved. Acceptance tests kill
+  an ordinary worker after actual evidence commits and independently replay the
+  unchanged bytes after restart, proving no silent redispatch.
+- PR #13 CI exposed Linux ESRCH during process-state reading in addition to the
+  previously handled disappearing file. Both reaping errors are now covered by
+  the observer regression; seven process-boundary tests pass locally.
+
+Prior milestone 6 (PR #13), already verified:
 
 - A valid seven-row baseline previously exceeded the coordinator's 12 KB fact
   limit. `agent-evidence.v1` now supplies exact typed facts and evidence identity
@@ -40,6 +54,19 @@ Zero model-provider calls or credential checks; live dispatch remains disabled.
   blocks new reservations and reports `needs_review` without changing old bytes.
 
 ## Evidence
+
+- Current full backend regression: 411 passed in 167.22s, excluding independent
+  `tests/integration`. Final 16-test parent-loss/boundary suite also passes,
+  including a subsequent guard-start-failure control (412 tests now collected).
+- Actual restart/evidence HTTP and ordinary CLI tests: 2 passed. Queued state
+  plus existing workflow tests: 31 passed. Independent code review found no
+  remaining correctness blocker. Ordinary-user process-boundary check: 7 passed
+  while the user owned 244 processes. Ruff and whitespace pass.
+- No schema/database migration or new public route. No engine, browser,
+  independent evaluator or Owner 3 source changes. The child guard adds one
+  short-lived supervised process within the existing resource policy.
+
+Prior milestone 6 evidence (PR #13):
 
 - Full backend regression: 397 passed in 140.46s (`tests --ignore=tests/integration`).
 - New actual-science controlled HTTP suite: 4 passed. Fact projection: 3 passed.
@@ -69,8 +96,7 @@ Zero model-provider calls or credential checks; live dispatch remains disabled.
 - Next backend action: integrate admitted actual-reading changes when supplied,
   resolve any backend defects from independent acceptance, and finish release
   qualification/handoff. Merged code alone does not establish release readiness.
-- Planning estimate: approximately 1–3 hours of remaining active backend
-  integration/verification, assuming no major new defect. This excludes waiting
-  for Owners 1/3/4/5; full-section calendar completion is dependency-bound.
-  The current controlled milestone was initially estimated at 30–60 minutes.
-  Reassess after the producer and independent acceptance changes land.
+- Available restart slice is finished. No additional unblocked backend feature
+  was identified in this audit; resume when producer changes or independent
+  acceptance findings arrive. The 30–60 minute estimate covered this slice, not
+  waiting on Owners 1/3/4/5. Full-section calendar sign-off remains dependency-bound.
