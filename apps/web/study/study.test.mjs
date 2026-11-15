@@ -257,9 +257,9 @@ test('the front page links only to the study, its own sections and the source, a
   // Its sections never take a study step's name: those links open the study (the redirect in <head>).
   for (const step of ['data', 'check', 'result', 'next']) assert.ok(!ids.has(step), step)
   assert.match(html, /\^#\(data\|check\|result\|next\)\(-\|\$\)/)
-  // The front page reads the study page's storage key to offer the saved study.
-  const key = readFileSync(new URL('./app.mjs', import.meta.url), 'utf8').match(/const STORE = '([^']+)'/)[1]
-  assert.ok(readFileSync(new URL('./home.mjs', import.meta.url), 'utf8').includes(`'${key}'`))
+  // A fresh /study/app opens an empty draft and offers Resume previous study, so the front page
+  // never promises to reopen a saved study and never reads the study's storage.
+  assert.doesNotMatch(readFileSync(new URL('./home.mjs', import.meta.url), 'utf8'), /Open your study|localStorage/)
   // The study page's logo leads back to the front page.
   assert.match(readFileSync(new URL('./app.html', import.meta.url), 'utf8'), /<a class="brand" href="\.\/">/)
 })
