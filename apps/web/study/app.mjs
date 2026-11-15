@@ -14,6 +14,7 @@ import { $, countStatus, failure, readable, saveText, size, status } from './ui.
 import { createComparison } from './compare-app.mjs'
 import { createGeneral } from './general-app.mjs'
 import { CHECKS, overview } from './general.mjs'
+import { recognizedPaper, paperDraft, paperFinding, PAPER_CSS } from './paper-study.mjs'
 import { fileMediaHint, generalCapabilities, validateFileSelection } from '../general-workspace.mjs'
 import { curvesFor, escapeHTML, fileView, finding, formatBound, formatRate, fromTexts, nextFinding, nextTable, readableReport, readingTable, summarize } from './results.mjs'
 
@@ -41,6 +42,7 @@ let shown = { tried: false, touched: {} }, nextShown = { tried: false, touched: 
 let mode = null                  // 'concentration' | 'currents' | 'general' | null
 let sources = []                 // [{ asset, tables, name? }] files in this study, read by the intake
 let question = ''
+let paperAsset = null
 const setMode = next => { mode = next }
 const comparisonAvailable = () => capabilities ? capabilities.model_comparison?.available === true : null
 const cmp = createComparison({
@@ -149,6 +151,7 @@ function checkBlocker() {
 }
 
 async function reopen() {
+  paperAsset = null
   if (study.kind === 'general' && study.analysisId) {
     try {
       const { assets, asked } = await gen.reopen(study.analysisId, study.assetIds ?? [])
@@ -175,6 +178,10 @@ async function reopen() {
   if (!study.sessionId) return
   try {
     snapshot = await api.json(`/research-sessions/${encodeURIComponent(study.sessionId)}`)
+    if (study.paperAssetId) {
+      const retained = await api.json(`/research-assets/${encodeURIComponent(study.paperAssetId)}`)
+      paperAsset = recognizedPaper([retained])
+    }
     draftFromSnapshot(snapshot)
     setMode('concentration'); connectionLabel()
     if (snapshot.reports.length) await loadResults()
@@ -250,6 +257,7 @@ async function addFiles(list) {
 
 // Back to the files, with nothing chosen yet.
 function showOverview() {
+  paperAsset = null
   mode = null; draft = blankDraft(); cmp.reset(); gen.reset(); snapshot = null; results = null; study = {}; writeStore()
   $('study-name').textContent = sources.length === 1 ? stem(sources[0].asset?.filename ?? sources[0].name) : sources.length ? `${sources.length} files` : ''
   location.hash = 'data'; route()
@@ -257,6 +265,7 @@ function showOverview() {
 
 // A check that starts from one table: from a file, or from the assistant's copy of one.
 function startCheck(kind, tables, index, asset) {
+  paperAsset = null
   const base = { kind: 'file', name: stem(asset?.filename ?? 'table'), asset: asset ?? null }
   setMode(kind)
   $('study-name').textContent = base.name
@@ -291,10 +300,21 @@ function applyTable() {
 }
 
 function useSample() {
+  paperAsset = null
   draft = { ...blankDraft(), kind: 'sample', name: SAMPLE.name, low: SAMPLE.low, high: SAMPLE.high, origin: SAMPLE.origin,
     timeOrigin: SAMPLE.timeOrigin, source: SAMPLE.source, rows: SAMPLE.rows.map(([time, v, allowance]) => ({ time, value: v, allowance, included: true, note: 'Sample reading, made up' })) }
   next = { ...SAMPLE.next }
   $('study-name').textContent = draft.name
+  showEditor()
+}
+
+function usePaperStudy() {
+  const matched = recognizedPaper(sources.filter(s=>s.asset).map(s=>s.asset))
+  if (!matched) return
+  draft = { ...blankDraft(), ...paperDraft(matched) }
+  paperAsset = matched
+  setMode('concentration')
+  $('study-name').textContent = 'Dr. Verity — Proposition 3.1'
   showEditor()
 }
 
@@ -405,7 +425,7 @@ async function prepare() {
     const created = await api.json(`/workspaces/${encodeURIComponent(workspace)}/research-sessions`, {
       objective: `Do these readings keep ke between ${draft.low} and ${draft.high} per hour?`, problem_id: problem.id,
       expected_problem_digest: problem.digest, source_ids: draft.asset ? [draft.asset.id] : [], mode: 'controlled', design_constraints: null })
-    study = { sessionId: created.id }; writeStore()
+    study = { sessionId: created.id, ...(paperAsset ? { paperAssetId: paperAsset.id } : {}) }; writeStore()
     await api.json(`/research-sessions/${encodeURIComponent(created.id)}/advance`, { expected_revision: created.revision })
     const s = await waitWhile(s => ['queued', 'running'].includes(s.state), 'prepare-status', false)
     if (s.state === 'waiting_review' && s.pending_review?.kind === 'plan') { status('prepare-status', ''); location.hash = 'check' }
@@ -453,7 +473,9 @@ async function loadResults() {
     texts[entry.anchor_filename] = read((await api.download(`/artifacts/${id}/anchor?download=true`)).bytes)
   }
   const data = fromTexts(texts)
-  results = { data, m: summarize(data) }
+  const m = summarize(data)
+  m.paperReview = paperFinding(data, m, paperAsset)
+  results = { data, m }
 }
 
 async function prepareNext() {
@@ -572,6 +594,9 @@ function renderOverview() {
     return `<li${off ? ' class="off"' : ''}><div><h3>${CHECKS[kind].title}</h3><p>${escapeHTML(off ?? `${CHECKS[kind].how}, from ${f.table.rows.length} rows in ${s.asset?.filename ?? s.name}${f.table.page ? `, page ${f.table.page}` : ''}.${header}`)}</p></div>
       <button type="button" class="primary" data-action="setup" data-kind="${kind}" data-source="${s.index}" data-table="${f.t}"${off ? ' disabled' : ''}>${CHECKS[kind].button}</button></li>`
   })
+  if (recognizedPaper(sources.filter(s=>s.asset).map(s=>s.asset))) {
+    items.unshift(`<li><div><h3>Test the paper’s numerical lemma</h3><p>Proposition 3.1, page 3. Review five synthetic readings and the claimed rate interval, then run the ordinary Counterdex investigation. Prepared inputs; the result is computed fresh.</p></div><button type="button" class="primary" data-action="paper-check"${checkOff.concentration ? ' disabled' : ''}>Check the proof’s premise</button></li>`)
+  }
   const reader = gen.limits().analysisMode === 'controlled' ? 'The local test responder' : 'Gemini'
   items.push(`<li${aiBlock ? ' class="off"' : ''}><div><h3>Ask the assistant</h3><p>${escapeHTML(aiBlock ?? `${reader} reads ${sources.filter(s => s.asset).length === 1 ? 'the file' : 'all the files'} and answers your question with quotes from them. The answer is not checked.`)}</p></div>
     <button type="button" class="${checks.length ? 'secondary' : 'primary'}" data-action="ask"${aiBlock ? ' disabled' : ''}>Ask the assistant</button></li>`)
@@ -588,7 +613,8 @@ function renderData() {
   if (document.activeElement !== $('allowance-source')) $('allowance-source').value = draft.source
   document.querySelectorAll('[name="origin"]').forEach(input => { input.checked = input.value === draft.origin })
   document.querySelectorAll('[data-limit]').forEach(input => { if (document.activeElement !== input) input.value = draft.limits[input.dataset.limit] })
-  const where = draft.kind === 'sample' ? 'Sample readings, made up for trying Dr. Bean. Change any value.'
+  const where = draft.kind === 'paper' ? `Prepared transcription from ${escapeHTML(draft.asset.filename)}, page 3. Review the five synthetic readings, hard allowances, and claim against the paper before continuing.`
+    : draft.kind === 'sample' ? 'Sample readings, made up for trying Dr. Bean. Change any value.'
     : draft.kind === 'file' && draft.tables[draft.table]?.fromAssistant ? `From ${escapeHTML(draft.tables[draft.table].file)}${draft.tables[draft.table].page ? `, page ${draft.tables[draft.table].page}` : ''}. The assistant copied these values: check every one against the file.`
     : draft.kind === 'file' ? `From ${escapeHTML(draft.asset?.filename || draft.name)}. The original file is saved with your study. Check every value against it.`
     : draft.kind === 'saved' ? 'The readings and claim saved with this study. Changing them starts a new check.'
@@ -672,6 +698,26 @@ function renderResult(v) {
   $('result-title').innerHTML = f.headline
   $('result-lead').innerHTML = f.lead
   $('result-limit').innerHTML = f.limit
+  $('pk-result').classList.toggle('paper-result', Boolean(m.paperReview))
+  let paperPanel = $('paper-study-review')
+  if (m.paperReview) {
+    if (!document.getElementById('paper-study-style')) {
+      const style=document.createElement('style');style.id='paper-study-style';style.textContent=PAPER_CSS;document.head.append(style)
+    }
+    if (!paperPanel) {
+      paperPanel=document.createElement('section');paperPanel.id='paper-study-review';paperPanel.className='paper-study-review'
+      $('result-lead').after(paperPanel)
+    }
+    const proof=m.paperReview, outside=m.candidates.find(c=>c.id===proof.witness_id)
+    paperPanel.hidden=false
+    $('result-title').textContent=proof.title
+    $('result-lead').textContent='The paper’s argument requires Proposition 3.1. A freshly checked counterexample violates that numerical premise.'
+    paperPanel.innerHTML=`<p class="paper-review-kicker">Page 3 · Proposition 3.1 · checked by Counterdex</p><div class="paper-review-steps">
+      <div><span class="paper-step">01 · What the paper requires</span><h2>Every fitting curve stays in the interval.</h2><div class="paper-review-number">${sym.claim('0.10','0.17')}</div><p>All five readings must be respected within ±0.50 mg/L.</p></div>
+      <div><span class="paper-step">02 · What the checker found</span><h2>A fitting curve outside it.</h2><div class="paper-review-number">${sym.ke} = ${formatRate(outside.params.ke)} h⁻¹</div><p>Exact value ${sym.exact(outside.exact.ke)}. Every included hard bound passed; the native evidence replayed.</p></div>
+      <div><span class="paper-step">03 · Why the argument fails</span><h2>Its necessary premise is false.</h2><p>The paper requires this interval for its transfer step. One admissible assignment outside the interval refutes that universal numerical claim.</p></div></div>
+      <p class="paper-review-scope">${escapeHTML(proof.scope)}</p>`
+  } else if (paperPanel) paperPanel.hidden=true
   if (v === 'result') $('result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Your readings with their allowances and the curves that fit them', ...size('result-chart') })
   $('candidates').innerHTML = m.candidates.map(c => `<tr class="${c.tone}"><th scope="row"><span class="swatch" aria-hidden="true"></span>${c.outside ? 'Outside the claim' : 'Inside the claim'}</th>
     <td>${formatRate(c.params.ke)}<div class="exact">${sym.exact(c.exact.ke)}</div></td><td>${formatRate(c.params.ka)}<div class="exact">${sym.exact(c.exact.ka)}</div></td>
@@ -779,6 +825,7 @@ document.addEventListener('click', event => {
   if (!target) return
   if (target.dataset.step && target.getAttribute('aria-disabled') === 'true') { event.preventDefault(); return }
   const action = target.dataset.action
+  if (action === 'paper-check') { usePaperStudy(); return }
   if (action === 'sample-concentration') { sources = []; setMode('concentration'); useSample() }
   else if (action === 'sample-currents') { sources = []; setMode('currents'); $('study-name').textContent = 'Sample currents'; cmp.sample() }
   else if (action === 'setup') { const s = sources[Number(target.dataset.source)]; startCheck(target.dataset.kind, s.tables, Number(target.dataset.table), s.asset) }

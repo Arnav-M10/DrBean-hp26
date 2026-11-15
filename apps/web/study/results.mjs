@@ -85,7 +85,7 @@ export function summarize(data) {
     ...reading,
     curves: candidates.map(c => {
       const row = rowsByCandidate.get(c.id)?.get(reading.id)
-      return row ? { tone: c.tone, low: toNumber(row.lower), high: toNumber(row.upper), within: row.status === 'compatible' } : { tone: c.tone, missing: true }
+      return row ? { candidateId: c.id, tone: c.tone, low: toNumber(row.lower), high: toNumber(row.upper), within: row.status === 'compatible' } : { candidateId: c.id, tone: c.tone, missing: true }
     }),
   }))
   const suggestion = body.evidence.find(item => item.kind === 'suggestion')?.body
@@ -123,7 +123,7 @@ export function summarize(data) {
     title: dataset.experiment_id, objective: body.objective, created: data.report.created_at, origin: dataset.origin,
     timeOrigin: dataset.time_origin, allowanceSource: dataset.change_reason, readings, included, claim, domain, candidates,
     readingChecks, next, files,
-    outcome: result.scientific_outcome, verification: result.verification, replay: result.replay, binding: result.expected_binding,
+    outcome: result.scientific_outcome, verification: result.verification, replayStatus: result.replay, binding: result.expected_binding,
     search: { attempted: result.baseline_search?.attempted_count ?? 0, feasible: result.baseline_search?.feasible_count ?? 0,
       kept: result.baseline_search?.retained_count ?? 0, partial: result.baseline_search?.partial === true },
     checker: { version: checker?.adapter_version, python: checker?.python, rule: checkProof?.science.report?.checked?.proof_rule },
@@ -266,6 +266,7 @@ thead th{color:var(--text2);font-weight:500}.mono{font-family:ui-monospace,Menlo
 </style></head><body><main>
 <p class="quiet">Dr. Bean report, saved ${escapeHTML(when(m.created))}. Made from the files listed at the end.</p>
 <h1>${f.headline}</h1><p>${f.lead}</p><p class="quiet">${f.limit}</p>
+${m.paperReview ? `<h2>${escapeHTML(m.paperReview.title)}</h2><p>${escapeHTML(m.paperReview.document)}, page ${m.paperReview.page}, ${escapeHTML(m.paperReview.proposition)}.</p><p>${escapeHTML(m.paperReview.summary)}</p><p>${escapeHTML(m.paperReview.scope)}</p><p class="quiet">${escapeHTML(m.paperReview.method)}</p><p class="mono">Document SHA-256 ${escapeHTML(m.paperReview.document_sha256)}</p>` : ''}
 ${chart}<div class="key"><span>Curve inside the claim</span><span class="o">Curve outside the claim</span></div>
 <h2>Question</h2><p>${escapeHTML(m.objective)}</p>
 <h2>Readings</h2><p class="quiet">${escapeHTML(m.timeOrigin)}. Allowances: ${escapeHTML(m.allowanceSource)}.</p>
