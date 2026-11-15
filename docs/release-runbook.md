@@ -1,6 +1,8 @@
 # Release runbook
 
-Run these commands from the repository root. Executed qualification belongs to the commit and environment named in retained release evidence; the commands alone are not a passing gate. AI stays in placeholder mode, with zero model-provider calls.
+Run these commands from the repository root. Executed qualification belongs to the commit and environment named in retained release evidence; the commands alone are not a passing gate. The offline checks use isolated state and make zero model-provider calls. Ordinary application startup can separately admit an explicit Gemini configuration.
+
+The [macOS strict offline record at `c4d1ad6`](release-evidence/offline-c4d1ad6-macos.json) passed G0–G4. It supersedes older missing-G4 reports, but does not qualify later source or live Gemini. The [retained live coordinator attempt at `17c7f7a`](../evaluation/results/sprint/live-final-17c7f7a/qualification.json) failed before scientific dispatch. See the [current workflow distinctions](../README.md#execution-and-evidence).
 
 ## Tested versions
 
@@ -99,8 +101,8 @@ the check results. Focused local browser checks also accept `PLAYWRIGHT_MODULE`
 and `CHROMIUM_PATH`, but an independently selected Playwright version does not
 qualify the locked clean-checkout environment. The clean check clears that module
 override and uses its own pinned installation. Source-review and follow-up
-browser controls remain explicit unrun G4 requirements; strict mode keeps failing
-until their real acceptance checks exist.
+browser controls are G4 requirements. They passed in the retained `c4d1ad6`
+record; a new release candidate must supply its own applicable evidence.
 
 ```sh
 python3 scripts/release/stack_smoke.py --require-science
@@ -128,25 +130,28 @@ The packet and expected anchors must come from the same approved run. Fresh repl
 
 ## AI mode
 
-Placeholder. The launcher, stack smoke, browser check, clean checkout and CI all remove provider and tracing variables from child processes and set `BEAN_AI_MODE=placeholder`. Doctor shows **Gemini live: disabled, not tested**, and raises an alert if a running API ever reports a configured provider.
+The stack smoke, clean-checkout checks and CI use provider-free configurations. The ordinary launcher strips inherited provider credentials, but can admit an owner-only `var/gemini.local.json` opt-in to the API and worker. Doctor reports observed configuration and readiness; it does not establish live qualification.
 
-Deferred until the user gives a new explicit instruction, and not to be run now: opening a provider cohort (`evaluation/cli.py budget open`), any live intake or agent lane, any account or key validation, and any Gemini-driven design invocation. The chosen design path is deterministic and separately approved. When live testing is authorized, issues I-004 and I-012 must be closed first.
+Gemini file analysis and the separate live coordinator have different consent and dispatch paths. The main study UI creates controlled coordinator sessions even when file analysis uses Gemini. See [configuration instructions](getting-started.md#configure-gemini) before selecting a live research server mode. Live qualification requires a separately authorized, metered run against named source; do not infer it from offline tests or reset an accounting ledger to obtain capacity. The legacy `evaluation/cli.py budget open` command still refuses live cohorts.
 
 ## CI
 
 `.github/workflows/ci.yml`: backend tests, lint and schema drift; engine tests and native replay on CPython 3.11; web unit tests; harness self-checks and secret scan; the provider-free stack smoke; Owner 5's suite when present. No model secrets. A green run is not a release qualification and not a live qualification.
 
-## Not attempted
+## Scope and remaining limits
 
 | Item | Status |
 |---|---|
-| Live Gemini of any kind | not run, disabled |
-| Target Mac qualification | not run |
-| Hosted deployment (Vultr or other) | not attempted; loopback only |
-| PDF intake, Tiger Data, MongoDB, Solana, Photon, AWS | omitted |
+| Live Gemini | Implemented with explicit opt-in. Retained coordinator runs include failures; no complete live release qualification is established by the offline gates. |
+| Target Mac qualification | Earlier named commits passed offline qualification. Rehearse the exact presentation revision and configuration separately. |
+| Hosted deployment | Vercel landing page and same-domain proxy to a development host; API/worker remain on that host. See [deployment](../deploy/landing/README.md). |
+| PDF intake | Implemented in general research; text extraction or selected scanned pages feed interpretation, not arbitrary proof certification. |
+| Other sponsor services | This runbook establishes no deployment or qualification claim for Tiger Data, MongoDB, Solana, Photon, AWS or Vultr. |
 | Browser replay | unsupported |
 
-## Final six hours (from Sunday 02:00 Eastern)
+## Historical final-six-hours rehearsal plan
+
+The following was the original submission freeze plan, not a current ban on implementation work.
 
 No new features or integrations. Fix only launch failures, incorrect scientific claims, approval or binding defects, blocked user steps and submission issues. Rehearse on the presentation device with model APIs unreachable. Keep a saved real-science fallback, labelled as saved, plus the recovery commands above. Tag the last commit whose clean-checkout run passed.
 
@@ -161,4 +166,4 @@ DRBEAN_RELEASE_EVIDENCE_DIR=/absolute/path/to/release-evidence \
 
 The command installs locked dependencies in a fresh clone, runs the offline gates with isolated state, and copies a timestamped report for the exact tested commit before cleanup, including on gate failure. Existing historical reports are not rewritten. Inspect `offline_release_ready`, individual checks, platform facts and tested commit together. A source fixture is controlled intake output; the science and replay checks execute the actual engine. The release verdict does not qualify live Gemini or substitute for a human consultation, observed task, or presentation rehearsal.
 
-The source-example option configures only the packaged trusted local manifest. The web action uses the ordinary intake route; unsupported images offer manual entry. Omit the flag to keep source proposals disabled. No hosted provider is enabled.
+The source-example option configures only the packaged trusted local manifest. The web action uses the ordinary intake route; unsupported images offer manual entry. Omit the flag to keep source proposals disabled. This option alone does not enable a hosted provider; the separate local Gemini opt-in can.

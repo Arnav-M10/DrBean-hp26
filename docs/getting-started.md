@@ -2,7 +2,7 @@
 
 ## Install and start
 
-Install [uv](https://docs.astral.sh/uv/) and Node.js 20 or newer, then run:
+On macOS or Linux, make sure `python3` is available and install [uv](https://docs.astral.sh/uv/) and Node.js 20 or newer, then run:
 
 ```bash
 git clone https://github.com/Arnav-M10/DrBean-hp26.git
@@ -27,7 +27,11 @@ The browser establishes private workspace access automatically. Reloads reuse th
 
 The connected views require the ordinary application server. Serving `workspace-preview` with `python -m http.server` provides only its labelled static/draft mode.
 
+The hosted prototype has a separate entry point, `https://drbean.study/study/app`. Its Vercel landing page proxies a running development host, whose frontend can differ from a fresh clone. It is not a full backend deployment on Vercel. See [deployment details](../deploy/landing/README.md).
+
 ## First study
+
+The Data entry opens an empty draft. Use **Resume previous study** to reopen retained work, or **New study** to start over without deleting server evidence.
 
 1. Write a question and upload supported files, paste a table, or choose a built-in example.
 2. Review the available analysis path. File interpretation, exact model checks, and numerical comparison are distinct operations.
@@ -73,13 +77,15 @@ Uploading a file alone does not send it to a provider. General analysis first sh
 
 ### Live research coordination
 
-File analysis and autonomous research coordination are separate capabilities. The research runner defaults to `controlled`. With a valid live configuration, select live coordination when starting the server:
+File analysis and autonomous research coordination are separate capabilities. The research runner defaults to `controlled`, and the main `/study/` UI explicitly requests that mode. Keep it controlled for the normal study workflow, even when enabling live Gemini file analysis.
+
+The separate live-coordination API and classic interface use this server setting with a valid live configuration:
 
 ```bash
 BEAN_RESEARCH_MODE=live scripts/dev/start.sh
 ```
 
-A live research session additionally needs consent bound to its context and an operator allocation. Consent does not create or refill an allocation. The UI and capabilities endpoint expose readiness and remaining capacity; configuration alone is not evidence that live qualification has passed. See the [research-session integration contract](integration/DEEPAGENTS_COMPLETION_UI.md) for the operator-facing boundaries.
+This setting does not switch the main study UI to live coordination; that UI's controlled requests will be rejected by a live-mode server. A live session additionally needs consent bound to its context and an operator allocation. Consent does not create or refill an allocation. The classic interface and capabilities endpoint expose readiness and capacity, not proof of successful live qualification. The [retained attempt at `17c7f7a`](../evaluation/results/sprint/live-final-17c7f7a/qualification.json) failed before scientific dispatch. See the [research-session integration contract](integration/DEEPAGENTS_COMPLETION_UI.md) for the operator-facing boundaries.
 
 The shared request ledger reserves capacity before dispatch. Failed or uncertain requests retain their reservations; requests are not automatically retried or moved to another model. The free-tier flag records the operator's declaration and does not query Google's billing state. If zero spend is required, use a Google project without billing enabled and confirm current model eligibility in that account.
 
@@ -142,7 +148,7 @@ uv run pytest -q tests --ignore=tests/integration
 uv run ruff check apps tests scripts
 .venv-engine/bin/python -m unittest discover -s packages/groundwork_adapter/tests
 .venv-engine/bin/python -m unittest discover -s packages/counterdex_models/tests
-node --test apps/web/*.test.mjs
+node --test apps/web/*.test.mjs apps/web/study/*.test.mjs
 node --test workspace-preview/tests/*.test.mjs
 ```
 

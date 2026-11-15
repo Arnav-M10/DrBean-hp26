@@ -71,6 +71,8 @@ test('the saved real run reads back exactly (fixtures made by the working app)',
   const texts = Object.fromEntries(names.map(name => [name, readFileSync(new URL(name, dir), 'utf8')]))
   const m = summarize(fromTexts(texts))
   assert.equal(m.outcome, 'certified_counterexample')
+  assert.equal(m.replayStatus, 'passed')
+  assert.ok(Array.isArray(m.replay), 'replay commands remain separate from replay status')
   assert.equal(m.included.length, 5)
   assert.deepEqual(m.candidates.map(c => c.outside), [false, true])
   assert.ok(m.readingChecks.every(r => r.curves.every(c => c.within)))

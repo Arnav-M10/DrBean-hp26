@@ -1,13 +1,15 @@
 # Study page
 
-A second browser front end for the same local app, served by `apps/web/serve.mjs`: a front page at
+The main study front end for the local app, served by `apps/web/serve.mjs`: a front page at
 `/study/` and the study itself at `/study/app`. The page at `/` is unchanged. Start the app as usual
 (`scripts/dev/launcher.py start`), then open `http://127.0.0.1:4173/study/` (or whatever web port the
 launcher prints). Links to a study step, such as `/study/#data`, open the study directly.
 
-The study uses the real API through the local proxy: the private browser session, research assets,
-the general research service, datasets, problems, research sessions with their review gates, the
-numerical model comparison service and the signed downloads. Nothing in the study is mocked.
+It uses the real API through the local proxy: the private browser session, research assets, the
+general research service, datasets, problems, research sessions with their review gates, the
+numerical model comparison service and authenticated downloads. Its scientific coordinator uses
+the controlled offline policy through the actual Deep Agents graph; it is not a live Gemini
+coordinator. General file analysis can separately use live Gemini or a labelled local test responder.
 
 ## Front page
 
@@ -18,7 +20,8 @@ from your files to the report, and sends one dot of data through them the first 
 Reduced motion shows the finished picture with no movement. `home.mjs` draws both; the values come
 from `home-data.mjs`, a copy of the run in `fixtures/` that `study.test.mjs` checks against those
 files. The front page sends nothing to the server and opens no workspace; its buttons lead to
-`/study/app`, which reopens a study saved in the browser. `logos/` holds the Gemini and LangChain
+`/study/app`, which starts an empty draft and offers **Resume previous study** when this browser saved one.
+`logos/` holds the Gemini and LangChain
 marks (CC0, see `logos/SOURCE.txt`).
 
 ## One flow for any files
@@ -30,8 +33,8 @@ marks (CC0, see `logos/SOURCE.txt`).
 
    | Offered when | Path | Answer |
    | --- | --- | --- |
-   | Always (needs a question) | The assistant: the general research service sends the files and question to Gemini, or to its local test responder | A summary, claims with exact quotes the server compares against the files, copied tables and next steps. Never shown as checked. |
-   | A table has time and concentration columns | Exact check: the research agent plans one check and Counterdex proves it | Whether the readings settle a claimed elimination rate, and which reading would |
+   | Always (needs a question) | The assistant: the general research service sends selected material and the question to Gemini, or to its local test responder | AI summary, source references, unreviewed copied tables and next steps. Quote occurrence is checked where retained text exists; occurrence does not establish interpretation. |
+   | A table has time and concentration columns | Exact check: the controlled research coordinator proposes an operation and Counterdex checks discovered fixed vectors | A compatible outside witness when found, or an inconclusive outcome; optional next-measurement design compares a selected pair. |
    | A table has angle and current columns | Numerical comparison: the model comparison service fits an isotropic and a bi-Maxwellian distribution | Which fits pass the χ²ν limit, and which next setting separates them at each noise level |
 
    A table with unnamed columns can still be sent to a check by hand ("Use a table for a check
@@ -43,18 +46,22 @@ marks (CC0, see `logos/SOURCE.txt`).
 4. **Next step.** The assistant's suggestions and the checks its files allow, the next
    measurement for a check, or the best setting at each noise level for a comparison.
 
-The study id is kept in `localStorage`, so a reload reopens it.
+The last saved study id is kept in `localStorage`. A fresh visit to `/study/app` or
+`#data` opens an empty draft; **Resume previous study** explicitly reopens saved work.
+Review, answer and next-step links still restore their saved study on reload.
+**New study** clears the current draft without deleting the saved server evidence.
 
 ## Limits
 
 - The assistant answers in any field, but only when the server owner has enabled Gemini (or the
   test responder, `BEAN_GENERAL_ANALYSIS_MODE=controlled_demo`, which restates files and never
   calls a provider). Its answers are AI readings, not checks.
-- Checked answers exist for two models so far: the two-rate concentration curve (claim on the
-  elimination rate, exact) and the isotropic versus bi-Maxwellian electron comparison (numerical,
-  made-up currents only, per the service contract).
+- The exact path supports the two-rate concentration curve and an elimination-rate claim.
+  The separate isotropic versus bi-Maxwellian electron comparison is numerical and uses
+  synthetic currents only, per the service contract; it is not an exact certificate.
 - Excel files are not read. Save them as CSV.
-- Live model runs were not part of testing.
+- The UI's controlled tests do not qualify live Gemini. Separate retained live coordinator
+  attempts and their failures are summarized in the [root README](../../../README.md#execution-and-evidence).
 - Browsers share cookies across ports, so two copies of the app on 127.0.0.1 (say ports 4173 and
   28170) clear each other's private session. Open the second copy in a private window. One copy
   serving both `/` and `/study/` shares a single session and has no such problem.

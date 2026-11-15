@@ -1,11 +1,13 @@
 import { readFile, open } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { createServer, request as upstreamRequest } from 'node:http'
-import { resolve } from 'node:path'
+import { timingSafeEqual } from 'node:crypto'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const SESSION_COOKIE = '__Host-bean_session'
 const TOKEN = /^[A-Za-z0-9_-]{43}$/
+const PROXY_HEADER = 'x-bean-vercel-proxy'
 const CLEAR_COOKIE = `${SESSION_COOKIE}=""; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Strict`
 const SAFE_HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' }
@@ -25,6 +27,25 @@ async function gatewaySecret(file) {
     const record = JSON.parse(await handle.readFile('utf8'))
     if (record.version !== 1 || !TOKEN.test(record.secret) || Object.keys(record).sort().join(',') !== 'secret,version') throw new Error('Invalid gateway credential file.')
     return record.secret
+  } finally { await handle.close() }
+}
+
+// This is a separate hop credential, never the API's gateway or provider key.
+// Read on each proxied request so a private, atomic config replacement rotates
+// the credential without restarting the scientific API or changing its origin.
+async function proxyConfig(file) {
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+  try {
+    const info = await handle.stat()
+    if (!info.isFile() || info.uid !== process.getuid() || (info.mode & 0o777) !== 0o600 || info.size > 1024) throw new Error('Invalid proxy configuration.')
+    const record = JSON.parse(await handle.readFile('utf8'))
+    if (Object.keys(record).sort().join(',') !== 'origin,secret,version' || record.version !== 1
+      || typeof record.secret !== 'string' || !TOKEN.test(record.secret)
+      || typeof record.origin !== 'string'
+      || !/^https:\/\/(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$/.test(record.origin)) throw new Error('Invalid proxy configuration.')
+    const origin = new URL(record.origin)
+    if (origin.origin !== record.origin || origin.hostname.endsWith('.localhost')) throw new Error('Invalid proxy configuration.')
+    return { origin, secret: record.secret }
   } finally { await handle.close() }
 }
 
@@ -65,7 +86,7 @@ function repeatedHeader(request, names) {
   return [...counts.values()].some(count => count > 1)
 }
 
-export function createShareGateway({ originFile, gatewayFile, webPort = 4173, apiPort = 8000 }) {
+export function createShareGateway({ originFile, gatewayFile, proxyFile = join(dirname(originFile), 'vercel-proxy.json'), webPort = 4173, apiPort = 8000 }) {
   for (const port of [webPort, apiPort]) if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid loopback upstream port.')
   return createServer(async (request, response) => {
     let origin
@@ -77,6 +98,26 @@ export function createShareGateway({ originFile, gatewayFile, webPort = 4173, ap
       response.writeHead(503, SAFE_HEADERS).end('Shared link is not ready.')
       return
     }
+    // A Vercel alias is admitted only with a separate server-injected proof and
+    // exact configured browser host. An attempted alias never falls back to the
+    // ordinary tunnel path, including when its private config is unavailable.
+    let browserOrigin = origin, viaProxy = false
+    if (request.headers[PROXY_HEADER] !== undefined) {
+      let config
+      try { config = await proxyConfig(proxyFile) } catch {
+        response.writeHead(503, SAFE_HEADERS).end('Public proxy is not ready.')
+        return
+      }
+      const supplied = request.headers[PROXY_HEADER]
+      if (typeof supplied !== 'string' || !TOKEN.test(supplied)
+        || !timingSafeEqual(Buffer.from(supplied), Buffer.from(config.secret))
+        || request.headers['x-forwarded-host'] !== config.origin.host) {
+        response.writeHead(403, SAFE_HEADERS).end()
+        return
+      }
+      browserOrigin = config.origin
+      viaProxy = true
+    }
     // Cloudflare terminates HTTPS; only the exact operator-approved boundary is
     // accepted. No request can choose an upstream or supply its trusted headers.
     const site = request.headers['sec-fetch-site']
@@ -87,11 +128,12 @@ export function createShareGateway({ originFile, gatewayFile, webPort = 4173, ap
       && ['/', '/index.html', '/workspace-preview/', '/workspace-preview/index.html', '/study', '/study/', '/study/index.html', '/study/app', '/study/app.html'].includes(request.url?.split('?')[0])
       && request.headers['sec-fetch-mode'] === 'navigate' && request.headers['sec-fetch-dest'] === 'document'
     if (request.headers.host !== origin.host || request.headers['x-forwarded-proto'] !== 'https'
-      || (request.headers['x-forwarded-host'] && request.headers['x-forwarded-host'] !== origin.host)
-      || (request.headers.origin && request.headers.origin !== origin.origin)
+      || (request.headers['x-forwarded-host'] && request.headers['x-forwarded-host'] !== browserOrigin.host)
+      || (request.headers.origin !== undefined && request.headers.origin !== browserOrigin.origin)
       || (site && !['same-origin', 'none'].includes(site) && !(entryNavigation && ['cross-site', 'same-site'].includes(site)))
-      || (request.method === 'POST' && (request.headers.origin !== origin.origin || (site && site !== 'same-origin')))
-      || repeatedHeader(request, ['host', 'origin', 'x-forwarded-proto', 'x-forwarded-host', 'sec-fetch-site'])) {
+      || (viaProxy && site && site !== 'same-origin' && !entryNavigation)
+      || (request.method === 'POST' && (request.headers.origin !== browserOrigin.origin || (site && site !== 'same-origin')))
+      || repeatedHeader(request, ['host', 'origin', 'x-forwarded-proto', 'x-forwarded-host', 'sec-fetch-site', PROXY_HEADER])) {
       response.writeHead(403, SAFE_HEADERS).end()
       return
     }
@@ -114,7 +156,9 @@ export function createShareGateway({ originFile, gatewayFile, webPort = 4173, ap
       }
       headers['x-bean-shared-origin'] = origin.origin
       if (cookie) headers.cookie = cookie
-      if (request.headers.origin) headers.origin = request.headers.origin
+      // The API retains its exact existing canonical tunnel boundary. A public
+      // browser origin is translated only after every proxy/origin check above.
+      if (request.headers.origin) headers.origin = origin.origin
       for (const name of ['content-type', 'idempotency-key', 'x-source-name']) {
         const value = request.headers[name]
         if (value !== undefined) {

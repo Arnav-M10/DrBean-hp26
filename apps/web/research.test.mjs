@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ResearchController, designConstraints, researchSnapshot } from './research.mjs'
+import { ResearchController, designConstraints, researchSnapshot, researchCapacity, researchStopMessage } from './research.mjs'
 
 const snapshot = (changes = {}) => ({ schema_version: 'DB-RESEARCH-1', id: 'research_session_test', workspace_id: 'ws_test', revision: 0,
   objective: 'Does this reviewed range survive?', mode: 'controlled', state: 'ready', children: [], reports: [], pending_review: null, pending_review_digest: null, ...changes })
@@ -132,4 +132,21 @@ test('explicit live consent freezes the exact disclosure and never advances or a
   assert.equal(mutation[0].path, `/research-sessions/${current.id}/provider-consents`)
   assert.deepEqual(mutation[0].body, { model: 'gemini-2.5-flash-lite', expected_context_digest: scope, accepted: true })
   assert.equal(c.state.pending, null)
+})
+
+
+test('live continuation respects token, accounting, action-quota and unknown-outcome projections independently of remaining calls', () => {
+  const live = {mode:'live', provider_allocation:{physical_requests:6}, usage:{physical_calls:1}, provider_usage:{accounting_valid:true,remaining:{physical_requests:5,input_tokens:100,output_tokens:100}}}
+  assert.equal(researchCapacity(live).blocked,false)
+  for (const key of ['physical_requests','input_tokens','output_tokens']) assert.equal(researchCapacity({...live,provider_usage:{...live.provider_usage,remaining:{...live.provider_usage.remaining,[key]:0}}}).blocked,true)
+  assert.equal(researchCapacity({...live,provider_usage:{...live.provider_usage,accounting_valid:false}}).blocked,true)
+  for (const interaction of [{quota_exhausted:true},{recovery:{required:true,can_reconcile:false}}]) assert.equal(researchCapacity({...live,interaction}).blocked,true)
+  assert.equal(researchCapacity({mode:'live',provider_allocation:{physical_requests:0}}).blocked,true)
+  assert.equal(researchCapacity({mode:'controlled'}).blocked,false)
+})
+test('provider stops have readable safe guidance without hiding their separate technical code', () => {
+  assert.match(researchStopMessage('provider_rate_limited'),/No automatic retry/)
+  assert.match(researchStopMessage('provider_budget_exhausted'),/existing allocation/)
+  assert.match(researchStopMessage('research_provider_allocation_exhausted'),/Consent does not grant/)
+  assert.match(researchStopMessage('unknown'),/Inspect the saved state/)
 })

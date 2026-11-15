@@ -14,6 +14,9 @@ import { $, countStatus, failure, readable, saveText, size, status } from './ui.
 import { createComparison } from './compare-app.mjs'
 import { createGeneral } from './general-app.mjs'
 import { CHECKS, overview } from './general.mjs'
+import { savedStudyId, requestsSavedStudy } from './entry.mjs'
+import { recognizedPaper, paperDraft, paperFinding, paperInputsMatch, PAPER_CSS } from './paper-study.mjs'
+import { createPaperView, paperNextHTML } from './paper-view.mjs'
 import { fileMediaHint, generalCapabilities, validateFileSelection } from '../general-workspace.mjs'
 import { curvesFor, escapeHTML, fileView, finding, formatBound, formatRate, fromTexts, nextFinding, nextTable, readableReport, readingTable, summarize } from './results.mjs'
 
@@ -28,7 +31,10 @@ const SAMPLE = {
 
 let api, workspace, capabilities
 let draft = blankDraft()
-let study = readStore()          // { sessionId } of the study on screen
+let study = {}                    // only the explicitly opened study is active
+let previousStudy = {}
+let restoreRequested = requestsSavedStudy(location.hash)
+let entryRevision = 0, restoring = false
 let snapshot = null               // latest research session from the server
 let results = null                // { data, m } once a report exists
 let next = { times: '', allowance: '', horizon: '', source: '' }
@@ -38,9 +44,12 @@ let busy = false
 let shown = { tried: false, touched: {} }, nextShown = { tried: false, touched: {} }
 
 // The path on screen: null until the person picks something to do with their files.
-let mode = null                  // 'concentration' | 'currents' | 'general' | null
+let mode = null                  // 'paper' | 'concentration' | 'currents' | 'general' | null
 let sources = []                 // [{ asset, tables, name? }] files in this study, read by the intake
 let question = ''
+let paperAsset = null
+const paperView = createPaperView($('editor'), sym)
+const chartContext = () => mode === 'paper' ? { xLabel:'Calibration time (h)', yLabel:'Calibration response (mg/L)' } : {}
 const setMode = next => { mode = next }
 const comparisonAvailable = () => capabilities ? capabilities.model_comparison?.available === true : null
 const cmp = createComparison({
@@ -58,15 +67,39 @@ const gen = createGeneral({
 
 function blankDraft() {
   return { kind: null, name: '', asset: null, tables: [], table: 0, columns: null, allowanceForAll: '', rows: [],
-    low: '', high: '', origin: '', timeOrigin: 'Time of dose', source: '', limits: { ...LIMITS } }
+    low: '', high: '', origin: '', timeOrigin: 'Elapsed time from the study initial state', source: '', limits: { ...LIMITS } }
 }
 function readStore() { try { return JSON.parse(localStorage.getItem(STORE) || '{}')[workspace] ?? {} } catch { return {} } }
 function writeStore() {
+  if (!savedStudyId(study)) return // starting over does not erase the saved result
   try {
     const all = JSON.parse(localStorage.getItem(STORE) || '{}')
     all[workspace] = study
     localStorage.setItem(STORE, JSON.stringify(all))
+    previousStudy = study
   } catch { /* the study stays on the server; only reopening after a reload needs storage */ }
+}
+
+function forgetStudy(entry) {
+  if (savedStudyId(readStore()) !== savedStudyId(entry)) return
+  try {
+    const all = JSON.parse(localStorage.getItem(STORE) || '{}')
+    delete all[workspace]
+    localStorage.setItem(STORE, JSON.stringify(all))
+  } catch { /* unavailable storage does not prevent a new study */ }
+  previousStudy = {}; study = {}
+}
+
+async function resumePrevious() {
+  if (connecting || restoring || !savedStudyId(previousStudy)) return
+  const revision = ++entryRevision
+  study = previousStudy; restoring = true; route()
+  try { await reopen(revision, true) }
+  finally { if (revision === entryRevision) { restoring = false; route() } }
+}
+
+function cancelRestore() {
+  entryRevision++; restoreRequested = false; restoring = false
 }
 
 // Numbers are kept exactly as typed, then made exact fractions for the server.
@@ -108,6 +141,7 @@ function connectionFailure(error) {
 let connecting = false
 async function connect(startNew = false) {
   if (connecting) return
+  const revision = entryRevision
   connecting = true
   setConnection('Connecting…')
   $('connection-problem').hidden = true
@@ -115,16 +149,22 @@ async function connect(startNew = false) {
     const opened = await bootstrapSharedSession(undefined, { startNew })
     // A different workspace shares nothing with the old one, so its study starts empty.
     if (workspace && workspace !== opened.session.workspace_id) {
+      study = {}
       draft = blankDraft(); snapshot = null; results = null; cmp.reset(); gen.reset(); sources = []; question = ''; mode = null
       $('study-name').textContent = ''; location.hash = 'data'
     }
     api = opened.api; workspace = opened.session.workspace_id
     api.setConnectionFailureHandler(error => { if (api === opened.api && !connecting) connectionFailure(error) })
     startStatus('')
-    study = readStore()
+    previousStudy = readStore()
     capabilities = await readConnection(api, '/capabilities')
     connectionLabel()
-    await reopen()
+    if (revision === entryRevision && restoreRequested) {
+      study = previousStudy
+      restoring = true
+      await reopen(revision)
+      if (revision === entryRevision) restoring = false
+    }
     route()
   } catch (error) {
     connectionFailure(error)
@@ -148,40 +188,62 @@ function checkBlocker() {
   return null
 }
 
-async function reopen() {
+async function reopen(revision, chooseStep = false) {
+  const entry = study, sourceApi = api, sourceWorkspace = workspace
+  const current = () => revision === entryRevision && api === sourceApi && workspace === sourceWorkspace
+  paperAsset = null
   if (study.kind === 'general' && study.analysisId) {
     try {
-      const { assets, asked } = await gen.reopen(study.analysisId, study.assetIds ?? [])
-      sources = await Promise.all(assets.map(async asset => ({ asset, tables: await readTables(asset) })))
+      const restored = await gen.reopen(entry.analysisId, entry.assetIds ?? [], current)
+      if (!current() || !restored) return
+      const { assets, asked } = restored
+      const restoredSources = await Promise.all(assets.map(async asset => ({ asset, tables: await readTables(asset) })))
+      if (!current()) return
+      sources = restoredSources
       question = asked; setMode('general')
       $('study-name').textContent = sources.length === 1 ? stem(sources[0].asset.filename) : `${sources.length} files`
-      if (!location.hash) location.replace('#result')
+      if (chooseStep || !location.hash) location.replace('#result')
     } catch (error) {
-      if (error.status === 404) { study = {}; writeStore() }
+      if (current() && error.status === 404) forgetStudy(entry)
     }
     return
   }
   if (study.kind === 'currents' && study.comparisonId) {
     try {
-      await cmp.reopen(study.comparisonId)
+      await cmp.reopen(entry.comparisonId, current)
+      if (!current()) return
       setMode('currents'); connectionLabel()
       $('study-name').textContent = 'Electron currents'
-      if (!location.hash) location.replace('#result')
+      if (chooseStep || !location.hash) location.replace('#result')
     } catch (error) {
-      if (error.status === 404) { study = {}; writeStore() }
+      if (current() && error.status === 404) forgetStudy(entry)
     }
     return
   }
   if (!study.sessionId) return
   try {
-    snapshot = await api.json(`/research-sessions/${encodeURIComponent(study.sessionId)}`)
+    const restored = await sourceApi.json(`/research-sessions/${encodeURIComponent(entry.sessionId)}`)
+    if (!current()) return
+    let restoredPaper = null
+    if (entry.paperAssetId) {
+      const retained = await sourceApi.json(`/research-assets/${encodeURIComponent(entry.paperAssetId)}`)
+      if (!current()) return
+      restoredPaper = recognizedPaper([retained])
+    }
+    snapshot = restored; paperAsset = restoredPaper
     draftFromSnapshot(snapshot)
-    setMode('concentration'); connectionLabel()
-    if (snapshot.reports.length) await loadResults()
-    if (!location.hash) location.replace('#' + (results ? (results.m.next ? 'next' : 'result') : snapshot.pending_review?.kind === 'plan' ? 'check' : 'data'))
+    if (paperAsset) {
+      draft.asset = paperAsset
+      sources = [{asset:paperAsset,tables:[]}]
+      $('study-name').textContent = 'Dr. Verity — Proposition 3.1'
+    }
+    setMode(paperAsset ? 'paper' : 'concentration'); connectionLabel()
+    if (snapshot.reports.length) await loadResults(current)
+    if (!current()) return
+    if (chooseStep || !location.hash) location.replace('#' + (results ? (results.m.next ? 'next' : 'result') : snapshot.pending_review?.kind === 'plan' ? 'check' : 'data'))
   } catch (error) {
     // Forget the saved study only when the server says it does not exist.
-    if (error.status === 404) { study = {}; writeStore() }
+    if (current() && error.status === 404) forgetStudy(entry)
   }
 }
 
@@ -226,6 +288,7 @@ async function readTables(asset) {
 }
 
 async function addFiles(list) {
+  cancelRestore()
   const files = [...list].filter(Boolean)
   if (!files.length) return
   const where = sources.length ? 'overview-status' : null
@@ -250,6 +313,8 @@ async function addFiles(list) {
 
 // Back to the files, with nothing chosen yet.
 function showOverview() {
+  cancelRestore()
+  paperAsset = null
   mode = null; draft = blankDraft(); cmp.reset(); gen.reset(); snapshot = null; results = null; study = {}; writeStore()
   $('study-name').textContent = sources.length === 1 ? stem(sources[0].asset?.filename ?? sources[0].name) : sources.length ? `${sources.length} files` : ''
   location.hash = 'data'; route()
@@ -257,6 +322,7 @@ function showOverview() {
 
 // A check that starts from one table: from a file, or from the assistant's copy of one.
 function startCheck(kind, tables, index, asset) {
+  paperAsset = null
   const base = { kind: 'file', name: stem(asset?.filename ?? 'table'), asset: asset ?? null }
   setMode(kind)
   $('study-name').textContent = base.name
@@ -291,10 +357,21 @@ function applyTable() {
 }
 
 function useSample() {
+  paperAsset = null
   draft = { ...blankDraft(), kind: 'sample', name: SAMPLE.name, low: SAMPLE.low, high: SAMPLE.high, origin: SAMPLE.origin,
     timeOrigin: SAMPLE.timeOrigin, source: SAMPLE.source, rows: SAMPLE.rows.map(([time, v, allowance]) => ({ time, value: v, allowance, included: true, note: 'Sample reading, made up' })) }
   next = { ...SAMPLE.next }
   $('study-name').textContent = draft.name
+  showEditor()
+}
+
+function usePaperStudy() {
+  const matched = recognizedPaper(sources.filter(s=>s.asset).map(s=>s.asset))
+  if (!matched) return
+  draft = { ...blankDraft(), ...paperDraft(matched) }
+  paperAsset = matched
+  setMode('paper')
+  $('study-name').textContent = 'Dr. Verity — Proposition 3.1'
   showEditor()
 }
 
@@ -304,7 +381,8 @@ function showEditor() {
   location.hash = 'data'
   route()
   renderMapping()
-  $('claim-low').focus({ preventScroll: true })
+  if (mode === 'paper') paperView.focus()
+  else $('claim-low').focus({ preventScroll: true })
 }
 
 // --- Checks on the draft --------------------------------------------------------------------
@@ -393,7 +471,7 @@ async function prepare() {
   const issues = problems()
   if (issues.length) {
     const order = ['claim', 'about', 'rows', 'limits'], first = [...issues].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))[0]
-    shown.tried = true; renderData(); FIELDS[first[2]]()?.focus(); return
+    shown.tried = true; renderData(); if (mode === 'paper') paperView.revealInputs(); FIELDS[first[2]]()?.focus(); return
   }
   busy = true; $('prepare').disabled = true
   try {
@@ -403,9 +481,9 @@ async function prepare() {
     const problem = await api.json(`/workspaces/${encodeURIComponent(workspace)}/problems`, problemBody(dataset))
     status('prepare-status', 'Starting the study…')
     const created = await api.json(`/workspaces/${encodeURIComponent(workspace)}/research-sessions`, {
-      objective: `Do these readings keep ke between ${draft.low} and ${draft.high} per hour?`, problem_id: problem.id,
+      objective: `${mode === 'paper' ? (paperInputsMatch(draft) ? 'Test the numerical premise of Proposition 3.1 on page 3. ' : 'Test an edited numerical study based on Proposition 3.1, not the original proposition. ') : ''}Do these readings keep ke between ${draft.low} and ${draft.high} per hour?`, problem_id: problem.id,
       expected_problem_digest: problem.digest, source_ids: draft.asset ? [draft.asset.id] : [], mode: 'controlled', design_constraints: null })
-    study = { sessionId: created.id }; writeStore()
+    study = { sessionId: created.id, ...(paperAsset ? { paperAssetId: paperAsset.id } : {}) }; writeStore()
     await api.json(`/research-sessions/${encodeURIComponent(created.id)}/advance`, { expected_revision: created.revision })
     const s = await waitWhile(s => ['queued', 'running'].includes(s.state), 'prepare-status', false)
     if (s.state === 'waiting_review' && s.pending_review?.kind === 'plan') { status('prepare-status', ''); location.hash = 'check' }
@@ -421,6 +499,7 @@ async function approve(statusId, buttonId, after) {
   if (busy) return
   const s = snapshot, review = s?.pending_review
   if (!review) return
+  if (mode === 'paper' && review.kind === 'design_plan') return
   busy = true; $(buttonId).disabled = true
   try {
     status(statusId, 'Recording your approval…')
@@ -440,23 +519,30 @@ async function approve(statusId, buttonId, after) {
 }
 
 // The same files a person can download, verified byte for byte against their fingerprints.
-async function loadResults() {
+async function loadResults(current = () => true) {
+  const sourceApi = api, restoredPaper = paperAsset
   const reportId = snapshot.reports.at(-1)
   const texts = {}
   const read = bytes => new TextDecoder().decode(bytes)
-  const report = await api.download(`/reports/${encodeURIComponent(reportId)}/download`)
+  const report = await sourceApi.download(`/reports/${encodeURIComponent(reportId)}/download`)
+  if (!current()) return
   const reportText = read(report.bytes)
   texts[`dr-bean-${reportId}.json`] = reportText
   for (const entry of JSON.parse(reportText).body.native_evidence) {
     const id = encodeURIComponent(entry.artifact.id)
-    texts[entry.native_filename] = read((await api.download(`/artifacts/${id}`, { sha256: entry.artifact.sha256, byte_size: entry.artifact.byte_size })).bytes)
-    texts[entry.anchor_filename] = read((await api.download(`/artifacts/${id}/anchor?download=true`)).bytes)
+    texts[entry.native_filename] = read((await sourceApi.download(`/artifacts/${id}`, { sha256: entry.artifact.sha256, byte_size: entry.artifact.byte_size })).bytes)
+    if (!current()) return
+    texts[entry.anchor_filename] = read((await sourceApi.download(`/artifacts/${id}/anchor?download=true`)).bytes)
+    if (!current()) return
   }
   const data = fromTexts(texts)
-  results = { data, m: summarize(data) }
+  const m = summarize(data)
+  m.paperReview = paperFinding(data, m, restoredPaper)
+  results = { data, m }
 }
 
 async function prepareNext() {
+  if (mode !== 'concentration') return
   if (busy) return
   const list = nextProblems()
   if (list.length) { nextShown.tried = true; renderNext(); $(`next-${list[0][1]}`).focus(); return }
@@ -511,13 +597,15 @@ const pkReached = {
 }
 
 const noneReached = { data: () => true, check: () => false, result: () => false, next: () => false }
-const PATHS = { concentration: 'pk', currents: 'cmp', general: 'ai' }
-const reached = new Proxy({}, { get: (_, step) => ({ concentration: pkReached, currents: cmp.reached, general: gen.reached }[mode] ?? noneReached)[step] })
+const PATHS = { paper: 'pk', concentration: 'pk', currents: 'cmp', general: 'ai' }
+const paperReached = { ...pkReached, next: () => Boolean(results) }
+const reached = new Proxy({}, { get: (_, step) => ({ paper: paperReached, concentration: pkReached, currents: cmp.reached, general: gen.reached }[mode] ?? noneReached)[step] })
 
 function route() {
   let v = view()
   if (!reached[VIEWS[v]]()) v = 'data'
   const section = VIEWS[v]
+  $('next').setAttribute('aria-labelledby', mode === 'paper' ? 'paper-next-title' : 'next-heading')
   const path = PATHS[mode] ?? 'pk'
   for (const step of ['check', 'result', 'next']) for (const pane of ['pk', 'cmp', 'ai']) $(`${pane}-${step}`).hidden = pane !== path
   document.querySelectorAll('main > section').forEach(s => { s.hidden = s.id !== section })
@@ -539,7 +627,11 @@ function route() {
 
 // Step 1: the start screen, then what Dr. Bean found in the files, then the chosen editor.
 function renderDataStep() {
-  const pk = mode === 'concentration' && Boolean(draft.kind), cm = mode === 'currents' && cmp.editing()
+  $('resume-study').hidden = !savedStudyId(previousStudy) || sources.length > 0 || mode !== null
+  $('resume-study').disabled = connecting || restoring
+  const pk = ['paper','concentration'].includes(mode) && Boolean(draft.kind), cm = mode === 'currents' && cmp.editing()
+  paperView.setActive(mode === 'paper' && pk)
+  $('data').setAttribute('aria-labelledby', mode === 'paper' && pk ? 'paper-data-title' : 'claim-title')
   const found = !pk && !cm && sources.length > 0
   $('start').hidden = pk || cm || found
   $('overview').hidden = !found
@@ -566,29 +658,35 @@ function renderOverview() {
   const found = overview(sources), aiBlock = gen.blocker(), checkOff = { concentration: checkBlocker(), currents: comparisonAvailable() === false ? 'Comparisons are not available on this server.' : null }
   $('source-list').innerHTML = found.map(s => `<li><div><h3>${escapeHTML(s.asset?.filename ?? s.name)}</h3><p>${escapeHTML(describeSource(s))}</p></div>
     <button type="button" class="icon" aria-label="Remove ${escapeHTML(s.asset?.filename ?? s.name)}" data-action="remove-source" data-index="${s.index}"><svg aria-hidden="true"><use href="#i-x"/></svg></button></li>`).join('')
-  const checks = found.flatMap(s => s.found.flatMap(f => f.checks.map(kind => ({ kind, s, f }))))
+  const prepared = recognizedPaper(sources.filter(s=>s.asset).map(s=>s.asset))
+  const checks = found.flatMap(s => s.found.flatMap(f => f.checks.filter(kind=>!prepared || kind!=='concentration').map(kind => ({ kind, s, f }))))
   const items = checks.map(({ kind, s, f }) => {
     const off = checkOff[kind], header = f.table.header ? ` Columns: ${f.table.header.slice(0, 4).join(', ')}.` : ''
     return `<li${off ? ' class="off"' : ''}><div><h3>${CHECKS[kind].title}</h3><p>${escapeHTML(off ?? `${CHECKS[kind].how}, from ${f.table.rows.length} rows in ${s.asset?.filename ?? s.name}${f.table.page ? `, page ${f.table.page}` : ''}.${header}`)}</p></div>
       <button type="button" class="primary" data-action="setup" data-kind="${kind}" data-source="${s.index}" data-table="${f.t}"${off ? ' disabled' : ''}>${CHECKS[kind].button}</button></li>`
   })
+  if (prepared) {
+    items.unshift(`<li><div><h3>Test the paper’s numerical lemma</h3><p>Proposition 3.1, page 3. Review five synthetic readings and the claimed rate interval, then run the ordinary Counterdex investigation. Prepared inputs; the result is computed fresh.</p></div><button type="button" class="primary" data-action="paper-check"${checkOff.concentration ? ' disabled' : ''}>Check the proof’s premise</button></li>`)
+  }
   const reader = gen.limits().analysisMode === 'controlled' ? 'The local test responder' : 'Gemini'
   items.push(`<li${aiBlock ? ' class="off"' : ''}><div><h3>Ask the assistant</h3><p>${escapeHTML(aiBlock ?? `${reader} reads ${sources.filter(s => s.asset).length === 1 ? 'the file' : 'all the files'} and answers your question with quotes from them. The answer is not checked.`)}</p></div>
     <button type="button" class="${checks.length ? 'secondary' : 'primary'}" data-action="ask"${aiBlock ? ' disabled' : ''}>Ask the assistant</button></li>`)
   $('can-do').innerHTML = items.join('')
   const loose = found.flatMap(s => s.found.filter(f => !f.checks.length).map(f => ({ s, f })))
-  $('manual-check').hidden = !loose.length
+  $('manual-check').hidden = Boolean(prepared) || !loose.length
   $('manual-table').innerHTML = loose.map(({ s, f }) => `<option value="${s.index}:${f.t}">${escapeHTML(s.asset?.filename ?? s.name)}${f.table.page ? `, page ${f.table.page}` : ''}: ${f.table.rows.length} rows${f.table.header ? `, ${escapeHTML(f.table.header.slice(0, 3).join(', '))}` : ''}</option>`).join('')
 }
 
 function renderData() {
   if (!draft.kind) return
+  if (mode === 'paper') paperView.render(draft, paperAsset)
   for (const id of ['claim-low', 'claim-high']) if (document.activeElement !== $(id)) $(id).value = draft[id === 'claim-low' ? 'low' : 'high']
   if (document.activeElement !== $('time-origin')) $('time-origin').value = draft.timeOrigin
   if (document.activeElement !== $('allowance-source')) $('allowance-source').value = draft.source
   document.querySelectorAll('[name="origin"]').forEach(input => { input.checked = input.value === draft.origin })
   document.querySelectorAll('[data-limit]').forEach(input => { if (document.activeElement !== input) input.value = draft.limits[input.dataset.limit] })
-  const where = draft.kind === 'sample' ? 'Sample readings, made up for trying Dr. Bean. Change any value.'
+  const where = draft.kind === 'paper' ? `Prepared transcription from ${escapeHTML(draft.asset.filename)}, page 3. Review the five synthetic readings, hard allowances, and claim against the paper before continuing.`
+    : draft.kind === 'sample' ? 'Sample readings, made up for trying Dr. Bean. Change any value.'
     : draft.kind === 'file' && draft.tables[draft.table]?.fromAssistant ? `From ${escapeHTML(draft.tables[draft.table].file)}${draft.tables[draft.table].page ? `, page ${draft.tables[draft.table].page}` : ''}. The assistant copied these values: check every one against the file.`
     : draft.kind === 'file' ? `From ${escapeHTML(draft.asset?.filename || draft.name)}. The original file is saved with your study. Check every value against it.`
     : draft.kind === 'saved' ? 'The readings and claim saved with this study. Changing them starts a new check.'
@@ -599,7 +697,7 @@ function renderData() {
   const points = draft.rows.filter(r => r.included).map(r => ({ t: value(r.time), v: value(r.value), e: value(r.allowance) }))
     .filter(p => [p.t, p.v].every(Number.isFinite) && p.t >= 0 && p.v >= 0).map(p => ({ ...p, e: p.e > 0 ? p.e : 0 }))
   const title = points.every(p => p.e > 0) ? `${points.length} readings with their allowances` : `${points.length} readings, some without an allowance yet`
-  $('data-chart').innerHTML = points.length ? chartSVG({ readings: points, title, ...size('data-chart', 270) }) : '<p class="empty">Readings appear here as you add them.</p>'
+  $('data-chart').innerHTML = points.length ? chartSVG({ readings: points, title, ...size('data-chart', 270), ...chartContext() }) : '<p class="empty">Readings appear here as you add them.</p>'
   $('used-count').textContent = `${draft.rows.filter(r => r.included).length} of ${draft.rows.length} readings used`
   const list = problems(), visible = list.filter(([, , field]) => shown.tried || shown.touched[field])
   for (const area of ['rows', 'claim', 'about', 'limits']) {
@@ -642,11 +740,13 @@ function renderRows() {
 }
 
 function renderCheck() {
+  $('check-title').textContent = mode === 'paper' ? (paperInputsMatch(draft) ? 'Approve the premise check' : 'Approve the edited numerical study') : 'Approve the check'
   const s = snapshot, review = s?.pending_review
   const plan = review?.body
   const used = draft.rows.filter(r => r.included)
   const times = used.map(r => value(r.time))
   $('check-facts').innerHTML = [
+    ...(mode === 'paper' ? [['Paper premise', 'Proposition 3.1, page 3. A necessary numerical condition of the proposed proof.'], ['Scope', paperInputsMatch(draft) ? 'Check the stated two-rate synthetic calibration model. This does not check the Riemann hypothesis itself.' : 'Check your edited numerical inputs. This cannot establish that the original paper’s premise is false.']] : []),
     ['Readings', `${used.length} readings from ${Math.min(...times)} to ${Math.max(...times)} hours`],
     ['Claim', `${sym.claim(draft.low, draft.high)}, both ends included`],
     ['Model', sym.modelInline],
@@ -672,7 +772,27 @@ function renderResult(v) {
   $('result-title').innerHTML = f.headline
   $('result-lead').innerHTML = f.lead
   $('result-limit').innerHTML = f.limit
-  if (v === 'result') $('result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Your readings with their allowances and the curves that fit them', ...size('result-chart') })
+  $('pk-result').classList.toggle('paper-result', Boolean(m.paperReview))
+  let paperPanel = $('paper-study-review')
+  if (m.paperReview) {
+    if (!document.getElementById('paper-study-style')) {
+      const style=document.createElement('style');style.id='paper-study-style';style.textContent=PAPER_CSS;document.head.append(style)
+    }
+    if (!paperPanel) {
+      paperPanel=document.createElement('section');paperPanel.id='paper-study-review';paperPanel.className='paper-study-review'
+      $('result-lead').after(paperPanel)
+    }
+    const proof=m.paperReview, outside=m.candidates.find(c=>c.id===proof.witness_id)
+    paperPanel.hidden=false
+    $('result-title').textContent=proof.title
+    $('result-lead').textContent='The paper’s argument requires Proposition 3.1. A freshly checked counterexample violates that numerical premise.'
+    paperPanel.innerHTML=`<p class="paper-review-kicker">Page 3 · Proposition 3.1 · checked by Counterdex</p><div class="paper-review-steps">
+      <div><span class="paper-step">01 · What the paper requires</span><h2>Every fitting curve stays in the interval.</h2><div class="paper-review-number">${sym.claim('0.10','0.17')}</div><p>All five readings must be respected within ±0.50 mg/L.</p></div>
+      <div><span class="paper-step">02 · What the checker found</span><h2>A fitting curve outside it.</h2><div class="paper-review-number">${sym.ke} = ${formatRate(outside.params.ke)} h⁻¹</div><p>Exact value ${sym.exact(outside.exact.ke)}. Every included hard bound passed; the native evidence replayed.</p></div>
+      <div><span class="paper-step">03 · Why the argument fails</span><h2>Its necessary premise is false.</h2><p>The paper requires this interval for its transfer step. One admissible assignment outside the interval refutes that universal numerical claim.</p></div></div>
+      <p class="paper-review-scope">${escapeHTML(proof.scope)}</p>`
+  } else if (paperPanel) paperPanel.hidden=true
+  if (v === 'result') $('result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Your readings with their allowances and the curves that fit them', ...size('result-chart'), ...chartContext() })
   $('candidates').innerHTML = m.candidates.map(c => `<tr class="${c.tone}"><th scope="row"><span class="swatch" aria-hidden="true"></span>${c.outside ? 'Outside the claim' : 'Inside the claim'}</th>
     <td>${formatRate(c.params.ke)}<div class="exact">${sym.exact(c.exact.ke)}</div></td><td>${formatRate(c.params.ka)}<div class="exact">${sym.exact(c.exact.ka)}</div></td>
     <td>${formatRate(c.params.A)}<div class="exact">${sym.exact(c.exact.A)}</div></td></tr>`).join('') || '<tr><td colspan="4" class="quiet">No curve was kept.</td></tr>'
@@ -680,17 +800,30 @@ function renderResult(v) {
   $('result-readings-table').innerHTML = readingTable(m)
   const groups = [['Full record', 'The saved study in one file: readings, claim, approvals, results and the list of proofs.', f => f.kind === 'record'],
     ['Claim check', "Counterdex's exact calculations for the check, and the fingerprints that tie them to your readings.", f => f.step === 'check'],
-    ['Next measurement', "Counterdex's exact calculations for the comparison, and their fingerprints.", f => f.step === 'next']]
+    [mode === 'paper' ? 'Saved numerical comparison' : 'Next measurement', "Counterdex's exact calculations for the comparison, and their fingerprints.", f => f.step === 'next']]
   $('file-list').innerHTML = groups.map(([title, about, pick]) => ({ title, about, files: m.files.filter(pick) })).filter(g => g.files.length).map(g => `<li><div><h3>${escapeHTML(g.title)}</h3><p>${escapeHTML(g.about)}</p></div>
     <div class="file-actions">${g.files.map(file => `<button type="button" class="secondary small" data-action="view-file" data-file="${m.files.indexOf(file)}">View ${file.kind === 'record' ? 'record' : file.kind === 'proof' ? 'proof' : 'fingerprints'}</button>`).join('')}</div></li>`).join('')
   const canPlan = reached.next()
   $('to-next').hidden = !canPlan
+  $('to-next').textContent = mode === 'paper' ? 'Review the proof’s next steps' : 'Plan the next measurement'
   $('next-unavailable').hidden = canPlan
   $('next-unavailable').textContent = canPlan ? '' : 'A next-measurement plan needs two fitting curves, one inside and one outside the claim. This check did not find that pair.'
 }
 
 function renderNext() {
   const m = results?.m
+  let paperFollowup = $('paper-followup')
+  if (mode === 'paper') {
+    for (const id of ['next-settings','next-review','next-answer']) $(id).hidden = true
+    if (!paperFollowup) {
+      paperFollowup = document.createElement('div'); paperFollowup.id = 'paper-followup'
+      $('pk-next').append(paperFollowup)
+    }
+    paperFollowup.hidden = false
+    paperFollowup.innerHTML = m ? paperNextHTML(m, sym) : ''
+    return
+  }
+  if (paperFollowup) paperFollowup.hidden = true
   const answered = Boolean(m?.next)
   const reviewing = !answered && snapshot?.state === 'waiting_review' && snapshot.pending_review?.kind === 'design_plan'
   $('next-settings').hidden = answered || reviewing
@@ -700,7 +833,7 @@ function renderNext() {
     const nf = nextFinding(m)
     $('next-title').textContent = nf.headline
     $('next-lead').textContent = nf.lead
-    $('next-result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Predicted ranges at the possible times, from the checked comparison', ...size('next-result-chart'),
+    $('next-result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Predicted ranges at the possible times, from the checked comparison', ...size('next-result-chart'), ...chartContext(),
       future: { until: m.next.horizon, times: m.next.times.map(t => ({ t: t.t, ranges: t.ranges, selected: t.t === m.next.selected })) } })
     $('next-table').innerHTML = nextTable(m)
     return
@@ -779,6 +912,8 @@ document.addEventListener('click', event => {
   if (!target) return
   if (target.dataset.step && target.getAttribute('aria-disabled') === 'true') { event.preventDefault(); return }
   const action = target.dataset.action
+  if (['sample-concentration', 'sample-currents', 'paste'].includes(action)) cancelRestore()
+  if (action === 'paper-check') { usePaperStudy(); return }
   if (action === 'sample-concentration') { sources = []; setMode('concentration'); useSample() }
   else if (action === 'sample-currents') { sources = []; setMode('currents'); $('study-name').textContent = 'Sample currents'; cmp.sample() }
   else if (action === 'setup') { const s = sources[Number(target.dataset.source)]; startCheck(target.dataset.kind, s.tables, Number(target.dataset.table), s.asset) }
@@ -800,6 +935,7 @@ document.addEventListener('click', event => {
   else if (action === 'close') target.closest('dialog').close()
   else if (action === 'add') { draft.rows.push({ time: '', value: '', allowance: draft.allowanceForAll || '', included: true }); renderRows(); renderData(); $('rows').lastElementChild?.querySelector('[data-key="time"]')?.focus() }
   else if (action === 'remove') { draft.rows.splice(Number(target.dataset.row), 1); renderRows(); renderData() }
+  else if (action === 'resume-study') resumePrevious()
   else if (action === 'retry-connection') connect()
   else if (action === 'start-new-workspace') connect(true)
   else if (action === 'start-over' && sources.length) showOverview()
@@ -808,7 +944,7 @@ document.addEventListener('click', event => {
   else if (action === 'approve-check') approve('check-status', 'approve-check', () => { location.hash = 'result' })
   else if (action === 'go-next') { if (draft.kind === 'sample' && !next.times) next = { ...SAMPLE.next }; location.hash = 'next' }
   else if (action === 'prepare-next') prepareNext()
-  else if (action === 'approve-next') approve('next-run-status', 'approve-next', () => renderNext())
+  else if (action === 'approve-next' && mode === 'concentration') approve('next-run-status', 'approve-next', () => renderNext())
   else if (action === 'view-file') openFile(results.m.files[Number(target.dataset.file)])
   else if (action === 'save-file' && viewing) saveText(viewing.name, results.data.texts[viewing.name], 'application/json')
   else if (action === 'report') downloadReport(target)

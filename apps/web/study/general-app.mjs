@@ -95,9 +95,12 @@ export function createGeneral({ route, api, workspace, capabilities, sources, qu
     }
   }
 
-  async function reopen(analysisId, assetIds) {
+  async function reopen(analysisId, assetIds, current = () => true) {
     const assets = await Promise.all(assetIds.map(id => api().json(`/research-assets/${encodeURIComponent(id)}`)))
-    record = validateResearchAnalysis(await api().json(`/research-analyses/${encodeURIComponent(analysisId)}`), assets, workspace())
+    if (!current()) return null
+    const restored = validateResearchAnalysis(await api().json(`/research-analyses/${encodeURIComponent(analysisId)}`), assets, workspace())
+    if (!current()) return null
+    record = restored
     m = G.readAnalysis(record, assets)
     return { assets, asked: m.question }
   }
