@@ -14,7 +14,8 @@ import { $, countStatus, failure, readable, saveText, size, status } from './ui.
 import { createComparison } from './compare-app.mjs'
 import { createGeneral } from './general-app.mjs'
 import { CHECKS, overview } from './general.mjs'
-import { recognizedPaper, paperDraft, paperFinding, PAPER_CSS } from './paper-study.mjs'
+import { recognizedPaper, paperDraft, paperFinding, paperInputsMatch, PAPER_CSS } from './paper-study.mjs'
+import { createPaperView } from './paper-view.mjs'
 import { fileMediaHint, generalCapabilities, validateFileSelection } from '../general-workspace.mjs'
 import { curvesFor, escapeHTML, fileView, finding, formatBound, formatRate, fromTexts, nextFinding, nextTable, readableReport, readingTable, summarize } from './results.mjs'
 
@@ -39,10 +40,12 @@ let busy = false
 let shown = { tried: false, touched: {} }, nextShown = { tried: false, touched: {} }
 
 // The path on screen: null until the person picks something to do with their files.
-let mode = null                  // 'concentration' | 'currents' | 'general' | null
+let mode = null                  // 'paper' | 'concentration' | 'currents' | 'general' | null
 let sources = []                 // [{ asset, tables, name? }] files in this study, read by the intake
 let question = ''
 let paperAsset = null
+const paperView = createPaperView($('editor'), sym)
+const chartContext = () => mode === 'paper' ? { xLabel:'Calibration time (h)', yLabel:'Calibration response (mg/L)' } : {}
 const setMode = next => { mode = next }
 const comparisonAvailable = () => capabilities ? capabilities.model_comparison?.available === true : null
 const cmp = createComparison({
@@ -60,7 +63,7 @@ const gen = createGeneral({
 
 function blankDraft() {
   return { kind: null, name: '', asset: null, tables: [], table: 0, columns: null, allowanceForAll: '', rows: [],
-    low: '', high: '', origin: '', timeOrigin: 'Time of dose', source: '', limits: { ...LIMITS } }
+    low: '', high: '', origin: '', timeOrigin: 'Elapsed time from the study initial state', source: '', limits: { ...LIMITS } }
 }
 function readStore() { try { return JSON.parse(localStorage.getItem(STORE) || '{}')[workspace] ?? {} } catch { return {} } }
 function writeStore() {
@@ -183,7 +186,12 @@ async function reopen() {
       paperAsset = recognizedPaper([retained])
     }
     draftFromSnapshot(snapshot)
-    setMode('concentration'); connectionLabel()
+    if (paperAsset) {
+      draft.asset = paperAsset
+      sources = [{asset:paperAsset,tables:[]}]
+      $('study-name').textContent = 'Dr. Verity — Proposition 3.1'
+    }
+    setMode(paperAsset ? 'paper' : 'concentration'); connectionLabel()
     if (snapshot.reports.length) await loadResults()
     if (!location.hash) location.replace('#' + (results ? (results.m.next ? 'next' : 'result') : snapshot.pending_review?.kind === 'plan' ? 'check' : 'data'))
   } catch (error) {
@@ -313,7 +321,7 @@ function usePaperStudy() {
   if (!matched) return
   draft = { ...blankDraft(), ...paperDraft(matched) }
   paperAsset = matched
-  setMode('concentration')
+  setMode('paper')
   $('study-name').textContent = 'Dr. Verity — Proposition 3.1'
   showEditor()
 }
@@ -324,7 +332,8 @@ function showEditor() {
   location.hash = 'data'
   route()
   renderMapping()
-  $('claim-low').focus({ preventScroll: true })
+  if (mode === 'paper') paperView.focus()
+  else $('claim-low').focus({ preventScroll: true })
 }
 
 // --- Checks on the draft --------------------------------------------------------------------
@@ -413,7 +422,7 @@ async function prepare() {
   const issues = problems()
   if (issues.length) {
     const order = ['claim', 'about', 'rows', 'limits'], first = [...issues].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))[0]
-    shown.tried = true; renderData(); FIELDS[first[2]]()?.focus(); return
+    shown.tried = true; renderData(); if (mode === 'paper') paperView.revealInputs(); FIELDS[first[2]]()?.focus(); return
   }
   busy = true; $('prepare').disabled = true
   try {
@@ -423,7 +432,7 @@ async function prepare() {
     const problem = await api.json(`/workspaces/${encodeURIComponent(workspace)}/problems`, problemBody(dataset))
     status('prepare-status', 'Starting the study…')
     const created = await api.json(`/workspaces/${encodeURIComponent(workspace)}/research-sessions`, {
-      objective: `Do these readings keep ke between ${draft.low} and ${draft.high} per hour?`, problem_id: problem.id,
+      objective: `${mode === 'paper' ? (paperInputsMatch(draft) ? 'Test the numerical premise of Proposition 3.1 on page 3. ' : 'Test an edited numerical study based on Proposition 3.1, not the original proposition. ') : ''}Do these readings keep ke between ${draft.low} and ${draft.high} per hour?`, problem_id: problem.id,
       expected_problem_digest: problem.digest, source_ids: draft.asset ? [draft.asset.id] : [], mode: 'controlled', design_constraints: null })
     study = { sessionId: created.id, ...(paperAsset ? { paperAssetId: paperAsset.id } : {}) }; writeStore()
     await api.json(`/research-sessions/${encodeURIComponent(created.id)}/advance`, { expected_revision: created.revision })
@@ -533,8 +542,8 @@ const pkReached = {
 }
 
 const noneReached = { data: () => true, check: () => false, result: () => false, next: () => false }
-const PATHS = { concentration: 'pk', currents: 'cmp', general: 'ai' }
-const reached = new Proxy({}, { get: (_, step) => ({ concentration: pkReached, currents: cmp.reached, general: gen.reached }[mode] ?? noneReached)[step] })
+const PATHS = { paper: 'pk', concentration: 'pk', currents: 'cmp', general: 'ai' }
+const reached = new Proxy({}, { get: (_, step) => ({ paper: pkReached, concentration: pkReached, currents: cmp.reached, general: gen.reached }[mode] ?? noneReached)[step] })
 
 function route() {
   let v = view()
@@ -561,7 +570,9 @@ function route() {
 
 // Step 1: the start screen, then what Dr. Bean found in the files, then the chosen editor.
 function renderDataStep() {
-  const pk = mode === 'concentration' && Boolean(draft.kind), cm = mode === 'currents' && cmp.editing()
+  const pk = ['paper','concentration'].includes(mode) && Boolean(draft.kind), cm = mode === 'currents' && cmp.editing()
+  paperView.setActive(mode === 'paper' && pk)
+  $('data').setAttribute('aria-labelledby', mode === 'paper' && pk ? 'paper-data-title' : 'claim-title')
   const found = !pk && !cm && sources.length > 0
   $('start').hidden = pk || cm || found
   $('overview').hidden = !found
@@ -588,13 +599,14 @@ function renderOverview() {
   const found = overview(sources), aiBlock = gen.blocker(), checkOff = { concentration: checkBlocker(), currents: comparisonAvailable() === false ? 'Comparisons are not available on this server.' : null }
   $('source-list').innerHTML = found.map(s => `<li><div><h3>${escapeHTML(s.asset?.filename ?? s.name)}</h3><p>${escapeHTML(describeSource(s))}</p></div>
     <button type="button" class="icon" aria-label="Remove ${escapeHTML(s.asset?.filename ?? s.name)}" data-action="remove-source" data-index="${s.index}"><svg aria-hidden="true"><use href="#i-x"/></svg></button></li>`).join('')
-  const checks = found.flatMap(s => s.found.flatMap(f => f.checks.map(kind => ({ kind, s, f }))))
+  const prepared = recognizedPaper(sources.filter(s=>s.asset).map(s=>s.asset))
+  const checks = found.flatMap(s => s.found.flatMap(f => f.checks.filter(kind=>!prepared || kind!=='concentration').map(kind => ({ kind, s, f }))))
   const items = checks.map(({ kind, s, f }) => {
     const off = checkOff[kind], header = f.table.header ? ` Columns: ${f.table.header.slice(0, 4).join(', ')}.` : ''
     return `<li${off ? ' class="off"' : ''}><div><h3>${CHECKS[kind].title}</h3><p>${escapeHTML(off ?? `${CHECKS[kind].how}, from ${f.table.rows.length} rows in ${s.asset?.filename ?? s.name}${f.table.page ? `, page ${f.table.page}` : ''}.${header}`)}</p></div>
       <button type="button" class="primary" data-action="setup" data-kind="${kind}" data-source="${s.index}" data-table="${f.t}"${off ? ' disabled' : ''}>${CHECKS[kind].button}</button></li>`
   })
-  if (recognizedPaper(sources.filter(s=>s.asset).map(s=>s.asset))) {
+  if (prepared) {
     items.unshift(`<li><div><h3>Test the paper’s numerical lemma</h3><p>Proposition 3.1, page 3. Review five synthetic readings and the claimed rate interval, then run the ordinary Counterdex investigation. Prepared inputs; the result is computed fresh.</p></div><button type="button" class="primary" data-action="paper-check"${checkOff.concentration ? ' disabled' : ''}>Check the proof’s premise</button></li>`)
   }
   const reader = gen.limits().analysisMode === 'controlled' ? 'The local test responder' : 'Gemini'
@@ -602,12 +614,13 @@ function renderOverview() {
     <button type="button" class="${checks.length ? 'secondary' : 'primary'}" data-action="ask"${aiBlock ? ' disabled' : ''}>Ask the assistant</button></li>`)
   $('can-do').innerHTML = items.join('')
   const loose = found.flatMap(s => s.found.filter(f => !f.checks.length).map(f => ({ s, f })))
-  $('manual-check').hidden = !loose.length
+  $('manual-check').hidden = Boolean(prepared) || !loose.length
   $('manual-table').innerHTML = loose.map(({ s, f }) => `<option value="${s.index}:${f.t}">${escapeHTML(s.asset?.filename ?? s.name)}${f.table.page ? `, page ${f.table.page}` : ''}: ${f.table.rows.length} rows${f.table.header ? `, ${escapeHTML(f.table.header.slice(0, 3).join(', '))}` : ''}</option>`).join('')
 }
 
 function renderData() {
   if (!draft.kind) return
+  if (mode === 'paper') paperView.render(draft, paperAsset)
   for (const id of ['claim-low', 'claim-high']) if (document.activeElement !== $(id)) $(id).value = draft[id === 'claim-low' ? 'low' : 'high']
   if (document.activeElement !== $('time-origin')) $('time-origin').value = draft.timeOrigin
   if (document.activeElement !== $('allowance-source')) $('allowance-source').value = draft.source
@@ -625,7 +638,7 @@ function renderData() {
   const points = draft.rows.filter(r => r.included).map(r => ({ t: value(r.time), v: value(r.value), e: value(r.allowance) }))
     .filter(p => [p.t, p.v].every(Number.isFinite) && p.t >= 0 && p.v >= 0).map(p => ({ ...p, e: p.e > 0 ? p.e : 0 }))
   const title = points.every(p => p.e > 0) ? `${points.length} readings with their allowances` : `${points.length} readings, some without an allowance yet`
-  $('data-chart').innerHTML = points.length ? chartSVG({ readings: points, title, ...size('data-chart', 270) }) : '<p class="empty">Readings appear here as you add them.</p>'
+  $('data-chart').innerHTML = points.length ? chartSVG({ readings: points, title, ...size('data-chart', 270), ...chartContext() }) : '<p class="empty">Readings appear here as you add them.</p>'
   $('used-count').textContent = `${draft.rows.filter(r => r.included).length} of ${draft.rows.length} readings used`
   const list = problems(), visible = list.filter(([, , field]) => shown.tried || shown.touched[field])
   for (const area of ['rows', 'claim', 'about', 'limits']) {
@@ -668,11 +681,13 @@ function renderRows() {
 }
 
 function renderCheck() {
+  $('check-title').textContent = mode === 'paper' ? (paperInputsMatch(draft) ? 'Approve the premise check' : 'Approve the edited numerical study') : 'Approve the check'
   const s = snapshot, review = s?.pending_review
   const plan = review?.body
   const used = draft.rows.filter(r => r.included)
   const times = used.map(r => value(r.time))
   $('check-facts').innerHTML = [
+    ...(mode === 'paper' ? [['Paper premise', 'Proposition 3.1, page 3. A necessary numerical condition of the proposed proof.'], ['Scope', paperInputsMatch(draft) ? 'Check the stated two-rate synthetic calibration model. This does not check the Riemann hypothesis itself.' : 'Check your edited numerical inputs. This cannot establish that the original paper’s premise is false.']] : []),
     ['Readings', `${used.length} readings from ${Math.min(...times)} to ${Math.max(...times)} hours`],
     ['Claim', `${sym.claim(draft.low, draft.high)}, both ends included`],
     ['Model', sym.modelInline],
@@ -718,7 +733,7 @@ function renderResult(v) {
       <div><span class="paper-step">03 · Why the argument fails</span><h2>Its necessary premise is false.</h2><p>The paper requires this interval for its transfer step. One admissible assignment outside the interval refutes that universal numerical claim.</p></div></div>
       <p class="paper-review-scope">${escapeHTML(proof.scope)}</p>`
   } else if (paperPanel) paperPanel.hidden=true
-  if (v === 'result') $('result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Your readings with their allowances and the curves that fit them', ...size('result-chart') })
+  if (v === 'result') $('result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Your readings with their allowances and the curves that fit them', ...size('result-chart'), ...chartContext() })
   $('candidates').innerHTML = m.candidates.map(c => `<tr class="${c.tone}"><th scope="row"><span class="swatch" aria-hidden="true"></span>${c.outside ? 'Outside the claim' : 'Inside the claim'}</th>
     <td>${formatRate(c.params.ke)}<div class="exact">${sym.exact(c.exact.ke)}</div></td><td>${formatRate(c.params.ka)}<div class="exact">${sym.exact(c.exact.ka)}</div></td>
     <td>${formatRate(c.params.A)}<div class="exact">${sym.exact(c.exact.A)}</div></td></tr>`).join('') || '<tr><td colspan="4" class="quiet">No curve was kept.</td></tr>'
@@ -746,7 +761,7 @@ function renderNext() {
     const nf = nextFinding(m)
     $('next-title').textContent = nf.headline
     $('next-lead').textContent = nf.lead
-    $('next-result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Predicted ranges at the possible times, from the checked comparison', ...size('next-result-chart'),
+    $('next-result-chart').innerHTML = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Predicted ranges at the possible times, from the checked comparison', ...size('next-result-chart'), ...chartContext(),
       future: { until: m.next.horizon, times: m.next.times.map(t => ({ t: t.t, ranges: t.ranges, selected: t.t === m.next.selected })) } })
     $('next-table').innerHTML = nextTable(m)
     return

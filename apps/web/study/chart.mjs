@@ -18,7 +18,7 @@ const attr = text => String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': 
  * curves:   [{params: {A, ke, ka}, tone: 'inside' | 'outside', name}]
  * future:   {times: [{t, ranges: [{tone, low, high}], selected}], until}
  */
-export function chartSVG({ readings = [], curves = [], future = null, width = 720, height = 360, title = '' } = {}) {
+export function chartSVG({ readings = [], curves = [], future = null, width = 720, height = 360, title = '', xLabel = 'Elapsed time (h)', yLabel = 'mg/L' } = {}) {
   const left = 52, right = 20, top = 20, bottom = 44
   const lastTime = Math.max(4, ...readings.map(r => r.t), future?.until ?? 0)
   const tMax = lastTime * 1.04
@@ -36,8 +36,8 @@ export function chartSVG({ readings = [], curves = [], future = null, width = 72
   for (let t = 0; t <= lastTime + 1e-9; t += xStep) {
     svg += `<text class="tick" x="${x(t)}" y="${height - bottom + 20}" text-anchor="middle">${label(t)}</text>`
   }
-  svg += `<text class="axis" x="${left}" y="${top - 6}">mg/L</text>`
-  svg += `<text class="axis" x="${width - right}" y="${height - 6}" text-anchor="end">hours after dose</text>`
+  svg += `<text class="axis" x="${left}" y="${top - 6}">${attr(yLabel)}</text>`
+  svg += `<text class="axis" x="${width - right}" y="${height - 6}" text-anchor="end">${attr(xLabel)}</text>`
   for (const c of curves) {
     let d = ''
     for (let i = 0; i <= 160; i++) {

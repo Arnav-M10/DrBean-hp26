@@ -32,11 +32,11 @@ The proposed transfer step and theorem explicitly require Proposition 3.1. Findi
 1. Open the study app and start a new study.
 2. Upload this PDF **alone**. Its filename may change; its bytes must match.
 3. Choose **Check the proof’s premise**.
-4. Review the five readings, hard allowances, claim, origin and search limits. The page identifies them as a prepared transcription.
+4. The paper review opens on Proposition 3.1 and its role in the proposed proof. Expand **Review the source values and assumptions** to compare the five readings, hard allowances, claim, origin and search limits with the PDF. **Edit the numerical inputs** opens the editable model details; edits are flagged as a different study.
 5. Prepare the check, then approve the real maintained plan.
 6. Read the counterexample, graph and per-reading checks. The Files view contains the readable report, native evidence and replay anchors.
 
-The displayed explanation has three parts: what the paper requires, the actual outside witness, and why the necessary premise fails. The next-measurement workflow remains available when a compatible inside/outside pair was retained.
+The displayed explanation has three parts: what the paper requires, the actual outside witness, and why the necessary premise fails. The next-measurement workflow remains available when a compatible inside/outside pair was retained. Uploading an ordinary document leaves the user at its overview, with no experiment selected. The concentration editor is reached by an explicit concentration check or sample choice; this paper has its own review presentation. Paper graphs use calibration time, and general concentration graphs use elapsed time without assuming a dose.
 
 ## What is prepared and what is computed
 
@@ -67,7 +67,7 @@ BEAN_VERITY_ENGINE_PYTHON=/absolute/path/to/.venv-engine/bin/python \
 node tests/integration/verity-counterdex-browser.mjs
 ```
 
-For an uninstalled frontend development preview, `BEAN_VERITY_OVERLAY=1` serves the three modified frontend modules from the current checkout while retaining the actual running API and worker. The test records whether it used an overlay or served product files.
+For an uninstalled frontend development preview, `BEAN_VERITY_OVERLAY=1` serves the modified frontend modules from the current checkout while retaining the actual running API and worker. The test records whether it used an overlay or served product files.
 
 This lane creates a private synthetic study, waits for approval, runs actual science, downloads and independently replays native evidence with the same checker implementation, verifies the saved explanation and readable report, checks desktop and phone layouts, and confirms a changed PDF with the same filename does not select the example. General assistant analysis endpoints are blocked. The coordinator must be configured as controlled, and the test requires zero physical model calls. No live Gemini qualification is implied.
 

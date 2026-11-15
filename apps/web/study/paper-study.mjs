@@ -8,6 +8,7 @@ export const VERITY_STUDY = Object.freeze({
   byteSize: 95608,
   page: 3,
   proposition: 'Proposition 3.1',
+  timeOrigin:'Elapsed hours from the synthetic calibration initial state C(0)=0',
   rows: Object.freeze([['0.25','4.80','0.50'],['0.5','7.20','0.50'],['1','8.00','0.50'],['2','6.80','0.50'],['4','5.70','0.50']].map(Object.freeze)),
   limits: Object.freeze({ aLow:'0.001',aHigh:'30',keLow:'0.015',keHigh:'0.35',kaLow:'0.4',kaHigh:'8' }),
 })
@@ -24,7 +25,7 @@ export function paperDraft(asset) {
   return {
     kind:'paper', paperProfile:VERITY_STUDY.id, name:'Dr Verity — numerical rigidity', asset, tables:[], table:0,
     columns:null, allowanceForAll:'0.50', low:'0.10',high:'0.17',origin:'synthetic',
-    timeOrigin:'Elapsed hours from the synthetic calibration initial state C(0)=0',
+    timeOrigin:VERITY_STUDY.timeOrigin,
     source:`Author-declared deterministic hard allowance ±0.50 mg/L for every synthetic reading. Transcribed from Proposition 3.1 and Table 1, page 3. PDF SHA-256 ${VERITY_STUDY.sha256}.`,
     limits:{...VERITY_STUDY.limits},
     rows:VERITY_STUDY.rows.map(([time,value,allowance])=>({time,value,allowance,included:true,
@@ -34,10 +35,19 @@ export function paperDraft(asset) {
 
 const same = (a,b) => {try {return parseExact(String(a)) === parseExact(String(b))} catch {return false}}
 
+export function paperInputsMatch(draft) {
+  return draft.origin==='synthetic' && same(draft.low,'.10') && same(draft.high,'.17')
+    && draft.source?.includes(VERITY_STUDY.sha256)
+    && draft.timeOrigin?.trim()===VERITY_STUDY.timeOrigin
+    && draft.rows.length===VERITY_STUDY.rows.length
+    && draft.rows.every((r,i)=>r.included && [r.time,r.value,r.allowance].every((v,j)=>same(v,VERITY_STUDY.rows[i][j])))
+    && Object.entries(VERITY_STUDY.limits).every(([k,v])=>same(draft.limits[k],v))
+}
+
 export function paperFinding(data, m, asset) {
   if (!recognizedPaper([asset])) return null
   const d=data?.report?.body?.root_inputs?.dataset?.body, p=data?.report?.body?.root_inputs?.problem?.body
-  if (!d || !p || d.origin!=='synthetic' || !d.change_reason?.includes(VERITY_STUDY.sha256)
+  if (!d || !p || d.origin!=='synthetic' || d.time_origin!==VERITY_STUDY.timeOrigin || !d.change_reason?.includes(VERITY_STUDY.sha256)
       || p.model!=='two_rate_concentration' || p.target?.parameter!=='ke' || p.target.closed!==true
       || !same(p.target.lower,'.10') || !same(p.target.upper,'.17') || p.domain?.rate_order!=='ke_lt_ka'
       || d.rows?.length!==VERITY_STUDY.rows.length) return null

@@ -243,8 +243,9 @@ export async function readableReport(data, m, fontURL) {
     font = `@font-face{font-family:Atkinson;src:url(data:font/woff2;base64,${btoa(binary)}) format('woff2');font-weight:200 800}`
   } catch { font = '' }
   const f = finding(m, sym), nf = nextFinding(m)
-  const chart = chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Readings with allowances and the curves that fit them' })
-  const nextChart = m.next ? chartSVG({ readings: m.included, curves: curvesFor(m), title: 'Predicted ranges at the possible times',
+  const chartLabels = m.paperReview ? { xLabel: 'Calibration time (h)', yLabel: 'Synthetic response (mg/L)' } : {}
+  const chart = chartSVG({ readings: m.included, curves: curvesFor(m), ...chartLabels, title: 'Readings with allowances and the curves that fit them' })
+  const nextChart = m.next ? chartSVG({ readings: m.included, curves: curvesFor(m), ...chartLabels, title: 'Predicted ranges at the possible times',
     future: { until: m.next.horizon, times: m.next.times.map(t => ({ t: t.t, ranges: t.ranges, selected: t.t === m.next.selected })) } }) : ''
   const candidateRows = m.candidates.map(c => `<tr><th scope="row">${c.outside ? 'Outside the claim' : 'Inside the claim'}</th><td>${formatRate(c.params.ke)}<div class="exact">${sym.exact(c.exact.ke)}</div></td><td>${formatRate(c.params.ka)}<div class="exact">${sym.exact(c.exact.ka)}</div></td><td>${formatRate(c.params.A)}<div class="exact">${sym.exact(c.exact.A)}</div></td><td>${c.fits ? 'Yes, all readings' : 'No'}</td></tr>`).join('')
   const files = m.files.map(file => `<tr><th scope="row">${escapeHTML(file.title)}</th><td class="mono">${escapeHTML(file.name)}</td><td>${escapeHTML(bytes(file.size))}</td></tr>`).join('')
