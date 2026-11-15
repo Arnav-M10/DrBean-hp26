@@ -17,6 +17,16 @@ test('a lab CSV: text column skipped, minutes and ng/mL recognised, SD never use
   assert.equal(rows[0].line, 2)
 })
 
+test('a CSV whose first reading is 0,0 keeps its header and every reading', () => {
+  // Real dose data often start at 0 h with 0 mg/L (R's Theoph, subject 3).
+  const [table] = tablesFromText('Time (h),Theophylline (mg/L)\n0,0\n0.27,4.4\n0.58,6.9\n24.17,1.05\n', { file: 'theoph.csv' })
+  assert.deepEqual(table.header, ['Time (h)', 'Theophylline (mg/L)'])
+  assert.deepEqual(table.rows, [['0', '0'], ['0.27', '4.4'], ['0.58', '6.9'], ['24.17', '1.05']])
+  // A decimal comma still reads as one number where the text has no point decimals.
+  assert.deepEqual(cellsOf('4,80'), ['4,80'])
+  assert.deepEqual(tablesFromText('Zeit (h);Konzentration (mg/L)\n0,25;4,80\n0,5;7,20\n1;8,00\n')[0].rows[0], ['0,25', '4,80'])
+})
+
 test('exact unit conversion never rounds', () => {
   assert.equal(convert('15', 'time', 'min'), '1/4')
   assert.equal(convert('20', 'time', 'min'), '1/3')

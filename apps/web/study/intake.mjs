@@ -22,8 +22,9 @@ function csvLine(line, delimiter) {
   return cells
 }
 
-// Split one line into cells, choosing the separator the line itself uses.
-export function cellsOf(line) {
+// Split one line into cells, choosing the separator the line itself uses. A line such as "4,80"
+// reads as a decimal comma unless the text around it already uses commas to separate cells.
+export function cellsOf(line, { commaSeparates = false } = {}) {
   const text = line.replace(/ /g, ' ').trim()
   if (!text) return []
   // In a delimited line an empty cell keeps its column (an optional value left blank); in
@@ -31,8 +32,9 @@ export function cellsOf(line) {
   let cells, delimited = true
   if (text.includes('\t')) cells = text.split('\t').map(c => c.trim())
   else if (/^\|.*\|$/.test(text)) cells = text.slice(1, -1).split('|').map(c => c.trim())
-  else if (text.includes(';') && !text.includes(',')) cells = csvLine(text, ';')
-  else if (text.includes(',') && !/\d,\d{1,2}(\s|$)/.test(text)) cells = csvLine(text, ',')
+  // A semicolon separates cells (as in European CSV, where the comma is the decimal mark).
+  else if (text.includes(';')) cells = csvLine(text, ';')
+  else if (text.includes(',') && (commaSeparates || !/\d,\d{1,2}(\s|$)/.test(text))) cells = csvLine(text, ',')
   else { delimited = false; cells = text.replace(/\s*(?:±|\+\/-|\+-)\s*/g, '  ').split(/\s{2,}|\s+(?=[-+.\d])|(?<=[\d)])\s+/).map(c => c.trim()) }
   // "4.80 ± 0.50" in one cell becomes a value and its allowance.
   return cells.flatMap(cell => {
@@ -45,11 +47,14 @@ export function cellsOf(line) {
 // above one becomes its header when it is not numeric.
 export function tablesFromText(text, where = {}) {
   const lines = String(text).replace(/\r\n?/g, '\n').split('\n')
+  // A text that writes decimals with a point next to a comma ("0.27,4.4") uses commas only between
+  // cells, so its "0,0" is two readings, not the decimal 0,0.
+  const commaSeparates = /\d\.\d+\s*,|,\s*[+-]?\d*\.\d/.test(text)
   const tables = []
   let current = null
   const flush = () => { if (current && current.rows.length >= 2) tables.push(current); current = null }
   lines.forEach((line, index) => {
-    const cells = cellsOf(line)
+    const cells = cellsOf(line, { commaSeparates })
     // A data line: two or more numbers, at most one label (such as a subject id); blanks allowed.
     const words = cells.filter(c => c !== '' && !isNumber(c)).length
     if (cells.filter(isNumber).length >= 2 && words <= 1) {
@@ -58,7 +63,7 @@ export function tablesFromText(text, where = {}) {
         current.rows.push(values); current.lines.push(index + 1)
       } else {
         flush()
-        const above = cellsOf(lines[index - 1] ?? '')
+        const above = cellsOf(lines[index - 1] ?? '', { commaSeparates })
         const header = above.length >= values.length - 1 && above.filter(isNumber).length === 0 ? above.slice(-values.length) : null
         current = { ...where, width: values.length, header, rows: [values], lines: [index + 1] }
       }
