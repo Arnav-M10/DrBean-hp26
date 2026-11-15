@@ -98,6 +98,7 @@ class CoordinatorResult:
     tool_calls: int
     scientific_reservations: int
     error_code: str | None = None
+    scenario_observations: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _safe_failure_code(exc: Exception, fallback: str) -> str:
@@ -184,16 +185,36 @@ class _Invocation:
         self.turns = self.tool_calls = self.reservations = 0
         self.executed: set[str] = set()
         self.skipped: set[str] = set()
+        self.scenario_evidence_ids: dict[str, str] = {}
+        self.skip_reasons: dict[str, str] = {}
         self.facts: dict[str, dict[str, Any]] = {}
         self.explanation: dict[str, Any] | None = None
         self.trace: list[dict[str, Any]] = []
         self.allowed_tools: set[str] = set()
 
     async def event(self, event: dict[str, Any]) -> None:
-        item = {"sequence": len(self.trace), "at": utc_now(), **event}
+        item = {"sequence": len(self.trace), "at": utc_now(), **copy.deepcopy(event)}
         self.trace.append(item)
         if self.callbacks.record_event:
-            await _await(self.callbacks.record_event(item))
+            await _await(self.callbacks.record_event(copy.deepcopy(item)))
+
+    def scenario_observations(self, termination_reason: str | None) -> list[dict[str, Any]]:
+        """Describe accepted callbacks, never infer a durable scientific state.
+
+        An interrupted or failed callback can leave authoritative work completed,
+        running or stopped elsewhere. Only its owning backend can establish that
+        state; an unobserved result stays unresolved in this invocation.
+        """
+        observations = []
+        for scenario_id in (self.scope.baseline_scenario_id, *self.scope.optional_scenario_ids):
+            disposition, evidence_id, reason = "unresolved", None, termination_reason or "agent_result_not_observed"
+            if scenario_id in self.scenario_evidence_ids:
+                disposition, evidence_id, reason = "completed", self.scenario_evidence_ids[scenario_id], None
+            elif scenario_id in self.skip_reasons:
+                disposition, reason = "skipped", self.skip_reasons[scenario_id]
+            observations.append({"scenario_id": scenario_id, "observation_scope": "coordinator_invocation",
+                                 "disposition": disposition, "evidence_id": evidence_id, "reason_code": reason})
+        return observations
 
     async def authority(self) -> None:
         if time.monotonic() - self.started >= self.scope.wall_seconds:
@@ -228,6 +249,7 @@ class _Invocation:
             raise CoordinatorFailure("agent_evidence_problem_mismatch")
         fact = self.add_evidence(evidence)
         self.executed.add(scenario_id)
+        self.scenario_evidence_ids[scenario_id] = fact["id"]
         return fact
 
     async def read(self, evidence_id: str) -> dict[str, Any]:
@@ -251,6 +273,7 @@ class _Invocation:
             raise CoordinatorFailure("skip_reason_invalid")
         result = await _await(self.callbacks.record_skip(scenario_id, reason_code))
         self.skipped.add(scenario_id)
+        self.skip_reasons[scenario_id] = reason_code
         return {"scenario_id": scenario_id, "status": "skipped", "reason_code": reason_code,
                 "reservation_id": result.get("id") if isinstance(result, dict) else None}
 
@@ -273,8 +296,10 @@ class _Invocation:
             self.reservations += 1
         result = await _await(self.callbacks.execute_design())
         await self.authority()
+        fact = self.add_evidence(result)
         self.executed.add(self.scope.baseline_scenario_id)
-        return self.add_evidence(result)
+        self.scenario_evidence_ids[self.scope.baseline_scenario_id] = fact["id"]
+        return fact
 
     async def explain(self, value: GroundedExplanation) -> dict[str, Any]:
         await self.authority()
@@ -507,12 +532,24 @@ async def run_coordinator(config: ProviderConfig, ledger: AttemptLedger, context
                                     config={"recursion_limit": 32})
         if inv.explanation is None:
             status, code = "failed", "agent_grounded_explanation_missing"
-    except asyncio.CancelledError:
-        await inv.event({"type": "invocation_cancelled", "termination": "controlled_orchestrator_cancelled"})
-        raise
+    except asyncio.CancelledError as cancellation:
+        cancellation_index = len(inv.trace)
+        try:
+            await inv.event({"type": "invocation_cancelled", "termination": "controlled_orchestrator_cancelled",
+                             "scenario_observations": inv.scenario_observations("controlled_orchestrator_cancelled")})
+        except (Exception, asyncio.CancelledError):
+            # event() retains its local snapshot before calling the sink. A
+            # failed acknowledgement leaves persistence unconfirmed; retrying
+            # here or replacing cancellation would obscure backend recovery.
+            if cancellation_index < len(inv.trace):
+                inv.trace[cancellation_index].update(event_persistence="unconfirmed",
+                                                     event_persistence_code="agent_event_sink_failed")
+        raise cancellation from None
     except Exception as exc:
         status = "failed"
         code = _safe_failure_code(exc, "agent_wall_budget_exhausted" if isinstance(exc, TimeoutError) else "agent_execution_failed")
-        await inv.event({"type": "invocation_failed", "code": code})
+    observations = inv.scenario_observations(code)
+    if status == "failed":
+        await inv.event({"type": "invocation_failed", "code": code, "scenario_observations": observations})
     return CoordinatorResult(status, inv.explanation, list(inv.facts.values()), inv.trace, runtime,
-                             inv.turns, inv.tool_calls, inv.reservations, code)
+                             inv.turns, inv.tool_calls, inv.reservations, code, observations)
