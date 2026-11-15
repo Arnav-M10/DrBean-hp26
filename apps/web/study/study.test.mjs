@@ -201,10 +201,10 @@ test('the published example answer reads with its quotes, and its tables can sta
 })
 
 // --- The front page ---------------------------------------------------------------------------------
-// Every number and sentence the front page shows comes from home-data.mjs. Read the saved runs again
-// and check that the copy is exact and words the same as the study page.
-test('the front page shows the saved runs exactly, worded as the study page words them', async () => {
-  const H = await import('./home-data.mjs'), R = await import('./results.mjs'), C = await import('./compare.mjs')
+// Every value the front page shows comes from home-data.mjs. Read the saved run again and check that
+// the copy is exact and words the same as the study page.
+test('the front page shows the saved run exactly, worded as the study page words it', async () => {
+  const H = await import('./home-data.mjs'), R = await import('./results.mjs')
   const dir = new URL('./fixtures/', import.meta.url)
   const names = readdirSync(dir).filter(name => name.startsWith('dr-bean-'))
   const m = summarize(fromTexts(Object.fromEntries(names.map(name => [name, readFileSync(new URL(name, dir), 'utf8')]))))
@@ -221,15 +221,13 @@ test('the front page shows the saved runs exactly, worded as the study page word
   assert.deepEqual(R.finding(d), R.finding(m))
   assert.deepEqual(R.nextFinding(d), R.nextFinding(m))
   assert.equal(R.nextTable(d), R.nextTable(m))
-  assert.equal(H.DOSE.replay, m.replay[0])
-  // The exact fraction set large on the page is the rate of the curve outside the claim.
+  // The fraction the page sets in its note is the rate of the curve outside the claim, and it is
+  // below the claim's 0.10 exactly (101/1016 < 1/10 because 1010 < 1016).
   assert.equal(d.candidates.find(c => c.outside).exact.ke, '101/1016')
-  assert.ok(101 * 10 < 1016 * 1, 'the fraction is below the claimed 0.10')
-
-  const cm = C.readComparison({ id: 'cmp_fixture', body: fixture('synthetic.response.json'), created_at: null })
-  assert.deepEqual(H.CURRENTS.groups, C.resultGroups(cm))
-  assert.deepEqual(C.comparisonFinding(H.currentsStudy()), C.comparisonFinding(cm))
-  assert.deepEqual(H.CURRENTS.cases, cm.cases.map(c => [C.micro(c.sigma_A), C.caseFinding(cm, c).headline]))
+  assert.ok(101 * 10 < 1016)
+  // "Measure at 8 h" on the page is the run's chosen time.
+  assert.equal(R.nextFinding(m).headline, 'Measure at 8 hours')
+  assert.equal(d.next.selected, 8)
 })
 
 test('the front page links only to the study, its own sections and the source, and loads nothing from elsewhere', () => {
@@ -238,6 +236,9 @@ test('the front page links only to the study, its own sections and the source, a
   for (const [, href] of html.matchAll(/\shref="([^"]*)"/g)) {
     if (href.startsWith('#')) assert.ok(href === '#main' || ids.has(href.slice(1)), `missing section ${href}`)
     else assert.ok(['app', './', 'https://github.com/Arnav-M10/DrBean-hp26'].includes(href) || /^(fonts|vendor)\/|\.css$/.test(href), `unexpected link ${href}`)
+  }
+  for (const [, src] of html.matchAll(/\ssrc="(logos\/[^"]+)"/g)) {
+    assert.doesNotMatch(readFileSync(new URL(src, import.meta.url), 'utf8'), /<script|\son[a-z]+=|href=/i, src)
   }
   for (const [, src] of html.matchAll(/\ssrc="([^"]*)"/g)) assert.doesNotMatch(src, /^(https?:)?\/\//)
   assert.equal([...html.matchAll(/data-start/g)].length, 3)

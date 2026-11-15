@@ -11,14 +11,15 @@ numerical model comparison service and the signed downloads. Nothing in the stud
 
 ## Front page
 
-`index.html` shows what a study does, using the study's own screens: its markup, `styles.css` and
-the functions that word and draw its results (`results.mjs`, `compare.mjs`, `chart.mjs`,
-`channel-chart.mjs`, `math.mjs`). `home.mjs` fills them from `home-data.mjs`, which copies two saved
-runs: the concentration study in `fixtures/` (the claim check and the next measurement) and the
-electron comparison in `fixtures/model-comparison/synthetic.response.json`. `study.test.mjs` reads
-those files again and checks every value. The file list and the assistant's answer on the front page
-are mock-ups of those screens, and the page says so. The front page sends nothing to the server and
-opens no workspace; its buttons lead to `/study/app`, which reopens a study saved in the browser.
+`index.html` is two screens. The first plays a saved run on the study's own chart (`chart.mjs`),
+once: the readings, the curve inside the claim, the curve outside it with its exact rate set by
+KaTeX, then the times to measure and the one that decides. The second shows the steps a study takes,
+from your files to the report, and sends one dot of data through them the first time it is seen.
+Reduced motion shows the finished picture with no movement. `home.mjs` draws both; the values come
+from `home-data.mjs`, a copy of the run in `fixtures/` that `study.test.mjs` checks against those
+files. The front page sends nothing to the server and opens no workspace; its buttons lead to
+`/study/app`, which reopens a study saved in the browser. `logos/` holds the Gemini and LangChain
+marks (CC0, see `logos/SOURCE.txt`).
 
 ## One flow for any files
 
@@ -63,7 +64,7 @@ The study id is kept in `localStorage`, so a reload reopens it.
 | File | What it does |
 | --- | --- |
 | `app.html`, `styles.css` | The study page and its styles (dark, one accent) |
-| `index.html`, `home.css`, `home.mjs`, `home-data.mjs` | The front page, its layout, and the saved runs it shows |
+| `index.html`, `home.css`, `home.mjs`, `home-data.mjs`, `logos/` | The front page, its layout and motion, the saved run it plays, and two service logos |
 | `app.mjs` | Files and question, the overview, routing, and the exact-check steps |
 | `general-app.mjs`, `general.mjs` | The assistant's steps, and which checks a table fits |
 | `compare-app.mjs`, `compare.mjs` | The electron-current steps, and the request, checks and wording behind them |
