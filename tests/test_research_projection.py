@@ -155,6 +155,21 @@ def test_unknown_attempt_keeps_its_reservation_and_exposes_inspect_or_cancel(lan
     assert service.get("alice", snapshot["id"])["provider_usage"] == usage
 
 
+def test_request_in_flight_is_not_reported_as_an_interruption(lane):
+    service, context, identity, _, ledger = active(lane)
+    asyncio.run(ApplicationResearchPorts(service, context).admit_model())
+    attempt = ledger.begin_attempt(identity.checked_dict(), {"reserved_input_tokens": 1000, "reserved_output_tokens": 100})
+    running = service.get("alice", context.research_session_id)
+    assert running["state"] == "running" and running["provider_usage"]["unresolved_attempts"] == 1
+    assert running["provider_usage"]["accounted_input_tokens"] == 1000
+    assert running["interaction"]["recovery"] == {"required": False, "code": None, "can_reconcile": False, "next_action": "none"}
+    assert running["interaction"]["suggested_action"] == "wait"
+    ledger.finish_attempt(attempt, {"status": "unknown_outcome", "usage": None})
+    service.release(context, "failed", error_code="provider_timeout_unknown_outcome")
+    stopped = service.get("alice", context.research_session_id)["interaction"]["recovery"]
+    assert stopped["required"] is True and stopped["code"] == "provider_outcome_unknown"
+
+
 def test_failed_sdk_action_still_exposes_unknown_provider_accounting(lane):
     service, context, identity, _, ledger = active(lane)
     asyncio.run(ApplicationResearchPorts(service, context).admit_model())

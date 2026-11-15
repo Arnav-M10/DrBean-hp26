@@ -7,6 +7,7 @@ from .ledger import _accounting, _aliases, _reservations, _usage
 
 
 UNRECOVERABLE = {"research_model_outcome_unrecoverable", "research_checkpoint_reconciliation_required"}
+ACTIVE_STATES = frozenset({"queued", "running", "waiting_child"})
 QUOTA_ERRORS = {"provider_budget_exhausted", "research_provider_allocation_exhausted", "research_budget_exhausted",
                 "agent_model_budget_exhausted", "agent_tool_budget_exhausted", "agent_child_budget_exhausted"}
 
@@ -54,7 +55,12 @@ def session_projection(conn, service, session, snapshot):
     usage = provider_usage(conn, session)
     action = snapshot["action"] or {}
     code = action.get("error_code")
-    recovery_required = (session["state"] == "needs_reconciliation" or bool(usage["unresolved_attempts"])
+    # A request still in flight belongs to the running action; it needs recovery only
+    # once the action has stopped (worker loss moves the session to needs_reconciliation,
+    # and a stopped action keeps its unresolved attempt).
+    in_flight = session["state"] in ACTIVE_STATES
+    recovery_required = (session["state"] == "needs_reconciliation"
+                         or (bool(usage["unresolved_attempts"]) and not in_flight)
                          or not usage["accounting_valid"])
     can_reconcile = (session["state"] == "needs_reconciliation" and not usage["unresolved_attempts"] and usage["accounting_valid"]
                      and code not in UNRECOVERABLE)
@@ -80,7 +86,7 @@ def session_projection(conn, service, session, snapshot):
     state = session["state"]
     if recovery_required:
         suggested = recovery_action
-    elif state in {"running", "queued", "waiting_child"}:
+    elif state in ACTIVE_STATES:
         suggested = "wait"
     elif state == "waiting_review":
         suggested = "review"
