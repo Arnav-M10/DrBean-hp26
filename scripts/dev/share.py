@@ -104,6 +104,70 @@ def session_api_ready():
         return False
 
 
+def sharing_environment():
+    """Only the gateway receives its explicit paths and selected app ports."""
+    env = launcher.child_env()
+    return {key: value for key, value in env.items()
+            if key != "DRBEAN_PROXY_SECRET"
+            and not key.startswith(("BEAN_SHARE_", "BEAN_LOCAL_"))}
+
+
+def spawn_gateway(env):
+    gateway_env = {**env, "BEAN_SHARE_ORIGIN_FILE": str(ORIGIN_FILE),
+                   "BEAN_SHARE_GATEWAY_FILE": str(GATEWAY_FILE),
+                   "BEAN_SHARE_WEB_PORT": str(launcher.WEB_PORT),
+                   "BEAN_SHARE_API_PORT": str(launcher.API_PORT)}
+    gateway = launcher.spawn("share-gateway", ["node", "apps/web/share-gateway.mjs", str(PORT)], gateway_env)
+    gateway["sharing_mode"] = GATEWAY_MODE
+    launcher.private_json(launcher.pidfile("share-gateway"), gateway)
+    return gateway
+
+
+@launcher.serialized_lifecycle
+def restart_gateway():
+    """Reload gateway code without rotating the tunnel URL or restarting science."""
+    if any(launcher.unproven_process(name) for name in NAMES):
+        print("A sharing process has unproven ownership. Nothing was changed.")
+        return 1
+    gateway = launcher.owned("share-gateway")
+    if not recorded_origin() or not launcher.owned("share-tunnel"):
+        print("A running managed tunnel and its existing origin are required. Nothing was changed.")
+        return 1
+    if gateway and gateway.get("sharing_mode") != GATEWAY_MODE:
+        print("The existing gateway is not a private-session gateway. Nothing was changed.")
+        return 1
+    if not all(launcher.owned(name) for name in ("api", "web")) or not session_api_ready():
+        print("The managed app is not ready. Nothing was changed.")
+        return 1
+    if not gateway and launcher.port_in_use(PORT):
+        print("Sharing port 4174 is occupied by an unowned process. Nothing was changed.")
+        return 1
+    try:
+        prepare_gateway()
+        if gateway:
+            stopped = launcher.stop_one("share-gateway")
+            if stopped.startswith("ownership unproven"):
+                raise launcher.LifecycleError("Gateway ownership changed; no replacement was launched.")
+        if launcher.port_in_use(PORT):
+            raise launcher.LifecycleError("Sharing port remains occupied; no replacement was launched.")
+        spawn_gateway(sharing_environment())
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if not launcher.owned("share-gateway"):
+                raise launcher.LifecycleError("Replacement gateway exited; the tunnel and app were retained.")
+            if launcher.port_in_use(PORT):
+                print("Sharing gateway restarted; existing tunnel URL, browser data and app retained.")
+                return 0
+            time.sleep(0.05)
+        raise launcher.LifecycleError("Replacement gateway did not become ready; inspect its local log.")
+    except (OSError, launcher.LifecycleError, KeyboardInterrupt) as error:
+        print(str(error) if isinstance(error, launcher.LifecycleError)
+              else "Gateway restart failed; the tunnel and app were retained.")
+        # Never stop the tunnel/awake process or clear its canonical origin.
+        # The command can be repeated if this gateway launch failed.
+        return 1
+
+
 @launcher.serialized_lifecycle
 def start():
     processes = {name: launcher.owned(name) for name in NAMES}
@@ -126,13 +190,10 @@ def start():
         return 1
     os.makedirs(launcher.RUN, exist_ok=True)
     clear_origin()
-    env = launcher.child_env()  # No provider credentials in the gateway or tunnel.
+    env = sharing_environment()  # No provider credentials in the gateway or tunnel.
     # Paths are only needed by the gateway; cloudflared gets no credential or
     # credential-file configuration. Neither public child needs local browser
     # proof configuration; only the gateway gets its explicit sharing paths.
-    env = {key: value for key, value in env.items() if not key.startswith(("BEAN_SHARE_", "BEAN_LOCAL_"))}
-    gateway_env = {**env, "BEAN_SHARE_ORIGIN_FILE": str(ORIGIN_FILE),
-                   "BEAN_SHARE_GATEWAY_FILE": str(GATEWAY_FILE)}
     log = Path(launcher.RUN) / "share-tunnel.log"
     offset = log.stat().st_size if log.exists() else 0
     try:
@@ -146,11 +207,9 @@ def start():
             _stop()
             if launcher.port_in_use(PORT):
                 raise launcher.LifecycleError("Sharing port remains occupied after owned-process cleanup; nothing else was killed.")
-        gateway = launcher.spawn("share-gateway", ["node", "apps/web/share-gateway.mjs", str(PORT)], gateway_env)
-        gateway["sharing_mode"] = GATEWAY_MODE
         # The marker belongs to this exact owned PID/start time, not to an old
         # origin file that a legacy gateway could also have written.
-        launcher.private_json(launcher.pidfile("share-gateway"), gateway)
+        spawn_gateway(env)
         launcher.spawn("share-tunnel", [binary, "tunnel", "--no-autoupdate", "--protocol", "http2",
                                       "--url", f"http://127.0.0.1:{PORT}"], env)
         deadline = time.monotonic() + 45
@@ -182,8 +241,9 @@ def start():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("start", "stop", "status"))
-    return {"start": start, "stop": stop, "status": status}[parser.parse_args().command]()
+    parser.add_argument("command", choices=("start", "stop", "status", "restart-gateway"))
+    return {"start": start, "stop": stop, "status": status,
+            "restart-gateway": restart_gateway}[parser.parse_args().command]()
 
 
 if __name__ == "__main__":

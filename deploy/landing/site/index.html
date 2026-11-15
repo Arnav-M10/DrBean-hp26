@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#121315">
+<meta name="description" content="Bring files and a question. Dr. Bean checks the claim with exact math and finds the one reading that would settle it.">
+<title>Dr. Bean: research assistant for scientific data</title>
+<script>
+  // Links to a study step (/study/#data, #check, #result, #next) open the study itself.
+  if (/^#(data|check|result|next)(-|$)/.test(location.hash)) location.replace('app' + location.hash)
+</script>
+<link rel="preload" href="fonts/atkinson-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="home.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<script type="module" src="home.mjs"></script>
+</head>
+<body class="home">
+<svg xmlns="http://www.w3.org/2000/svg" class="symbols" aria-hidden="true">
+<symbol id="professor-bean" viewBox="0 0 240 240">
+  <g stroke="#423b30" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path fill="#eeeae1" d="M69 116 27 104 42 89 17 82 42 69 24 54 54 53 44 34 77 45 78 25 101 46 131 41 155 28 162 48 190 36 187 56 215 54 200 72 223 82 202 97 213 113 178 123Z"/>
+    <path fill="#c6ccc0" stroke="none" d="m31 82 29-6-6 13 19 4-4 23-42-12 15-15Zm170-9-18 14 10 10-18 13 3 13 35-10-11-16 21-15Z"/>
+    <path fill="#c68c5a" d="M141 48C106 40 79 58 70 88c-8 27 4 43-2 64-5 20 2 43 24 54 34 18 79 2 92-35 13-36-5-56-5-76 0-24-13-41-38-47Z"/>
+    <path fill="#ddb385" stroke="none" d="M135 55c-31-4-52 12-58 36-6 25 6 41-1 65-5 19 4 35 23 44 17 8 35 6 48-1-38 2-38-34-31-53 11-29 20-31 24-53 3-19 0-30-5-38Z"/>
+    <path fill="none" stroke="#9c6c42" d="M137 58c18 27-3 48-17 72-11 20-14 42-1 54"/>
+    <path fill="none" d="m83 103 15-4m43-2 16 6"/>
+    <ellipse fill="#423b30" stroke="none" cx="94" cy="115" rx="3.8" ry="5.4"/><ellipse fill="#423b30" stroke="none" cx="146" cy="115" rx="3.8" ry="5.4"/>
+    <path fill="#e3b78c" stroke="#9c6c42" stroke-width="2" d="M117 117c-5 6-7 13-3 15 5 3 12 0 12-3"/>
+    <path fill="#f6f3ea" d="M119 136c-17-15-28-5-33 6-3 6-9 10-14 10 12 11 36 12 47-4 9 16 32 17 47 6-8-1-13-6-16-12-7-12-18-17-31-6Z"/>
+    <path fill="none" stroke-width="2" d="m88 149 11-6m43 1 9 7m-39 19q10 6 19-1"/>
+    <path fill="none" stroke="#7a8072" stroke-width="2" d="m46 62 17 9m-25 9 22 3m118-17 17-8m-11 26 17-1"/>
+  </g></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6v18h12V7zM14 3v4h4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/></symbol>
+  <symbol id="i-bars" viewBox="0 0 24 24"><path d="M4 20h16M7 16v-5M12 16V6M17 16v-8"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to the page</a>
+
+<header class="top">
+  <div class="wrap top-inner">
+    <a class="brand" href="./" aria-current="page"><svg aria-hidden="true"><use href="#professor-bean"/></svg><span>Dr. Bean</span></a>
+    <nav class="top-links" aria-label="This page">
+      <a class="nav-link" href="#how">How it works</a>
+      <a class="primary small" href="app" data-start>Start a study</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap hero-grid">
+      <div class="hero-text">
+        <h1 id="hero-title">What your data support, and what to measure next</h1>
+        <p class="lead">Bring files and a question. Dr. Bean checks the claim with exact math and finds the one reading that would settle it.</p>
+        <div class="hero-actions">
+          <a class="primary" href="app" data-start>Start a study</a>
+          <a class="text-link" href="#how">How it works</a>
+        </div>
+        <p class="meta hero-note">No account or key needed.</p>
+      </div>
+
+      <figure id="run" class="run" aria-labelledby="run-claim">
+        <div class="run-head">
+          <p id="run-claim" class="run-claim">Five readings, and the claim <span class="m-claim"></span></p>
+          <button id="replay" type="button" class="quiet-button" data-action="replay" hidden>Replay</button>
+        </div>
+        <div id="run-chart" class="run-chart"></div>
+        <div class="key"><span class="k-inside">Curve inside the claim</span><span class="k-outside">Curve outside the claim</span><span class="k-reading">Reading with its allowance</span></div>
+        <div class="run-notes">
+          <div class="note note-outside">
+            <p id="note-outside-math" class="note-head"></p>
+            <p class="note-text">This curve fits all five readings too, so they don’t settle the claim.</p>
+          </div>
+          <div class="note note-next">
+            <p class="note-head">Measure at 8 h</p>
+            <p class="note-text">One new reading there can fit only one of the two curves.</p>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="how" id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="how-head">
+        <h2 id="how-title">How it works</h2>
+        <p>Every step waits for your approval.</p>
+      </div>
+      <div id="flow-wrap" class="flow-wrap">
+        <svg id="flow-lines" class="flow-lines" aria-hidden="true"></svg>
+        <ol class="flow">
+          <li class="step" data-node="files"><span class="chip"><svg class="line-icon" aria-hidden="true"><use href="#i-file"/></svg></span><span class="step-text"><span class="step-name">Your files</span><span class="step-sub">Any field</span></span></li>
+          <li class="step" data-node="gemini"><span class="chip light"><img src="logos/gemini.svg" alt="" width="24" height="24"></span><span class="step-text"><span class="step-name">Gemini</span><span class="step-sub">Reads and quotes</span></span></li>
+          <li class="step" data-node="agents"><span class="chip light"><img src="logos/langchain.svg" alt="" width="22" height="22"></span><span class="step-text"><span class="step-name">Deep Agents</span><span class="step-sub">Plans one check</span></span></li>
+          <li class="step" data-node="approve"><span class="chip"><svg class="line-icon blue" aria-hidden="true"><use href="#i-check"/></svg></span><span class="step-text"><span class="step-name">You approve</span><span class="step-sub">Before anything runs</span></span></li>
+          <li class="step decides" data-node="counterdex"><span class="chip light"><span id="q-mark" class="q-mark" aria-hidden="true"></span></span><span class="step-text"><span class="step-name">Counterdex</span><span class="step-sub">Exact proof</span></span></li>
+          <li class="step" data-node="comparison"><span class="chip"><svg class="line-icon" aria-hidden="true"><use href="#i-bars"/></svg></span><span class="step-text"><span class="step-name">Comparison</span><span class="step-sub">Electron currents</span></span></li>
+          <li class="step" data-node="report"><span class="chip"><svg class="line-icon" aria-hidden="true"><use href="#i-download"/></svg></span><span class="step-text"><span class="step-name">Report</span><span class="step-sub">Replayable</span></span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-cta">
+      <svg class="foot-bean" aria-hidden="true"><use href="#professor-bean"/></svg>
+      <div class="foot-copy">
+        <p class="foot-title">Start with your own files</p>
+        <p class="meta">Or open a sample: drug levels or electron currents.</p>
+      </div>
+      <a class="primary" href="app" data-start>Start a study</a>
+    </div>
+    <div class="foot-row">
+      <p class="meta">The readings shown are synthetic, from a saved run. Product names and logos are trademarks of their owners.</p>
+      <a class="nav-link" href="https://github.com/Arnav-M10/DrBean-hp26">Source code on GitHub</a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

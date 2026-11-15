@@ -1,0 +1,130 @@
+/* Dr. Bean front page, on the study page's own styles (styles.css loads first): the same tokens,
+   type, buttons, chart and math. Two screens: a saved run happening on its real chart, then the
+   steps a study takes. The only motion that plays by itself is that run, once. */
+
+/* styles.css fits the study into one window; the front page scrolls instead. */
+.home main { display: block; max-width: none; padding: 0; }
+.home main > section { display: block; scroll-margin-top: 0; }
+@media (prefers-reduced-motion: no-preference) { html:has(> body.home) { scroll-behavior: smooth; } }
+
+.wrap { width: 100%; max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; padding: 0 var(--gutter); }
+
+/* Header: the study page's bar, its content on the page's edges */
+.home .top { display: block; padding: 0; }
+.top-inner { display: flex; align-items: center; gap: 24px; height: 100%; }
+.home .top-links { gap: 32px; }
+.nav-link { padding: 10px 0; color: var(--text-2); font-size: 15px; transition: color 0.15s var(--ease); }
+.nav-link:hover { color: var(--text); }
+
+/* Hero: the promise on the left, the saved run on the right. As tall as its content, so the
+   steps below start right after it. */
+.hero { padding: 72px 0 40px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: center; }
+.hero h1 { max-width: 13ch; font-size: clamp(40px, 4.2vw, 60px); line-height: 1.06; letter-spacing: -0.025em; }
+.hero-text .lead { max-width: 36ch; margin-top: 24px; font-size: 19px; }
+.hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin-top: 32px; }
+.text-link { padding: 10px 0; color: var(--text-2); font-weight: 500; transition: color 0.15s var(--ease); }
+.text-link:hover { color: var(--text); }
+.hero-note { margin-top: 18px; }
+
+/* The saved run: the study's own chart and key, and what the run found */
+.run { min-width: 0; margin: 0; padding: 20px 24px 24px; background: var(--surface); border-radius: var(--radius-p); }
+.run-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 36px; }
+.run-claim { color: var(--text-2); font-size: 15px; }
+.run-chart { min-height: 240px; margin-top: 8px; }
+.run .key { margin-top: 2px; font-size: 14px; }
+.run-chart .chart .curve.glow { stroke: var(--series); stroke-width: 10; opacity: 0.32; }
+.run-notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 32px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.note { display: grid; align-content: start; gap: 4px; }
+.note-head { color: var(--text); font-size: 18px; font-weight: 600; }
+.note-head .katex { font-size: 1.1em; }
+.note-text { color: var(--text-2); font-size: 15px; line-height: 1.45; }
+
+/* The run, played once: readings, the curve inside the claim, the one outside it, what it means,
+   then the times to measure and the one that decides. The plain rules above are the finished look. */
+@keyframes draw { from { stroke-dashoffset: 1; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.3); } }
+@keyframes drop { from { transform: scaleY(0); } }
+@keyframes grow { from { opacity: 0; transform: scaleY(0); } }
+@keyframes show { from { opacity: 0; } }
+@keyframes lift { from { opacity: 0; transform: translateY(8px); } }
+.run.play .reading { transform-box: fill-box; transform-origin: center; animation: pop 0.45s var(--ease) both; animation-delay: var(--d, 0ms); }
+.run.play .curve { stroke-dasharray: 1; animation: draw 1s cubic-bezier(0.65, 0, 0.35, 1) both; }
+.run.play .curve.inside { animation-delay: 0.5s; }
+.run.play .curve.outside, .run.play .curve.glow { animation-delay: 1.45s; }
+.run.play .note-outside { animation: lift 0.5s var(--ease) both; animation-delay: 2.35s; }
+.run.play .slot-line { transform-box: fill-box; transform-origin: top; animation: drop 0.5s var(--ease) both; animation-delay: 2.6s; }
+.run.play .slot-label { animation: show 0.4s both; animation-delay: 2.8s; }
+.run.play .range { transform-box: fill-box; transform-origin: center; animation: grow 0.45s var(--ease) both; animation-delay: 2.95s; }
+.run.play .slot.selected .range { animation-delay: 3.2s; }
+.run.play .note-next { animation: lift 0.5s var(--ease) both; animation-delay: 3.45s; }
+
+/* How it works: the steps in order, the decision branch under Counterdex */
+.how { padding: 56px 0 clamp(72px, 10vh, 112px); }
+.how-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 32px; margin-bottom: 48px; }
+.how-head h2 { font-size: clamp(28px, 3vw, 40px); line-height: 1.15; letter-spacing: -0.015em; }
+.how-head p { color: var(--text-2); font-size: 17px; }
+.flow-wrap { position: relative; }
+.flow-lines { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.flow { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 64px 44px; margin: 0; padding: 0; list-style: none; }
+.step { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius-p);
+  transition: border-color 0.35s var(--ease), box-shadow 0.35s var(--ease); }
+.step.decides { border-color: rgba(127, 176, 255, 0.55); }
+.step.lit { border-color: var(--series); box-shadow: 0 0 0 4px rgba(127, 176, 255, 0.16); }
+.step[data-node="comparison"] { grid-column: 5; grid-row: 2; }
+.step[data-node="report"] { grid-column: 6; grid-row: 1; }
+.chip { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--radius-c); background: var(--raised); }
+.chip.light { background: var(--text); }
+.chip img { display: block; }
+.line-icon { width: 20px; height: 20px; fill: none; stroke: var(--text); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.line-icon.blue { stroke: var(--series); stroke-width: 2.2; }
+.q-mark { color: var(--on-primary); font-size: 19px; line-height: 1; }
+.step-text { display: grid; gap: 2px; }
+.step-name { color: var(--text); font-size: 17px; font-weight: 600; }
+.step-sub { color: var(--text-3); font-size: 15px; }
+.flow-line { fill: none; stroke: rgba(233, 236, 240, 0.28); stroke-width: 1.5; }
+.flow-head { fill: rgba(233, 236, 240, 0.45); }
+.pulse-halo { fill: var(--series); opacity: 0.55; }
+.pulse-core { fill: #d6e6ff; }
+
+/* Footer: the one action again, and the facts behind the page */
+.foot { padding: 48px 0 40px; border-top: 1px solid var(--line); }
+.foot-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 20px; }
+.foot-bean { flex: none; width: 56px; height: 56px; }
+.foot-copy { display: grid; gap: 2px; }
+.foot-title { font-size: 22px; font-weight: 600; }
+.foot-cta .primary { margin-left: auto; }
+.foot-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px 32px; margin-top: 40px; }
+.foot-row .meta { max-width: 72ch; }
+
+@media (max-width: 1023px) {
+  .hero { padding: 48px 0 32px; }
+  .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .hero h1 { max-width: 16ch; }
+}
+@media (max-width: 899px) {
+  .flow { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .step[data-node="comparison"], .step[data-node="report"] { grid-column: auto; grid-row: auto; }
+  .step { flex-direction: row; align-items: center; padding: 14px 16px; }
+  .flow-lines { display: none; }
+}
+@media (max-width: 640px) {
+  .nav-link { display: none; }
+  .foot-row .nav-link { display: inline; }
+  .home .top-links { gap: 16px; }
+  .hero { padding: 40px 0 24px; }
+  .hero h1 { font-size: clamp(34px, 10vw, 44px); }
+  .hero-text .lead { margin-top: 20px; font-size: 17px; }
+  .run { padding: 16px; }
+  .run-notes { grid-template-columns: minmax(0, 1fr); }
+  .how { padding: 48px 0 72px; }
+  .how-head { margin-bottom: 32px; }
+  .foot-cta .primary { margin-left: 0; }
+}
+/* Short laptop screens: the hero still fits the first screen. */
+@media (max-height: 820px) and (min-width: 1024px) {
+  .hero { padding: 32px 0 24px; }
+  .hero h1 { font-size: clamp(38px, 3.8vw, 52px); }
+  .run { padding: 16px 20px 20px; }
+  .run-notes { margin-top: 14px; padding-top: 14px; }
+}
