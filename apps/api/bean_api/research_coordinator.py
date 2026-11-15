@@ -19,7 +19,8 @@ from langchain.agents.middleware.types import hook_config
 from langchain.tools import ToolRuntime
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.types import Command, interrupt
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, with_config
+from typing_extensions import TypedDict
 
 from .ai_prompts import COMMENTARY_POLICY_VERSION
 from .canonical import canonical_bytes
@@ -36,6 +37,20 @@ PORT_VERSION = "research-ports.v1"
 FACT_VIEW_VERSION = "agent-evidence-view.v1"
 TOOLS = frozenset({"write_todos", "prepare_scientific_proposal", "run_scientific_operation",
                    "read_research_evidence", "request_clarification", "publish_research_report"})
+
+
+@with_config(ConfigDict(extra="forbid", strict=True))
+class _ResearchTodo(TypedDict):
+    # The canonical plan adapter/store cap titles at 300, stricter than the
+    # generic tool boundary. Keep dictionaries for the SDK planning state.
+    content: Annotated[str, Field(min_length=1, max_length=300)]
+    status: Literal["pending", "in_progress", "completed"]
+
+
+class _ResearchTodosInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, arbitrary_types_allowed=True)
+    todos: Annotated[list[_ResearchTodo], Field(min_length=1, max_length=12)]
+    runtime: ToolRuntime
 
 
 def _safe_tool_batch(calls: list[dict]) -> bool:
@@ -648,7 +663,7 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
 
     async def run_scientific_operation(proposal_id: str, proposal_digest: str,
                                        review_id: str, review_digest: str, runtime: ToolRuntime) -> dict[str, Any]:
-        """Copy all four prepared fields verbatim; pause for approval; execute/reconcile that child."""
+        """Copy prepared fields verbatim; approval required to execute/reconcile."""
         _references([proposal_id])
         review = _review(await _await(ports.read_review(proposal_id)), proposal_id)
         if (proposal_digest, review_id, review_digest) != (
@@ -858,11 +873,16 @@ def create_research_coordinator(*, context: ResearchContext, ports: ResearchPort
         excluded_middleware=frozenset({"SummarizationMiddleware"})))
     # The SDK defaults repeat several pages of general planning instructions on
     # every physical request. Keep the actual SDK planning middleware and its
-    # tool/schema while supplying the research-specific instruction once. This
+    # tool implementation while supplying the research instruction once. This
     # reduces charged context without dropping any reviewed input or evidence.
     planning = TodoListMiddleware(
-        system_prompt="Plan from evidence; preserve completed steps; no authority.",
-        tool_description="Plan only; preserve completed steps.")
+        system_prompt="Preserve completed steps; no authority.",
+        tool_description="Plan.")
+    # Advertise the exact shape the canonical application can persist. The
+    # SDK functions and injected ToolRuntime stay intact; no values are coerced.
+    # Canonical evidence and preserved-step instructions already live in the
+    # system prompts, so do not duplicate them or tautological item prose here.
+    planning.tools[0].args_schema = _ResearchTodosInput
     graph = create_deep_agent(model=model, tools=typed, middleware=[NoFilesystem(), planning, Boundary()],
         state_schema=ResearchState, backend=StateBackend(), checkpointer=checkpointer,
         subagents=[], skills=None, memory=None, store=None, cache=None, debug=False,

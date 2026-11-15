@@ -23,6 +23,7 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, Field
 
 from .canonical import parse_json_strict
+from .gemini_chat_gateway import safe_tool_validation_detail
 from .gemini_tool_diagnostics import ToolCallValidationFailure
 from .providers import ProviderFailure
 
@@ -37,9 +38,19 @@ class _CancelledModelCall(Exception):
 
 
 class _SchemaValidationError(ValueError):
-    def __init__(self, reason, missing_fields=()):
+    def __init__(self, reason, missing_fields=(), *, schema_path=None, expected_type=None, observed_type=None):
         self.reason, self.missing_fields = reason, tuple(missing_fields)
+        self.schema_path, self.expected_type, self.observed_type = schema_path, expected_type, observed_type
         super().__init__(reason)
+
+
+def _json_type(value):
+    return {dict: "object", list: "array", str: "string", int: "integer", float: "number",
+            bool: "boolean", type(None): "null"}.get(type(value), "non_json")
+
+
+def _schema_pointer(path):
+    return "#" + "".join("/" + str(part).replace("~", "~0").replace("/", "~1") for part in path)
 
 
 def _json(value: Any) -> str:
@@ -64,7 +75,7 @@ def _text(message: BaseMessage) -> str:
 
 
 def _validate_schema(value: Any, schema: dict[str, Any], root: dict[str, Any] | None = None,
-                     depth: int = 0) -> None:
+                     depth: int = 0, schema_path: tuple = ()) -> None:
     """Bounded JSON Schema subset for tool dictionaries; never coerce arguments.
 
     Pydantic tool classes additionally run their original strict validator. Other
@@ -78,30 +89,32 @@ def _validate_schema(value: Any, schema: dict[str, Any], root: dict[str, Any] | 
         if not isinstance(ref, str) or not ref.startswith("#/$defs/"):
             raise ValueError("Only local schema references are supported")
         target = root
-        for component in ref[2:].split("/"):
-            target = target[component.replace("~1", "/").replace("~0", "~")]
-        _validate_schema(value, target, root, depth + 1)
+        target_path = tuple(component.replace("~1", "/").replace("~0", "~") for component in ref[2:].split("/"))
+        for component in target_path:
+            target = target[component]
+        _validate_schema(value, target, root, depth + 1, target_path)
     for keyword in ("anyOf", "oneOf"):
         if keyword in schema:
             matches = 0
-            for choice in schema[keyword]:
+            for index, choice in enumerate(schema[keyword]):
                 try:
-                    _validate_schema(value, choice, root, depth + 1)
+                    _validate_schema(value, choice, root, depth + 1, (*schema_path, keyword, index))
                     matches += 1
                 except (ValueError, TypeError, KeyError):
                     pass
             if matches < 1 or (keyword == "oneOf" and matches != 1):
                 raise ValueError("Value does not match a schema alternative")
     if "allOf" in schema:
-        for choice in schema["allOf"]:
-            _validate_schema(value, choice, root, depth + 1)
+        for index, choice in enumerate(schema["allOf"]):
+            _validate_schema(value, choice, root, depth + 1, (*schema_path, "allOf", index))
     kind = schema.get("type")
     kinds = {"object": lambda: type(value) is dict, "array": lambda: type(value) is list,
              "string": lambda: type(value) is str, "integer": lambda: type(value) is int,
              "number": lambda: type(value) in (int, float), "boolean": lambda: type(value) is bool,
              "null": lambda: value is None}
     if kind is not None and (kind not in kinds or not kinds[kind]()):
-        raise _SchemaValidationError("wrong_argument_type")
+        raise _SchemaValidationError("wrong_argument_type", schema_path=_schema_pointer(schema_path),
+                                     expected_type=kind, observed_type=_json_type(value))
     if "enum" in schema and _json(value) not in {_json(item) for item in schema["enum"]}:
         raise ValueError("Value outside the declared enumeration")
     if "const" in schema and _json(value) != _json(schema["const"]):
@@ -118,12 +131,13 @@ def _validate_schema(value: Any, schema: dict[str, Any], root: dict[str, Any] | 
             if child is False:
                 raise _SchemaValidationError("unknown_arguments")
             if isinstance(child, dict):
-                _validate_schema(item, child, root, depth + 1)
+                child_path = (*schema_path, "properties", key) if key in properties else (*schema_path, "additionalProperties")
+                _validate_schema(item, child, root, depth + 1, child_path)
     if type(value) is list:
         if not schema.get("minItems", 0) <= len(value) <= schema.get("maxItems", _BOUND):
             raise ValueError("Incorrect array size")
         for item in value:
-            _validate_schema(item, schema.get("items", {}), root, depth + 1)
+            _validate_schema(item, schema.get("items", {}), root, depth + 1, (*schema_path, "items"))
     if type(value) is str:
         if not schema.get("minLength", 0) <= len(value) <= schema.get("maxLength", _BOUND):
             raise ValueError("Incorrect string size")
@@ -265,21 +279,27 @@ class GeminiChatModel(BaseChatModel):
 
         return model | RunnableLambda(parse)
 
-    def _tool_failure(self, reason, name=None, missing_fields=()):
+    def _tool_failure(self, reason, name=None, missing_fields=(), *, schema_path=None, expected_type=None, observed_type=None):
         declarations = {value["name"]: value["parameters_json_schema"] for value in map(json.loads, self.tools_json)}
-        return ToolCallValidationFailure(reason, declarations, tool_name=name, missing_fields=missing_fields)
+        failure = ToolCallValidationFailure(reason, declarations, tool_name=name, missing_fields=missing_fields)
+        failure.validation_detail = safe_tool_validation_detail(
+            {**failure.validation_detail, "schema_path": schema_path, "expected_type": expected_type,
+             "observed_type": observed_type}, declarations)
+        return failure
 
     def _validate_arguments(self, name: str, arguments: Any) -> None:
         declarations = {value["name"]: value for value in map(json.loads, self.tools_json)}
         if name not in declarations:
             raise self._tool_failure("unknown_tool")
         if type(arguments) is not dict:
-            raise self._tool_failure("wrong_argument_type", name)
+            raise self._tool_failure("wrong_argument_type", name, schema_path="#", expected_type="object",
+                                     observed_type=_json_type(arguments))
         try:
             _json(arguments)
             _validate_schema(arguments, declarations[name]["parameters_json_schema"])
         except _SchemaValidationError as exc:
-            raise self._tool_failure(exc.reason, name, exc.missing_fields) from None
+            raise self._tool_failure(exc.reason, name, exc.missing_fields, schema_path=exc.schema_path,
+                                     expected_type=exc.expected_type, observed_type=exc.observed_type) from None
         except (TypeError, ValueError, KeyError):
             raise self._tool_failure("schema_constraint", name) from None
         try:

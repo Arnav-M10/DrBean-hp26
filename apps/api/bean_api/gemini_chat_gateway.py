@@ -29,6 +29,61 @@ from .providers import (
 
 SESSION_ACCOUNTING_VERSION = "research-session.v1"
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z")
+_JSON_TYPES = frozenset({"object", "array", "string", "integer", "number", "boolean", "null"})
+
+
+def safe_tool_validation_detail(value, declarations):
+    """Retain only a bounded schema location and JSON type labels, never values.
+
+    This gateway rechecks the diagnostic against the original trusted tool
+    schema. Paths address schema nodes, not argument keys or array positions.
+    The existing reason/name/missing-field sanitizer remains authoritative.
+    """
+    result = safe_validation_detail(value, declarations)
+    if not result or result["reason"] != "wrong_argument_type" or "tool_name" not in result:
+        return result
+    path = value.get("schema_path")
+    if (type(path) is not str or len(path.encode("utf-8", errors="replace")) > 512
+            or not (path == "#" or path.startswith("#/"))):
+        return result
+    parts = path[2:].split("/") if path != "#" else []
+    if len(parts) > 64:
+        return result
+    parts = [part.replace("~1", "/").replace("~0", "~") for part in parts]
+    if "#" + "".join("/" + part.replace("~", "~0").replace("/", "~1") for part in parts) != path:
+        return result
+    node = declarations[result["tool_name"]]
+    index = depth = 0
+    while index < len(parts):
+        if type(node) is not dict or depth >= 32:
+            return result
+        keyword = parts[index]
+        index, depth = index + 1, depth + 1
+        if keyword in {"properties", "$defs"}:
+            children = node.get(keyword)
+            if type(children) is not dict or index == len(parts) or parts[index] not in children:
+                return result
+            node, index = children[parts[index]], index + 1
+        elif keyword in {"anyOf", "oneOf", "allOf"}:
+            children = node.get(keyword)
+            if (type(children) is not list or index == len(parts) or not parts[index].isascii()
+                    or not parts[index].isdigit() or len(parts[index]) > 3):
+                return result
+            choice = int(parts[index])
+            if str(choice) != parts[index] or choice >= len(children):
+                return result
+            node, index = children[choice], index + 1
+        elif keyword in {"items", "additionalProperties"}:
+            node = node.get(keyword)
+        else:
+            return result
+    expected, observed = value.get("expected_type"), value.get("observed_type")
+    if (type(node) is not dict or type(expected) is not str or expected not in _JSON_TYPES
+            or node.get("type") != expected or type(observed) is not str
+            or observed not in _JSON_TYPES | {"non_json"} or expected == observed
+            or expected == "number" and observed == "integer"):
+        return result
+    return {**result, "schema_path": path, "expected_type": expected, "observed_type": observed}
 
 
 @dataclass(frozen=True)
@@ -247,7 +302,7 @@ class GeminiChatGateway:
         except BaseException as exc:
             code = "provider_cancelled_unknown_outcome" if isinstance(exc, asyncio.CancelledError) else (
                 exc.code if isinstance(exc, ProviderFailure) else classify_failure(exc)[0])
-            validation_detail = safe_validation_detail(getattr(exc, "validation_detail", None),
+            validation_detail = safe_tool_validation_detail(getattr(exc, "validation_detail", None),
                 {declaration.name: declaration.parameters_json_schema for tool in typed_tools
                  for declaration in tool.function_declarations}) if code == "provider_malformed_tool_call" else None
             if not finalization_attempted:
