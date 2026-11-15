@@ -167,10 +167,24 @@ export class ResearchController {
   }
 }
 
+export function researchCapacity(s) {
+  const remaining = Math.max(0, (s.provider_allocation?.physical_requests || 0) - (s.usage?.physical_calls || 0))
+  const usage = s.provider_usage
+  return { remaining: usage?.remaining?.physical_requests ?? remaining,
+    blocked: s.mode === 'live' && (s.interaction?.quota_exhausted === true || s.interaction?.recovery?.required === true
+      || usage?.accounting_valid === false || (usage?.remaining ? ['physical_requests', 'input_tokens', 'output_tokens'].some(key => usage.remaining[key] === 0) : remaining === 0)) }
+}
+export function researchStopMessage(code) {
+  return ({ provider_rate_limited: 'The model provider temporarily refused the request. No automatic retry was made.',
+    provider_budget_exhausted: 'The model budget is exhausted. Ask the server operator to inspect the existing allocation.',
+    research_provider_allocation_exhausted: 'The allocated model capacity is exhausted. Consent does not grant more capacity.' })[code]
+    || 'The assistant stopped before completing its next step. Inspect the saved state before continuing.'
+}
+
 const SESSION_STATES = {
   ready: ['plan', 'Ready for the next step'], queued: ['run', 'Queued'], running: ['run', 'Assistant working'], waiting_child: ['run', 'Checker running'],
   waiting_review: ['wait', 'Waiting for your approval'], waiting_observation: ['wait', 'Waiting for a new reading'], paused: ['off', 'Paused'],
-  needs_reconciliation: ['bad', 'Interrupted'], completed: ['ok', 'Complete'], failed: ['bad', 'Failed'], cancelled: ['off', 'Cancelled'],
+  needs_reconciliation: ['bad', 'Interrupted'], completed: ['ok', 'Complete'], failed: ['bad', 'Assistant stopped'], cancelled: ['off', 'Cancelled'],
 }
 const STEP_STATES = {
   pending: ['plan', 'Suggested'], in_progress: ['run', 'Running'], waiting_review: ['wait', 'Needs your approval'], waiting_observation: ['wait', 'Needs a reading'],
@@ -271,8 +285,8 @@ function button(parent, title, callback, disabled = false, className = '', downl
       }
       return
     }
-    const live = s.mode === 'live', remaining = live ? Math.max(0, (s.provider_allocation?.physical_requests || 0) - s.usage.physical_calls) : 0
-    const blocked = !enabled || Boolean(state.pending) || (live && !remaining)
+    const live = s.mode === 'live', capacity = researchCapacity(s), remaining = live ? capacity.remaining : 0
+    const blocked = !enabled || Boolean(state.pending) || capacity.blocked
     root.append(element('h3', 'Your question'), element('h4', s.objective, 'objective'))
     const status = element('div', '', 'actions'); status.append(chip(SESSION_STATES[s.state] ?? ['off', s.state]), element('span', live ? 'Live model: each call is metered' : 'Controlled assistant: scripted planning model, real checker jobs', 'meta'))
     root.append(status, element('p', `State: ${s.state} · revision ${s.revision}`, 'fine'))
@@ -283,7 +297,7 @@ function button(parent, title, callback, disabled = false, className = '', downl
       details(box, 'Exactly what would be sent', { provider: 'gemini', model: connection.capabilities.gemini?.model, ...s.provider_disclosure }, 'technical')
       checkbox(box, 'I consent to sending this research question, reviewed inputs, plan, retained evidence and source references to the disclosed Gemini model.', Boolean(state.providerAccepted), value => { state.providerAccepted = value })
       button(box, 'Save provider consent', () => controller.consent(), !enabled || Boolean(state.pending), 'secondary')
-      if (!remaining) box.append(element('p', 'The assistant cannot continue until the server operator allocates capacity. Consenting does not grant capacity.', 'note wait'))
+      if (capacity.blocked) box.append(element('p', 'The assistant cannot continue: capacity is unavailable or an interrupted request needs inspection. Ask the operator to inspect the existing accounting. Consenting does not grant capacity.', 'note wait'))
     }
     const review = s.pending_review, observing = caps?.supported_operations?.includes('observation')
     const turn = element('div', '', 'callout primary')
@@ -334,12 +348,16 @@ function button(parent, title, callback, disabled = false, className = '', downl
       button(turn, 'Plan next step for separate review', planNext, blocked)
       next.append(element('h2', 'Compare feasible measurement times'), element('p', 'The assistant can propose a comparison based on the saved investigation. You’ll review the exact pair and approve the comparison separately.'))
       button(next, 'Plan next step for separate review', async () => { location.hash = 'investigations'; await planNext() }, blocked)
-    } else if (s.state === 'needs_reconciliation') {
+    } else if (s.state === 'needs_reconciliation' || s.interaction?.recovery?.required) {
       root.append(turn)
-      turn.append(element('h3', 'Recover the interrupted step'), element('p', 'The last step stopped unexpectedly. Completed evidence and usage counts are kept. The assistant does not resume by itself after a restart; reconcile the step to continue.'))
-      button(turn, 'Reconcile interrupted action', () => controller.reconcile(), Boolean(state.pending))
+      turn.append(element('h3', 'Recover the interrupted step'), element('p', 'The last step stopped unexpectedly. Completed evidence and usage counts are kept. The assistant does not resume by itself after a restart; review the recovery action authorized below.'))
+      if (!s.interaction?.recovery || s.interaction.recovery.can_reconcile === true) button(turn, 'Reconcile interrupted action', () => controller.reconcile(), Boolean(state.pending))
+      else turn.append(element('p', 'The backend has not authorized reconciliation. Inspect accounting with the server operator or cancel remaining work; nothing is resent automatically.', 'note wait'))
     }
-    if (s.action?.error_code) root.append(element('p', `The last step stopped: ${s.action.error_code}. Completed evidence is kept.`, 'note bad'))
+    if (s.action?.error_code) {
+      root.append(element('p', `${researchStopMessage(s.action.error_code)} Completed scientific evidence remains available in Results and downloads.`, 'note bad'))
+      details(root, 'Why the assistant stopped (technical)', { code: s.action.error_code }, 'technical')
+    }
     root.append(element('h3', 'Plan'))
     if (!s.plan) root.append(element('p', 'The assistant has not written a plan yet. Advance the research plan to let it draft one.', 'note'))
     else {
