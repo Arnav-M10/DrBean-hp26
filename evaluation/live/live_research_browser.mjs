@@ -221,6 +221,7 @@ try {
     await panel.getByRole('button', { name: 'Save provider consent', exact: true }).click()
     await page.waitForFunction(() => document.querySelector('#durable-research').textContent.match(/(Provider consent|Consent) saved/), null, { timeout: 30000 })
     check('consent-recorded-through-the-browser')
+    record.observations.consent = { at: new Date().toISOString(), provider_consent_required: (await api(`/research-sessions/${session.id}`)).interaction?.provider_consent_required ?? null }
     const attemptsBefore = list(await api(`/workspaces/${workspace}/provider-attempts`)).length
     assert.equal(attemptsBefore, 0, 'Saving inputs or consent must not call the provider')
 
@@ -282,7 +283,8 @@ try {
   record.observations.provider_usage = (await api(`/research-sessions/${session.id}`)).provider_usage ?? null
   record.observations.model_tool_calls = JSON.parse(await run(python, ['evaluation/live/extract_tool_calls.py', join(scratch, 'bean.sqlite3'), session.id], env, 30000))
   const events = (await api(`/research-sessions/${session.id}/events?after=-1`)).items
-  record.observations.events = events.map(event => ({ type: event.event_type, summary: event.summary, references: event.reference_ids,
+  record.observations.events = events.map(event => ({ sequence: event.sequence ?? null, at: event.created_at ?? event.at ?? null,
+    type: event.event_type, summary: event.summary, references: event.reference_ids,
     execution_mode: event.execution_mode ?? event.body?.execution_mode ?? null }))
   record.physical_requests = attempts.length
   if (UI === 'preview' && session.state === 'completed' && session.reports?.length) {
@@ -298,7 +300,10 @@ try {
     assert.equal(sha(await reread.body()), sha(bytes), 'Report snapshot is unchanged on a fresh download')
     record.observations.report_snapshot_repeat_digest_matches = true
     await writeFile(join(output, 'research-report.json'), bytes)
-    record.observations.report = { id: session.reports.at(-1), sha256: sha(bytes), fields: Object.keys(JSON.parse(bytes).body) }
+    const reportBody = JSON.parse(bytes).body
+    record.observations.report = { id: session.reports.at(-1), sha256: sha(bytes), fields: Object.keys(reportBody),
+      commentary_status: reportBody.commentary_status ?? null, model_failure: reportBody.model_failure ?? null,
+      evidence_count: reportBody.evidence?.length ?? null, native_evidence_count: reportBody.native_evidence?.length ?? null }
     for (const entry of JSON.parse(bytes).body.native_evidence || []) {
       const native = await context.request.get(`${base}${entry.download_path}`), anchor = await context.request.get(`${base}${entry.anchor_path}`)
       assert.equal(native.status(), 200); assert.equal(anchor.status(), 200)
