@@ -34,7 +34,7 @@ conservative ledger and current native science routing; they are reused.
 # Backend integration verification
 
 Priority: integration and recovery only; new features paused.
-Branch: `backend/integration-verification`; replacement draft PR #21.
+Branch: `backend/integration-verification`; replacement PR #21, ready for integration review.
 Agreed base: main `37d8f6f6010e2fe8be3e55323bd6cc18f9112760`, tree-identical
 with merged PR #19 `fca07fe4f59eaf7668ea1d2dfeda21be29d6b4a4`.
 Tested backend candidate: `4f6c580553b666286177de8080a5e4e5d3d4d2b9`.
@@ -94,7 +94,25 @@ descendants: no signals, barriers, limit changes or evaluator assertion changes.
 Final evaluator teardown was clean. Ordinary and barrier evidence stay separate.
 Test log prefixes in this workspace: `/tmp/integration-final-*`.
 
-## Preserved evidence, Mac status and next trigger
+## Executed Mac and CI evidence
+
+- Owner 1 executed clean `4f6c580` on Mac: 588 backend tests passed in 86.03 s;
+  all 7 ordinary guarded HTTP lane scenarios passed, no diagnostic overrides or
+  process-limit relaxation. CPython 3.13.18 backend and 3.11.17 scientific runtime.
+  This includes permission-denial closure, timeout, adapter failure, cancellation,
+  worker SIGKILL/lifeline cleanup, retained bytes and no redispatch.
+- Exact-source report: PR #19 comment `6872682729`. An additional synthetic
+  unresolved own-time recheck passed (2.52 s); it retains inconclusive candidate
+  status/row identity and fresh packet replay, rather than forcing a binary verdict.
+- Mac/Linux installed engine source digest agrees:
+  `90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
+- GitHub CI at `c44b010` (run `43563651309`): all five jobs passed. Linux
+  CPython 3.13 backend: 588 passed (107.08 s); independent HTTP/invariant suite:
+  47 passed (73.02 s); ordinary-user boundary: 10 passed with 64 owned processes;
+  engine: 291 tests, 2 skips; web/harness checks, lint and schema drift passed.
+  The final evidence update changes this progress file only, not runtime/tests.
+
+## Preserved evidence and next trigger
 
 - Read Claude's FINDINGS, c231be4 preview README and killpg-eperm-repro.py at
   `526f15a6f4be5aac81232badaba2893ac9fc4aa6`. His branch/tests/findings are untouched.
@@ -103,9 +121,19 @@ Test log prefixes in this workspace: `/tmp/integration-final-*`.
 - Earlier retained Mac lane at `159fd65` has identical production paths to
   fca07fe/37d8f6f and records ordinary passing scientific acceptance. It is
   baseline evidence, not Mac qualification of the new 4f6c580 correction.
-- Owner 1 acknowledged the exact candidate and is executing it on Mac. Shared
-  coordination/results: PR #19 conversation. Final candidate Mac result pending;
-  draft #21 stays held until it is reported. No new numerical or cleanup rebuild.
-- Next: preserve any newer Claude tests/findings, resolve concrete matrix failures,
-  and update this record with the actual Mac SHA/runtime/results. Backend checks
-  alone do not establish whole-release readiness. No automatic merge authorized here.
+- Owner 1's actual Mac candidate execution is reported above. The requested
+  supplementary run of Claude's unchanged ledger file on Mac is pending; its 15
+  assertions already passed on Linux, and candidate-owned ledger regressions
+  passed in both complete backend suites. Claude then pushed `896bfe0`; its
+  updated EPERM/ledger findings were read and preserved. Its ledger test file
+  is byte-identical to 526f15a (same SHA-256 above), so the 15/15 result applies
+  to the latest assertions. No validation-owned files or markers were changed.
+- Owner 1 subsequently pushed test/evidence-only PR #23 at `5d66354`, stacked
+  on #21 and incorporating c44b010/main 4b5f1f5. He reports an additional exact
+  clean Mac run: ordinary HTTP 7/7, controls 22/22, unresolved native recheck 1
+  passed, web 30 passed, and engine 292 tests (one dependency skip, checked
+  separately). Production backend/engine source remains unchanged. Preserve
+  that owned regression and portable example as a separate review; do not rebuild it.
+- Next: review/merge #21 and supersede obsolete #13/#14 as recommended above;
+  preserve any subsequent independent findings. No new numerical or cleanup
+  rebuild. Backend checks alone do not establish whole-release readiness.
