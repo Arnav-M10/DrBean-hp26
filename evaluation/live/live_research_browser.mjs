@@ -80,6 +80,14 @@ async function poll(predicate, timeout, every = 2000) {
   throw new Error(`Timed out after ${timeout} ms`)
 }
 const list = value => Array.isArray(value) ? value : (value.items || [])
+// Settle on the server's state, never on panel text: a request in flight is not a stop.
+const ACTIVE_STATES = new Set(['queued', 'running', 'waiting_child'])
+async function settledSession(id, timeout) {
+  let latest
+  await poll(async () => { latest = await api(`/research-sessions/${id}`)
+    return !ACTIVE_STATES.has(latest.state) && !latest.provider_usage?.unresolved_attempts }, timeout, 1000)
+  return latest
+}
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
 
 try {
@@ -149,7 +157,7 @@ try {
       await page.locator('#continue-plan').click()
       // Wait until the click has reached the server (revision moves) and the action is no longer moving.
       const settle = async (fromRevision, timeout) => { await poll(async () => { const s = await api(`/research-sessions/${session.id}`)
-        return s.revision > fromRevision && !['queued', 'running', 'waiting_child'].includes(s.state) }, timeout); return api(`/research-sessions/${session.id}`) }
+        return s.revision > fromRevision && !['queued', 'running', 'waiting_child'].includes(s.state) && !s.provider_usage?.unresolved_attempts }, timeout); return api(`/research-sessions/${session.id}`) }
       session = await settle(beforeAdvance, 240000)
       record.observations.after_first_advance = { state: session.state, revision: session.revision, child_count: session.children.length, pending_review: session.pending_review?.kind ?? null, error_code: session.action?.error_code ?? null, usage: session.usage }
       if (session.pending_review?.kind === 'plan') {
@@ -251,7 +259,7 @@ try {
           const text = document.querySelector('#durable-research').textContent
           return /Review the investigation operation|Review the separate|The assistant needs more information|State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped|Why the assistant stopped/.test(text)
         }, null, { timeout })
-        return api(`/research-sessions/${session.id}`)
+        return settledSession(session.id, timeout)
       }
       session = await settled(240000)
       record.observations.after_first_advance = { state: session.state, pending_review: session.pending_review?.kind ?? null,
@@ -265,7 +273,7 @@ try {
         await approve.click()
         await page.waitForFunction(() => /State: (completed|failed|cancelled|needs_reconciliation)|The last step stopped|Why the assistant stopped|Review the separate/.test(
           document.querySelector('#durable-research').textContent), null, { timeout: 300000 })
-        session = await api(`/research-sessions/${session.id}`)
+        session = await settledSession(session.id, 300000)
       }
       record.observations.final = { state: session.state, pending_review: session.pending_review?.kind ?? null,
         error_code: session.action?.error_code ?? null, usage: session.usage, provider_allocation: session.provider_allocation,
@@ -334,8 +342,9 @@ try {
     record.observations.reload = { same_workspace: shownWorkspace === workspace, same_session: after.id === before.id,
       state: after.state, revision_unchanged: after.revision === before.revision,
       reports_unchanged: JSON.stringify(after.reports) === JSON.stringify(before.reports),
-      report_download_offered: UI !== 'web' || !before.reports?.length || panel.includes('Download research report snapshot') ||
-        await page.getByRole('button', { name: 'Download research report snapshot', exact: true }).count() > 0 }
+      // The report button lives on the separate Next page, so count it whether or not that page is shown.
+      report_download_offered: UI !== 'web' || !before.reports?.length ||
+        await page.locator('button', { hasText: 'Download research report snapshot' }).count() > 0 }
     record.observations.reload.passed = Object.entries(record.observations.reload).every(([key, value]) => key === 'state' || value === true)
     if (record.observations.reload.passed) check('reload-keeps-the-same-session-and-results', `${after.state} r${after.revision}`)
   } catch (error) {
