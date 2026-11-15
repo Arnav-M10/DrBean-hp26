@@ -10,7 +10,8 @@ It also enforces the default sprint ceiling of 12. A separately recorded,
 explicitly selected qualification extension permits one additional grant of
 at most six requests. The first has an overall ceiling of 16; the separately
 authorized repaired-run extension has a ceiling of 22; a separate final-run
-authorization has a ceiling of 28. Grants bound the
+authorization has a ceiling of 28. The independent validator's sprint
+(2026-11-15) adds one grant of at most eight requests, ceiling 36. Grants bound the
 physical requests that can be dispatched, and failed or uncertain attempts are
 charged against them, so the ceiling holds for attempts too.
 
@@ -44,15 +45,23 @@ FINAL_QUALIFICATION_EXTENSION_POLICY = {
     "max_new_requests": 6, "max_runs": 1, "actor": "root",
     "authorization": "User replied 'idk do whatever is best in ur opinion' to one final live qualification of at most 6 requests, qualification ceiling 28, and merge only if it passes.",
 }
+VALIDATOR_SPRINT_EXTENSION_POLICY = {
+    "id": "validator-sprint-2026-11-15", "previous_ceiling": 28, "ceiling": 36,
+    "max_new_requests": 8, "max_runs": 1, "actor": "claude-independent-validator",
+    "authorization": "Sprint brief 2026-11-15 (validator role): 'You are the ONLY owner allowed to make live Gemini calls in this sprint. Maximum: EIGHT physical requests TOTAL across all live attempts, including failed calls.' $0 free tier only.",
+}
 QUALIFICATION_EXTENSION_POLICIES = {
     policy["id"]: policy for policy in (QUALIFICATION_EXTENSION_POLICY, REPAIRED_QUALIFICATION_EXTENSION_POLICY,
-                                        FINAL_QUALIFICATION_EXTENSION_POLICY)
+                                        FINAL_QUALIFICATION_EXTENSION_POLICY, VALIDATOR_SPRINT_EXTENSION_POLICY)
 }
 QUALIFICATION_HISTORY = {
     QUALIFICATION_EXTENSION_POLICY["id"]: (10, 8, ()),
     REPAIRED_QUALIFICATION_EXTENSION_POLICY["id"]: (16, 10, ((QUALIFICATION_EXTENSION_POLICY["id"], 2),)),
     FINAL_QUALIFICATION_EXTENSION_POLICY["id"]: (22, 14, ((QUALIFICATION_EXTENSION_POLICY["id"], 2),
                                                        (REPAIRED_QUALIFICATION_EXTENSION_POLICY["id"], 4))),
+    VALIDATOR_SPRINT_EXTENSION_POLICY["id"]: (28, 15, ((QUALIFICATION_EXTENSION_POLICY["id"], 2),
+                                                    (REPAIRED_QUALIFICATION_EXTENSION_POLICY["id"], 4),
+                                                    (FINAL_QUALIFICATION_EXTENSION_POLICY["id"], 1))),
 }
 # One canonical sprint ledger, wherever the harness runs (LIVE_BUDGET_FILE overrides the default).
 BUDGET = Path(os.environ.get("LIVE_BUDGET_FILE") or Path(__file__).resolve().parents[1] / "results" / "sprint" / "live-budget.json")
@@ -113,7 +122,8 @@ def check_grant(budget: dict, physical: int, extension: str | None = None) -> di
                     or any(row.get("research_session_id") == prior[0]["research_session_id"] for row in released)):
                 raise SystemExit("Refusing: retain each unreleased preceding six-request grant and its actual attempts.")
         if physical > policy["max_new_requests"]:
-            raise SystemExit("Refusing: this qualification extension permits at most six new requests.")
+            limit = "six" if policy["max_new_requests"] == 6 else str(policy["max_new_requests"])
+            raise SystemExit(f"Refusing: this qualification extension permits at most {limit} new requests.")
         ceiling = policy["ceiling"]
     if granted + physical > ceiling:
         raise SystemExit(f"Refusing: {granted} already granted; {physical} more would exceed the qualification ceiling of {ceiling}.")
