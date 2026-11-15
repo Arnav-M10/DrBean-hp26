@@ -144,6 +144,15 @@ try {
   assert.ok(session.children.every(child => child.state === 'completed'))
   assert.equal(session.reports.length, 2)
   check('separate-design-approval-computes-design-and-accepts-evidence-bound-report')
+  const retainedChildren = session.children.map(child => child.id)
+  const mutationRequests = []
+  page.on('request', request => { if(request.url().startsWith(base+'/api/') && request.method() !== 'GET') mutationRequests.push(request.url()) })
+  await page.reload()
+  await page.waitForFunction(() => document.querySelector('#durable-research').textContent.includes('State: completed'))
+  assert.deepEqual((await api(`/research-sessions/${session.id}`)).children.map(child=>child.id),retainedChildren)
+  assert.deepEqual(mutationRequests,[])
+  check('classic-reload-restores-the-same-session-and-evidence-with-zero-mutations-or-duplicate-children')
+
   const navigate = async name => {
     const link = page.locator('.steps').getByRole('link', { name })
     const hash = await link.getAttribute('href'), previous = await page.evaluate(() => location.hash)
@@ -183,6 +192,27 @@ try {
     await writeFile(join(output, `${entry.artifact.id}.replay.json`), JSON.stringify(replay, null, 2))
   }
   check('actual-browser-native-downloads-and-fresh-installed-engine-replay-for-both-operations')
+  // Presentation-only diagnostic: actual retained science stays unchanged on the server.
+  // This substitutes only the parent read response; it does not qualify backend failure recovery.
+  const sessionRoute = `${base}/api/bean/v1/research-sessions/${session.id}`
+  await page.route(sessionRoute, async route => {
+    const response = await route.fetch(), body = await response.json()
+    await route.fulfill({response,json:{...body,state:'failed',action:{...body.action,error_code:'provider_rate_limited'}}})
+  })
+  await page.reload()
+  await page.waitForFunction(() => document.querySelector('#durable-research').textContent.includes('The model provider temporarily refused'))
+  await navigate(/^Result/)
+  assert.equal(await page.locator('#research-results').getByRole('button',{name:'Download evidence file',exact:true}).count(),1)
+  await navigate(/^Next measurement/)
+  assert.equal(await page.locator('#research-next').getByRole('button',{name:'Download evidence file',exact:true}).count(),1)
+  assert.equal(await page.locator('#research-report').getByRole('button',{name:'Download research report snapshot',exact:true}).count(),2)
+  assert.deepEqual((await api(`/research-sessions/${session.id}`)).children.map(child=>child.id),retainedChildren)
+  assert.deepEqual(mutationRequests,[])
+  await navigate(/^Investigate/)
+  await page.screenshot({path:join(output,'classic-stopped-narration-presentation.png'),fullPage:true})
+  await page.unroute(sessionRoute)
+  check('separate-read-response-presentation-diagnostic-stopped-narration-keeps-real-evidence-and-downloads-no-server-mutation')
+
   assert.deepEqual(errors, []); assert.deepEqual(external, [])
   const guard = await readFile(join(scratch, 'egress.jsonl'), 'utf8').catch(() => '')
   assert.doesNotMatch(guard, /"(?:egress_blocked|provider_client_blocked|credential_access)"/)
