@@ -4,13 +4,13 @@ The dependency-free browser supports reviewed CSV/manual measurements, exact rat
 
 ## Local startup
 
-From the repository root, `scripts/dev/setup.sh` once and then `scripts/dev/start.sh` prepare both runtimes and start the API, durable worker and this workspace together on one store, with `BEAN_COUNTERDEX_PYTHON` pointing at the prepared CPython 3.11 engine. AI stays in placeholder mode unless the private live configuration is explicitly enabled; see [Optional live Gemini](../../README.md#optional-live-gemini). To run only this web server against an API you started yourself:
+From the repository root, `scripts/dev/setup.sh` once and then `scripts/dev/start.sh` prepare both runtimes and start the API, durable worker and this workspace together on one store, with `BEAN_COUNTERDEX_PYTHON` pointing at the prepared CPython 3.11 engine. AI stays in placeholder mode unless the private live configuration is explicitly enabled; see [Gemini configuration](../../README.md#gemini-configuration). To run only this web server against an API you started yourself:
 
 ```sh
 node apps/web/serve.mjs
 ```
 
-Open the web address printed by the launcher. It automatically selects a private browser workspace using an HttpOnly cookie. Reloads and additional tabs reuse a valid session. Researchers do not enter access tokens or provider keys. Cookie expiry, clearing site data or changing the shared hostname cannot recover earlier private work; the UI offers explicit recovery or a new workspace without moving old records.
+Open the web address printed by the launcher. It automatically selects a private browser workspace using an HttpOnly cookie. Reloads and additional tabs reuse a valid session. Researchers do not enter access tokens or provider keys. Browser access expires after 24 hours by default. Records remain on the host, but identity recovery is not implemented: cookie expiry, clearing site data or changing the shared hostname can prevent access to earlier private work. A new workspace does not move those records. Download evidence you want to keep accessible.
 
 The launcher configures a separate private loopback proxy boundary. An operator running the web server alone must supply the matching local gateway file and exact origin to the API; otherwise private connection fails visibly. Direct API maintenance remains separate. For the optional shared HTTPS path, see [Shared server](../../docs/shared-server.md). Connection and navigation make no provider or scientific calls.
 
