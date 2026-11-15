@@ -32,7 +32,10 @@ coordinator. General file analysis can separately use live Gemini or a labelled 
 4. **Next step.** The assistant's suggestions and the checks its files allow, the next
    measurement for a check, or the best setting at each noise level for a comparison.
 
-The study id is kept in `localStorage`, so a reload reopens it.
+The last saved study id is kept in `localStorage`. A fresh visit to `/study/` or
+`#data` opens an empty draft; **Resume previous study** explicitly reopens saved work.
+Review, answer and next-step links still restore their saved study on reload.
+**New study** clears the current draft without deleting the saved server evidence.
 
 ## Limits
 

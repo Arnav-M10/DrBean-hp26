@@ -31,6 +31,8 @@ The hosted prototype has a separate entry point, `https://drbean.study/study/app
 
 ## First study
 
+The Data entry opens an empty draft. Use **Resume previous study** to reopen retained work, or **New study** to start over without deleting server evidence.
+
 1. Write a question and upload supported files, paste a table, or choose a built-in example.
 2. Review the available analysis path. File interpretation, exact model checks, and numerical comparison are distinct operations.
 3. Inspect the proposed inputs, assumptions, and scope. Approve the specific operation when requested.

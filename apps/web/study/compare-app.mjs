@@ -71,8 +71,12 @@ export function createComparison({ route, workspace, available, seconds, onConne
   const type = () => begin(withDefaults({ ...C.blankComparison(), kind: 'typed', name: 'My currents',
     rows: [0, 1, 2, 3].map(() => ({ angle: '', emin: '', emax: '', current: '', sigma: '', included: true })) }))
 
-  async function reopen(id) {
-    record = await (await connection()).get(id)
+  async function reopen(id, current = () => true) {
+    const client = await connection()
+    if (!current()) return
+    const restored = await client.get(id)
+    if (!current()) return
+    record = restored
     m = C.readComparison(record)
     draft = C.draftFromRequest(record.body.request)
     pending = null; changedSinceRun = false; caseIndex = firstSuggestion()

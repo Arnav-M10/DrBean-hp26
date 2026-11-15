@@ -159,6 +159,8 @@ jobs:
         run: node tests/integration/node_modules/playwright/cli.js install --with-deps chromium
       - name: manual editor browser check
         run: node tests/integration/web_manual_smoke.mjs
+      - name: empty study entry and explicit resume
+        run: node tests/integration/study-entry-browser.mjs
       - name: responsive keyboard, disclosure and reduced-motion checks
         run: |
           export NODE_PATH="$PWD/tests/integration/node_modules"
