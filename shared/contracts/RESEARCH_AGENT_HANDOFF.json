@@ -1,0 +1,69 @@
+{
+  "version": "research-agent.v1",
+  "branch": "backend/deepagents-durable",
+  "base": "cbfa5ef0494bb681d4d8748cfd2d2487a1e0887d",
+  "ownership": {
+    "owner2": ["contracts", "API registration", "source and approval authority", "session ledger", "durable orchestration", "coordinator.py", "tests/test_coordinator.py"],
+    "owner3": ["providers.py", "gemini_chat_model.py", "physical request metering adapter", "conversation", "narration"],
+    "owner4": ["papers parser modules", "browser", "launcher", "integration assembly", "ownership document"],
+    "owner1": ["scientific eligibility", "exact paper mapping requirements", "Counterdex"],
+    "claude": ["independent evaluator", "exact combined acceptance"]
+  },
+  "modes": ["manual", "controlled", "live_gemini"],
+  "live_default_allocation": 0,
+  "limits": {
+    "action_policy": "research-action.v1",
+    "model_turns": 4,
+    "tool_calls": 6,
+    "physical_requests_per_action_ceiling": 12,
+    "physical_requests_per_session_ceiling": 24,
+    "auxiliary_per_action_ceiling": 16,
+    "auxiliary_per_session_ceiling": 32,
+    "cleanup_slots_reserved": 2,
+    "scientific_reservations": "unchanged approved plan budget",
+    "specialists": 2,
+    "delegation_depth": 1,
+    "PDF_bytes": 20971520,
+    "PDF_pages": 50,
+    "selected_pages_per_batch": 8,
+    "existing_global_token_caps": "unchanged; lower caps always win"
+  },
+  "identity": {
+    "research_session_id": "server-issued, workspace + retained paper identity; refresh/restart/new graph cannot reset it",
+    "agent_run_id": "server-issued tenant-scoped mapping to private graph thread",
+    "operation_id": "durable action identity; all retries and children share it",
+    "source_identity": ["source_asset_id", "source_sha256"],
+    "page_identity": ["page_id", "physical_page_number", "source_sha256", "text_reference", "image_reference", "parser_version"],
+    "disclosure": ["source_asset_id", "source_sha256", "selected_page_manifest_id", "selected_page_manifest_digest"]
+  },
+  "parser_interface": {
+    "request": {"source_asset_id": "source_123", "source_sha256": "64 lowercase hex", "source_bytes": "trusted in-process bytes only"},
+    "result": {"parser_version": "owner4 version", "page_count": 2, "pages": [{"physical_page_number": 1, "text": "untrusted source text", "warnings": []}], "warnings": [], "unprocessed_pages": [2]},
+    "storage": "Owner2 retains original bytes and registers parser references; Owner4 supplies bounded parsing/rendering, never approval or database writes",
+    "status": "interface proposed; confirm actual parser signature before registration"
+  },
+  "model_factory": {
+    "signature": "factory(context: MeteredModelContext) -> LangChain BaseChatModel",
+    "immutable_context": ["workspace_id", "actor_id", "research_session_id", "agent_run_id", "operation_id", "consent_id", "model", "selected_page_manifest_digest", "mode", "action_policy"],
+    "owner3_responsibility": "reserve every physical request/retry/auxiliary operation through the single ProviderLedger before dispatch; preserve tool binding, metadata and cancellation",
+    "owner2_responsibility": "validate authority, grant action scope, meter tool/turn limits, require registered metered adapter in live mode; do not reserve each physical request a second time",
+    "controlled": "explicit local adapter; no external request/provider-attempt identity or actual tokens"
+  },
+  "paper_proposal": {
+    "review_state": "unaccepted",
+    "execution_approved": false,
+    "citations": "each proposed field binds a disclosed page identity and exact excerpt",
+    "materialization": "human reviewed exact values + explicit assumptions use ordinary immutable dataset/problem creation; no computation approval",
+    "unsupported": "paper evidence review remains available; scientific execution unavailable/manual, no model substitution"
+  },
+  "events": {
+    "envelope": ["event_id", "sequence", "workspace_id", "agent_run_id", "operation_id", "event_type", "timestamp", "mode", "source_ids", "evidence_ids", "plan_ids"],
+    "types": ["model_attempt_started", "model_attempt_finished", "tool_requested", "tool_finished", "delegation_started", "delegation_finished", "review_required", "resumed", "cancel_requested", "terminal"],
+    "content": "safe summaries/references only; no raw reasoning, credentials or fabricated transcripts"
+  },
+  "review_interrupt": {
+    "pending_review_id": "canonical immutable application record",
+    "pending_review_digest": "exact digest",
+    "resume": "authenticated current workspace access + unchanged context + matching canonical approval; interrupt itself confers no authority"
+  }
+}
