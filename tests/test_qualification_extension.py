@@ -320,3 +320,99 @@ def test_final_extension_requires_both_retained_prior_runs_and_cannot_be_reused(
             budget["released"].append({"research_session_id": "final-extension", "physical_requests": 6})
     with pytest.raises(SystemExit):
         operator_grant.check_grant(budget, 6, final_id)
+
+
+def after_final_extension():
+    budget = after_second_extension()
+    budget["grants"].append({"research_session_id": "final-extension", "physical_requests": 6,
+                             "qualification_extension": operator_grant.FINAL_QUALIFICATION_EXTENSION_POLICY["id"]})
+    budget["physical_requests_used"]["final-extension"] = 1
+    budget["sprint_physical_requests_total"] = 15
+    budget["qualification_extensions"].append(copy.deepcopy(operator_grant.VALIDATOR_SPRINT_EXTENSION_POLICY))
+    return budget
+
+
+def test_validator_sprint_receipt_grants_at_most_eight_and_keeps_every_prior_run():
+    budget = after_final_extension()
+    before = copy.deepcopy(budget)
+    validator_id = operator_grant.VALIDATOR_SPRINT_EXTENSION_POLICY["id"]
+    assert operator_grant.check_grant(budget, 8, validator_id) == {
+        "sprint_granted_total": 36, "ceiling": 36, "qualification_extension": validator_id}
+    assert operator_grant.check_grant(budget, 1, validator_id)["sprint_granted_total"] == 29
+    assert budget == before
+    for prior in (operator_grant.QUALIFICATION_EXTENSION_POLICY, operator_grant.REPAIRED_QUALIFICATION_EXTENSION_POLICY,
+                  operator_grant.FINAL_QUALIFICATION_EXTENSION_POLICY):
+        with pytest.raises(SystemExit, match="already been used"):
+            operator_grant.check_grant(budget, 1, prior["id"])
+    for oversized in (9, 0, True, "8"):
+        with pytest.raises(SystemExit):
+            operator_grant.check_grant(budget, oversized, validator_id)
+    with pytest.raises(SystemExit, match="exceed"):
+        operator_grant.check_grant(budget, 1)
+
+
+@pytest.mark.parametrize("index,key,value", [(3, "previous_ceiling", 22), (3, "ceiling", 37), (3, "max_new_requests", 9),
+    (3, "max_runs", 2), (3, "actor", "root"), (3, "authorization", "unrecorded"), (3, "id", "another-authorization"),
+    (0, "authorization", "changed-first"), (2, "ceiling", 30)])
+def test_validator_extension_rejects_tampering_with_any_receipt(index, key, value):
+    budget = after_final_extension()
+    budget["qualification_extensions"][index][key] = value
+    with pytest.raises(SystemExit, match="receipt"):
+        operator_grant.check_grant(budget, 8, operator_grant.VALIDATOR_SPRINT_EXTENSION_POLICY["id"])
+
+
+@pytest.mark.parametrize("change", ["missing_validator_receipt", "missing_final_tag", "final_not_one_attempt", "final_released",
+    "reset_used", "wrong_granted", "prior_validator_grant", "released_validator_grant"])
+def test_validator_extension_requires_all_retained_prior_runs_and_cannot_be_reused(change):
+    budget = after_final_extension()
+    validator_id = operator_grant.VALIDATOR_SPRINT_EXTENSION_POLICY["id"]
+    if change == "missing_validator_receipt":
+        budget["qualification_extensions"].pop()
+    elif change == "missing_final_tag":
+        budget["grants"][-1].pop("qualification_extension")
+    elif change == "final_not_one_attempt":
+        budget["physical_requests_used"]["final-extension"] = 0
+        budget["physical_requests_used"]["first"] += 1
+    elif change == "final_released":
+        budget["released"].append({"research_session_id": "final-extension", "physical_requests": 6})
+        budget["grants"][0]["physical_requests"] += 6
+    elif change == "reset_used":
+        budget["sprint_physical_requests_total"] = 0
+    elif change == "wrong_granted":
+        budget["grants"][0]["physical_requests"] += 1
+    else:
+        budget["grants"].append({"research_session_id": "validator-run", "physical_requests": 8,
+                                 "qualification_extension": validator_id})
+        if change == "released_validator_grant":
+            budget["released"].append({"research_session_id": "validator-run", "physical_requests": 8})
+    with pytest.raises(SystemExit):
+        operator_grant.check_grant(budget, 8, validator_id)
+
+
+def test_validator_grant_tags_one_real_operator_allocation_of_eight(tmp_path, monkeypatch, capsys):
+    from bean_api.research import ResearchService
+    from bean_api.store import Store
+    from bean_api.workflow import Workflow
+
+    workflow = Workflow(Store(tmp_path / "isolated-validator.sqlite3"))
+    workspace = workflow.create_workspace("fixture-actor", "No-provider allocation regression")["id"]
+    service = ResearchService(workflow, live_enabled=True)
+    session = service.create("fixture-actor", workspace, {"objective": "Inspect a bounded workflow", "mode": "live"}, "create")
+    history = after_final_extension()
+    budget_path = tmp_path / "budget.json"
+    budget_path.write_text(json.dumps(history))
+    monkeypatch.setattr(operator_grant, "BUDGET", budget_path)
+    validator_id = operator_grant.VALIDATOR_SPRINT_EXTENSION_POLICY["id"]
+    monkeypatch.setenv("LIVE_QUALIFICATION_EXTENSION", validator_id)
+    arguments = [str(tmp_path / "isolated-validator.sqlite3"), session["id"], "8", "64000", "4096", "offline-regression"]
+    assert operator_grant.main(arguments) == 0
+    returned = json.loads(capsys.readouterr().out)
+    assert returned["qualification_extension"] == validator_id and returned["sprint_granted_total"] == 36
+    retained = json.loads(budget_path.read_text())
+    assert retained["grants"][:-1] == history["grants"] and retained["grants"][-1]["physical_requests"] == 8
+    assert service.get("fixture-actor", session["id"])["provider_allocation"]["physical_requests"] == 8
+    with pytest.raises(SystemExit, match="already been used"):
+        operator_grant.main(arguments)
+    assert json.loads(budget_path.read_text()) == retained
+    with workflow.store.read() as conn:
+        assert conn.execute("SELECT count(*) FROM provider_attempts").fetchone()[0] == 0

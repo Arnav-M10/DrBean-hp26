@@ -31,6 +31,11 @@ assert.ok(UI === 'web' || CASE !== 'clarification', 'The missing-input contrast 
 assert.ok(['dry-run', 'baseline', 'clarification'].includes(CASE), 'LIVE_CASE must be dry-run, baseline or clarification')
 assert.ok(CASE === 'dry-run' ? GRANT === 0 : GRANT >= 1 && GRANT <= 8, 'A live case needs LIVE_GRANT in 1..8; dry-run grants nothing')
 const commit = (await run('git', ['rev-parse', 'HEAD'])).trim()
+// Live runs test one exact commit: application files must match HEAD; only harness files may be layered on top.
+const appChanges = (await run('git', ['status', '--porcelain', '--', 'apps', 'packages', 'scripts', 'workspace-preview'])).trim()
+assert.ok(!process.env.LIVE_EXPECT_COMMIT || process.env.LIVE_EXPECT_COMMIT === commit, `HEAD ${commit} is not LIVE_EXPECT_COMMIT`)
+assert.ok(CASE === 'dry-run' || !appChanges, `Application files differ from the tested commit:\n${appChanges}`)
+const overlay = (await run('git', ['status', '--porcelain', '--untracked-files=no'])).trim()
 const appBase = (await run('git', ['merge-base', 'HEAD', 'origin/main'])).trim().slice(0, 7)
 const appDiff = (await run('git', ['diff', '--name-only', 'origin/main', '--', 'apps', 'packages', 'scripts', 'workspace-preview'])).trim()
 const output = resolve(process.env.LIVE_EVIDENCE_DIR || join(root, `evaluation/results/sprint/live-${CASE}-${appBase}`))
@@ -43,8 +48,8 @@ const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', DRBEAN_VAR_DIR: scratch, 
   LIVE_BUDGET_FILE: process.env.LIVE_BUDGET_FILE || join(root, 'evaluation/results/sprint/live-budget.json'),
   ...(process.env.LIVE_QUALIFICATION_EXTENSION ? { LIVE_QUALIFICATION_EXTENSION: process.env.LIVE_QUALIFICATION_EXTENSION } : {}) }
 const record = { schema_version: 'c-sprint-live-run.v1', lane: CASE === 'dry-run' ? 'live_gemini (dry run, zero requests)' : 'live_gemini',
-  case: CASE, ui: UI, qualification_extension: process.env.LIVE_QUALIFICATION_EXTENSION || null, harness_commit: commit, application_tree: appDiff ? `differs from origin/main: ${appDiff.split('\n').length} files` : `identical to origin/main ${appBase}`, grant: GRANT, started_at: new Date().toISOString(), checks: [], observations: {} }
-let browser, context, page, launched = false
+  case: CASE, ui: UI, qualification_extension: process.env.LIVE_QUALIFICATION_EXTENSION || null, harness_commit: commit, tested_commit: commit, application_files_match_tested_commit: !appChanges, harness_overlay: overlay ? overlay.split('\n') : [], application_tree: appDiff ? `differs from origin/main: ${appDiff.split('\n').length} files` : `identical to origin/main ${appBase}`, grant: GRANT, started_at: new Date().toISOString(), checks: [], observations: {} }
+let browser, context, page, launched = false, tracked = null
 
 async function run(executable, args, extraEnv = null, timeout = 60000) {
   const child = spawn(executable, args, { cwd: root, env: extraEnv || process.env, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -122,6 +127,7 @@ try {
     assert.equal(sessions.length, 1, 'Exactly one session created by the preferred workspace')
     let session = sessions[0]
     const workspace = session.workspace_id || session.workspace
+    tracked = { session: session.id, workspace }
     assert.equal(session.mode, 'live'); assert.equal(session.provider_allocation.physical_requests, 0)
     check('live-session-created-from-the-preferred-workspace-with-zero-default-allocation', session.id)
     assert.equal(await page.locator('#continue-plan').isDisabled(), true, 'Continue must stay disabled before consent and capacity')
@@ -205,6 +211,7 @@ try {
     }
     await panel.getByRole('button', { name: 'Save provider consent', exact: true }).waitFor({ timeout: 30000 })
     let session = (await api(`/workspaces/${workspace}/research-sessions`)).items[0]
+    tracked = { session: session.id, workspace }
     assert.equal(session.mode, 'live')
     assert.equal(session.provider_allocation.physical_requests, 0)
     check('live-session-created-from-the-browser-with-zero-default-allocation', session.id)
@@ -303,6 +310,32 @@ try {
         replay: replay.replay, expected_binding: replay.expected_binding, verification: replay.verification, outcome: replay.outcome?.scientific_outcome ?? replay.fresh_checked?.tier }]
     }
   }
+  // L7: an ordinary reload keeps the same private session and its saved results.
+  try {
+    const before = await api(`/research-sessions/${session.id}`)
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    if (UI === 'web') {
+      await page.waitForFunction(() => document.querySelector('#workspace-select')?.value !== '', null, { timeout: 30000 })
+      await page.evaluate(() => { location.hash = 'investigations' })
+      await page.waitForFunction(({ state, revision }) => (document.querySelector('#durable-research')?.textContent || '')
+        .includes(`State: ${state} · revision ${revision}`), { state: before.state, revision: before.revision }, { timeout: 30000 })
+    } else {
+      await page.waitForFunction(({ state, revision }) => { const status = document.querySelector('#research-status')
+        return status?.dataset.state === state && Number(status.dataset.revision) >= revision }, { state: before.state, revision: before.revision }, { timeout: 30000 })
+    }
+    const after = await api(`/research-sessions/${session.id}`)
+    const shownWorkspace = UI === 'web' ? await page.locator('#workspace-select').inputValue() : workspace
+    const panel = await page.locator(UI === 'web' ? '#durable-research' : '#research-status').innerText()
+    record.observations.reload = { same_workspace: shownWorkspace === workspace, same_session: after.id === before.id,
+      state: after.state, revision_unchanged: after.revision === before.revision,
+      reports_unchanged: JSON.stringify(after.reports) === JSON.stringify(before.reports),
+      report_download_offered: UI !== 'web' || !before.reports?.length || panel.includes('Download research report snapshot') ||
+        await page.getByRole('button', { name: 'Download research report snapshot', exact: true }).count() > 0 }
+    record.observations.reload.passed = Object.entries(record.observations.reload).every(([key, value]) => key === 'state' || value === true)
+    if (record.observations.reload.passed) check('reload-keeps-the-same-session-and-results', `${after.state} r${after.revision}`)
+  } catch (error) {
+    record.observations.reload = { passed: false, error: String(error.message).slice(0, 600) }
+  }
   assert.deepEqual(errors, [])
   record.status = 'completed'
 } catch (error) {
@@ -310,12 +343,35 @@ try {
   record.error = String(error.message).slice(0, 4000)
   if (page) await page.screenshot({ path: join(output, 'failure.png'), fullPage: true }).catch(() => {})
   if (page) record.panel_text = await page.locator('#durable-research').innerText({ timeout: 5000 }).catch(() => null)
+  if (tracked && context && record.physical_requests === undefined) {
+    try {
+      const attempts = list(await api(`/workspaces/${tracked.workspace}/provider-attempts`))
+      record.observations.attempts = attempts
+      record.physical_requests = attempts.length
+      const latest = await api(`/research-sessions/${tracked.session}`)
+      record.observations.at_failure = { state: latest.state, pending_review: latest.pending_review?.kind ?? null,
+        error_code: latest.action?.error_code ?? null, usage: latest.usage, provider_allocation: latest.provider_allocation,
+        children: latest.children?.map(child => ({ id: child.id, kind: child.kind, state: child.state })) ?? [], reports: latest.reports }
+      record.observations.model_tool_calls = JSON.parse(await run(python, ['evaluation/live/extract_tool_calls.py', join(scratch, 'bean.sqlite3'), tracked.session], env, 30000))
+    } catch (accounting) {
+      record.accounting_error = String(accounting.message).slice(0, 600)
+    }
+  }
   process.exitCode = 1
 } finally {
   record.finished_at = new Date().toISOString()
   await writeFile(join(output, 'record.json'), JSON.stringify(record, null, 2) + '\n')
   await browser?.close()
   if (launched) await run(python, ['scripts/dev/launcher.py', 'stop'], env, 60000).catch(error => { console.error(error.message); process.exitCode = 1 })
+  if (process.env.LIVE_RETAIN_STORE_DIR) {
+    const keep = resolve(process.env.LIVE_RETAIN_STORE_DIR)
+    if (keep.startsWith(root)) console.error('Not retaining the store: LIVE_RETAIN_STORE_DIR must be outside the repository')
+    else {
+      await mkdir(keep, { recursive: true }).catch(() => {})
+      for (const name of ['bean.sqlite3', 'bean.sqlite3-wal', 'bean.sqlite3-shm'])
+        await copyFile(join(scratch, name), join(keep, name)).catch(() => {})
+    }
+  }
   await rm(scratch, { recursive: true, force: true })
   console.log(JSON.stringify({ status: record.status, case: CASE, physical_requests: record.physical_requests ?? null, output }, null, 2))
 }
