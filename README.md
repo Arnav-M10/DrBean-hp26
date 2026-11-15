@@ -24,7 +24,7 @@ Dr. Bean is a research assistant for examining what scientific data support and 
 The main interface is the **study workspace** at `/study/`. Researchers bring files and a question, review the proposed analysis, inspect the answer, and choose a next step. Supported scientific checks retain the reviewed inputs, assumptions, computation, and evidence needed to inspect or replay a result.
 
 <p align="center">
-  <img src="docs/images/study-workspace.png" alt="Dr. Bean study workspace with a question, file intake, and the Data, Approval, Answer, and Next step stages" width="100%">
+  <img src="docs/images/study-landing.png" alt="Dr. Bean landing page showing the research workflow and two concentration curves compatible with the same readings" width="100%">
 </p>
 
 ## Workflows
