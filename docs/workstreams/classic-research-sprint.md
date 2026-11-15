@@ -14,7 +14,8 @@ before enabling live continuation; show plain-language provider stops with codes
 in technical details; distinguish stopped assistant from scientific outcome.
 No new consent, model, routing, deployment or modern study change.
 
-Current: candidate browser qualification underway. Reload must restore the same
+Completed: candidate application 158daa2a94b01c92803acf135e6055cf53fcaa74
+passes 119 web units and 10 browser checks. Reload restores the same
 session/children with zero mutations. A separately labelled parent-read-response
 presentation diagnostic keeps actual evidence/downloads accessible after simulated
 narration failure; it is not backend failure, restart or live qualification.
@@ -46,3 +47,24 @@ show the result and its assumptions, then download native evidence/anchors.
 80–90s: request next-measurement planning; demonstrate its separate approval.
 Live demonstration only by Claude: explicit provider disclosure/consent, actual
 operator allocation, then scientific approval. Controlled success is not live proof.
+
+
+Delivery: PR70, owned changes only research.mjs, research.test.mjs,
+check-research.mjs and this handoff/evidence. No serve.mjs, share-gateway.mjs,
+modern study or deployment changes. Commit identity verified as eesh-verma
+<eesh.verma@codvo.ai>. No Gemini calls, keys inspected, capacity grants or service
+restarts outside temporary test stores/dynamic ports. Baseline before changes:
+8 browser checks passed. Candidate: 119 units, 10 browser checks, whitespace clean.
+Linux locked backend CPython 3.12.14, scientific CPython 3.11.18, Node 24/Chromium.
+
+Checks:
+node --test apps/web/*.test.mjs
+PLAYWRIGHT_MODULE=/absolute/path/to/pinned/playwright CHROMIUM_PATH=/path/to/chromium node apps/web/check-research.mjs
+
+Retained receipt and labelled presentation screenshot:
+../frontend/classic-sprint/. The existing runner downloads/replays both actual
+native packets under ignored var/test-evidence/research-browser/.
+
+Current task: frontend delivery complete; support Codex 3 integration only.
+Remaining gates: CI, Codex 3 merge/routing choice and Claude's independent/live
+qualification. This branch does not advertise live or restart qualification.
