@@ -51,8 +51,7 @@ operator allocation, then scientific approval. Controlled success is not live pr
 
 Delivery: PR70, owned changes only research.mjs, research.test.mjs,
 check-research.mjs and this handoff/evidence. No serve.mjs, share-gateway.mjs,
-modern study or deployment changes. Commit identity verified as eesh-verma
-<eesh.verma@codvo.ai>. No Gemini calls, keys inspected, capacity grants or service
+modern study or deployment changes. Commit identity verified as the requested eesh-verma account. No Gemini calls, keys inspected, capacity grants or service
 restarts outside temporary test stores/dynamic ports. Baseline before changes:
 8 browser checks passed. Candidate: 119 units, 10 browser checks, whitespace clean.
 Linux locked backend CPython 3.12.14, scientific CPython 3.11.18, Node 24/Chromium.
