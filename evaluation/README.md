@@ -1,10 +1,16 @@
 # Evaluation harness (Workstream 5)
 
-Standard-library Python, run with CPython 3.11. Owner: Workstream 5 (independent adversarial validation). Protocol and rules: [docs/evaluation-protocol.md](../docs/evaluation-protocol.md). Current findings: [FINDINGS.md](FINDINGS.md) (generated from `findings.json`). Latest report: [results/REPORT.md](results/REPORT.md).
+Standard-library Python, run with CPython 3.11. Owner: Workstream 5 (independent adversarial validation). Protocol and rules: [docs/evaluation-protocol.md](../docs/evaluation-protocol.md). Recorded findings: [FINDINGS.md](FINDINGS.md) (generated from `findings.json`). Retained harness report: [results/REPORT.md](results/REPORT.md).
 
 **No command here dispatches a model request.** Live lanes are disabled (`NOT_RUN`); there is no flag that activates them and `budget open` refuses. Real local computation (API, worker, Counterdex, native replay) does run. Any AI in the current lanes is absent or a labelled *controlled placeholder*, never Gemini evidence.
 
-## Coordinator sprint (DB-COORDINATOR-3OWNER-1, role C)
+## Evidence scope
+
+The checkpoint summaries below describe their named historical commits, not current feature availability. The coordinator and general-file producer have since been implemented. The later [macOS strict offline report at `c4d1ad6`](../docs/release-evidence/offline-c4d1ad6-macos.json) passed G0–G4, superseding the older missing-G4 observation below. Neither report automatically qualifies later source revisions.
+
+Live tests outside this provider-free CLI are recorded separately. An [earlier live coordinator run](results/sprint/combined-5a028f1.json) reached approved science but failed narration validation. The [retained live attempt at `17c7f7a`](results/sprint/live-final-17c7f7a/qualification.json) failed tool-argument validation before scientific dispatch. Its controlled browser checks passed separately. Consult the [root README](../README.md#execution-and-evidence) for the study UI's controlled/live distinction; neither a configured server nor offline CI proves live qualification.
+
+## Historical coordinator sprint (DB-COORDINATOR-3OWNER-1, role C)
 
 Frozen predicates: [coordinator/](coordinator/README.md). Baseline on main `299a356`:
 [results/integration/baseline-299a356.md](results/integration/baseline-299a356.md) (12 passed, 7 not_run, 35
@@ -17,7 +23,7 @@ passes on main, but no route or worker uses it yet. Revision 2 (`-r2`, harness `
 35 not_available; every exercisable scientific predicate passes. Previews of unmerged A/B branches live under
 `results/previews/` (for example `pr42-051b4d6/`) and are never acceptance.
 
-## Integrated acceptance checkpoint
+## Historical integrated acceptance checkpoints
 
 The final source commit `159fd65303c5ff87a14dfa616f88dbd5a76777b5` was
 qualified again after the explanatory-text corrections: all seven ordinary HTTP
@@ -25,7 +31,7 @@ entries and all 22 native controls passed on a clean tree. The
 [independent scientific gate](results/integration/159fd65-science-gate.json)
 passes every required check, including append-only integrity, adverse controls,
 supported-host execution, verified zero model dispatch and no unresolved P0.
-The latest [report](results/REPORT.md) includes all 112 historical attempts.
+The checkpoint [report](results/REPORT.md) records the historical attempts.
 Subsequent changes in this checkpoint only record this evidence and its summary.
 
 Source `d821202b339ed60720e3c919d6be47e450e3b894` passed all seven
@@ -42,16 +48,16 @@ The [fresh-clone log](results/integration/d821202-clean-checkout.log) records
 checks, exact schema exports, secret scanning, both implemented browser checks
 and 31/31 ordinary startup/restart checks. Setup installed locked dependencies
 and pinned Playwright 1.63 with its matching Chromium 153. The strict product
-release command correctly exited 1: G0–G3 passed; G4 still requires browser
-source-review and follow-up controls. Scientific acceptance does not close those
-product gaps. Live model qualification remains unrun; no application model
-provider requests were made.
+release command correctly exited 1 at `d821202`: G0–G3 passed; G4 still required
+browser source-review and follow-up controls at that revision. The later passing
+G4 record is linked above. No live model qualification or application model
+provider requests occurred in this offline run.
 
 ## Commands (entry points for Owner 4 and CI)
 
 | Command | What it does | Exit |
 |---|---|---|
-| `python3.11 -m unittest discover -s evaluation/tests -v` | harness unit tests (142; Node comparison skips when Node is absent) | 0 = pass |
+| `python3.11 -m unittest discover -s evaluation/tests -v` | harness unit tests; Node comparison skips when Node is absent | 0 = pass |
 | `python3.11 evaluation/cli.py verify` | frozen manifest v3 + archived ancestry + science packets | 0 = OK, 1 = drift |
 | `python3.11 evaluation/cli.py selftest` | grader exemplars (24 compliant, 62 violating). Harness only, never product evidence | 0 / raises |
 | `python3.11 evaluation/cli.py run --lane offline_real_science --subject http-launch` | launches an isolated API + worker (fresh temp SQLite, blobs, in-memory tokens, allowlisted env, egress guard) and drives the real HTTP routes; appends attempts | 0 only if every entry passed; 2 otherwise |
