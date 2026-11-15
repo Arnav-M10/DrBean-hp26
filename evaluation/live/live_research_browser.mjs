@@ -16,7 +16,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
-import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -384,6 +384,9 @@ try {
       await mkdir(keep, { recursive: true }).catch(() => {})
       for (const name of ['bean.sqlite3', 'bean.sqlite3-wal', 'bean.sqlite3-shm'])
         await copyFile(join(scratch, name), join(keep, name)).catch(() => {})
+      // Blob and artifact folders hold native evidence bytes; the opt-in file sits at the store root and is never copied.
+      for (const folder of ['sources', 'artifacts'])
+        await cp(join(scratch, folder), join(keep, folder), { recursive: true }).catch(() => {})
     }
   }
   await rm(scratch, { recursive: true, force: true })
