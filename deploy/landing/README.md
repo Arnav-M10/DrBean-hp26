@@ -40,6 +40,18 @@ The landing illustration is a saved synthetic example and remains labelled accor
 - Deployment and ordinary page/session checks make no model calls. Explicit analysis actions retain the application's consent and budget requirements.
 - Do not copy `.vercel`, `.env*`, databases, local research uploads or machine-specific launcher scripts into Git.
 
+## Recovering a stale tunnel route
+
+If the landing page loads but `/study/app` returns HTTP 530 with Cloudflare error 1033, check the tunnel address before changing application code. The static landing page can remain available while the configured upstream tunnel is unavailable.
+
+1. In the running app's checkout, with its original `DRBEAN_VAR_DIR` and port settings, run `python3 scripts/dev/share.py status`. This reports the current managed tunnel. If sharing has stopped, restore the app and run `python3 scripts/dev/share.py start`.
+2. Confirm that the reported HTTPS origin serves `/study/app`. A running local frontend alone does not establish public connectivity.
+3. In the Vercel project's **Production** environment, set `DRBEAN_UPSTREAM_ORIGIN` to that exact origin. Keep the existing `DRBEAN_PROXY_SECRET`; changing the tunnel address does not require rotating it.
+4. Redeploy the production project so the updated configuration takes effect. A Git merge by itself does not discover the new tunnel address.
+5. Open `https://drbean.study/study/app` in a fresh browser and verify that the empty Data view connects to a private workspace. Check that the address remains on `drbean.study`.
+
+These checks do not require submitting an analysis or making a model-provider call. Quick Tunnel addresses remain temporary; repeat the configuration update if a later restart changes the origin.
+
 ## Verification
 
 Run `node --test build.test.mjs` for build, routing and public-output checks. After deployment, verify from a fresh browser profile that the URL stays on `drbean.study`, session creation and reload work, an uploaded public/synthetic file is retained, private files cannot be read from another profile, and evidence downloads retain their hashes. Live model execution is a separate test.

@@ -15,7 +15,7 @@ Setup installs locked backend dependencies, creates a CPython 3.11 environment f
 
 Open `/study/#data` on the web origin printed by the launcher. The default is **http://127.0.0.1:4173/study/#data**. A deployment using port `28170`, for example, uses **http://127.0.0.1:28170/study/#data**. These are ports for the same interface, not separate applications.
 
-The browser establishes private workspace access automatically. Reloads reuse the session cookie. No researcher-facing bearer-token or provider-key field is required. Existing history remains subject to that browser identity; cross-device identity recovery is not implemented.
+The browser establishes private workspace access automatically. Reloads reuse a valid session cookie. No researcher-facing bearer-token or provider-key field is required. Browser access expires after 24 hours by default. Records remain on the host, but identity recovery is not implemented; an expired or cleared cookie does not regain access to earlier private work. Download reports and scientific evidence you want to keep accessible.
 
 | Entry point | Purpose |
 | --- | --- |
