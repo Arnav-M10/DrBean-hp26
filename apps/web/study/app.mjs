@@ -14,6 +14,7 @@ import { $, countStatus, failure, readable, saveText, size, status } from './ui.
 import { createComparison } from './compare-app.mjs'
 import { createGeneral } from './general-app.mjs'
 import { CHECKS, overview } from './general.mjs'
+import { savedStudyId, requestsSavedStudy } from './entry.mjs'
 import { recognizedPaper, paperDraft, paperFinding, paperInputsMatch, PAPER_CSS } from './paper-study.mjs'
 import { createPaperView, paperNextHTML } from './paper-view.mjs'
 import { fileMediaHint, generalCapabilities, validateFileSelection } from '../general-workspace.mjs'
@@ -30,7 +31,10 @@ const SAMPLE = {
 
 let api, workspace, capabilities
 let draft = blankDraft()
-let study = readStore()          // { sessionId } of the study on screen
+let study = {}                    // only the explicitly opened study is active
+let previousStudy = {}
+let restoreRequested = requestsSavedStudy(location.hash)
+let entryRevision = 0, restoring = false
 let snapshot = null               // latest research session from the server
 let results = null                // { data, m } once a report exists
 let next = { times: '', allowance: '', horizon: '', source: '' }
@@ -67,11 +71,35 @@ function blankDraft() {
 }
 function readStore() { try { return JSON.parse(localStorage.getItem(STORE) || '{}')[workspace] ?? {} } catch { return {} } }
 function writeStore() {
+  if (!savedStudyId(study)) return // starting over does not erase the saved result
   try {
     const all = JSON.parse(localStorage.getItem(STORE) || '{}')
     all[workspace] = study
     localStorage.setItem(STORE, JSON.stringify(all))
+    previousStudy = study
   } catch { /* the study stays on the server; only reopening after a reload needs storage */ }
+}
+
+function forgetStudy(entry) {
+  if (savedStudyId(readStore()) !== savedStudyId(entry)) return
+  try {
+    const all = JSON.parse(localStorage.getItem(STORE) || '{}')
+    delete all[workspace]
+    localStorage.setItem(STORE, JSON.stringify(all))
+  } catch { /* unavailable storage does not prevent a new study */ }
+  previousStudy = {}; study = {}
+}
+
+async function resumePrevious() {
+  if (connecting || restoring || !savedStudyId(previousStudy)) return
+  const revision = ++entryRevision
+  study = previousStudy; restoring = true; route()
+  try { await reopen(revision, true) }
+  finally { if (revision === entryRevision) { restoring = false; route() } }
+}
+
+function cancelRestore() {
+  entryRevision++; restoreRequested = false; restoring = false
 }
 
 // Numbers are kept exactly as typed, then made exact fractions for the server.
@@ -113,6 +141,7 @@ function connectionFailure(error) {
 let connecting = false
 async function connect(startNew = false) {
   if (connecting) return
+  const revision = entryRevision
   connecting = true
   setConnection('Connecting…')
   $('connection-problem').hidden = true
@@ -120,16 +149,22 @@ async function connect(startNew = false) {
     const opened = await bootstrapSharedSession(undefined, { startNew })
     // A different workspace shares nothing with the old one, so its study starts empty.
     if (workspace && workspace !== opened.session.workspace_id) {
+      study = {}
       draft = blankDraft(); snapshot = null; results = null; cmp.reset(); gen.reset(); sources = []; question = ''; mode = null
       $('study-name').textContent = ''; location.hash = 'data'
     }
     api = opened.api; workspace = opened.session.workspace_id
     api.setConnectionFailureHandler(error => { if (api === opened.api && !connecting) connectionFailure(error) })
     startStatus('')
-    study = readStore()
+    previousStudy = readStore()
     capabilities = await readConnection(api, '/capabilities')
     connectionLabel()
-    await reopen()
+    if (revision === entryRevision && restoreRequested) {
+      study = previousStudy
+      restoring = true
+      await reopen(revision)
+      if (revision === entryRevision) restoring = false
+    }
     route()
   } catch (error) {
     connectionFailure(error)
@@ -153,38 +188,49 @@ function checkBlocker() {
   return null
 }
 
-async function reopen() {
+async function reopen(revision, chooseStep = false) {
+  const entry = study, sourceApi = api, sourceWorkspace = workspace
+  const current = () => revision === entryRevision && api === sourceApi && workspace === sourceWorkspace
   paperAsset = null
   if (study.kind === 'general' && study.analysisId) {
     try {
-      const { assets, asked } = await gen.reopen(study.analysisId, study.assetIds ?? [])
-      sources = await Promise.all(assets.map(async asset => ({ asset, tables: await readTables(asset) })))
+      const restored = await gen.reopen(entry.analysisId, entry.assetIds ?? [], current)
+      if (!current() || !restored) return
+      const { assets, asked } = restored
+      const restoredSources = await Promise.all(assets.map(async asset => ({ asset, tables: await readTables(asset) })))
+      if (!current()) return
+      sources = restoredSources
       question = asked; setMode('general')
       $('study-name').textContent = sources.length === 1 ? stem(sources[0].asset.filename) : `${sources.length} files`
-      if (!location.hash) location.replace('#result')
+      if (chooseStep || !location.hash) location.replace('#result')
     } catch (error) {
-      if (error.status === 404) { study = {}; writeStore() }
+      if (current() && error.status === 404) forgetStudy(entry)
     }
     return
   }
   if (study.kind === 'currents' && study.comparisonId) {
     try {
-      await cmp.reopen(study.comparisonId)
+      await cmp.reopen(entry.comparisonId, current)
+      if (!current()) return
       setMode('currents'); connectionLabel()
       $('study-name').textContent = 'Electron currents'
-      if (!location.hash) location.replace('#result')
+      if (chooseStep || !location.hash) location.replace('#result')
     } catch (error) {
-      if (error.status === 404) { study = {}; writeStore() }
+      if (current() && error.status === 404) forgetStudy(entry)
     }
     return
   }
   if (!study.sessionId) return
   try {
-    snapshot = await api.json(`/research-sessions/${encodeURIComponent(study.sessionId)}`)
-    if (study.paperAssetId) {
-      const retained = await api.json(`/research-assets/${encodeURIComponent(study.paperAssetId)}`)
-      paperAsset = recognizedPaper([retained])
+    const restored = await sourceApi.json(`/research-sessions/${encodeURIComponent(entry.sessionId)}`)
+    if (!current()) return
+    let restoredPaper = null
+    if (entry.paperAssetId) {
+      const retained = await sourceApi.json(`/research-assets/${encodeURIComponent(entry.paperAssetId)}`)
+      if (!current()) return
+      restoredPaper = recognizedPaper([retained])
     }
+    snapshot = restored; paperAsset = restoredPaper
     draftFromSnapshot(snapshot)
     if (paperAsset) {
       draft.asset = paperAsset
@@ -192,11 +238,12 @@ async function reopen() {
       $('study-name').textContent = 'Dr. Verity — Proposition 3.1'
     }
     setMode(paperAsset ? 'paper' : 'concentration'); connectionLabel()
-    if (snapshot.reports.length) await loadResults()
-    if (!location.hash) location.replace('#' + (results ? (results.m.next ? 'next' : 'result') : snapshot.pending_review?.kind === 'plan' ? 'check' : 'data'))
+    if (snapshot.reports.length) await loadResults(current)
+    if (!current()) return
+    if (chooseStep || !location.hash) location.replace('#' + (results ? (results.m.next ? 'next' : 'result') : snapshot.pending_review?.kind === 'plan' ? 'check' : 'data'))
   } catch (error) {
     // Forget the saved study only when the server says it does not exist.
-    if (error.status === 404) { study = {}; writeStore() }
+    if (current() && error.status === 404) forgetStudy(entry)
   }
 }
 
@@ -241,6 +288,7 @@ async function readTables(asset) {
 }
 
 async function addFiles(list) {
+  cancelRestore()
   const files = [...list].filter(Boolean)
   if (!files.length) return
   const where = sources.length ? 'overview-status' : null
@@ -265,6 +313,7 @@ async function addFiles(list) {
 
 // Back to the files, with nothing chosen yet.
 function showOverview() {
+  cancelRestore()
   paperAsset = null
   mode = null; draft = blankDraft(); cmp.reset(); gen.reset(); snapshot = null; results = null; study = {}; writeStore()
   $('study-name').textContent = sources.length === 1 ? stem(sources[0].asset?.filename ?? sources[0].name) : sources.length ? `${sources.length} files` : ''
@@ -470,21 +519,25 @@ async function approve(statusId, buttonId, after) {
 }
 
 // The same files a person can download, verified byte for byte against their fingerprints.
-async function loadResults() {
+async function loadResults(current = () => true) {
+  const sourceApi = api, restoredPaper = paperAsset
   const reportId = snapshot.reports.at(-1)
   const texts = {}
   const read = bytes => new TextDecoder().decode(bytes)
-  const report = await api.download(`/reports/${encodeURIComponent(reportId)}/download`)
+  const report = await sourceApi.download(`/reports/${encodeURIComponent(reportId)}/download`)
+  if (!current()) return
   const reportText = read(report.bytes)
   texts[`dr-bean-${reportId}.json`] = reportText
   for (const entry of JSON.parse(reportText).body.native_evidence) {
     const id = encodeURIComponent(entry.artifact.id)
-    texts[entry.native_filename] = read((await api.download(`/artifacts/${id}`, { sha256: entry.artifact.sha256, byte_size: entry.artifact.byte_size })).bytes)
-    texts[entry.anchor_filename] = read((await api.download(`/artifacts/${id}/anchor?download=true`)).bytes)
+    texts[entry.native_filename] = read((await sourceApi.download(`/artifacts/${id}`, { sha256: entry.artifact.sha256, byte_size: entry.artifact.byte_size })).bytes)
+    if (!current()) return
+    texts[entry.anchor_filename] = read((await sourceApi.download(`/artifacts/${id}/anchor?download=true`)).bytes)
+    if (!current()) return
   }
   const data = fromTexts(texts)
   const m = summarize(data)
-  m.paperReview = paperFinding(data, m, paperAsset)
+  m.paperReview = paperFinding(data, m, restoredPaper)
   results = { data, m }
 }
 
@@ -574,6 +627,8 @@ function route() {
 
 // Step 1: the start screen, then what Dr. Bean found in the files, then the chosen editor.
 function renderDataStep() {
+  $('resume-study').hidden = !savedStudyId(previousStudy) || sources.length > 0 || mode !== null
+  $('resume-study').disabled = connecting || restoring
   const pk = ['paper','concentration'].includes(mode) && Boolean(draft.kind), cm = mode === 'currents' && cmp.editing()
   paperView.setActive(mode === 'paper' && pk)
   $('data').setAttribute('aria-labelledby', mode === 'paper' && pk ? 'paper-data-title' : 'claim-title')
@@ -857,6 +912,7 @@ document.addEventListener('click', event => {
   if (!target) return
   if (target.dataset.step && target.getAttribute('aria-disabled') === 'true') { event.preventDefault(); return }
   const action = target.dataset.action
+  if (['sample-concentration', 'sample-currents', 'paste'].includes(action)) cancelRestore()
   if (action === 'paper-check') { usePaperStudy(); return }
   if (action === 'sample-concentration') { sources = []; setMode('concentration'); useSample() }
   else if (action === 'sample-currents') { sources = []; setMode('currents'); $('study-name').textContent = 'Sample currents'; cmp.sample() }
@@ -879,6 +935,7 @@ document.addEventListener('click', event => {
   else if (action === 'close') target.closest('dialog').close()
   else if (action === 'add') { draft.rows.push({ time: '', value: '', allowance: draft.allowanceForAll || '', included: true }); renderRows(); renderData(); $('rows').lastElementChild?.querySelector('[data-key="time"]')?.focus() }
   else if (action === 'remove') { draft.rows.splice(Number(target.dataset.row), 1); renderRows(); renderData() }
+  else if (action === 'resume-study') resumePrevious()
   else if (action === 'retry-connection') connect()
   else if (action === 'start-new-workspace') connect(true)
   else if (action === 'start-over' && sources.length) showOverview()

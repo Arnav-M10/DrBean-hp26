@@ -11,11 +11,8 @@ const dose = doseStudy()
 const outside = dose.candidates.find(c => c.outside)
 const still = matchMedia('(prefers-reduced-motion: reduce)')
 
-// A study saved in this browser (the study page's own storage key): the main button reopens it.
-try {
-  const saved = Object.values(JSON.parse(localStorage.getItem('dr-bean.study.v1') || '{}'))
-  if (saved.some(s => s?.sessionId || s?.analysisId || s?.comparisonId)) document.querySelectorAll('[data-start]').forEach(a => { a.textContent = 'Open your study' })
-} catch { /* storage is optional; the button still starts a study */ }
+// Start a study always opens an empty draft. Resuming saved work is an explicit
+// choice in the authenticated study workspace.
 
 // The claim, the exact rate of the curve outside it, and Counterdex's mark, typeset by KaTeX.
 const low = formatBound(dose.claim.low), high = formatBound(dose.claim.high)
