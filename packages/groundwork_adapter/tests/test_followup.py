@@ -25,7 +25,7 @@ def observation_revision(problem, dataset, *, origin="actual", time="79/10", all
         "observable": "concentration", "origin": origin,
         "row": {"id": "row_followup", "time": time, "concentration": reading,
                 "hard_allowance": allowance, "included": True,
-                "original_values": {"time": "7.9 hours", "concentration": "3.4 mg/L"},
+                "original_values": {"time": f"{time} h", "concentration": f"{reading} mg/L"},
                 "source_asset_id": None, "notes": "Separately reviewed follow-up reading"},
         "source_description": "Manual reviewed observation, with its original value spellings",
         "change_reason": "Append the separately reviewed reading at its supplied elapsed time",
