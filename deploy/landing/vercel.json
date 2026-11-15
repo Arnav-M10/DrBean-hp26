@@ -1,0 +1,36 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "node build.mjs",
+  "outputDirectory": "public",
+  "routes": [
+    {
+      "src": "/(study(?:/.*)?|api/bean/v1(?:/.*)?|(?:session|api|exact|general-workspace|comparison-api)\\.mjs)$",
+      "dest": "${DRBEAN_UPSTREAM_ORIGIN}/$1",
+      "env": ["DRBEAN_UPSTREAM_ORIGIN"],
+      "headers": {
+        "Cache-Control": "no-store",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store"
+      },
+      "transforms": [
+        {
+          "type": "request.headers",
+          "op": "set",
+          "target": { "key": "x-bean-vercel-proxy" },
+          "args": "$DRBEAN_PROXY_SECRET",
+          "env": ["DRBEAN_PROXY_SECRET"]
+        }
+      ]
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

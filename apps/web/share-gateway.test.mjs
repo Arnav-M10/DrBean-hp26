@@ -111,7 +111,8 @@ test('following an external link admits only the entry document, never cross-sit
   assert.equal((await send(f.port, { path: '/index.html', method: 'HEAD', headers: navigation })).status, 200)
   assert.equal((await send(f.port, { path: '/', headers: { ...navigation, 'sec-fetch-site': 'same-site' } })).status, 200)
   assert.equal((await send(f.port, { path: '/study/', headers: navigation })).status, 200)
-  assert.equal(f.statics.length, 4)
+  assert.equal((await send(f.port, { path: '/study/app', headers: navigation })).status, 200)
+  assert.equal(f.statics.length, 5)
   assert.equal(f.calls.length, 0)
   for (const path of ['/api/bean/v1/shared-session', '/api/bean/v1/workspaces', '/session.mjs', '/styles.css', '/study/app.mjs', '/study/styles.css']) {
     assert.equal((await send(f.port, { path, headers: navigation })).status, 403)
@@ -121,7 +122,7 @@ test('following an external link admits only the entry document, never cross-sit
   for (const headers of [{ host: 'evil.test' }, { 'x-forwarded-proto': 'http' }, { origin: 'https://evil.test' }, { 'sec-fetch-site': 'unknown' }]) {
     assert.equal((await send(f.port, { path: '/', headers: { ...navigation, ...headers } })).status, 403)
   }
-  assert.equal(f.statics.length, 4)
+  assert.equal(f.statics.length, 5)
   assert.equal(f.calls.length, 0)
 })
 
@@ -186,4 +187,115 @@ test('static requests have no credentials and raw filename metadata stays bounde
     assert.equal((await send(f.port, { method: 'POST', headers: { origin, 'x-source-name': value } })).status, 400)
   }
   assert.equal(f.calls.length, 0)
+})
+
+const publicOrigin = 'https://drbean.study', proxySecret = 'p'.repeat(43)
+const aliasHeaders = { 'x-bean-vercel-proxy': proxySecret, 'x-forwarded-host': 'drbean.study',
+  origin: publicOrigin, 'sec-fetch-site': 'same-origin' }
+async function configureAlias(f, value = { version: 1, origin: publicOrigin, secret: proxySecret }) {
+  const file = join(f.directory, 'vercel-proxy.json')
+  await writeFile(file, JSON.stringify(value), { mode: 0o600 })
+  return file
+}
+
+test('Vercel alias validates the new hop then preserves session cookies and maps only the checked origin', async t => {
+  const f = await fixture(t, (req, res) => {
+    res.writeHead(200, { 'Set-Cookie': secureCookie, 'Content-Type': 'application/json',
+      'X-Bean-Vercel-Proxy': proxySecret, 'X-Bean-Shared-Gateway': secret })
+    res.end('{}')
+  })
+  await configureAlias(f)
+  const result = await send(f.port, { method: 'POST', path: '/api/bean/v1/workspaces/w/research-assets',
+    headers: { ...aliasHeaders, cookie, 'content-type': 'application/pdf', 'x-source-name': 'public-study.pdf',
+      'idempotency-key': 'upload-public-study' }, body: '%PDF-public-synthetic-fixture' })
+  assert.equal(result.status, 200)
+  assert.deepEqual(result.headers['set-cookie'], [secureCookie])
+  assert.equal(result.headers['cache-control'], 'no-store')
+  assert.equal(result.headers['x-bean-vercel-proxy'], undefined)
+  assert.equal(result.headers['x-bean-shared-gateway'], undefined)
+  assert.equal(f.calls.length, 1)
+  const call = f.calls[0]
+  assert.equal(call.headers.origin, origin)
+  assert.equal(call.headers['x-bean-shared-origin'], origin)
+  assert.equal(call.headers['x-bean-shared-gateway'], secret)
+  assert.equal(call.headers.cookie, cookie)
+  assert.equal(call.headers['content-type'], 'application/pdf')
+  assert.equal(call.headers['x-source-name'], 'public-study.pdf')
+  assert.equal(call.headers['idempotency-key'], 'upload-public-study')
+  assert.equal(call.body, '%PDF-public-synthetic-fixture')
+  for (const name of ['x-bean-vercel-proxy', 'x-forwarded-host', 'authorization', 'sec-fetch-site']) assert.equal(call.headers[name], undefined)
+})
+
+test('alias proof, exact public origin, transport host and fetch metadata are all required before dispatch', async t => {
+  const f = await fixture(t)
+  await configureAlias(f)
+  const invalid = [
+    { 'x-bean-vercel-proxy': undefined }, { 'x-bean-vercel-proxy': 'q'.repeat(43) }, { 'x-bean-vercel-proxy': '' },
+    { 'x-forwarded-host': undefined }, { 'x-forwarded-host': new URL(origin).host }, { 'x-forwarded-host': 'evil.test' },
+    { host: 'drbean.study' }, { host: 'evil.test' }, { 'x-forwarded-proto': 'http' },
+    { origin }, { origin: 'https://evil.test' }, { origin: 'null' }, { origin: '' },
+    { 'sec-fetch-site': 'same-site' }, { 'sec-fetch-site': 'cross-site' }, { 'sec-fetch-site': 'none' },
+    { 'x-bean-vercel-proxy': [proxySecret, proxySecret] }, { origin: [publicOrigin, publicOrigin] },
+  ]
+  for (const changed of invalid) {
+    const headers = { ...aliasHeaders, ...changed }
+    for (const name of Object.keys(headers)) if (headers[name] === undefined) delete headers[name]
+    assert.equal((await send(f.port, { headers })).status, 403, JSON.stringify(Object.keys(changed)))
+  }
+  const noOrigin = { ...aliasHeaders }; delete noOrigin.origin
+  assert.equal((await send(f.port, { method: 'POST', headers: noOrigin })).status, 403)
+  assert.equal(f.calls.length, 0)
+  assert.equal(f.statics.length, 0)
+  // Browser GET fetches often omit Origin; the exact forwarded host and proof
+  // still bind them, and their session remains independently authorized by API.
+  assert.equal((await send(f.port, { headers: noOrigin })).status, 200)
+  assert.equal(f.calls[0].headers.origin, undefined)
+  assert.equal(f.calls[0].headers['x-bean-shared-origin'], origin)
+})
+
+test('alias entry navigation and static modules work without forwarding credentials to the static server', async t => {
+  const f = await fixture(t)
+  await configureAlias(f)
+  const navigation = { 'x-bean-vercel-proxy': proxySecret, 'x-forwarded-host': 'drbean.study',
+    'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }
+  assert.equal((await send(f.port, { path: '/study/app', headers: navigation })).status, 200)
+  assert.equal((await send(f.port, { path: '/session.mjs', headers: { ...aliasHeaders, cookie } })).status, 200)
+  assert.equal((await send(f.port, { path: '/session.mjs', headers: navigation })).status, 403)
+  assert.equal((await send(f.port, { path: '/api/bean/v1/shared-session/current', headers: navigation })).status, 403)
+  assert.equal(f.calls.length, 0)
+  assert.equal(f.statics.length, 2)
+  for (const call of f.statics) {
+    for (const name of ['x-bean-vercel-proxy', 'cookie', 'origin', 'x-bean-shared-gateway']) assert.equal(call.headers[name], undefined)
+  }
+})
+
+test('alias config fails closed, never disables direct tunnel access, and rotates without API restart', async t => {
+  const f = await fixture(t)
+  assert.equal((await send(f.port, { headers: aliasHeaders })).status, 503)
+  assert.equal((await send(f.port)).status, 200)
+  const file = await configureAlias(f)
+  await chmod(file, 0o644)
+  assert.equal((await send(f.port, { headers: aliasHeaders })).status, 503)
+  await chmod(file, 0o600)
+  for (const value of [null, {}, { version: 1, origin: publicOrigin, secret: 'bad' },
+    { version: 1, origin: 'http://drbean.study', secret: proxySecret },
+    { version: 1, origin: 'https://*.drbean.study', secret: proxySecret },
+    { version: 1, origin: 'https://drbean.study/path', secret: proxySecret },
+    { version: 1, origin: 'https://drbean.study:443', secret: proxySecret },
+    { version: 1, origin: 'https://user:pass' + '@drbean.study', secret: proxySecret },
+    { version: 1, origin: publicOrigin, secret: proxySecret, extra: true }]) {
+    await configureAlias(f, value)
+    assert.equal((await send(f.port, { headers: aliasHeaders })).status, 503)
+  }
+  await configureAlias(f, { version: 1, origin: publicOrigin, secret: 'r'.repeat(43) })
+  assert.equal((await send(f.port, { headers: aliasHeaders })).status, 403)
+  assert.equal((await send(f.port, { headers: { ...aliasHeaders, 'x-bean-vercel-proxy': 'r'.repeat(43) } })).status, 200)
+  await rm(file)
+  const target = join(f.directory, 'not-a-proxy.json')
+  await writeFile(target, JSON.stringify({ version: 1, origin: publicOrigin, secret: proxySecret }), { mode: 0o600 })
+  await symlink(target, file)
+  const result = await send(f.port, { headers: aliasHeaders })
+  assert.equal(result.status, 503)
+  assert.equal(result.text.includes(proxySecret), false)
+  assert.equal((await send(f.port)).status, 200)
 })

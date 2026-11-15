@@ -143,7 +143,95 @@ class Sharing(unittest.TestCase):
             self.assertFalse(any(key.startswith("BEAN_LOCAL_") for key in env), name)
             shared = {key: value for key, value in env.items() if key.startswith("BEAN_SHARE_")}
             self.assertEqual(shared, {"BEAN_SHARE_ORIGIN_FILE": str(self.origin),
-                                      "BEAN_SHARE_GATEWAY_FILE": str(self.gateway)} if name == "share-gateway" else {})
+                                      "BEAN_SHARE_GATEWAY_FILE": str(self.gateway),
+                                      "BEAN_SHARE_WEB_PORT": str(share.launcher.WEB_PORT),
+                                      "BEAN_SHARE_API_PORT": str(share.launcher.API_PORT)} if name == "share-gateway" else {})
+
+    def test_selected_app_ports_reach_only_gateway_and_inherited_proof_is_stripped(self):
+        captured = {}
+        inherited_proof = "/private/owner-only-local-proof.json"
+        environment = {"BEAN_AI_MODE": "placeholder",
+                       "BEAN_LOCAL_GATEWAY_FILE": inherited_proof,
+                       "DRBEAN_PROXY_SECRET": "p" * 43,
+                       "BEAN_SHARE_WEB_PORT": "9999", "BEAN_SHARE_API_PORT": "9998"}
+
+        def capture(name, command, env):
+            captured[name] = env.copy()
+            return self.spawn(name, command, env)
+
+        with self.controlled(), mock.patch.object(share.launcher, "WEB_PORT", 28170), \
+                mock.patch.object(share.launcher, "API_PORT", 28171), \
+                mock.patch.object(share.launcher, "child_env", return_value=environment), \
+                mock.patch.object(share.launcher, "spawn", side_effect=capture):
+            self.assertEqual(share.start(), 0)
+        self.assertEqual(captured["share-gateway"]["BEAN_SHARE_WEB_PORT"], "28170")
+        self.assertEqual(captured["share-gateway"]["BEAN_SHARE_API_PORT"], "28171")
+        for name, env in captured.items():
+            self.assertNotIn(inherited_proof, env.values(), name)
+            self.assertFalse(any(key.startswith("BEAN_LOCAL_") for key in env), name)
+            self.assertNotIn("DRBEAN_PROXY_SECRET", env, name)
+            self.assertNotIn("p" * 43, env.values(), name)
+        self.assertFalse(any(key.startswith("BEAN_SHARE_") for key in captured["share-tunnel"]))
+        self.assertNotIn(str(self.gateway), captured["share-tunnel"].values())
+
+    def test_gateway_restart_preserves_tunnel_origin_app_and_credentials(self):
+        share.prepare_gateway()
+        self.origin.write_text('{"origin":"https://bean-study.trycloudflare.com"}')
+        origin_bytes, gateway_bytes = self.origin.read_bytes(), self.gateway.read_bytes()
+        self.processes.update({"share-gateway": {"pid": 120, "sharing_mode": share.GATEWAY_MODE},
+                               "share-tunnel": {"pid": 121}, "share-awake": {"pid": 122}})
+        retained = {name: record.copy() for name, record in self.processes.items() if name != "share-gateway"}
+
+        def stop_gateway(name):
+            self.assertEqual(name, "share-gateway")
+            self.assertEqual(self.origin.read_bytes(), origin_bytes)
+            self.processes.pop(name)
+            return "stopped"
+
+        with self.controlled(), mock.patch.object(share.launcher, "stop_one", side_effect=stop_gateway) as stop, \
+                mock.patch.object(share.launcher, "port_in_use", side_effect=lambda port: port != share.PORT or "share-gateway" in self.processes), \
+                mock.patch.object(share.launcher, "live_config", side_effect=AssertionError("No provider configuration read")):
+            self.assertEqual(share.restart_gateway(), 0)
+        stop.assert_called_once_with("share-gateway")
+        self.assertEqual(self.spawned, ["share-gateway"])
+        self.assertEqual({name: self.processes[name] for name in retained}, retained)
+        self.assertEqual(self.origin.read_bytes(), origin_bytes)
+        self.assertEqual(self.gateway.read_bytes(), gateway_bytes)
+        self.assertEqual(self.processes["share-gateway"]["sharing_mode"], share.GATEWAY_MODE)
+        self.assertNotIn(json.loads(gateway_bytes)["secret"], self.output.getvalue())
+
+    def test_gateway_restart_refuses_unproven_or_foreign_processes_and_unready_api(self):
+        self.origin.write_text('{"origin":"https://bean-study.trycloudflare.com"}')
+        self.processes["share-tunnel"] = {"pid": 121}
+        before = self.origin.read_bytes()
+        for problem in ("unproven", "foreign-port", "unready-api", "legacy-gateway"):
+            with self.subTest(problem=problem), self.controlled(), \
+                    mock.patch.object(share.launcher, "unproven_process", return_value=problem == "unproven"), \
+                    mock.patch.object(share.launcher, "port_in_use", return_value=problem == "foreign-port"), \
+                    mock.patch.object(share, "session_api_ready", return_value=problem != "unready-api"), \
+                    mock.patch.object(share.launcher, "stop_one") as stop:
+                if problem == "legacy-gateway":
+                    self.processes["share-gateway"] = {"pid": 120}
+                self.assertEqual(share.restart_gateway(), 1)
+                stop.assert_not_called()
+        self.assertEqual(self.spawned, [])
+        self.assertEqual(self.origin.read_bytes(), before)
+
+    def test_failed_gateway_restart_retains_tunnel_and_can_be_retried(self):
+        share.prepare_gateway()
+        self.origin.write_text('{"origin":"https://bean-study.trycloudflare.com"}')
+        before = (self.origin.read_bytes(), self.gateway.read_bytes())
+        self.processes["share-tunnel"] = {"pid": 121}
+        with self.controlled(), mock.patch.object(share.launcher, "spawn", side_effect=OSError("secret-error-text")), \
+                mock.patch.object(share.launcher, "stop_one") as stop:
+            self.assertEqual(share.restart_gateway(), 1)
+            stop.assert_not_called()
+        self.assertEqual((self.origin.read_bytes(), self.gateway.read_bytes()), before)
+        self.assertEqual(self.processes["share-tunnel"], {"pid": 121})
+        self.assertNotIn("secret-error-text", self.output.getvalue())
+        with self.controlled(), mock.patch.object(share.launcher, "port_in_use", side_effect=lambda port: port != share.PORT or "share-gateway" in self.processes):
+            self.assertEqual(share.restart_gateway(), 0)
+        self.assertEqual(self.spawned, ["share-gateway"])
 
     def test_partial_failure_recovers_without_api_restart_or_credential_rotation(self):
         def fail_tunnel(name, command, env):
