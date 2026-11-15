@@ -3,6 +3,26 @@
 import { escapeHTML } from './results.mjs'
 import { paperInputsMatch } from './paper-study.mjs'
 
+export function paperNextHTML(m, sym) {
+  const proof = m.paperReview
+  const title = proof ? 'Revisit the proof at Proposition 3.1' : 'Review what this check establishes'
+  const lead = proof
+    ? 'A checked counterexample already contradicts this necessary premise. The next step is to examine that failure and revise the argument.'
+    : 'This run does not establish that the original paper’s premise is false. Review the result and its assumptions before drawing a conclusion about the proof.'
+  const first = proof
+    ? `The checked assignment has ${sym.ke} = ${sym.exact(proof.witness.ke)} h⁻¹, outside ${sym.claim('0.10','0.17')}, while respecting all five stated hard bounds. Proposition 3.1 says this cannot happen.`
+    : 'Check which inputs were tested and what the checker returned. An edited study is a different claim; a search that finds no counterexample does not prove the original proposition.'
+  return `<p class="meta">Paper review · Proposition 3.1 · Page 3</p>
+    <h1 id="paper-next-title">${title}</h1><p class="lead">${lead}</p>
+    <ol class="paper-followup-list">
+      <li><h2>${proof ? 'Locate the failed premise' : 'Check the result’s scope'}</h2><p>${first}</p><a href="#result-readings">Inspect the reading-by-reading checks</a></li>
+      <li><h2>Check the evidence</h2><p>Open the exact assignment and native evidence. Download the matching replay anchors to run the recorded check again with Counterdex.</p><a href="#result-files">Open the evidence and replay instructions</a></li>
+      <li><h2>Revisit the argument</h2><p>${proof ? 'The transfer step on page 4 requires Proposition 3.1. It cannot rely on that premise as written. A revised proof needs a justified replacement or additional assumptions, followed by a new check.' : 'Confirm the proposition, source values and model assumptions. If the argument changes, prepare a new check for the revised claim.'}</p><a href="#data">Review the premise and assumptions</a></li>
+    </ol>
+    <p class="hint">This is a check of the paper’s finite numerical premise. It does not decide the Riemann hypothesis.</p>
+    <div class="actions"><a href="#result" class="back">Back to the result</a><button type="button" class="primary" data-action="report"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Download the readable report</span></button></div>`
+}
+
 export function createPaperView(editor, sym) {
   const pane = document.createElement('div')
   pane.id = 'paper-editor'; pane.hidden = true
@@ -33,6 +53,7 @@ export function createPaperView(editor, sym) {
 .paper-review-brief{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:28px 0}.paper-review-brief p{color:var(--text-2);line-height:1.7;margin:0}
 .paper-values,.paper-inputs{border-top:1px solid var(--line);padding:18px 0}.paper-values summary,.paper-inputs summary{font-size:16px}.paper-values-body{padding-top:18px;max-width:900px}.paper-values-body table{width:100%}.paper-values-body .equation{overflow-x:auto}
 #paper-editor>.actions{position:static;margin-top:12px;box-shadow:none}#paper-editor #editor{padding:22px 0}#paper-editor #claim-title{font-size:24px}#paper-editor .paper-edited{margin:24px 0}
+#paper-followup .paper-followup-list{padding:0;list-style:none;counter-reset:followup;margin:32px 0;max-width:1000px}#paper-followup .paper-followup-list li{counter-increment:followup;position:relative;padding:24px 0 24px 55px;border-top:1px solid var(--line)}#paper-followup .paper-followup-list li::before{content:counter(followup,decimal-leading-zero);position:absolute;left:0;top:27px;color:var(--text-3);font-size:14px}#paper-followup h2{font-size:21px;margin:0 0 12px;font-weight:550}#paper-followup .paper-followup-list p{color:var(--text-2);line-height:1.7;margin:0 0 12px}#paper-followup>.actions{position:static;box-shadow:none}
 @media(max-width:700px){.paper-review-brief{grid-template-columns:1fr;gap:22px}.paper-premise{padding:20px}.paper-premise blockquote{font-size:18px}.paper-values-body{overflow-x:auto}}
 `
   document.head.append(style)

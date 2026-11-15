@@ -36,7 +36,7 @@ The proposed transfer step and theorem explicitly require Proposition 3.1. Findi
 5. Prepare the check, then approve the real maintained plan.
 6. Read the counterexample, graph and per-reading checks. The Files view contains the readable report, native evidence and replay anchors.
 
-The displayed explanation has three parts: what the paper requires, the actual outside witness, and why the necessary premise fails. The next-measurement workflow remains available when a compatible inside/outside pair was retained. Uploading an ordinary document leaves the user at its overview, with no experiment selected. The concentration editor is reached by an explicit concentration check or sample choice; this paper has its own review presentation. Paper graphs use calibration time, and general concentration graphs use elapsed time without assuming a dose.
+The displayed explanation has three parts: what the paper requires, the actual outside witness, and why the necessary premise fails. **Next step** stays within the paper review: inspect the checked assignment, download and replay evidence, and revisit the failed premise. It does not offer measurement planning or dispatch new scientific jobs. The experimental next-measurement workflow remains available for ordinary concentration studies. Uploading an ordinary document leaves the user at its overview, with no experiment selected. The concentration editor is reached by an explicit concentration check or sample choice; this paper has its own review presentation. Paper graphs use calibration time, and general concentration graphs use elapsed time without assuming a dose.
 
 ## What is prepared and what is computed
 

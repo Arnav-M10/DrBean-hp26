@@ -15,7 +15,7 @@ import { createComparison } from './compare-app.mjs'
 import { createGeneral } from './general-app.mjs'
 import { CHECKS, overview } from './general.mjs'
 import { recognizedPaper, paperDraft, paperFinding, paperInputsMatch, PAPER_CSS } from './paper-study.mjs'
-import { createPaperView } from './paper-view.mjs'
+import { createPaperView, paperNextHTML } from './paper-view.mjs'
 import { fileMediaHint, generalCapabilities, validateFileSelection } from '../general-workspace.mjs'
 import { curvesFor, escapeHTML, fileView, finding, formatBound, formatRate, fromTexts, nextFinding, nextTable, readableReport, readingTable, summarize } from './results.mjs'
 
@@ -450,6 +450,7 @@ async function approve(statusId, buttonId, after) {
   if (busy) return
   const s = snapshot, review = s?.pending_review
   if (!review) return
+  if (mode === 'paper' && review.kind === 'design_plan') return
   busy = true; $(buttonId).disabled = true
   try {
     status(statusId, 'Recording your approval…')
@@ -488,6 +489,7 @@ async function loadResults() {
 }
 
 async function prepareNext() {
+  if (mode !== 'concentration') return
   if (busy) return
   const list = nextProblems()
   if (list.length) { nextShown.tried = true; renderNext(); $(`next-${list[0][1]}`).focus(); return }
@@ -543,12 +545,14 @@ const pkReached = {
 
 const noneReached = { data: () => true, check: () => false, result: () => false, next: () => false }
 const PATHS = { paper: 'pk', concentration: 'pk', currents: 'cmp', general: 'ai' }
-const reached = new Proxy({}, { get: (_, step) => ({ paper: pkReached, concentration: pkReached, currents: cmp.reached, general: gen.reached }[mode] ?? noneReached)[step] })
+const paperReached = { ...pkReached, next: () => Boolean(results) }
+const reached = new Proxy({}, { get: (_, step) => ({ paper: paperReached, concentration: pkReached, currents: cmp.reached, general: gen.reached }[mode] ?? noneReached)[step] })
 
 function route() {
   let v = view()
   if (!reached[VIEWS[v]]()) v = 'data'
   const section = VIEWS[v]
+  $('next').setAttribute('aria-labelledby', mode === 'paper' ? 'paper-next-title' : 'next-heading')
   const path = PATHS[mode] ?? 'pk'
   for (const step of ['check', 'result', 'next']) for (const pane of ['pk', 'cmp', 'ai']) $(`${pane}-${step}`).hidden = pane !== path
   document.querySelectorAll('main > section').forEach(s => { s.hidden = s.id !== section })
@@ -741,17 +745,30 @@ function renderResult(v) {
   $('result-readings-table').innerHTML = readingTable(m)
   const groups = [['Full record', 'The saved study in one file: readings, claim, approvals, results and the list of proofs.', f => f.kind === 'record'],
     ['Claim check', "Counterdex's exact calculations for the check, and the fingerprints that tie them to your readings.", f => f.step === 'check'],
-    ['Next measurement', "Counterdex's exact calculations for the comparison, and their fingerprints.", f => f.step === 'next']]
+    [mode === 'paper' ? 'Saved numerical comparison' : 'Next measurement', "Counterdex's exact calculations for the comparison, and their fingerprints.", f => f.step === 'next']]
   $('file-list').innerHTML = groups.map(([title, about, pick]) => ({ title, about, files: m.files.filter(pick) })).filter(g => g.files.length).map(g => `<li><div><h3>${escapeHTML(g.title)}</h3><p>${escapeHTML(g.about)}</p></div>
     <div class="file-actions">${g.files.map(file => `<button type="button" class="secondary small" data-action="view-file" data-file="${m.files.indexOf(file)}">View ${file.kind === 'record' ? 'record' : file.kind === 'proof' ? 'proof' : 'fingerprints'}</button>`).join('')}</div></li>`).join('')
   const canPlan = reached.next()
   $('to-next').hidden = !canPlan
+  $('to-next').textContent = mode === 'paper' ? 'Review the proof’s next steps' : 'Plan the next measurement'
   $('next-unavailable').hidden = canPlan
   $('next-unavailable').textContent = canPlan ? '' : 'A next-measurement plan needs two fitting curves, one inside and one outside the claim. This check did not find that pair.'
 }
 
 function renderNext() {
   const m = results?.m
+  let paperFollowup = $('paper-followup')
+  if (mode === 'paper') {
+    for (const id of ['next-settings','next-review','next-answer']) $(id).hidden = true
+    if (!paperFollowup) {
+      paperFollowup = document.createElement('div'); paperFollowup.id = 'paper-followup'
+      $('pk-next').append(paperFollowup)
+    }
+    paperFollowup.hidden = false
+    paperFollowup.innerHTML = m ? paperNextHTML(m, sym) : ''
+    return
+  }
+  if (paperFollowup) paperFollowup.hidden = true
   const answered = Boolean(m?.next)
   const reviewing = !answered && snapshot?.state === 'waiting_review' && snapshot.pending_review?.kind === 'design_plan'
   $('next-settings').hidden = answered || reviewing
@@ -870,7 +887,7 @@ document.addEventListener('click', event => {
   else if (action === 'approve-check') approve('check-status', 'approve-check', () => { location.hash = 'result' })
   else if (action === 'go-next') { if (draft.kind === 'sample' && !next.times) next = { ...SAMPLE.next }; location.hash = 'next' }
   else if (action === 'prepare-next') prepareNext()
-  else if (action === 'approve-next') approve('next-run-status', 'approve-next', () => renderNext())
+  else if (action === 'approve-next' && mode === 'concentration') approve('next-run-status', 'approve-next', () => renderNext())
   else if (action === 'view-file') openFile(results.m.files[Number(target.dataset.file)])
   else if (action === 'save-file' && viewing) saveText(viewing.name, results.data.texts[viewing.name], 'application/json')
   else if (action === 'report') downloadReport(target)
