@@ -8,6 +8,7 @@ import time
 import pytest
 
 from bean_api.science import UnavailableAdapter, run_bounded
+from bean_api.science import _kill_owned_session
 
 
 class SlowAdapter:
@@ -59,6 +60,52 @@ def test_process_observer_handles_reaping_during_stat_read(monkeypatch, failure)
     monkeypatch.setattr(Path, "read_text", disappeared)
     monkeypatch.setattr(os, "kill", reaped)
     assert not process_running(12345)
+
+
+@pytest.mark.parametrize("reaped_exitcode", [-9, None])
+def test_session_permission_failure_retries_only_after_reaping_dead_leader(monkeypatch, reaped_exitcode):
+    class Process:
+        pid = 12345
+        exitcode = None
+
+        def join(self, timeout):
+            assert timeout == 2
+            self.exitcode = reaped_exitcode
+
+    attempts = []
+
+    def killpg(pid, stop_signal):
+        attempts.append((pid, stop_signal))
+        if len(attempts) == 1:
+            raise PermissionError("controlled Darwin zombie session")
+        raise ProcessLookupError("reaped session no longer exists")
+
+    monkeypatch.setattr(os, "killpg", killpg)
+    if reaped_exitcode is None:
+        with pytest.raises(PermissionError):
+            _kill_owned_session(Process())
+        assert len(attempts) == 1
+    else:
+        _kill_owned_session(Process())
+        assert attempts == [(12345, 9), (12345, 9)]
+
+
+def test_session_permission_failure_after_reaping_is_not_ignored(monkeypatch):
+    class Process:
+        pid = 12345
+        exitcode = -9
+
+        def join(self, timeout):
+            pass
+
+    def denied(*args):
+        raise PermissionError("controlled real signal denial")
+
+    monkeypatch.setattr(os, "killpg", denied)
+    times = iter([0, 3])
+    monkeypatch.setattr(time, "monotonic", lambda: next(times))
+    with pytest.raises(PermissionError, match="real signal denial"):
+        _kill_owned_session(Process())
 
 
 def test_unconfigured_science_has_no_checked_capability():

@@ -686,11 +686,17 @@ class Workflow:
         """
         with self.store.transaction() as conn:
             now = utc_now()
+            # No child was ever started for these jobs. A restart must still
+            # acknowledge the user's cancellation instead of inventing an
+            # interrupted scientific attempt.
+            cancelled = conn.execute("UPDATE jobs SET state='cancelled',finished_at=? "
+                "WHERE state='cancel_requested' AND started_at IS NULL", (now,)).rowcount
             jobs = conn.execute("UPDATE jobs SET state='interrupted',finished_at=?,error_code='worker_restart' WHERE state IN ('running','cancel_requested')", (now,)).rowcount
             children = conn.execute("UPDATE scenario_reservations SET state='interrupted',finished_at=?,reason_code='worker_restart' WHERE state IN ('reserved','running') AND run_id IN (SELECT id FROM jobs WHERE state='interrupted')", (now,)).rowcount
             attempts = conn.execute("UPDATE provider_attempts SET state='unknown_outcome',finished_at=? WHERE state='reserved'", (now,)).rowcount
             operations = conn.execute("UPDATE operations SET state='interrupted',finished_at=?,error_code='worker_restart' WHERE state='reserved'", (now,)).rowcount
-            return {"jobs": jobs, "scenarios": children, "provider_attempts": attempts, "operations": operations}
+            return {"jobs": jobs + cancelled, "queued_cancellations": cancelled,
+                    "scenarios": children, "provider_attempts": attempts, "operations": operations}
 
     def queued_jobs(self, limit: int = 20) -> list[dict]:
         """Internal dispatcher inventory, never expose without workspace filtering."""
