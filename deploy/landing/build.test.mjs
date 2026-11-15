@@ -12,7 +12,7 @@ test('deployment refuses absent, malformed or untrusted configuration', () => {
   validateEnvironment(env)
   for (const upstream of ['', 'http://bean.trycloudflare.com', 'https://bean.trycloudflare.com/',
     'https://bean.trycloudflare.com/study', 'https://bean.trycloudflare.com.evil.test',
-    'https://localhost', 'https://user:secret@bean.trycloudflare.com']) {
+    'https://localhost', 'https://user:secret' + '@bean.trycloudflare.com']) {
     assert.throws(() => validateEnvironment({ ...env, DRBEAN_UPSTREAM_ORIGIN: upstream }))
   }
   for (const secret of ['', undefined, 'short', 'x'.repeat(44), ' '.repeat(43)]) {

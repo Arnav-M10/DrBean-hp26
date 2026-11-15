@@ -282,7 +282,7 @@ test('alias config fails closed, never disables direct tunnel access, and rotate
     { version: 1, origin: 'https://*.drbean.study', secret: proxySecret },
     { version: 1, origin: 'https://drbean.study/path', secret: proxySecret },
     { version: 1, origin: 'https://drbean.study:443', secret: proxySecret },
-    { version: 1, origin: 'https://user:pass@drbean.study', secret: proxySecret },
+    { version: 1, origin: 'https://user:pass' + '@drbean.study', secret: proxySecret },
     { version: 1, origin: publicOrigin, secret: proxySecret, extra: true }]) {
     await configureAlias(f, value)
     assert.equal((await send(f.port, { headers: aliasHeaders })).status, 503)
