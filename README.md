@@ -23,7 +23,7 @@ Dr. Bean connects research papers and data to a practical scientific question: *
 
 A convincing curve is only a starting point. For its supported concentration model, Dr. Bean can discover a competing parameter assignment, check that it satisfies every reviewed measurement bound, and retain the evidence for replay. Researchers can then compare follow-up measurements that distinguish two retained candidates.
 
-The main interface is the **study workspace** at `/study/` in a local checkout. Researchers bring files and a question, review the proposed analysis, inspect the answer, and choose a next step. Supported scientific checks retain the reviewed inputs, assumptions, computation, and evidence needed to inspect or replay a result.
+The main interface is the **study workspace** at `/study/app`, introduced by a front page at `/study/` in a local checkout. Researchers bring files and a question, review the proposed analysis, inspect the answer, and choose a next step. Supported scientific checks retain the reviewed inputs, assumptions, computation, and evidence needed to inspect or replay a result.
 
 The [hosted prototype](https://drbean.study/) opens its study app at `/study/app`. Vercel serves the landing page and proxies the app to the development host; the API, worker, database, and provider key remain on that host. Availability depends on that host and its tunnel. The hosted frontend can differ from a fresh clone. See [deployment details](deploy/landing/README.md).
 

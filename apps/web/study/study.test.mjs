@@ -17,6 +17,16 @@ test('a lab CSV: text column skipped, minutes and ng/mL recognised, SD never use
   assert.equal(rows[0].line, 2)
 })
 
+test('a CSV whose first reading is 0,0 keeps its header and every reading', () => {
+  // Real dose data often start at 0 h with 0 mg/L (R's Theoph, subject 3).
+  const [table] = tablesFromText('Time (h),Theophylline (mg/L)\n0,0\n0.27,4.4\n0.58,6.9\n24.17,1.05\n', { file: 'theoph.csv' })
+  assert.deepEqual(table.header, ['Time (h)', 'Theophylline (mg/L)'])
+  assert.deepEqual(table.rows, [['0', '0'], ['0.27', '4.4'], ['0.58', '6.9'], ['24.17', '1.05']])
+  // A decimal comma still reads as one number where the text has no point decimals.
+  assert.deepEqual(cellsOf('4,80'), ['4,80'])
+  assert.deepEqual(tablesFromText('Zeit (h);Konzentration (mg/L)\n0,25;4,80\n0,5;7,20\n1;8,00\n')[0].rows[0], ['0,25', '4,80'])
+})
+
 test('exact unit conversion never rounds', () => {
   assert.equal(convert('15', 'time', 'min'), '1/4')
   assert.equal(convert('20', 'time', 'min'), '1/3')
@@ -200,4 +210,56 @@ test('the published example answer reads with its quotes, and its tables can sta
   assert.deepEqual(table.header, first.columns)
   assert.equal(table.rows.length, first.rows.length)
   assert.ok(G.nextSteps(m).includes('Review the values'))
+})
+
+// --- The front page ---------------------------------------------------------------------------------
+// Every value the front page shows comes from home-data.mjs. Read the saved run again and check that
+// the copy is exact and words the same as the study page.
+test('the front page shows the saved run exactly, worded as the study page words it', async () => {
+  const H = await import('./home-data.mjs'), R = await import('./results.mjs')
+  const dir = new URL('./fixtures/', import.meta.url)
+  const names = readdirSync(dir).filter(name => name.startsWith('dr-bean-'))
+  const m = summarize(fromTexts(Object.fromEntries(names.map(name => [name, readFileSync(new URL(name, dir), 'utf8')]))))
+  const d = H.doseStudy()
+  assert.deepEqual(d.included.map(({ t, v, e, time, value, allowance }) => ({ t, v, e, time, value, allowance })),
+    m.included.map(({ t, v, e, time, value, allowance }) => ({ t, v, e, time, value, allowance })))
+  assert.deepEqual(d.candidates.map(({ tone, outside, exact, params }) => ({ tone, outside, exact, params })),
+    m.candidates.map(({ tone, outside, exact, params }) => ({ tone, outside, exact, params })))
+  assert.deepEqual([d.claim.low, d.claim.high, d.outcome, d.search, d.created, d.checker.version, d.objective],
+    [m.claim.low, m.claim.high, m.outcome, m.search, m.created, m.checker.version, m.objective])
+  const shown = times => times.map(({ t, separated, margin, centers, ranges }) => ({ t, separated, margin, centers, ranges }))
+  assert.deepEqual(d.next.times, shown(m.next.times))
+  assert.deepEqual([d.next.tier, d.next.selected, d.next.allowance, d.next.horizon], [m.next.tier, m.next.selected, m.next.allowance, m.next.horizon])
+  assert.deepEqual(R.finding(d), R.finding(m))
+  assert.deepEqual(R.nextFinding(d), R.nextFinding(m))
+  assert.equal(R.nextTable(d), R.nextTable(m))
+  // The fraction the page sets in its note is the rate of the curve outside the claim, and it is
+  // below the claim's 0.10 exactly (101/1016 < 1/10 because 1010 < 1016).
+  assert.equal(d.candidates.find(c => c.outside).exact.ke, '101/1016')
+  assert.ok(101 * 10 < 1016)
+  // "Measure at 8 h" on the page is the run's chosen time.
+  assert.equal(R.nextFinding(m).headline, 'Measure at 8 hours')
+  assert.equal(d.next.selected, 8)
+})
+
+test('the front page links only to the study, its own sections and the source, and loads nothing from elsewhere', () => {
+  const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8')
+  const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]))
+  for (const [, href] of html.matchAll(/\shref="([^"]*)"/g)) {
+    if (href.startsWith('#')) assert.ok(href === '#main' || ids.has(href.slice(1)), `missing section ${href}`)
+    else assert.ok(['app', './', 'https://github.com/Arnav-M10/DrBean-hp26'].includes(href) || /^(fonts|vendor)\/|\.css$/.test(href), `unexpected link ${href}`)
+  }
+  for (const [, src] of html.matchAll(/\ssrc="(logos\/[^"]+)"/g)) {
+    assert.doesNotMatch(readFileSync(new URL(src, import.meta.url), 'utf8'), /<script|\son[a-z]+=|href=/i, src)
+  }
+  for (const [, src] of html.matchAll(/\ssrc="([^"]*)"/g)) assert.doesNotMatch(src, /^(https?:)?\/\//)
+  assert.equal([...html.matchAll(/data-start/g)].length, 3)
+  // Its sections never take a study step's name: those links open the study (the redirect in <head>).
+  for (const step of ['data', 'check', 'result', 'next']) assert.ok(!ids.has(step), step)
+  assert.match(html, /\^#\(data\|check\|result\|next\)\(-\|\$\)/)
+  // A fresh /study/app opens an empty draft and offers Resume previous study, so the front page
+  // never promises to reopen a saved study and never reads the study's storage.
+  assert.doesNotMatch(readFileSync(new URL('./home.mjs', import.meta.url), 'utf8'), /Open your study|localStorage/)
+  // The study page's logo leads back to the front page.
+  assert.match(readFileSync(new URL('./app.html', import.meta.url), 'utf8'), /<a class="brand" href="\.\/">/)
 })

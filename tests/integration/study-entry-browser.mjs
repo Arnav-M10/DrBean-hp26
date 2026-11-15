@@ -84,7 +84,7 @@ try {
       }
       return json(route, { code: 'unimplemented_controlled_fixture', message: path }, 404)
     })
-    await page.goto(`${origin}/study/${fragment}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${origin}/study/app${fragment}`, { waitUntil: 'domcontentloaded' })
     return { page, requests, release, requested }
   }
   const ready = page => page.waitForFunction(() => document.getElementById('connection')?.textContent === 'Private workspace'

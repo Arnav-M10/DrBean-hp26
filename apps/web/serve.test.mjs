@@ -161,12 +161,22 @@ test('the study page serves only its own files, by type, and nothing outside its
   const redirect = await send('/study')
   assert.equal(redirect.status, 308)
   assert.equal(redirect.headers.location, '/study/')
+  // /study/ is the front page; /study/app is the study itself.
   const page = await send('/study/')
   assert.equal(page.status, 200)
   assert.match(page.headers['content-type'], /^text\/html/)
   assert.equal(page.headers['x-content-type-options'], 'nosniff')
   assert.match(page.text, /<title>/)
+  assert.match(page.text, /src="home\.mjs"/)
+  for (const path of ['/study/app', '/study/app.html']) {
+    const app = await send(path)
+    assert.equal(app.status, 200, path)
+    assert.match(app.headers['content-type'], /^text\/html/, path)
+    assert.match(app.text, /src="app\.mjs"/, path)
+  }
   for (const [path, type] of [['/study/app.mjs', /^text\/javascript/], ['/study/styles.css', /^text\/css/],
+    ['/study/home.mjs', /^text\/javascript/], ['/study/home-data.mjs', /^text\/javascript/], ['/study/home.css', /^text\/css/],
+    ['/study/logos/gemini.svg', /^image\/svg\+xml$/], ['/study/logos/langchain.svg', /^image\/svg\+xml$/],
     ['/study/vendor/katex/katex.min.js', /^text\/javascript/], ['/study/fonts/atkinson-next-latin.woff2', /^font\/woff2$/]]) {
     const response = await send(path)
     assert.equal(response.status, 200, path)
@@ -177,7 +187,8 @@ test('the study page serves only its own files, by type, and nothing outside its
   assert.equal(head.text, '')
   for (const path of ['/study/../serve.mjs', '/study/..%2fserve.mjs', '/study/%2e%2e/serve.mjs', '/study/vendor/../../serve.mjs',
     '/study/.hidden.mjs', '/study/fonts/.x.woff2', '/study/fixtures/provenance.json', '/study/fixtures/x.html', '/study/study.test.mjs',
-    '/study/vendor/katex/LICENSE', '/study/fonts/SOURCE.txt', '/study/nothing-here.mjs', '/study/app.mjs/', '/study//app.mjs', '/study/a\\b.mjs']) {
+    '/study/vendor/katex/LICENSE', '/study/fonts/SOURCE.txt', '/study/nothing-here.mjs', '/study/app.mjs/', '/study//app.mjs', '/study/a\\b.mjs',
+    '/study/app/', '/study/home', '/study/index', '/study/logos/SOURCE.txt']) {
     assert.equal((await send(path)).status, 404, path)
   }
   assert.equal((await send('/study/app.mjs', {}, 'POST')).status, 405)

@@ -1,14 +1,28 @@
 # Study page
 
-The main study front end for the local app, served at `/study/` by `apps/web/serve.mjs`.
-The page at `/` is unchanged. Start the app as usual (`scripts/dev/launcher.py start`), then open
-`http://127.0.0.1:4173/study/` (or whatever web port the launcher prints).
+The main study front end for the local app, served by `apps/web/serve.mjs`: a front page at
+`/study/` and the study itself at `/study/app`. The page at `/` is unchanged. Start the app as usual
+(`scripts/dev/launcher.py start`), then open `http://127.0.0.1:4173/study/` (or whatever web port the
+launcher prints). Links to a study step, such as `/study/#data`, open the study directly.
 
 It uses the real API through the local proxy: the private browser session, research assets, the
 general research service, datasets, problems, research sessions with their review gates, the
 numerical model comparison service and authenticated downloads. Its scientific coordinator uses
 the controlled offline policy through the actual Deep Agents graph; it is not a live Gemini
 coordinator. General file analysis can separately use live Gemini or a labelled local test responder.
+
+## Front page
+
+`index.html` is two screens. The first plays a saved run on the study's own chart (`chart.mjs`),
+once: the readings, the curve inside the claim, the curve outside it with its exact rate set by
+KaTeX, then the times to measure and the one that decides. The second shows the steps a study takes,
+from your files to the report, and sends one dot of data through them the first time it is seen.
+Reduced motion shows the finished picture with no movement. `home.mjs` draws both; the values come
+from `home-data.mjs`, a copy of the run in `fixtures/` that `study.test.mjs` checks against those
+files. The front page sends nothing to the server and opens no workspace; its buttons lead to
+`/study/app`, which starts an empty draft and offers **Resume previous study** when this browser saved one.
+`logos/` holds the Gemini and LangChain
+marks (CC0, see `logos/SOURCE.txt`).
 
 ## One flow for any files
 
@@ -32,7 +46,7 @@ coordinator. General file analysis can separately use live Gemini or a labelled 
 4. **Next step.** The assistant's suggestions and the checks its files allow, the next
    measurement for a check, or the best setting at each noise level for a comparison.
 
-The last saved study id is kept in `localStorage`. A fresh visit to `/study/` or
+The last saved study id is kept in `localStorage`. A fresh visit to `/study/app` or
 `#data` opens an empty draft; **Resume previous study** explicitly reopens saved work.
 Review, answer and next-step links still restore their saved study on reload.
 **New study** clears the current draft without deleting the saved server evidence.
@@ -56,7 +70,8 @@ Review, answer and next-step links still restore their saved study on reload.
 
 | File | What it does |
 | --- | --- |
-| `index.html`, `styles.css` | The page and its styles (dark, one accent) |
+| `app.html`, `styles.css` | The study page and its styles (dark, one accent) |
+| `index.html`, `home.css`, `home.mjs`, `home-data.mjs`, `logos/` | The front page, its layout and motion, the saved run it plays, and two service logos |
 | `app.mjs` | Files and question, the overview, routing, and the exact-check steps |
 | `general-app.mjs`, `general.mjs` | The assistant's steps, and which checks a table fits |
 | `compare-app.mjs`, `compare.mjs` | The electron-current steps, and the request, checks and wording behind them |
@@ -69,4 +84,4 @@ Review, answer and next-step links still restore their saved study on reload.
 | `fixtures/` | Files from a real run of the app on the sample, used by `study.test.mjs` |
 
 `node --test` in `apps/web` runs `study.test.mjs` with the other web tests; `serve.test.mjs` and
-`share-gateway.test.mjs` cover the `/study/` route.
+`share-gateway.test.mjs` cover the `/study/` and `/study/app` routes.
