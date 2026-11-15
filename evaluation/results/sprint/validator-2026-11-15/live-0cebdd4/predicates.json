@@ -1,0 +1,53 @@
+{
+  "schema": "validator-predicates.v1",
+  "tested_commit": "0cebdd41ba2b9ab357fded27daa9319bcc748388",
+  "sources": {
+    "record": "record.json (harness; final snapshot taken while request 4 was in flight)",
+    "readback": "retained-store-readback.json (settled state, read-only from the retained isolated store)",
+    "independent": "independent-witness-check.txt (60-digit recomputation outside the application)"
+  },
+  "predicates": {
+    "L1": {
+      "status": "passed",
+      "source": "record",
+      "evidence": "4 attempts, provider gemini, model gemini-3.5-flash-lite, execution_mode live; deepagents execution_mode live; the responses drove write_todos, prepare_scientific_proposal, run_scientific_operation and publish_research_report"
+    },
+    "L2": {
+      "status": "passed",
+      "source": "record",
+      "evidence": "consent saved 06:06:13.055Z through the browser; zero attempts before it (harness assertion); first attempt 06:06:13.758Z; every attempt carries the consent id"
+    },
+    "L3": {
+      "status": "passed",
+      "source": "record",
+      "evidence": "first advance ended waiting_review with a pending plan review and no child; Approve disabled until the scope checkbox"
+    },
+    "L4": {
+      "status": "passed",
+      "source": "readback + independent",
+      "evidence": "approved child run completed: certified_counterexample; native artifact sha256 872045c10d8451148668c870c847ef97a892a0d98635cfab426ed5860b12ab5b, 57,700 bytes, origin bound to approval_21270601c5a346fd933e53b8bbc4f7fc; application native replay: integrity passed, replay passed, verification valid, binding matches. Engine version is recorded only inside the native file, which was not retained."
+    },
+    "L5": {
+      "status": "passed",
+      "source": "record events + readback",
+      "evidence": "evidence_observed after child_linked, then publish_research_report assembled a canonical report snapshot; commentary validated and bound to the evidence id; next_action stop. The commentary is minimal and the agent did not propose the next measurement itself."
+    },
+    "L6": {
+      "status": "not_exercised_live",
+      "source": "offline",
+      "evidence": "commentary was validated, so the failure path did not occur live; offline O4 tests passed on this commit"
+    },
+    "L7": {
+      "status": "incomplete",
+      "source": "record",
+      "evidence": "reload kept the same workspace and session, state completed, revision and report list unchanged. The report-button sub-check was mis-specified (button sits on the hidden Next page). The validator's fresh replay of this run's downloaded native file was NOT RUN: the harness captured before the report existed and the run's blob directory was deleted."
+    },
+    "L8": {
+      "status": "passed",
+      "source": "record + readback",
+      "evidence": "4 physical requests within a grant of 8 (sprint maximum 8); all four attempts settled completed; retry_policy none and one request per attempt; accounting valid; ledger 15 -> 19 actual, 28 -> 36 effective grants"
+    }
+  },
+  "live_workflow_passed_all_predicates": false,
+  "summary": "The live workflow completed on the exact candidate (L1-L5, L8 passed). L6 was not exercised live and L7 is incomplete, so this is not a fully qualified autonomous release."
+}

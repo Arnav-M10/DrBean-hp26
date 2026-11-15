@@ -1,0 +1,658 @@
+{
+  "schema_version": "c-sprint-live-run.v1",
+  "lane": "live_gemini",
+  "case": "baseline",
+  "ui": "web",
+  "qualification_extension": "validator-sprint-2026-11-15",
+  "harness_commit": "0cebdd41ba2b9ab357fded27daa9319bcc748388",
+  "tested_commit": "0cebdd41ba2b9ab357fded27daa9319bcc748388",
+  "application_files_match_tested_commit": true,
+  "harness_overlay": [
+    " M evaluation/live/live_research_browser.mjs",
+    " M evaluation/live/operator_grant.py"
+  ],
+  "application_tree": "differs from origin/main: 3 files",
+  "grant": 8,
+  "started_at": "2026-11-15T06:06:09.929Z",
+  "checks": [
+    {
+      "id": "server-configured-for-live-free-tier-coordination",
+      "detail": "model gemini-3.5-flash-lite, retry undefined"
+    },
+    {
+      "id": "live-session-created-from-the-browser-with-zero-default-allocation",
+      "detail": "research_session_42bdbe0e8c034613b7aee6a918a38d4c"
+    },
+    {
+      "id": "consent-recorded-through-the-browser",
+      "detail": ""
+    },
+    {
+      "id": "operator-granted-explicit-allocation",
+      "detail": "8 requests; sprint total 36/36"
+    },
+    {
+      "id": "live-plan-stops-for-approval-with-no-child",
+      "detail": ""
+    }
+  ],
+  "observations": {
+    "capabilities": {
+      "deepagents": {
+        "execution_mode": "live",
+        "dispatch_enabled": true,
+        "unavailable_reason": null,
+        "session_limits": {
+          "logical_turns": 16,
+          "tool_calls": 24,
+          "child_count": 4
+        }
+      },
+      "gemini": {
+        "model": "gemini-3.5-flash-lite",
+        "execution_mode": "live",
+        "dispatch_enabled": true,
+        "billing_verified": false
+      }
+    },
+    "consent": {
+      "at": "2026-11-15T06:06:13.055Z",
+      "provider_consent_required": false
+    },
+    "grant": {
+      "granted": 8,
+      "sprint_granted_total": 36,
+      "ceiling": 36,
+      "qualification_extension": "validator-sprint-2026-11-15",
+      "allocation_record": "research_provider_allocation_3bb3001bf0d54d58b67c6d0fa8ec6b9d"
+    },
+    "after_first_advance": {
+      "state": "waiting_review",
+      "pending_review": "plan",
+      "error_code": null,
+      "usage": {
+        "logical_turns": 2,
+        "tool_calls": 2,
+        "child_count": 0,
+        "physical_calls": 2
+      }
+    },
+    "final": {
+      "state": "running",
+      "pending_review": null,
+      "error_code": null,
+      "usage": {
+        "logical_turns": 4,
+        "tool_calls": 3,
+        "child_count": 1,
+        "physical_calls": 4
+      },
+      "provider_allocation": {
+        "physical_requests": 8,
+        "input_tokens": 64000,
+        "output_tokens": 4096
+      },
+      "children": [
+        {
+          "id": "run_4c03068c378e4fd3ac61eb42d79960bb",
+          "kind": "run",
+          "state": "completed",
+          "scientific_reservations": 1
+        }
+      ],
+      "reports": [],
+      "plan_steps": [
+        {
+          "title": "Write plan and inspect dataset rows.",
+          "status": "pending"
+        },
+        {
+          "title": "Prepare scientific proposal for investigation/design.",
+          "status": "pending"
+        },
+        {
+          "title": "Publish research report with required text.",
+          "status": "in_progress"
+        }
+      ]
+    },
+    "attempts": [
+      {
+        "id": "404f110f-f572-4bb9-ab61-a1a65d8f4482",
+        "workspace_id": "ws_d468d9bf2105427c966faa7131b76654",
+        "operation_id": "op_8a31d8249b224e6f9877246c02c3ed32",
+        "metadata": {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "operation": "agent",
+          "execution_mode": "live",
+          "sdk_version": "3.3.0",
+          "adapter_version": "gemini-chat-gateway.v1",
+          "schema_version": "gemini-chat.v1",
+          "prompt_sha256": "fb83e35c1fab3a5f484d910a1ce854a049b335f824152c417b3d68b46534df01",
+          "retry_policy": "none",
+          "max_requests": 1,
+          "reserved_input_tokens": 9120,
+          "reserved_output_tokens": 512,
+          "external_provider_calls": 0,
+          "timeout_seconds": 30,
+          "context": {
+            "actor_id": "browser_684daa52162b5a553774b147def25512959cf416bdff8dd4",
+            "workspace_id": "ws_d468d9bf2105427c966faa7131b76654",
+            "operation_id": "op_8a31d8249b224e6f9877246c02c3ed32",
+            "research_session_id": "research_session_42bdbe0e8c034613b7aee6a918a38d4c",
+            "action_id": "research_action_a408a12d576d4cb788c3df71b75b86d6",
+            "consent_id": "research_provider_consent_053d9a9191a841bfaf7c884672c2c185",
+            "model": "gemini-3.5-flash-lite",
+            "input_digest": "2c49d43bfdb0a5cb281c376100e12edd910f0b43f1a447150699971ccb4c4b3c",
+            "context_digest": "1cbe1e31177ebc4c72309c4325e45da280c6afb1b1e0e546042c53dac20ec5f0",
+            "source_digests": []
+          }
+        },
+        "state": "completed",
+        "response_metadata": {
+          "status": "validated",
+          "usage": {
+            "input_tokens": 2365,
+            "output_tokens": 70,
+            "total_tokens": 2435,
+            "thought_tokens": null
+          },
+          "simulated_usage": null,
+          "provider_request_id": "1kv5aqyBAsChxdIPqZOd6AU",
+          "observed_model_version": "gemini-3.5-flash-lite",
+          "finished_at": "2026-11-15T06:06:14.758531Z",
+          "duration_ms": 999,
+          "external_provider_calls": 1
+        },
+        "created_at": "2026-11-15T06:06:13.758Z",
+        "finished_at": "2026-11-15T06:06:14.759Z"
+      },
+      {
+        "id": "219068c2-fb8e-4bbf-be28-0c8778127480",
+        "workspace_id": "ws_d468d9bf2105427c966faa7131b76654",
+        "operation_id": "op_8a31d8249b224e6f9877246c02c3ed32",
+        "metadata": {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "operation": "agent",
+          "execution_mode": "live",
+          "sdk_version": "3.3.0",
+          "adapter_version": "gemini-chat-gateway.v1",
+          "schema_version": "gemini-chat.v1",
+          "prompt_sha256": "69990d9351989bfe445346241e95c854a6c2c74bfcb9abf7106b16ee5bed88d8",
+          "retry_policy": "none",
+          "max_requests": 1,
+          "reserved_input_tokens": 10321,
+          "reserved_output_tokens": 512,
+          "external_provider_calls": 0,
+          "timeout_seconds": 30,
+          "context": {
+            "actor_id": "browser_684daa52162b5a553774b147def25512959cf416bdff8dd4",
+            "workspace_id": "ws_d468d9bf2105427c966faa7131b76654",
+            "operation_id": "op_8a31d8249b224e6f9877246c02c3ed32",
+            "research_session_id": "research_session_42bdbe0e8c034613b7aee6a918a38d4c",
+            "action_id": "research_action_a408a12d576d4cb788c3df71b75b86d6",
+            "consent_id": "research_provider_consent_053d9a9191a841bfaf7c884672c2c185",
+            "model": "gemini-3.5-flash-lite",
+            "input_digest": "2c49d43bfdb0a5cb281c376100e12edd910f0b43f1a447150699971ccb4c4b3c",
+            "context_digest": "1cbe1e31177ebc4c72309c4325e45da280c6afb1b1e0e546042c53dac20ec5f0",
+            "source_digests": []
+          }
+        },
+        "state": "completed",
+        "response_metadata": {
+          "status": "validated",
+          "usage": {
+            "input_tokens": 2555,
+            "output_tokens": 59,
+            "total_tokens": 2614,
+            "thought_tokens": null
+          },
+          "simulated_usage": null,
+          "provider_request_id": "1kv5aqaTOpnk5NoP7JKcqQ0",
+          "observed_model_version": "gemini-3.5-flash-lite",
+          "finished_at": "2026-11-15T06:06:15.470063Z",
+          "duration_ms": 678,
+          "external_provider_calls": 1
+        },
+        "created_at": "2026-11-15T06:06:14.790Z",
+        "finished_at": "2026-11-15T06:06:15.470Z"
+      },
+      {
+        "id": "97d52371-73c9-4567-af79-b92c619d55b2",
+        "workspace_id": "ws_d468d9bf2105427c966faa7131b76654",
+        "operation_id": "op_20455cfaa21c4cc7acb50624b77b96a3",
+        "metadata": {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "operation": "agent",
+          "execution_mode": "live",
+          "sdk_version": "3.3.0",
+          "adapter_version": "gemini-chat-gateway.v1",
+          "schema_version": "gemini-chat.v1",
+          "prompt_sha256": "a08068d83830b923f1d73d5588fba659de44295e4e0eb371ecd1adb5eb7f901e",
+          "retry_policy": "none",
+          "max_requests": 1,
+          "reserved_input_tokens": 10298,
+          "reserved_output_tokens": 512,
+          "external_provider_calls": 0,
+          "timeout_seconds": 30,
+          "context": {
+            "actor_id": "browser_684daa52162b5a553774b147def25512959cf416bdff8dd4",
+            "workspace_id": "ws_d468d9bf2105427c966faa7131b76654",
+            "operation_id": "op_20455cfaa21c4cc7acb50624b77b96a3",
+            "research_session_id": "research_session_42bdbe0e8c034613b7aee6a918a38d4c",
+            "action_id": "research_action_e459def5cfce4e5491a71b7813266f3f",
+            "consent_id": "research_provider_consent_053d9a9191a841bfaf7c884672c2c185",
+            "model": "gemini-3.5-flash-lite",
+            "input_digest": "2c49d43bfdb0a5cb281c376100e12edd910f0b43f1a447150699971ccb4c4b3c",
+            "context_digest": "1cbe1e31177ebc4c72309c4325e45da280c6afb1b1e0e546042c53dac20ec5f0",
+            "source_digests": []
+          }
+        },
+        "state": "completed",
+        "response_metadata": {
+          "status": "validated",
+          "usage": {
+            "input_tokens": 2716,
+            "output_tokens": 214,
+            "total_tokens": 2930,
+            "thought_tokens": null
+          },
+          "simulated_usage": null,
+          "provider_request_id": "2Ev5atmgMs-LytMP2vuBsQM",
+          "observed_model_version": "gemini-3.5-flash-lite",
+          "finished_at": "2026-11-15T06:06:17.532086Z",
+          "duration_ms": 856,
+          "external_provider_calls": 1
+        },
+        "created_at": "2026-11-15T06:06:16.674Z",
+        "finished_at": "2026-11-15T06:06:17.532Z"
+      },
+      {
+        "id": "57f55abe-d05d-4d91-a80f-52ec314d9c8a",
+        "workspace_id": "ws_d468d9bf2105427c966faa7131b76654",
+        "operation_id": "op_20455cfaa21c4cc7acb50624b77b96a3",
+        "metadata": {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "operation": "agent",
+          "execution_mode": "live",
+          "sdk_version": "3.3.0",
+          "adapter_version": "gemini-chat-gateway.v1",
+          "schema_version": "gemini-chat.v1",
+          "prompt_sha256": "ceeca05b6aa17a89fac0fce5d028dd26da2d261ef857ab0d63331e22f792a939",
+          "retry_policy": "none",
+          "max_requests": 1,
+          "reserved_input_tokens": 13503,
+          "reserved_output_tokens": 512,
+          "external_provider_calls": 0,
+          "timeout_seconds": 30,
+          "context": {
+            "actor_id": "browser_684daa52162b5a553774b147def25512959cf416bdff8dd4",
+            "workspace_id": "ws_d468d9bf2105427c966faa7131b76654",
+            "operation_id": "op_20455cfaa21c4cc7acb50624b77b96a3",
+            "research_session_id": "research_session_42bdbe0e8c034613b7aee6a918a38d4c",
+            "action_id": "research_action_e459def5cfce4e5491a71b7813266f3f",
+            "consent_id": "research_provider_consent_053d9a9191a841bfaf7c884672c2c185",
+            "model": "gemini-3.5-flash-lite",
+            "input_digest": "2c49d43bfdb0a5cb281c376100e12edd910f0b43f1a447150699971ccb4c4b3c",
+            "context_digest": "1cbe1e31177ebc4c72309c4325e45da280c6afb1b1e0e546042c53dac20ec5f0",
+            "source_digests": []
+          }
+        },
+        "state": "reserved",
+        "response_metadata": null,
+        "created_at": "2026-11-15T06:06:18.708Z",
+        "finished_at": null
+      }
+    ],
+    "provider_usage": {
+      "scope": "research_session",
+      "physical_requests": 4,
+      "reserved_input_tokens": 43242,
+      "reserved_output_tokens": 2048,
+      "accounted_input_tokens": 43242,
+      "accounted_output_tokens": 2048,
+      "reported_input_tokens": 7636,
+      "reported_output_tokens": 343,
+      "reported_thought_tokens": null,
+      "reported_total_tokens": 7979,
+      "reported_attempts": 3,
+      "unresolved_attempts": 1,
+      "accounting_valid": true,
+      "remaining": {
+        "physical_requests": 4,
+        "input_tokens": 20758,
+        "output_tokens": 2048
+      }
+    },
+    "model_tool_calls": {
+      "turns": [
+        {
+          "role": "model",
+          "tool_calls": [
+            {
+              "name": "write_todos",
+              "args": {
+                "todos": [
+                  {
+                    "content": "Write plan and inspect dataset rows.",
+                    "status": "completed"
+                  },
+                  {
+                    "content": "Prepare scientific proposal for investigation/design.",
+                    "status": "completed"
+                  },
+                  {
+                    "status": "in_progress",
+                    "content": "Publish research report with required text."
+                  }
+                ]
+              }
+            }
+          ],
+          "text": ""
+        },
+        {
+          "role": "tool",
+          "name": "write_todos",
+          "status": "success",
+          "content_head": "Updated todo list to [{'content': 'Write plan and inspect dataset rows.', 'status': 'completed'}, {'content': 'Prepare scientific proposal for investigation/design.', 'status': 'completed'}, {'content': 'Publish research report with required text.', 'status': 'in_progress'}]"
+        },
+        {
+          "role": "model",
+          "tool_calls": [
+            {
+              "name": "prepare_scientific_proposal",
+              "args": {
+                "reference_ids": [
+                  "dataset_f229bda63b09477b87d3c28f94f574b8"
+                ],
+                "kind": "investigation"
+              }
+            }
+          ],
+          "text": ""
+        },
+        {
+          "role": "tool",
+          "name": "prepare_scientific_proposal",
+          "status": "success",
+          "content_head": "{\"accepted\": false, \"proposal_id\": \"plan_1cc147a03fe747fc91dbabdf43795027\", \"proposal_digest\": \"f480f29bb52ce06b923490df410a04e23f836d52940d013ac7a999a7a6fcf221\", \"review_id\": \"plan_1cc147a03fe747fc91dbabdf43795027\", \"review_digest\": \"f480f29bb52ce06b923490df410a04e23f836d52940d013ac7a999a7a6fcf221\", \"review_decision\": \"approved\", \"next_tool\": \"run_scientific_operation\"}"
+        },
+        {
+          "role": "model",
+          "tool_calls": [
+            {
+              "name": "run_scientific_operation",
+              "args": {
+                "review_digest": "f480f29bb52ce06b923490df410a04e23f836d52940d013ac7a999a7a6fcf221",
+                "review_id": "plan_1cc147a03fe747fc91dbabdf43795027",
+                "proposal_digest": "f480f29bb52ce06b923490df410a04e23f836d52940d013ac7a999a7a6fcf221",
+                "proposal_id": "plan_1cc147a03fe747fc91dbabdf43795027"
+              }
+            }
+          ],
+          "text": ""
+        },
+        {
+          "role": "tool",
+          "name": "run_scientific_operation",
+          "status": "success",
+          "content_head": "{\"review_id\": \"plan_1cc147a03fe747fc91dbabdf43795027\", \"kind\": \"investigation\", \"approval_id\": \"approval_21270601c5a346fd933e53b8bbc4f7fc\", \"decision\": \"approve\", \"job_id\": \"run_4c03068c378e4fd3ac61eb42d79960bb\", \"state\": \"completed\", \"evidence_ids\": [\"evidence_63ed4ff467ed4667aabb1519deb7038d\"], \"result_id\": \"run_summary_0ca50004afd94e92b28c54a54fcb6643\", \"proposal_id\": \"plan_1cc147a03fe747fc91dbabdf43795027\", \"canonical_evidence\": [{\"id\": \"evidence_63ed4ff467ed4667aabb1519deb7038d\", \"evidence_digest\": \"cd1c91442d6c2b9bd2261982d52bb939ace3866ce87ffdfa7237ed864d4d6234\", \"fact_projection\": \"age"
+        },
+        {
+          "role": "model",
+          "tool_calls": [
+            {
+              "name": "publish_research_report",
+              "args": {
+                "next_action": "stop",
+                "text": "The evidence has a conditional scope.",
+                "evidence_ids": [
+                  "evidence_63ed4ff467ed4667aabb1519deb7038d"
+                ]
+              }
+            }
+          ],
+          "text": ""
+        },
+        {
+          "role": "tool",
+          "name": "publish_research_report",
+          "status": "success",
+          "content_head": "{\"id\": \"report_b1dd4ac172cd4beda84ab1ad94d135db\", \"report_id\": \"report_b1dd4ac172cd4beda84ab1ad94d135db\", \"report_digest\": \"6f0c86c05aa38eb6e7cdb0b214554c580eaa5d730dda37ac1b3db2ea7419f820\", \"evidence_ids\": [\"evidence_63ed4ff467ed4667aabb1519deb7038d\"], \"agent_commentary\": {\"authorship\": \"model_commentary\", \"clarification_fields\": [], \"fact_ids\": [\"evidence_63ed4ff467ed4667aabb1519deb7038d\"], \"next_action\": \"stop\", \"scientific_authority\": false, \"text\": \"The evidence has a conditional scope.\"}, \"commentary_persisted\": true, \"deterministic_summary_available\": true, \"scope\": \"Canonical evidence "
+        }
+      ]
+    },
+    "events": [
+      {
+        "sequence": 0,
+        "at": null,
+        "type": "action_started",
+        "summary": "A bounded research action was admitted.",
+        "references": [
+          "research_action_a408a12d576d4cb788c3df71b75b86d6"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 1,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "Authorized scoped tool: write_todos",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 2,
+        "at": null,
+        "type": "plan_updated",
+        "summary": "The maintained research plan was revised.",
+        "references": [
+          "research_plan_revision_9d19136f71994d178fcd52689ed0d5d8"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 3,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "tool_requested: write_todos",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 4,
+        "at": null,
+        "type": "tool_finished",
+        "summary": "tool_finished: write_todos",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 5,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "Authorized scoped tool: prepare_scientific_proposal",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 6,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "tool_requested: prepare_scientific_proposal",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 7,
+        "at": null,
+        "type": "review_required",
+        "summary": "Human review is required for the exact prepared scope.",
+        "references": [
+          "plan_1cc147a03fe747fc91dbabdf43795027"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 8,
+        "at": null,
+        "type": "review_required",
+        "summary": "review_required",
+        "references": [
+          "plan_1cc147a03fe747fc91dbabdf43795027"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 9,
+        "at": null,
+        "type": "decision_recorded",
+        "summary": "The authenticated person recorded a decision.",
+        "references": [
+          "research_decision_6dae4c4ec800443691a6b991a759b392"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 10,
+        "at": null,
+        "type": "resumed",
+        "summary": "A bounded research action was admitted.",
+        "references": [
+          "research_action_e459def5cfce4e5491a71b7813266f3f"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 11,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "tool_requested: prepare_scientific_proposal",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 12,
+        "at": null,
+        "type": "tool_finished",
+        "summary": "tool_finished: prepare_scientific_proposal",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 13,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "Authorized scoped tool: run_scientific_operation",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 14,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "tool_requested: run_scientific_operation",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 15,
+        "at": null,
+        "type": "child_linked",
+        "summary": "The exact approved scientific child was reserved.",
+        "references": [
+          "plan_1cc147a03fe747fc91dbabdf43795027",
+          "run_4c03068c378e4fd3ac61eb42d79960bb"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 16,
+        "at": null,
+        "type": "evidence_observed",
+        "summary": "Actual scientific evidence was read; its verification axes remain unchanged.",
+        "references": [
+          "evidence_63ed4ff467ed4667aabb1519deb7038d"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 17,
+        "at": null,
+        "type": "tool_finished",
+        "summary": "tool_finished: run_scientific_operation",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 18,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "Authorized scoped tool: publish_research_report",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 19,
+        "at": null,
+        "type": "tool_requested",
+        "summary": "tool_requested: publish_research_report",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 20,
+        "at": null,
+        "type": "evidence_observed",
+        "summary": "Actual scientific evidence was read; its verification axes remain unchanged.",
+        "references": [
+          "evidence_63ed4ff467ed4667aabb1519deb7038d"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 21,
+        "at": null,
+        "type": "tool_finished",
+        "summary": "A canonical report snapshot was assembled from retained evidence.",
+        "references": [
+          "report_b1dd4ac172cd4beda84ab1ad94d135db"
+        ],
+        "execution_mode": null
+      },
+      {
+        "sequence": 22,
+        "at": null,
+        "type": "tool_finished",
+        "summary": "tool_finished: publish_research_report",
+        "references": [],
+        "execution_mode": null
+      },
+      {
+        "sequence": 23,
+        "at": null,
+        "type": "terminal",
+        "summary": "Research action ended: completed",
+        "references": [],
+        "execution_mode": null
+      }
+    ],
+    "reload": {
+      "same_workspace": true,
+      "same_session": true,
+      "state": "completed",
+      "revision_unchanged": true,
+      "reports_unchanged": true,
+      "report_download_offered": false,
+      "passed": false
+    }
+  },
+  "physical_requests": 4,
+  "status": "completed",
+  "finished_at": "2026-11-15T06:06:20.023Z"
+}

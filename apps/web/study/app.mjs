@@ -669,7 +669,8 @@ function renderOverview() {
     items.unshift(`<li><div><h3>Test the paper’s numerical lemma</h3><p>Proposition 3.1, page 3. Review five synthetic readings and the claimed rate interval, then run the ordinary Counterdex investigation. Prepared inputs; the result is computed fresh.</p></div><button type="button" class="primary" data-action="paper-check"${checkOff.concentration ? ' disabled' : ''}>Check the proof’s premise</button></li>`)
   }
   const reader = gen.limits().analysisMode === 'controlled' ? 'The local test responder' : 'Gemini'
-  items.push(`<li${aiBlock ? ' class="off"' : ''}><div><h3>Ask the assistant</h3><p>${escapeHTML(aiBlock ?? `${reader} reads ${sources.filter(s => s.asset).length === 1 ? 'the file' : 'all the files'} and answers your question with quotes from them. The answer is not checked.`)}</p></div>
+  const one = sources.filter(s => s.asset).length === 1
+  items.push(`<li${aiBlock ? ' class="off"' : ''}><div><h3>Ask the assistant</h3><p>${escapeHTML(aiBlock ?? `${reader} reads ${one ? 'the file' : 'all the files'} and answers your question with quotes from ${one ? 'it' : 'them'}. The answer is not checked.`)}</p></div>
     <button type="button" class="${checks.length ? 'secondary' : 'primary'}" data-action="ask"${aiBlock ? ' disabled' : ''}>Ask the assistant</button></li>`)
   $('can-do').innerHTML = items.join('')
   const loose = found.flatMap(s => s.found.filter(f => !f.checks.length).map(f => ({ s, f })))

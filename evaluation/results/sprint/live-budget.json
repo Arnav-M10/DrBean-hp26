@@ -66,6 +66,16 @@
       "input_tokens": 64000,
       "output_tokens": 3072,
       "qualification_extension": "user-final-handoff-2026-11-14"
+    },
+    {
+      "at": "2026-11-15T06:06:13Z",
+      "purpose": "baseline-0cebdd41ba2b9ab357fded27daa9319bcc748388",
+      "research_session_id": "research_session_42bdbe0e8c034613b7aee6a918a38d4c",
+      "allocation_record": "research_provider_allocation_3bb3001bf0d54d58b67c6d0fa8ec6b9d",
+      "physical_requests": 8,
+      "input_tokens": 64000,
+      "output_tokens": 4096,
+      "qualification_extension": "validator-sprint-2026-11-15"
     }
   ],
   "released": [
@@ -89,10 +99,11 @@
     "research_session_7233afd76ccb49a98c99017392f0b6d6": 3,
     "research_session_615696b8c14f4bcc8ebdbab2f0c221b2": 2,
     "research_session_bc8916cb6e8d4937b51c3e29193e3b4a": 4,
-    "research_session_b0d69692f4184ce7998a1314b927ae21": 1
+    "research_session_b0d69692f4184ce7998a1314b927ae21": 1,
+    "research_session_42bdbe0e8c034613b7aee6a918a38d4c": 4
   },
-  "sprint_physical_requests_total": 15,
-  "note": "Grants bound dispatch; failed and uncertain attempts count. Historical failed receipts and unused grants remain retained. Live traffic stopped after the final authorized run: 15 actual requests, 28 effective grants. No further live run is authorized.",
+  "sprint_physical_requests_total": 19,
+  "note": "Grants bound dispatch; failed and uncertain attempts count. Historical failed receipts and unused grants remain retained. After the validator sprint run (2026-11-15): 19 actual requests, 36 effective grants. No further live run is authorized.",
   "qualification_extensions": [
     {
       "id": "user-followthrough-2026-11-14",
@@ -124,6 +135,16 @@
       "actor": "root",
       "authorization": "User replied 'idk do whatever is best in ur opinion' to one final live qualification of at most 6 requests, qualification ceiling 28, and merge only if it passes.",
       "scope": "One final qualification of the structural review handoff. Preserve all fourteen actual attempts and twenty-two effective grants. No production cap change, refund or automatic retry; stop live testing if this run fails."
+    },
+    {
+      "id": "validator-sprint-2026-11-15",
+      "previous_ceiling": 28,
+      "ceiling": 36,
+      "max_new_requests": 8,
+      "max_runs": 1,
+      "actor": "claude-independent-validator",
+      "authorization": "Sprint brief 2026-11-15 (validator role): 'You are the ONLY owner allowed to make live Gemini calls in this sprint. Maximum: EIGHT physical requests TOTAL across all live attempts, including failed calls.' $0 free tier only.",
+      "scope": "One live workflow on Codex 3's exact combined commit, run by the independent validator with C's harness. One grant of at most 8; failed and uncertain attempts count; no automatic retry, refund, release or replenishment. All fifteen earlier physical attempts and twenty-eight effective grants stay recorded. Existing server-side free-tier configuration only; no billing or paid model."
     }
   ],
   "qualification_followthrough": {
@@ -165,5 +186,18 @@
     "remaining_extension_requests_released": false,
     "next_live_run_authorized": false,
     "note": "Final authorized run stopped after the first malformed planning response. No retry, fourth run, refund or replenishment. Raw rejected arguments were not retained; the failing field and value are unknown. PR remains unmerged."
+  },
+  "qualification_validator_sprint": {
+    "operator": "claude-independent-validator",
+    "tested_commit": "0cebdd41ba2b9ab357fded27daa9319bcc748388",
+    "receipt": "validator-2026-11-15/live-0cebdd4/record.json",
+    "settled_state_readback": "validator-2026-11-15/live-0cebdd4/retained-store-readback.json",
+    "status": "completed",
+    "code": null,
+    "physical_requests": 4,
+    "total_physical_requests_after_run": 19,
+    "remaining_extension_requests_released": false,
+    "next_live_run_authorized": false,
+    "note": "One run, no retry. The session completed: approved Counterdex child (certified_counterexample, application native replay passed), validated commentary, all four attempts terminal. The validator harness captured its final snapshot while the fourth request was in flight, so it did not download the report or native file; the settled state was read back from the retained isolated store. The four unused requests in this grant are not reusable (single-run policy)."
   }
 }
