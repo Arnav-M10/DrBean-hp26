@@ -1,5 +1,11 @@
 # Current scientific integration review
 
+The current review of main `2d2993d`, backend `42f92b1` and product `31a8ed3`,
+tested after integration at `5507519`, is
+[Integrated source-to-science qualification](INTEGRATED_SOURCE_LOOP_REVIEW.md).
+The evidence below is retained as the historical backend-integration review;
+its checks and browser handoffs are not silently relabelled as current results.
+
 Owner 1, November 14, 2026. Counterdex **0.3.0**, prepared CPython **3.11.17**,
 Darwin arm64; backend CPython **3.13.18**. Scientific implementation identity:
 `90b42ae505c9a7c25103331f447edc2e15026d291374f6beefd0ef89c23b7bf8`.
