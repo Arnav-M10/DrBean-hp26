@@ -82,7 +82,7 @@ ENGINE_PYTHON=/opt/homebrew/bin/python3.11
 "$ENGINE_PYTHON" packages/groundwork_adapter/scripts/generate_decision_fixtures.py
 ```
 
-The generator executes seven actual bridge subprocesses and seven separate offline replay subprocesses, plus three exact fixed-pair regression controls. It aborts if source identity changes during generation. After any scientific source edit, regenerate these current examples with the final source version; never relabel archived bytes. [manifest.json](../fixtures/decision/manifest.json) records the source manifest, qualified runtime, actual attempt counts, raw artifact sizes/hashes and observed operation/replay latencies. Timings are local diagnostics, not performance guarantees.
+The generator executes eight actual bridge subprocesses and eight separate offline replay subprocesses, plus three exact fixed-pair regression controls. It aborts if source identity changes during generation. After any scientific source edit, regenerate these current examples with the final source version; never relabel archived bytes. [manifest.json](../fixtures/decision/manifest.json) records the source manifest, qualified runtime, actual attempt counts, raw artifact sizes/hashes and observed operation/replay latencies. Timings are local diagnostics, not performance guarantees.
 
 Integration example 1 runs the complete historical request through the prepared stdin/stdout bridge:
 
@@ -113,15 +113,15 @@ PYTHONPATH=packages/groundwork_adapter "$ENGINE_PYTHON" -m counterdex.bridge \
 
 Every operation has `.request.json`, `.response.json`, `.native.json`, `.anchors.json`, `.replay-request.json`, `.replay.json` and `.display.json` files. Native artifacts are exact bytes without an appended newline. Application/native identities are different, explicitly retained anchors. They are content bindings, not signatures or proof of authorization.
 
-Validate the seven application requests and results with the authoritative DTOs in a prepared API environment. On this machine the isolated contract-check environment is `/tmp/counterdex-contracts-check/bin/python`; deployment can use its prepared API interpreter:
+Validate the eight application requests and results with the authoritative DTOs in the prepared API environment:
 
 ```sh
-/tmp/counterdex-contracts-check/bin/python \
+.venv/bin/python \
   packages/groundwork_adapter/scripts/check_application_schema.py \
   --fixtures packages/groundwork_adapter/fixtures/decision
 ```
 
-The observed schema check passes 7 requests and 7 results. The fixed-pair controls use native engine input shapes and can be replayed with:
+The fixture set contains 8 requests and 8 results for this schema check. The fixed-pair controls use native engine input shapes and can be replayed with:
 
 ```sh
 PYTHONPATH=packages/groundwork_adapter "$ENGINE_PYTHON" -m counterdex replay \

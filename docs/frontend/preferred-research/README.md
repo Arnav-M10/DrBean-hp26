@@ -1,5 +1,7 @@
 # Preferred research workspace handoff
 
+This is a historical handoff for the named PR60/61 candidates. Its remaining-gate statements describe that checkpoint, not current merge status or the main study UI. See the [root README](../../../README.md#execution-and-evidence) for controlled/live scope and later retained qualification records.
+
 PR55 is merged at `a8765430c46989189b82c298c9c017dbf76dc27f`.
 PR61 owns the preferred browser journey; PR60 owns backend recovery/reports.
 The qualified manual UI at `/` and the numerical service implementation are unchanged.

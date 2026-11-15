@@ -1,7 +1,7 @@
 <h1 align="center">Dr. Bean</h1>
 
 <p align="center">
-  <strong>Scientific model comparison, counterexample discovery, and measurement design.</strong>
+  <strong>Find competing explanations. Decide what to measure next.</strong>
 </p>
 
 <p align="center">
@@ -19,19 +19,25 @@
   <a href="#contributing">Contributing</a>
 </p>
 
-Dr. Bean is a research assistant for examining what scientific data support and deciding what to measure next. It combines file analysis with **Google Gemini**, research coordination with **LangChain Deep Agents**, and deterministic scientific computation with **Counterdex**.
+Dr. Bean connects research papers and data to a practical scientific question: **could another explanation fit, and what measurement would distinguish it?** It combines file analysis with **Google Gemini**, research coordination with **LangChain Deep Agents**, and deterministic scientific computation with **Counterdex**.
 
-The main interface is the **study workspace** at `/study/`. Researchers bring files and a question, review the proposed analysis, inspect the answer, and choose a next step. Supported scientific checks retain the reviewed inputs, assumptions, computation, and evidence needed to inspect or replay a result.
+A convincing curve is only a starting point. For its supported concentration model, Dr. Bean can discover a competing parameter assignment, check that it satisfies every reviewed measurement bound, and retain the evidence for replay. Researchers can then compare follow-up measurements that distinguish two retained candidates.
+
+The main interface is the **study workspace** at `/study/` in a local checkout. Researchers bring files and a question, review the proposed analysis, inspect the answer, and choose a next step. Supported scientific checks retain the reviewed inputs, assumptions, computation, and evidence needed to inspect or replay a result.
+
+The [hosted prototype](https://drbean.study/) opens its study app at `/study/app`. Vercel serves the landing page and proxies the app to the development host; the API, worker, database, and provider key remain on that host. Availability depends on that host and its tunnel. The hosted frontend can differ from a fresh clone. See [deployment details](deploy/landing/README.md).
 
 <p align="center">
   <img src="docs/images/study-landing.png" alt="Dr. Bean landing page showing the research workflow and two concentration curves compatible with the same readings" width="100%">
 </p>
 
+The landing illustration shows a saved synthetic example, not a new computation.
+
 ## Workflows
 
 | Workflow | Input and method | Output |
 | --- | --- | --- |
-| **Research file analysis** | A question with PDFs, images, CSV, TSV, JSON, text, or Markdown; Gemini interprets selected material after consent. | Source-linked analysis, quotations checked against retained text, extracted tables, limitations, and suggested next steps. |
+| **Research file analysis** | A question with PDFs, images, CSV, TSV, JSON, text, or Markdown; Gemini interprets selected material after consent. | AI interpretation, source references, extracted tables, limitations, and suggested next steps. Quotes are checked for occurrence where a usable text layer exists; unmatched or uncheckable quotes are labelled. Values and interpretations still require review. |
 | **Parameter-claim investigation** | Reviewed time–concentration measurements, hard allowances, a supported model, and a claimed parameter interval. | Discovered candidates, exact compatibility checks, an outside witness when found, and replayable native evidence. |
 | **Next-measurement design** | Two retained candidates, feasible measurement times, and a reviewed future hard allowance. | A checked separation result for the fixed pair when supported, or an explicitly numerical or inconclusive result. |
 | **Numerical model comparison** | Reviewed synthetic electron-current observations and an idealized collector response. | Isotropic versus gyrotropic bi-Maxwellian fits, residuals, noise sensitivity, conditional Monte Carlo results, and candidate measurement settings. |
@@ -41,7 +47,7 @@ General file analysis can address questions across disciplines. Exact scientific
 ### Core capabilities
 
 - **Review before execution.** Scientific operations bind to the exact inputs and assumptions the researcher approved. Changed inputs require a new review.
-- **Evidence-dependent planning.** The Deep Agents coordinator maintains a plan, invokes scoped tools, reads returned scientific evidence, and proposes a next action.
+- **Evidence-dependent planning.** The Deep Agents coordinator maintains a plan, invokes scoped tools, reads returned scientific evidence, and proposes a next action. The main study UI uses its controlled offline policy; live coordination has separate implementation and qualification limits described below.
 - **Readable results.** Reports explain the question, finding, conditional meaning, uncertainty, and next step. Exact values and machine-readable records remain available.
 - **Persistent investigations.** Private workspaces retain sessions, approvals, events, reports, and scientific artifacts. Committed actions support reconciled checkpoint continuation.
 - **Reproducible evidence.** Exact-check packets retain rational inputs and separately supplied replay anchors. Numerical results retain their assumptions and provenance.
@@ -49,7 +55,7 @@ General file analysis can address questions across disciplines. Exact scientific
 
 ## Quick start
 
-**Requirements:** [uv](https://docs.astral.sh/uv/) and Node.js 20 or newer. The launcher prepares the backend on Python 3.12/3.13 and the exact checker on CPython 3.11.
+**Requirements:** macOS or Linux, `python3` for the launcher, [uv](https://docs.astral.sh/uv/), and Node.js 20 or newer. The launcher prepares the backend on Python 3.12/3.13 and the exact checker on CPython 3.11. CI uses Node.js 22.
 
 ```bash
 git clone https://github.com/Arnav-M10/DrBean-hp26.git
@@ -81,7 +87,7 @@ C(t)=A\left(e^{-k_e t}-e^{-k_a t}\right),
 \qquad A>0,\quad 0<k_e<k_a.
 $$
 
-For the synthetic example, ask whether the measurements force the elimination rate into the closed interval $k_e\in[0.10,0.17]\;\mathrm{h}^{-1}$. Review the measurements and assumptions, inspect the maintained research plan, and approve the proposed scientific operation.
+For the synthetic example, ask whether the measurements force the elimination rate into the closed interval $k_e\in[0.10,0.17]\;\mathrm{h}^{-1}$. Review the measurements, assumptions, and proposed scope, then approve the scientific operation.
 
 The example has compatible parameter assignments outside the claimed interval. A verified outside witness establishes that the reviewed assumptions do **not** force the claim; it does not identify the true physical parameters. A subsequent design can compare two retained candidates at separately reviewed measurement times.
 
@@ -98,7 +104,7 @@ The numerical workflow shows where fitted predictions differ and whether the dif
 The separate `counterdex-models` package provides bounded fitting, sensitivity analysis, seeded Monte Carlo, and finite-grid measurement ranking for registered models:
 
 ```bash
-python3.11 packages/counterdex_models/examples/demo.py
+.venv-engine/bin/python packages/counterdex_models/examples/demo.py
 ```
 
 This provider-free example compares single- and two-exponential models under different observation windows, noise assumptions, and detection thresholds. See the [package documentation](packages/counterdex_models/README.md) for request schemas and model registration.
@@ -111,7 +117,7 @@ flowchart TD
     Files --> Gemini[Gemini analysis with source references]
     UI --> Review[Reviewed scientific inputs]
     Gemini -->|Researcher reviews extracted values| Review
-    Review --> Agent[Deep Agents coordinator]
+    Review --> Agent[Deep Agents coordinator: controlled in study UI]
     Agent --> Approval[Scientific scope approval]
     Approval --> Exact[Counterdex investigation or pair design]
     Exact --> Evidence[Retained scientific evidence]
@@ -133,11 +139,15 @@ Counterdex constructs exact enclosures for selected parameter vectors in the sup
 | --- | --- |
 | **Controlled coordinator** | Deterministic offline model driving the actual graph, worker, and scientific tools. It makes no provider calls. |
 | **Live Gemini** | Configured server-side model calls with consent, admission, and shared accounting. Readiness and live qualification are separate facts. |
-| **Exact scientific check** | Compatibility of the named fixed vectors with the reviewed hard bounds, model, and claim. |
+| **Exact scientific check** | Checks named fixed vectors against the reviewed model and hard bounds, and determines whether each lies outside the claimed interval. |
 | **Numerical comparison** | Conditional numerical results for the registered models, supplied observations, and noise assumptions. |
 | **Native replay** | Fresh execution of the matching checker against retained bytes and independent expected identities. It is not a second proof system. |
 
-The server exposes current capabilities and qualification state. Historical tests and saved examples retain their original commit identities. General paper interpretation does not certify arbitrary mathematical proofs, and a bounded search that finds no counterexample does not prove a universal claim.
+The main study UI starts the **controlled coordinator**, including when Gemini file analysis is enabled. A live Gemini coordinator is implemented behind separate configuration, session consent, and operator allocation, but is not connected to that study workflow or qualified for end-to-end autonomous use. An [earlier live run](evaluation/results/sprint/combined-5a028f1.json) reached approved scientific execution and retained replayable evidence, then failed narration validation. The [later retained attempt at `17c7f7a`](evaluation/results/sprint/live-final-17c7f7a/qualification.json) failed tool-argument validation before scientific dispatch. These are recorded outcomes at those revisions, not fresh tests of every later commit.
+
+Strict offline qualification has passed on earlier named revisions, including [the macOS record at `c4d1ad6`](docs/release-evidence/offline-c4d1ad6-macos.json). Those results do not automatically qualify the current revision or live Gemini. The server reports configuration and readiness alongside static qualification labels; consult the commit-bound records for executed outcomes. Live file analysis is implemented, but the offline results and coordinator records do not establish its general extraction accuracy.
+
+General paper interpretation does not certify arbitrary mathematical proofs, and a bounded search that finds no counterexample does not prove a universal claim. The authored Riemann-paper example checks a synthetic two-rate numerical premise inside that paper; it does not check or disprove the Riemann hypothesis.
 
 ## Gemini configuration
 
@@ -148,7 +158,7 @@ cp scripts/dev/gemini.local.example.json var/gemini.local.json
 chmod 600 var/gemini.local.json
 ```
 
-Configure the server-side key and explicit opt-in, then restart the launcher. File analysis and autonomous coordination are distinct capabilities; live coordination also requires a consented session and an operator allocation. [Configuration instructions](docs/getting-started.md#configure-gemini) describe both paths.
+Configure the server-side key and explicit opt-in, then restart the launcher to enable Gemini file analysis. This does not change the study workspace's controlled coordinator. The separate live-coordination API requires matching server configuration, current session consent, and an operator allocation. [Configuration instructions](docs/getting-started.md#configure-gemini) describe both paths and the UI limitation.
 
 The free-tier flag records the operator's project declaration; it does not verify Google billing or guarantee a dollar-denominated cap. Shared accounting limits application requests, including failed or uncertain attempts, without automatic retries or model fallback.
 
@@ -157,11 +167,16 @@ The free-tier flag records the operator's project declaration; it does not verif
 Run setup before using the managed backend and engine environments. Routine checks are provider-free:
 
 ```bash
+export BEAN_COUNTERDEX_PYTHON="$PWD/.venv-engine/bin/python"
+export BEAN_COUNTERDEX_REPLAY_PYTHON="$PWD/.venv-engine/bin/python"
+export PATH="$PWD/.venv-engine/bin:$PATH"
+export PYTHONPATH="$PWD/packages/counterdex_models"
+
 uv run ruff check apps tests scripts
 uv run pytest -q tests --ignore=tests/integration
 .venv-engine/bin/python -m unittest discover -s packages/groundwork_adapter/tests
 .venv-engine/bin/python -m unittest discover -s packages/counterdex_models/tests
-node --test apps/web/*.test.mjs
+node --test apps/web/*.test.mjs apps/web/study/*.test.mjs
 node --test workspace-preview/tests/*.test.mjs
 ```
 
@@ -179,6 +194,7 @@ Some backend tests need the prepared engine interpreter. The [development instru
 | [`evaluation/`](evaluation/) | Independent checks, retained evidence, and qualification tooling. |
 | [`scripts/`](scripts/) | Setup, service management, sharing, and release checks. |
 | [`workspace-preview/`](workspace-preview/) | Additional connected research/comparison views and labelled static examples. |
+| [`deploy/landing/`](deploy/landing/) | Curated public landing-page snapshot and Vercel routing to the running development host. |
 
 ## Documentation
 
